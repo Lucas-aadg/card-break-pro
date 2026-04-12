@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Card Break Pro — Break Entry</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d14;
+      --card: #13131e;
+      --border: #2d2d3d;
+      --primary: #4f6ef7;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --yellow: #f59e0b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+    /* NAV */
+    nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand { font-size: 1.2rem; font-weight: 800; letter-spacing: 2px; }
+    .brand span { color: var(--primary); }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .breaker-badge {
+      background: rgba(79,110,247,0.15);
+      border: 1px solid rgba(79,110,247,0.3);
+      border-radius: 20px;
+      color: var(--primary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.3rem 0.8rem;
+    }
+    .btn-sm {
+      padding: 0.4rem 0.9rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-sm:hover { opacity: 0.8; }
+    .btn-signout { background: var(--border); color: var(--text); }
+
+    /* LAYOUT */
+    .main { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    @media (max-width: 680px) { .grid-2 { grid-template-columns: 1fr; } }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .grid-3 { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .panel-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+    }
+
+    /* SESSION INFO */
+    .session-grid { display: grid; grid-template-columns: 1fr 1.5fr auto; gap: 1rem; align-items: end; }
+    @media (max-width: 560px) { .session-grid { grid-template-columns: 1fr; } }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.35rem;
+    }
+    input, select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.6rem 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+    input[readonly] { color: var(--muted); cursor: default; }
+    .break-num-display {
+      background: var(--primary);
+      color: #fff;
+      border-radius: 7px;
+      font-size: 1.4rem;
+      font-weight: 800;
+      text-align: center;
+      padding: 0.5rem 1.2rem;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    /* PRODUCT TABLE */
+    .product-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .product-table th {
+      text-align: left;
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .product-table td { padding: 0.45rem 0.5rem; border-bottom: 1px solid rgba(45,45,61,0.5); vertical-align: middle; }
+    .product-table tr:last-child td { border-bottom: none; }
+    .product-table input[type="number"] { width: 70px; padding: 0.35rem 0.5rem; text-align: center; }
+    .stock-ok { color: var(--green); font-size: 0.8rem; }
+    .stock-low { color: var(--yellow); font-size: 0.8rem; }
+    .stock-out { color: var(--red); font-size: 0.8rem; }
+    .ext-cost { color: var(--text); font-weight: 600; font-size: 0.85rem; }
+
+    /* REVENUE INPUT */
+    .revenue-input-wrap { position: relative; }
+    .revenue-input-wrap span {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--green);
+      font-size: 1.5rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    .revenue-input-wrap input {
+      padding-left: 2.2rem;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--green);
+      border-color: rgba(34,197,94,0.4);
+      background: rgba(34,197,94,0.05);
+    }
+    .revenue-input-wrap input:focus { border-color: var(--green); }
+
+    /* RUNNING TOTAL PANEL */
+    .running-total-panel {
+      background: var(--card);
+      border: 2px solid var(--primary);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .running-total-panel .panel-title { color: var(--primary); }
+    .break-list { list-style: none; margin-bottom: 0.75rem; }
+    .break-list li {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      padding: 0.3rem 0;
+      border-bottom: 1px solid rgba(45,45,61,0.6);
+    }
+    .break-list li:last-child { border-bottom: none; }
+    .break-list li.live-preview {
+      color: var(--muted);
+      font-style: italic;
+    }
+    .break-list li.live-preview .preview-amount { color: var(--green); font-style: normal; font-weight: 600; }
+    .rt-divider { border: none; border-top: 2px solid var(--border); margin: 0.75rem 0; }
+    .stream-total-line {
+      display: flex;
+      justify-content: space-between;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+    .stream-total-line .total-amount { color: var(--primary); }
+    .empty-stream-msg { color: var(--muted); font-size: 0.85rem; font-style: italic; padding: 0.25rem 0; }
+
+    /* CALC GRID */
+    .calc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    @media (max-width: 560px) { .calc-grid { grid-template-columns: 1fr 1fr; } }
+
+    /* STATS */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
+    @media (max-width: 640px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      text-align: center;
+    }
+    .stat-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.3rem; }
+    .stat-value { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.red { color: var(--red); }
+    .stat-value.blue { color: var(--primary); }
+
+    /* BUTTONS */
+    .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .btn {
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.5px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn:hover:not(:disabled) { opacity: 0.85; }
+    .btn-submit { flex: 1; min-width: 160px; font-size: 1rem; padding: 1rem; }
+
+    /* ALERT BOXES */
+    .error-box {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      color: var(--red);
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .success-box {
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.3);
+      border-radius: 8px;
+      color: var(--green);
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 1rem;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal h2 { font-size: 1.1rem; margin-bottom: 1.25rem; color: var(--text); }
+    .modal-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 1.25rem; }
+    .modal-table th { text-align: left; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; padding: 0.4rem; border-bottom: 1px solid var(--border); }
+    .modal-table td { padding: 0.45rem 0.4rem; border-bottom: 1px solid rgba(45,45,61,0.5); }
+    .modal-table tr:last-child td { border-bottom: none; }
+    .modal-total { font-weight: 700; color: var(--primary); }
+    .form-group { margin-bottom: 1rem; }
+    .net-preview {
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+    }
+    .net-preview .net-label { color: var(--muted); }
+    .net-preview .net-val { font-weight: 800; font-size: 1.1rem; }
+    .net-preview .net-val.positive { color: var(--green); }
+    .net-preview .net-val.negative { color: var(--red); }
+    .modal-btn-row { display: flex; gap: 0.75rem; }
+    .modal-btn-row .btn { flex: 1; }
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.6rem 0.85rem;
+      outline: none;
+      resize: vertical;
+      min-height: 70px;
+      font-family: inherit;
+    }
+    textarea:focus { border-color: var(--primary); }
+
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(13,13,20,0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading…</div>
+</div>
+
+<nav>
+  <div class="brand">CARD <span>BREAK</span> PRO</div>
+  <div class="nav-right">
+    <span class="breaker-badge" id="breakerBadge">Breaker</span>
+    <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div id="errorBox" class="error-box"></div>
+  <div id="successBox" class="success-box"></div>
+
+  <!-- SESSION -->
+  <div class="panel">
+    <div class="panel-title">Session Info</div>
+    <div class="session-grid">
+      <div>
+        <label for="breakDate">Date</label>
+        <input type="date" id="breakDate" />
+      </div>
+      <div>
+        <label for="streamKey">Stream Key / ID</label>
+        <input type="text" id="streamKey" placeholder="e.g. STREAM-001 or Live#42" />
+      </div>
+      <div>
+        <label>Break #</label>
+        <div class="break-num-display" id="breakNumDisplay">1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCTS -->
+  <div class="panel">
+    <div class="panel-title">Products Used This Break</div>
+    <div id="productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
+    <div id="productsWrap" style="display:none;overflow-x:auto;">
+      <table class="product-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Unit Cost</th>
+            <th>Qty Used</th>
+            <th>Ext. Cost</th>
+            <th>Stock After</th>
+          </tr>
+        </thead>
+        <tbody id="productTableBody"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right;color:var(--muted);font-size:0.8rem;font-weight:600;padding-top:0.6rem;">TOTAL BOX COST</td>
+            <td colspan="2" style="font-weight:800;color:var(--text);font-size:0.95rem;padding-top:0.6rem;" id="totalBoxCostCell">$0.00</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div id="noProductsMsg" style="display:none;color:var(--muted);font-size:0.85rem;font-style:italic;">
+      No active products. Ask your owner to add products in the inventory tab.
+    </div>
+  </div>
+
+  <!-- RUNNING TOTAL -->
+  <div class="running-total-panel">
+    <div class="panel-title">Stream Running Total</div>
+    <ul class="break-list" id="breakList">
+      <li class="empty-stream-msg" id="emptyStreamMsg">No breaks submitted yet for this stream.</li>
+    </ul>
+    <hr class="rt-divider" />
+    <div class="stream-total-line">
+      <span>Stream Total:</span>
+      <span class="total-amount" id="streamTotalDisplay">$0.00</span>
+    </div>
+  </div>
+
+  <!-- REVENUE + CALCULATOR -->
+  <div class="panel">
+    <div class="panel-title">Current Whatnot Total
+      <span style="font-size:0.75rem;font-weight:400;color:var(--muted);margin-left:8px;">— type the running total shown on your platform, we calculate each break's revenue automatically</span>
+    </div>
+    <div class="revenue-input-wrap" style="margin-bottom:0.5rem;">
+      <span>$</span>
+      <input type="number" id="revenueInput" placeholder="0.00" min="0" step="0.01" />
+    </div>
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1.25rem;" id="breakRevenuePreview">This break's revenue: <strong style="color:var(--text);">$0.00</strong></div>
+    <div class="calc-grid">
+      <div>
+        <label for="spotsInput">Spots Sold</label>
+        <input type="number" id="spotsInput" placeholder="0" min="0" />
+      </div>
+      <div>
+        <label for="feeRateInput">Platform Fee %</label>
+        <input type="number" id="feeRateInput" placeholder="0.00" min="0" max="100" step="0.01" />
+      </div>
+      <div>
+        <label for="otherCostsInput">Other Costs ($)</label>
+        <input type="number" id="otherCostsInput" placeholder="0.00" min="0" step="0.01" />
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Box Cost</div>
+      <div class="stat-value" id="statBoxCost">$0.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Est. Platform Fees</div>
+      <div class="stat-value" id="statFees">$0.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Est. Profit</div>
+      <div class="stat-value" id="statProfit">$0.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Profit / Spot</div>
+      <div class="stat-value" id="statPPS">—</div>
+    </div>
+  </div>
+
+  <!-- BUTTONS -->
+  <div class="panel">
+    <div class="btn-row">
+      <button class="btn btn-green btn-submit" id="submitBreakBtn">SUBMIT BREAK</button>
+      <button class="btn btn-red" id="closeStreamBtn">CLOSE OUT STREAM</button>
+      <button class="btn btn-outline" id="resetEntryBtn">RESET ENTRY</button>
+      <button class="btn btn-outline" id="refreshProductsBtn">REFRESH PRODUCTS</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLOSE OUT MODAL -->
+<div class="modal-overlay" id="closeOutModal">
+  <div class="modal">
+    <h2>Close Out Stream</h2>
+    <table class="modal-table" id="closeOutTable">
+      <thead>
+        <tr>
+          <th>Break #</th>
+          <th>Revenue</th>
+          <th>Box Cost</th>
+          <th>Est. Fees</th>
+        </tr>
+      </thead>
+      <tbody id="closeOutTableBody"></tbody>
+      <tfoot>
+        <tr>
+          <td style="font-weight:700;color:var(--muted);">Totals</td>
+          <td class="modal-total" id="coTotalRevenue">$0.00</td>
+          <td class="modal-total" id="coTotalBoxCost">$0.00</td>
+          <td class="modal-total" id="coTotalFees">$0.00</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="form-group" style="background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.3);border-radius:8px;padding:14px;">
+      <label for="finalSalesInput" style="color:var(--primary);font-size:0.85rem;font-weight:700;text-transform:none;letter-spacing:0;">
+        Final Whatnot Total <span style="color:var(--red);">*</span>
+        <span style="color:var(--muted);font-weight:400;font-size:0.75rem;margin-left:6px;">— the final number shown on Whatnot after all giveaways</span>
+      </label>
+      <input type="number" id="finalSalesInput" placeholder="0.00" min="0" step="0.01" style="font-size:1.3rem;font-weight:700;font-family:'Consolas',monospace;margin-top:8px;border-color:var(--primary);" />
+    </div>
+
+    <div class="net-preview">
+      <span class="net-label">Estimated Net Profit</span>
+      <span class="net-val" id="netProfitPreview">—</span>
+    </div>
+
+    <div class="form-group">
+      <label for="closeNotes">Notes (optional)</label>
+      <textarea id="closeNotes" placeholder="Any notes about this stream…"></textarea>
+    </div>
+
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="cancelCloseBtn">Cancel</button>
+      <button class="btn btn-red" id="confirmCloseBtn">Close Out Stream</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const { createClient } = supabase;
+const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+// ── State ────────────────────────────────────────────────
+let currentUser = null;
+let currentProfile = null;
+let products = [];
+let currentStream = null;
+let submittedBreaks = [];
+let breakNumber = 1;
+
+// ── Utility ──────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function fmt(n) {
+  return '$' + (parseFloat(n) || 0).toFixed(2);
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function showLoading(text) {
+  document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = text || 'Loading…';
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('successBox').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showSuccess(msg) {
+  const el = document.getElementById('successBox');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('errorBox').style.display = 'none';
+  setTimeout(function () { el.style.display = 'none'; }, 4000);
+}
+
+function hideMessages() {
+  document.getElementById('errorBox').style.display = 'none';
+  document.getElementById('successBox').style.display = 'none';
+}
+
+// ── Auth ─────────────────────────────────────────────────
+async function initAuth() {
+  showLoading('Checking session…');
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.href = 'index.html';
+      return;
+    }
+    currentUser = session.user;
+
+    const { data: profile, error } = await sb
+      .from('profiles')
+      .select('*')
+      .eq('id', currentUser.id)
+      .single();
+
+    if (error || !profile) {
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
+      return;
+    }
+
+    if (profile.role !== 'breaker') {
+      window.location.href = profile.role === 'owner' ? 'owner.html' : 'index.html';
+      return;
+    }
+
+    currentProfile = profile;
+    document.getElementById('breakerBadge').textContent = escHtml(profile.display_name);
+
+    await loadProducts();
+    setupEventListeners();
+    initSession();
+    hideLoading();
+  } catch (err) {
+    hideLoading();
+    showError('Failed to initialize: ' + err.message);
+    console.error(err);
+  }
+}
+
+// ── Session ───────────────────────────────────────────────
+function initSession() {
+  const dateEl = document.getElementById('breakDate');
+  dateEl.value = today();
+  updateBreakDisplay();
+}
+
+function updateBreakDisplay() {
+  document.getElementById('breakNumDisplay').textContent = breakNumber;
+}
+
+// ── Products ──────────────────────────────────────────────
+async function loadProducts() {
+  const loadingEl = document.getElementById('productsLoading');
+  const wrapEl = document.getElementById('productsWrap');
+  const noMsg = document.getElementById('noProductsMsg');
+
+  loadingEl.style.display = 'block';
+  wrapEl.style.display = 'none';
+  noMsg.style.display = 'none';
+
+  try {
+    const { data, error } = await sb
+      .from('products')
+      .select('*')
+      .eq('org_id', currentProfile.org_id)
+      .eq('active', true)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+
+    products = data || [];
+
+    if (products.length === 0) {
+      loadingEl.style.display = 'none';
+      noMsg.style.display = 'block';
+      return;
+    }
+
+    renderProductTable();
+    loadingEl.style.display = 'none';
+    wrapEl.style.display = 'block';
+  } catch (err) {
+    loadingEl.textContent = 'Failed to load products: ' + escHtml(err.message);
+  }
+}
+
+function renderProductTable() {
+  const tbody = document.getElementById('productTableBody');
+  tbody.innerHTML = '';
+
+  products.forEach(function (p, idx) {
+    const tr = document.createElement('tr');
+    const stockClass = p.current_stock === 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
+    const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
+
+    tr.innerHTML =
+      '<td>' + escHtml(p.name) + '</td>' +
+      '<td style="color:var(--muted);">' + escHtml(p.category || '—') + '</td>' +
+      '<td>' + fmt(p.unit_cost) + '</td>' +
+      '<td><input type="number" class="qty-input" data-idx="' + idx + '" data-unit-cost="' + p.unit_cost + '" data-stock="' + p.current_stock + '" min="0" max="' + p.current_stock + '" value="0" placeholder="0" /></td>' +
+      '<td class="ext-cost" id="extCost_' + idx + '">$0.00</td>' +
+      '<td class="' + stockClass + '" id="stockAfter_' + idx + '">' + stockLabel + '</td>';
+
+    tbody.appendChild(tr);
+  });
+
+  // Attach qty input listeners
+  tbody.querySelectorAll('.qty-input').forEach(function (input) {
+    input.addEventListener('input', function () {
+      updateProductRow(input);
+      recalcTotals();
+    });
+  });
+}
+
+function updateProductRow(input) {
+  const idx = parseInt(input.dataset.idx, 10);
+  const unitCost = parseFloat(input.dataset.unitCost) || 0;
+  const stock = parseInt(input.dataset.stock, 10) || 0;
+  const qty = Math.max(0, Math.min(parseInt(input.value, 10) || 0, stock));
+  input.value = qty;
+
+  const extCost = qty * unitCost;
+  document.getElementById('extCost_' + idx).textContent = fmt(extCost);
+
+  const remaining = stock - qty;
+  const stockCell = document.getElementById('stockAfter_' + idx);
+  stockCell.textContent = remaining === 0 ? '0 — OUT' : remaining <= products[idx].min_stock_alert ? remaining + ' — LOW' : remaining;
+  stockCell.className = remaining === 0 ? 'stock-out' : remaining <= products[idx].min_stock_alert ? 'stock-low' : 'stock-ok';
+}
+
+function getProductsUsed() {
+  const used = [];
+  document.querySelectorAll('.qty-input').forEach(function (input) {
+    const idx = parseInt(input.dataset.idx, 10);
+    const qty = parseInt(input.value, 10) || 0;
+    if (qty > 0) {
+      used.push({
+        product_id: products[idx].id,
+        name: products[idx].name,
+        qty,
+        unit_cost: products[idx].unit_cost,
+        ext_cost: qty * products[idx].unit_cost
+      });
+    }
+  });
+  return used;
+}
+
+function getTotalBoxCost() {
+  let total = 0;
+  document.querySelectorAll('.qty-input').forEach(function (input) {
+    const qty = parseInt(input.value, 10) || 0;
+    const unitCost = parseFloat(input.dataset.unitCost) || 0;
+    total += qty * unitCost;
+  });
+  return total;
+}
+
+function getTotalUnitsUsed() {
+  let total = 0;
+  document.querySelectorAll('.qty-input').forEach(function (input) {
+    total += parseInt(input.value, 10) || 0;
+  });
+  return total;
+}
+
+// ── Helper: get the previous stream cumulative total ───────
+function getPreviousCumulativeTotal() {
+  // Sum of all previously submitted break revenues in this stream
+  return submittedBreaks.reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+}
+
+// ── Helper: get this break's individual revenue ─────────────
+// Breaker enters the new running total; we subtract the old total
+function getThisBreakRevenue() {
+  const currentWhatnotTotal = parseFloat(document.getElementById('revenueInput').value) || 0;
+  const prevTotal = getPreviousCumulativeTotal();
+  return Math.max(0, currentWhatnotTotal - prevTotal);
+}
+
+// ── Calculations ──────────────────────────────────────────
+function recalcTotals() {
+  const currentWhatnotTotal = parseFloat(document.getElementById('revenueInput').value) || 0;
+  const thisBreakRevenue = getThisBreakRevenue();
+  const spots = parseInt(document.getElementById('spotsInput').value, 10) || 0;
+  const feeRate = (parseFloat(document.getElementById('feeRateInput').value) || 0) / 100;
+  const otherCosts = parseFloat(document.getElementById('otherCostsInput').value) || 0;
+  const boxCost = getTotalBoxCost();
+  const fees = thisBreakRevenue * feeRate;
+  const profit = thisBreakRevenue - boxCost - fees - otherCosts;
+  const pps = spots > 0 ? profit / spots : null;
+
+  document.getElementById('totalBoxCostCell').textContent = fmt(boxCost);
+  document.getElementById('statBoxCost').textContent = fmt(boxCost);
+  document.getElementById('statFees').textContent = fmt(fees);
+
+  const profitEl = document.getElementById('statProfit');
+  profitEl.textContent = fmt(profit);
+  profitEl.className = 'stat-value ' + (profit >= 0 ? 'green' : 'red');
+
+  const ppsEl = document.getElementById('statPPS');
+  if (pps !== null) {
+    ppsEl.textContent = fmt(pps);
+    ppsEl.className = 'stat-value ' + (pps >= 0 ? 'green' : 'red');
+  } else {
+    ppsEl.textContent = '—';
+    ppsEl.className = 'stat-value';
+  }
+
+  // Show the calculated individual break revenue under the input
+  const previewEl = document.getElementById('breakRevenuePreview');
+  if (previewEl) {
+    previewEl.innerHTML = 'This break\'s revenue: <strong style="color:' + (thisBreakRevenue > 0 ? 'var(--green)' : 'var(--text)') + ';">' + fmt(thisBreakRevenue) + '</strong>'
+      + (submittedBreaks.length > 0 ? ' <span style="color:var(--muted);font-size:0.75rem;">(' + fmt(currentWhatnotTotal) + ' total − ' + fmt(getPreviousCumulativeTotal()) + ' prev)</span>' : '');
+  }
+
+  updateRunningTotalLivePreview(currentWhatnotTotal);
+}
+
+// ── Running Total Panel ────────────────────────────────────
+// submittedBreaks stores { break_number, revenue (individual break revenue), cumulativeTotal (what was typed) }
+function renderRunningTotal() {
+  const list = document.getElementById('breakList');
+  const totalEl = document.getElementById('streamTotalDisplay');
+
+  list.innerHTML = '';
+
+  if (submittedBreaks.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'empty-stream-msg';
+    li.id = 'emptyStreamMsg';
+    li.textContent = 'No breaks submitted yet for this stream.';
+    list.appendChild(li);
+  } else {
+    submittedBreaks.forEach(function (b) {
+      const li = document.createElement('li');
+      // Show cumulative total entered + individual revenue in muted text
+      li.innerHTML = '<span>Break ' + b.break_number + '</span>'
+        + '<span style="font-weight:700;">' + fmt(b.cumulativeTotal || b.revenue) + '</span>';
+      list.appendChild(li);
+    });
+  }
+
+  // Live preview row — shows what the breaker is currently typing
+  const currentWhatnotTotal = parseFloat(document.getElementById('revenueInput').value) || 0;
+  const previewLi = document.createElement('li');
+  previewLi.className = 'live-preview';
+  previewLi.id = 'livePreviewRow';
+  previewLi.innerHTML = '<span>Break ' + breakNumber + ' (typing...)</span><span class="preview-amount">' + fmt(currentWhatnotTotal) + '</span>';
+  list.appendChild(previewLi);
+
+  // Grand total = whatever is currently typed (it IS the cumulative total)
+  totalEl.textContent = fmt(currentWhatnotTotal || getPreviousCumulativeTotal());
+}
+
+function updateRunningTotalLivePreview(currentWhatnotTotal) {
+  const previewRow = document.getElementById('livePreviewRow');
+  if (!previewRow) { renderRunningTotal(); return; }
+
+  previewRow.innerHTML = '<span>Break ' + breakNumber + ' (typing...)</span><span class="preview-amount">' + fmt(currentWhatnotTotal) + '</span>';
+
+  // The number they typed IS the stream total
+  const displayTotal = currentWhatnotTotal > 0 ? currentWhatnotTotal : getPreviousCumulativeTotal();
+  document.getElementById('streamTotalDisplay').textContent = fmt(displayTotal);
+}
+
+// ── Stream Management ─────────────────────────────────────
+async function getOrCreateStream() {
+  const streamKey = document.getElementById('streamKey').value.trim();
+  const breakDate = document.getElementById('breakDate').value;
+
+  if (!streamKey) return null;
+
+  // Check for existing active stream
+  const { data: existing, error: fetchErr } = await sb
+    .from('streams')
+    .select('*')
+    .eq('org_id', currentProfile.org_id)
+    .eq('breaker_id', currentUser.id)
+    .eq('stream_key', streamKey)
+    .eq('break_date', breakDate)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (fetchErr) throw fetchErr;
+
+  if (existing) {
+    return existing;
+  }
+
+  // Create new stream
+  const { data: newStream, error: createErr } = await sb
+    .from('streams')
+    .insert({
+      org_id: currentProfile.org_id,
+      breaker_id: currentUser.id,
+      stream_key: streamKey,
+      break_date: breakDate,
+      status: 'active',
+      total_submitted_revenue: 0,
+      break_count: 0
+    })
+    .select()
+    .single();
+
+  if (createErr) throw createErr;
+
+  return newStream;
+}
+
+async function loadStreamBreaks(streamId) {
+  const { data, error } = await sb
+    .from('breaks')
+    .select('*')
+    .eq('stream_id', streamId)
+    .order('break_number', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+// When stream key changes, reload context
+async function onStreamKeyChange() {
+  const streamKey = document.getElementById('streamKey').value.trim();
+  const breakDate = document.getElementById('breakDate').value;
+
+  if (!streamKey) {
+    submittedBreaks = [];
+    breakNumber = 1;
+    currentStream = null;
+    renderRunningTotal();
+    updateBreakDisplay();
+    return;
+  }
+
+  try {
+    const { data: existing } = await sb
+      .from('streams')
+      .select('*')
+      .eq('org_id', currentProfile.org_id)
+      .eq('breaker_id', currentUser.id)
+      .eq('stream_key', streamKey)
+      .eq('break_date', breakDate)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (existing) {
+      currentStream = existing;
+      const breaks = await loadStreamBreaks(existing.id);
+      submittedBreaks = breaks;
+      breakNumber = breaks.length + 1;
+    } else {
+      currentStream = null;
+      submittedBreaks = [];
+      breakNumber = 1;
+    }
+
+    renderRunningTotal();
+    updateBreakDisplay();
+  } catch (err) {
+    console.error('Stream key change error:', err);
+  }
+}
+
+// ── Submit Break ──────────────────────────────────────────
+async function handleSubmitBreak() {
+  hideMessages();
+
+  const streamKey = document.getElementById('streamKey').value.trim();
+  const breakDate = document.getElementById('breakDate').value;
+  const revenueStr = document.getElementById('revenueInput').value.trim();
+  const spots = parseInt(document.getElementById('spotsInput').value, 10) || 0;
+  const feeRate = (parseFloat(document.getElementById('feeRateInput').value) || 0) / 100;
+  const otherCosts = parseFloat(document.getElementById('otherCostsInput').value) || 0;
+
+  if (!streamKey) { showError('Please enter a Stream Key / ID.'); return; }
+  if (!breakDate) { showError('Please select a date.'); return; }
+  if (!revenueStr || isNaN(parseFloat(revenueStr))) { showError('Please enter a valid Whatnot total.'); return; }
+
+  const currentWhatnotTotal = parseFloat(revenueStr);
+  const prevTotal = getPreviousCumulativeTotal();
+
+  // Validate: typed total must be >= previous total
+  if (currentWhatnotTotal < prevTotal) {
+    showError('The Whatnot total you entered ($' + currentWhatnotTotal.toFixed(2) + ') is less than the previous stream total ($' + prevTotal.toFixed(2) + '). Enter the current running total shown on your platform.');
+    return;
+  }
+
+  // This break's individual revenue = new total minus old total
+  const revenue = currentWhatnotTotal - prevTotal;
+  const boxCost = getTotalBoxCost();
+  const fees = revenue * feeRate;
+  const netProfit = revenue - boxCost - fees - otherCosts;
+  const productsUsed = getProductsUsed();
+  const totalUnitsUsed = getTotalUnitsUsed();
+
+  const submitBtn = document.getElementById('submitBreakBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting…';
+  showLoading('Saving break…');
+
+  try {
+    // Get or create stream
+    const stream = await getOrCreateStream();
+    if (!stream) { showError('Failed to create stream.'); return; }
+    currentStream = stream;
+
+    // Insert break record
+    const { error: breakErr } = await sb
+      .from('breaks')
+      .insert({
+        org_id: currentProfile.org_id,
+        stream_id: stream.id,
+        breaker_id: currentUser.id,
+        break_number: breakNumber,
+        break_date: breakDate,
+        revenue,
+        spots,
+        fee_rate: feeRate,
+        other_costs: otherCosts,
+        total_product_cost: boxCost,
+        estimated_fees: fees,
+        net_profit: netProfit,
+        total_units_used: totalUnitsUsed,
+        products_used: productsUsed
+      });
+
+    if (breakErr) throw breakErr;
+
+    // Deduct stock from products
+    for (const used of productsUsed) {
+      const product = products.find(function (p) { return p.id === used.product_id; });
+      if (!product) continue;
+      const newStock = Math.max(0, product.current_stock - used.qty);
+      const { error: stockErr } = await sb
+        .from('products')
+        .update({ current_stock: newStock })
+        .eq('id', used.product_id);
+      if (stockErr) console.warn('Stock update error:', stockErr);
+      product.current_stock = newStock;
+    }
+
+    // Update stream totals
+    const newTotalRevenue = (parseFloat(stream.total_submitted_revenue) || 0) + revenue;
+    const newTotalBoxCost = (parseFloat(stream.total_product_cost) || 0) + boxCost;
+    const newTotalFees = (parseFloat(stream.total_fees) || 0) + fees;
+    const newTotalOther = (parseFloat(stream.total_other_costs) || 0) + otherCosts;
+    const newBreakCount = (stream.break_count || 0) + 1;
+
+    const { error: streamErr } = await sb
+      .from('streams')
+      .update({
+        total_submitted_revenue: newTotalRevenue,
+        total_product_cost: newTotalBoxCost,
+        total_fees: newTotalFees,
+        total_other_costs: newTotalOther,
+        break_count: newBreakCount
+      })
+      .eq('id', stream.id);
+
+    if (streamErr) console.warn('Stream update error:', streamErr);
+
+    // Update local state — store individual revenue AND the cumulative total that was typed
+    submittedBreaks.push({ break_number: breakNumber, revenue, cumulativeTotal: currentWhatnotTotal });
+    breakNumber += 1;
+    currentStream = { ...stream, total_submitted_revenue: newTotalRevenue, break_count: newBreakCount };
+
+    // Clear inputs
+    document.getElementById('revenueInput').value = '';
+    document.querySelectorAll('.qty-input').forEach(function (inp) {
+      inp.value = 0;
+      updateProductRow(inp);
+    });
+
+    updateBreakDisplay();
+    renderRunningTotal();
+    recalcTotals();
+    renderProductTable();
+
+    showSuccess('Break ' + (breakNumber - 1) + ' submitted! Running total updated.');
+  } catch (err) {
+    showError('Failed to submit break: ' + escHtml(err.message));
+    console.error(err);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'SUBMIT BREAK';
+    hideLoading();
+  }
+}
+
+// ── Close Out Stream ──────────────────────────────────────
+async function openCloseOutModal() {
+  hideMessages();
+
+  if (!currentStream) {
+    const streamKey = document.getElementById('streamKey').value.trim();
+    if (!streamKey) { showError('Please enter a Stream Key first.'); return; }
+    if (submittedBreaks.length === 0) { showError('No breaks have been submitted for this stream yet.'); return; }
+  }
+
+  if (submittedBreaks.length === 0) {
+    showError('No breaks have been submitted for this stream yet.');
+    return;
+  }
+
+  // Populate modal table
+  const tbody = document.getElementById('closeOutTableBody');
+  tbody.innerHTML = '';
+  let totalRev = 0, totalBox = 0, totalFees = 0;
+
+  // Load full break data for the current stream
+  let breaksForModal = submittedBreaks;
+  if (currentStream) {
+    try {
+      const fullBreaks = await loadStreamBreaks(currentStream.id);
+      breaksForModal = fullBreaks;
+    } catch (err) {
+      console.warn('Could not load full breaks for modal:', err);
+    }
+  }
+
+  breaksForModal.forEach(function (b) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>Break ' + b.break_number + '</td>' +
+      '<td>' + fmt(b.revenue) + '</td>' +
+      '<td>' + fmt(b.total_product_cost) + '</td>' +
+      '<td>' + fmt(b.estimated_fees) + '</td>';
+    tbody.appendChild(tr);
+    totalRev += parseFloat(b.revenue) || 0;
+    totalBox += parseFloat(b.total_product_cost) || 0;
+    totalFees += parseFloat(b.estimated_fees) || 0;
+  });
+
+  document.getElementById('coTotalRevenue').textContent = fmt(totalRev);
+  document.getElementById('coTotalBoxCost').textContent = fmt(totalBox);
+  document.getElementById('coTotalFees').textContent = fmt(totalFees);
+
+  document.getElementById('finalSalesInput').value = '';
+  document.getElementById('closeNotes').value = '';
+  document.getElementById('netProfitPreview').textContent = '—';
+  document.getElementById('netProfitPreview').className = 'net-val';
+
+  // Store totals for net calc
+  document.getElementById('closeOutModal').dataset.totalBox = totalBox;
+  document.getElementById('closeOutModal').dataset.totalFees = totalFees;
+  document.getElementById('closeOutModal').dataset.totalOther =
+    currentStream ? (parseFloat(currentStream.total_other_costs) || 0) : 0;
+
+  document.getElementById('closeOutModal').classList.add('active');
+}
+
+async function handleConfirmClose() {
+  const finalSalesStr = document.getElementById('finalSalesInput').value.trim();
+  const notes = document.getElementById('closeNotes').value.trim();
+
+  if (!finalSalesStr || isNaN(parseFloat(finalSalesStr))) {
+    showError('Final Sales amount is required.');
+    return;
+  }
+
+  const finalSales = parseFloat(finalSalesStr);
+  const modal = document.getElementById('closeOutModal');
+  const totalBox = parseFloat(modal.dataset.totalBox) || 0;
+  const totalFees = parseFloat(modal.dataset.totalFees) || 0;
+  const totalOther = parseFloat(modal.dataset.totalOther) || 0;
+  const netProfit = finalSales - totalBox - totalFees - totalOther;
+
+  const confirmBtn = document.getElementById('confirmCloseBtn');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Closing…';
+  showLoading('Closing stream…');
+
+  try {
+    if (!currentStream) throw new Error('No active stream found.');
+
+    const { error } = await sb
+      .from('streams')
+      .update({
+        status: 'closed',
+        final_sales: finalSales,
+        net_profit: netProfit,
+        notes: notes || null,
+        closed_at: new Date().toISOString()
+      })
+      .eq('id', currentStream.id);
+
+    if (error) throw error;
+
+    // Reset everything
+    document.getElementById('closeOutModal').classList.remove('active');
+    document.getElementById('streamKey').value = '';
+    submittedBreaks = [];
+    breakNumber = 1;
+    currentStream = null;
+
+    renderRunningTotal();
+    updateBreakDisplay();
+    recalcTotals();
+
+    document.getElementById('revenueInput').value = '';
+    document.querySelectorAll('.qty-input').forEach(function (inp) { inp.value = 0; updateProductRow(inp); });
+
+    await loadProducts();
+
+    showSuccess('Stream closed out! Net Profit: ' + fmt(netProfit));
+  } catch (err) {
+    showError('Failed to close stream: ' + escHtml(err.message));
+    console.error(err);
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Close Out Stream';
+    hideLoading();
+  }
+}
+
+// ── Event Listeners ───────────────────────────────────────
+function setupEventListeners() {
+  document.getElementById('signOutBtn').addEventListener('click', async function () {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  document.getElementById('submitBreakBtn').addEventListener('click', handleSubmitBreak);
+
+  document.getElementById('closeStreamBtn').addEventListener('click', openCloseOutModal);
+
+  document.getElementById('cancelCloseBtn').addEventListener('click', function () {
+    document.getElementById('closeOutModal').classList.remove('active');
+  });
+
+  document.getElementById('confirmCloseBtn').addEventListener('click', handleConfirmClose);
+
+  document.getElementById('resetEntryBtn').addEventListener('click', function () {
+    document.getElementById('revenueInput').value = '';
+    document.querySelectorAll('.qty-input').forEach(function (inp) { inp.value = 0; updateProductRow(inp); });
+    recalcTotals();
+    renderRunningTotal();
+  });
+
+  document.getElementById('refreshProductsBtn').addEventListener('click', loadProducts);
+
+  document.getElementById('revenueInput').addEventListener('input', recalcTotals);
+  document.getElementById('spotsInput').addEventListener('input', recalcTotals);
+  document.getElementById('feeRateInput').addEventListener('input', recalcTotals);
+  document.getElementById('otherCostsInput').addEventListener('input', recalcTotals);
+
+  let streamKeyTimer = null;
+  document.getElementById('streamKey').addEventListener('input', function () {
+    clearTimeout(streamKeyTimer);
+    streamKeyTimer = setTimeout(onStreamKeyChange, 600);
+  });
+
+  document.getElementById('breakDate').addEventListener('change', onStreamKeyChange);
+
+  document.getElementById('finalSalesInput').addEventListener('input', function () {
+    const val = parseFloat(this.value) || 0;
+    const modal = document.getElementById('closeOutModal');
+    const totalBox = parseFloat(modal.dataset.totalBox) || 0;
+    const totalFees = parseFloat(modal.dataset.totalFees) || 0;
+    const totalOther = parseFloat(modal.dataset.totalOther) || 0;
+    const net = val - totalBox - totalFees - totalOther;
+    const el = document.getElementById('netProfitPreview');
+    el.textContent = fmt(net);
+    el.className = 'net-val ' + (net >= 0 ? 'positive' : 'negative');
+  });
+
+  // Close modal on overlay click
+  document.getElementById('closeOutModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+}
+
+// ── Boot ──────────────────────────────────────────────────
+initAuth();
+</script>
+</body>
+</html>

@@ -1,0 +1,2323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Card Break Pro — Owner Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d14;
+      --card: #13131e;
+      --border: #2d2d3d;
+      --primary: #4f6ef7;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --yellow: #f59e0b;
+      --purple: #a855f7;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; min-height: 100vh; }
+
+    /* ── NAV ── */
+    nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      min-height: 52px;
+      flex-wrap: wrap;
+    }
+    .brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 2px; margin-right: 1.5rem; white-space: nowrap; }
+    .brand span { color: var(--primary); }
+    .tab-bar { display: flex; flex: 1; overflow-x: auto; gap: 0; }
+    .tab-bar::-webkit-scrollbar { height: 2px; }
+    .tab-bar::-webkit-scrollbar-thumb { background: var(--border); }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0 0.9rem;
+      height: 52px;
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+      letter-spacing: 0.3px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .nav-actions { display: flex; gap: 0.5rem; align-items: center; padding: 0.5rem 0; margin-left: auto; }
+    .btn-sm {
+      padding: 0.35rem 0.8rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    .btn-sm:hover { opacity: 0.8; }
+    .btn-signout { background: var(--border); color: var(--text); }
+    .btn-danger-sm { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+    /* ── LAYOUT ── */
+    .main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── PANELS ── */
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .panel-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .panel-header .panel-title { margin-bottom: 0; }
+
+    /* ── FORM ELEMENTS ── */
+    label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.35rem;
+    }
+    input, select, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.6rem 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    input[readonly] { color: var(--muted); cursor: default; }
+    textarea { resize: vertical; min-height: 60px; }
+    .form-group { margin-bottom: 1rem; }
+    .form-row { display: grid; gap: 1rem; }
+    .form-row-2 { grid-template-columns: 1fr 1fr; }
+    .form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 580px) { .form-row-2, .form-row-3 { grid-template-columns: 1fr; } }
+
+    /* ── BUTTONS ── */
+    .btn {
+      padding: 0.7rem 1.25rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.4px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-yellow { background: var(--yellow); color: #000; }
+    .btn:hover:not(:disabled) { opacity: 0.85; }
+    .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+
+    /* ── ALERTS ── */
+    .error-box {
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px; color: var(--red); font-size: 0.875rem;
+      padding: 0.75rem 1rem; margin-bottom: 1rem; display: none;
+    }
+    .success-box {
+      background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3);
+      border-radius: 8px; color: var(--green); font-size: 0.875rem;
+      padding: 0.75rem 1rem; margin-bottom: 1rem; display: none;
+    }
+
+    /* ── TABLES ── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .data-table th {
+      text-align: left; color: var(--muted); font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border);
+    }
+    .data-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid rgba(45,45,61,0.5); vertical-align: middle; }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .empty-row td { color: var(--muted); font-style: italic; text-align: center; padding: 1.5rem; }
+    .tbl-wrap { overflow-x: auto; }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge-blue { background: rgba(79,110,247,0.15); color: var(--primary); }
+    .badge-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .badge-gray { background: rgba(100,116,139,0.15); color: var(--muted); }
+
+    /* ── STATS CARDS ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    @media (max-width: 720px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem 1.1rem;
+    }
+    .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem; }
+    .stat-value { font-size: 1.3rem; font-weight: 800; color: var(--text); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.red { color: var(--red); }
+    .stat-value.blue { color: var(--primary); }
+
+    /* ── RUNNING TOTAL PANEL ── */
+    .running-total-panel {
+      background: var(--card); border: 2px solid var(--primary);
+      border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem;
+    }
+    .running-total-panel .panel-title { color: var(--primary); }
+    .break-list { list-style: none; margin-bottom: 0.75rem; }
+    .break-list li {
+      display: flex; justify-content: space-between;
+      font-size: 0.9rem; padding: 0.3rem 0;
+      border-bottom: 1px solid rgba(45,45,61,0.6);
+    }
+    .break-list li:last-child { border-bottom: none; }
+    .break-list li.live-preview { color: var(--muted); font-style: italic; }
+    .break-list li.live-preview .preview-amount { color: var(--green); font-style: normal; font-weight: 600; }
+    .rt-divider { border: none; border-top: 2px solid var(--border); margin: 0.75rem 0; }
+    .stream-total-line { display: flex; justify-content: space-between; font-size: 1.05rem; font-weight: 800; }
+    .stream-total-line .total-amount { color: var(--primary); }
+    .empty-stream-msg { color: var(--muted); font-size: 0.85rem; font-style: italic; padding: 0.25rem 0; }
+
+    /* ── PRODUCT TABLE (break entry) ── */
+    .product-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .product-table th {
+      text-align: left; color: var(--muted); font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border);
+    }
+    .product-table td { padding: 0.45rem 0.5rem; border-bottom: 1px solid rgba(45,45,61,0.5); vertical-align: middle; }
+    .product-table tr:last-child td { border-bottom: none; }
+    .product-table input[type="number"].qty-input { width: 70px; padding: 0.35rem 0.5rem; text-align: center; }
+    .stock-ok { color: var(--green); font-size: 0.8rem; }
+    .stock-low { color: var(--yellow); font-size: 0.8rem; }
+    .stock-out { color: var(--red); font-size: 0.8rem; }
+
+    /* Revenue input */
+    .revenue-input-wrap { position: relative; margin-bottom: 1.25rem; }
+    .revenue-input-wrap span { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--green); font-size: 1.4rem; font-weight: 700; pointer-events: none; }
+    .revenue-input-wrap input { padding-left: 2.1rem; font-size: 1.6rem; font-weight: 800; color: var(--green); border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.05); }
+    .revenue-input-wrap input:focus { border-color: var(--green); }
+
+    .calc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    @media (max-width: 560px) { .calc-grid { grid-template-columns: 1fr 1fr; } }
+
+    /* Calc stats row */
+    .calc-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+    @media (max-width: 700px) { .calc-stats { grid-template-columns: repeat(2, 1fr); } }
+    .cs-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 0.9rem; text-align: center; }
+    .cs-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 0.25rem; }
+    .cs-val { font-size: 0.95rem; font-weight: 700; }
+
+    /* Session grid */
+    .session-grid { display: grid; grid-template-columns: 1fr 1.5fr auto; gap: 1rem; align-items: end; }
+    @media (max-width: 560px) { .session-grid { grid-template-columns: 1fr; } }
+    .break-num-display { background: var(--primary); color: #fff; border-radius: 7px; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.5rem 1rem; }
+
+    /* ── INVENTORY ── */
+    .inv-form { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 560px) { .inv-form { grid-template-columns: 1fr; } }
+
+    /* ── TEAM ── */
+    .code-display {
+      font-family: 'Courier New', monospace;
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: 4px;
+      color: var(--primary);
+      background: rgba(79,110,247,0.08);
+      border: 2px dashed rgba(79,110,247,0.4);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      text-align: center;
+      margin: 1rem 0;
+    }
+    .copy-hint { color: var(--muted); font-size: 0.8rem; text-align: center; margin-bottom: 1rem; }
+
+    /* ── LEADERBOARD ── */
+    .lb-rank { font-size: 1.1rem; font-weight: 800; color: var(--muted); text-align: center; }
+    .lb-rank.gold { color: #f59e0b; }
+    .lb-rank.silver { color: #94a3b8; }
+    .lb-rank.bronze { color: #b45309; }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+      display: none; align-items: center; justify-content: center; z-index: 999; padding: 1rem;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 2rem; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 1.05rem; margin-bottom: 1.25rem; }
+    .modal-btn-row { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+    .modal-btn-row .btn { flex: 1; }
+    .modal-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 1rem; }
+    .modal-table th { text-align: left; color: var(--muted); font-size: 0.7rem; text-transform: uppercase; padding: 0.4rem; border-bottom: 1px solid var(--border); }
+    .modal-table td { padding: 0.45rem 0.4rem; border-bottom: 1px solid rgba(45,45,61,0.5); }
+    .modal-table tr:last-child td { border-bottom: none; }
+    .net-preview { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; font-size: 0.95rem; }
+    .net-preview .net-label { color: var(--muted); }
+    .net-preview .net-val { font-weight: 800; font-size: 1.1rem; }
+    .net-preview .net-val.positive { color: var(--green); }
+    .net-preview .net-val.negative { color: var(--red); }
+
+    /* ── LOADING ── */
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(13,13,20,0.85);
+      display: none; align-items: center; justify-content: center;
+      z-index: 9999; flex-direction: column; gap: 1rem;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner { width: 38px; height: 38px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 0.9rem; }
+
+    /* ── FILTER ROW ── */
+    .filter-row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; }
+    .filter-row > * { flex: 1; min-width: 130px; }
+    .filter-row .btn { flex: 0 0 auto; }
+
+    /* ── CONFIRM MODAL ── */
+    .confirm-text { color: var(--text); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.25rem; }
+
+    /* ── ROI TABLE ── */
+    .roi-bar-wrap { background: var(--border); border-radius: 4px; height: 6px; width: 100%; }
+    .roi-bar { height: 6px; border-radius: 4px; background: var(--primary); }
+
+    .section-divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+    .break-entry-col-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; }
+    @media (max-width: 860px) { .break-entry-col-layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Loading…</div>
+</div>
+
+<nav>
+  <div class="brand">CARD <span>BREAK</span> PRO</div>
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="breakEntry">Break Entry</button>
+    <button class="tab-btn" data-tab="inventory">Inventory</button>
+    <button class="tab-btn" data-tab="history">History</button>
+    <button class="tab-btn" data-tab="streamSummary">Stream Summary</button>
+    <button class="tab-btn" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="productRoi">Product ROI</button>
+    <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
+    <button class="tab-btn" data-tab="team">Team</button>
+  </div>
+  <div class="nav-actions">
+    <span id="ownerBadge" style="color:var(--muted);font-size:0.8rem;"></span>
+    <button class="btn-sm btn-danger-sm" id="resetDataBtn">Reset Data</button>
+    <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div id="globalError" class="error-box"></div>
+  <div id="globalSuccess" class="success-box"></div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: BREAK ENTRY
+  ════════════════════════════════════════════ -->
+  <div class="tab-content active" id="tab-breakEntry">
+    <div class="break-entry-col-layout">
+      <!-- Left column -->
+      <div>
+        <!-- Session -->
+        <div class="panel">
+          <div class="panel-title">Session Info</div>
+          <div class="session-grid">
+            <div>
+              <label for="be-date">Date</label>
+              <input type="date" id="be-date" />
+            </div>
+            <div>
+              <label for="be-streamKey">Stream Key / ID</label>
+              <input type="text" id="be-streamKey" placeholder="e.g. STREAM-001" />
+            </div>
+            <div>
+              <label>Break #</label>
+              <div class="break-num-display" id="be-breakNum">1</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Products -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Products Used This Break</div>
+            <button class="btn btn-outline btn-sm" id="be-refreshProducts" style="padding:0.3rem 0.7rem;font-size:0.75rem;">Refresh</button>
+          </div>
+          <div id="be-productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
+          <div id="be-productsWrap" style="display:none;overflow-x:auto;">
+            <table class="product-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Unit Cost</th>
+                  <th>Qty</th>
+                  <th>Ext. Cost</th>
+                  <th>Stock After</th>
+                </tr>
+              </thead>
+              <tbody id="be-productBody"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4" style="text-align:right;color:var(--muted);font-size:0.78rem;font-weight:600;padding-top:0.5rem;">TOTAL BOX COST</td>
+                  <td colspan="2" style="font-weight:800;font-size:0.9rem;padding-top:0.5rem;" id="be-totalBoxCostCell">$0.00</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div id="be-noProducts" style="display:none;color:var(--muted);font-size:0.85rem;font-style:italic;">No active products. Add products in the Inventory tab.</div>
+        </div>
+
+        <!-- Revenue -->
+        <div class="panel">
+          <div class="panel-title">Current Whatnot Total
+            <span style="font-size:0.75rem;font-weight:400;color:var(--muted);margin-left:8px;">— type the running total shown on your platform</span>
+          </div>
+          <div class="revenue-input-wrap">
+            <span>$</span>
+            <input type="number" id="be-revenue" placeholder="0.00" min="0" step="0.01" />
+          </div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;" id="be-breakRevenuePreview">This break's revenue: <strong style="color:var(--text);">$0.00</strong></div>
+          <div class="calc-grid">
+            <div>
+              <label for="be-spots">Spots Sold</label>
+              <input type="number" id="be-spots" placeholder="0" min="0" />
+            </div>
+            <div>
+              <label for="be-feeRate">Platform Fee %</label>
+              <input type="number" id="be-feeRate" placeholder="0.00" min="0" max="100" step="0.01" />
+            </div>
+            <div>
+              <label for="be-otherCosts">Other Costs ($)</label>
+              <input type="number" id="be-otherCosts" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Calc Stats -->
+        <div class="calc-stats">
+          <div class="cs-card"><div class="cs-label">Box Cost</div><div class="cs-val" id="be-statBox">$0.00</div></div>
+          <div class="cs-card"><div class="cs-label">Est. Fees</div><div class="cs-val" id="be-statFees">$0.00</div></div>
+          <div class="cs-card"><div class="cs-label">Est. Profit</div><div class="cs-val" id="be-statProfit">$0.00</div></div>
+          <div class="cs-card"><div class="cs-label">Profit/Spot</div><div class="cs-val" id="be-statPPS">—</div></div>
+          <div class="cs-card"><div class="cs-label">Break-Even</div><div class="cs-val" id="be-statBE">—</div></div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="panel">
+          <div class="btn-row">
+            <button class="btn btn-green" id="be-submitBtn" style="flex:1;min-width:140px;">SUBMIT BREAK</button>
+            <button class="btn btn-red" id="be-closeStreamBtn">CLOSE OUT STREAM</button>
+            <button class="btn btn-outline" id="be-resetBtn">RESET ENTRY</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column: Running Total -->
+      <div>
+        <div class="running-total-panel" style="position:sticky;top:60px;">
+          <div class="panel-title">Stream Running Total</div>
+          <ul class="break-list" id="be-breakList">
+            <li class="empty-stream-msg">No breaks yet for this stream.</li>
+          </ul>
+          <hr class="rt-divider" />
+          <div class="stream-total-line">
+            <span>Stream Total:</span>
+            <span class="total-amount" id="be-streamTotal">$0.00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: INVENTORY
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-inventory">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title" id="invFormTitle">Add Product</div>
+        <div class="btn-row">
+          <button class="btn btn-outline" id="invCancelEdit" style="display:none;">Cancel Edit</button>
+          <button class="btn btn-primary" id="invSaveBtn">Save Product</button>
+        </div>
+      </div>
+      <input type="hidden" id="invEditId" />
+      <div class="inv-form">
+        <div class="form-group">
+          <label for="invName">Product Name</label>
+          <input type="text" id="invName" placeholder="e.g. 2024 Topps Chrome Blaster" />
+        </div>
+        <div class="form-group">
+          <label for="invCategory">Category</label>
+          <input type="text" id="invCategory" placeholder="e.g. Baseball, Basketball" />
+        </div>
+        <div class="form-group">
+          <label for="invUnitCost">Unit Cost ($)</label>
+          <input type="number" id="invUnitCost" placeholder="0.00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label for="invStock">Current Stock (qty)</label>
+          <input type="number" id="invStock" placeholder="0" min="0" />
+        </div>
+        <div class="form-group">
+          <label for="invMinAlert">Low Stock Alert At</label>
+          <input type="number" id="invMinAlert" placeholder="5" min="0" />
+        </div>
+        <div class="form-group">
+          <label for="invDisplayOrder">Display Order</label>
+          <input type="number" id="invDisplayOrder" placeholder="0" min="0" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label for="invNotes">Notes</label>
+          <textarea id="invNotes" placeholder="Optional notes…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Product List</div>
+      <div class="tbl-wrap">
+        <table class="data-table" id="invTable">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Unit Cost</th>
+              <th>Stock</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: HISTORY
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-history">
+    <div class="panel">
+      <div class="filter-row">
+        <div>
+          <label for="histDateFrom">From</label>
+          <input type="date" id="histDateFrom" />
+        </div>
+        <div>
+          <label for="histDateTo">To</label>
+          <input type="date" id="histDateTo" />
+        </div>
+        <div>
+          <label for="histBreaker">Breaker</label>
+          <select id="histBreaker">
+            <option value="">All Breakers</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="histFilterBtn">Filter</button>
+        <button class="btn btn-outline" id="histExportBtn">Export CSV</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Stream</th>
+              <th>Break #</th>
+              <th>Breaker</th>
+              <th>Revenue</th>
+              <th>Box Cost</th>
+              <th>Fees</th>
+              <th>Profit</th>
+              <th>Spots</th>
+            </tr>
+          </thead>
+          <tbody id="histTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: STREAM SUMMARY
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-streamSummary">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">All Streams</div>
+        <button class="btn btn-outline btn-sm" id="ssRefreshBtn" style="padding:0.3rem 0.7rem;font-size:0.75rem;">Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Stream Key</th>
+              <th>Breaker</th>
+              <th>Breaks</th>
+              <th>Revenue</th>
+              <th>Final Sales</th>
+              <th>Box Cost</th>
+              <th>Fees</th>
+              <th>Net Profit</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="ssTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: DASHBOARD
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-dashboard">
+    <div class="stats-grid" id="dashStats">
+      <div class="stat-card"><div class="stat-label">Today's Revenue</div><div class="stat-value blue" id="dash-revenue">—</div></div>
+      <div class="stat-card"><div class="stat-label">Today's Profit</div><div class="stat-value green" id="dash-profit">—</div></div>
+      <div class="stat-card"><div class="stat-label">Breaks Today</div><div class="stat-value" id="dash-breaks">—</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Revenue/Break</div><div class="stat-value" id="dash-avg">—</div></div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Revenue (All Time)</div><div class="stat-value blue" id="dash-totalRevenue">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Profit (All Time)</div><div class="stat-value green" id="dash-totalProfit">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Breaks</div><div class="stat-value" id="dash-totalBreaks">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Streams</div><div class="stat-value" id="dash-totalStreams">—</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Recent Breaks (Last 10)</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Stream</th>
+              <th>Break #</th>
+              <th>Breaker</th>
+              <th>Revenue</th>
+              <th>Profit</th>
+            </tr>
+          </thead>
+          <tbody id="dashRecentBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: PRODUCT ROI
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-productRoi">
+    <div class="panel">
+      <div class="panel-title">Product ROI Summary</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Times Used</th>
+              <th>Total Units</th>
+              <th>Total Cost</th>
+              <th>Total Revenue</th>
+              <th>Est. Profit</th>
+              <th>ROI %</th>
+              <th>Bar</th>
+            </tr>
+          </thead>
+          <tbody id="roiTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: LEADERBOARD
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-leaderboard">
+    <div class="panel">
+      <div class="panel-title">Breaker Leaderboard (All Time)</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:50px;">#</th>
+              <th>Breaker</th>
+              <th>Breaks</th>
+              <th>Total Revenue</th>
+              <th>Total Profit</th>
+              <th>Avg Revenue/Break</th>
+              <th>Streams</th>
+            </tr>
+          </thead>
+          <tbody id="lbTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: TEAM
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-team">
+    <!-- Generate Invite Code -->
+    <div class="panel">
+      <div class="panel-title">Invite a New Breaker</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="genInviteBtn">Generate Invite Code</button>
+      </div>
+      <div id="inviteCodeDisplay" style="display:none;">
+        <div class="code-display" id="inviteCodeText"></div>
+        <p class="copy-hint">Share this code with your breaker. They go to the Join page and enter it to sign up.</p>
+        <button class="btn btn-outline" id="copyCodeBtn">Copy Code</button>
+      </div>
+    </div>
+
+    <!-- Unused Codes -->
+    <div class="panel">
+      <div class="panel-title">Unused Invite Codes</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Created</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="unusedCodesBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Team Members -->
+    <div class="panel">
+      <div class="panel-title">Team Members</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="teamTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CLOSE OUT MODAL
+═════════════════════════════════════════════ -->
+<div class="modal-overlay" id="closeOutModal">
+  <div class="modal">
+    <h2>Close Out Stream</h2>
+    <table class="modal-table">
+      <thead><tr><th>Break #</th><th>Revenue</th><th>Box Cost</th><th>Est. Fees</th></tr></thead>
+      <tbody id="coTableBody"></tbody>
+      <tfoot>
+        <tr>
+          <td style="font-weight:700;color:var(--muted);">Totals</td>
+          <td style="font-weight:800;color:var(--primary);" id="coTotalRev">$0.00</td>
+          <td style="font-weight:800;color:var(--primary);" id="coTotalBox">$0.00</td>
+          <td style="font-weight:800;color:var(--primary);" id="coTotalFees">$0.00</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="form-group">
+      <label for="coFinalSales">Final Sales (Actual Collected $)</label>
+      <input type="number" id="coFinalSales" placeholder="Enter actual money collected" min="0" step="0.01" style="font-size:1.05rem;" />
+    </div>
+    <div class="net-preview">
+      <span class="net-label">Estimated Net Profit</span>
+      <span class="net-val" id="coNetPreview">—</span>
+    </div>
+    <div class="form-group">
+      <label for="coNotes">Notes (optional)</label>
+      <textarea id="coNotes" placeholder="Any stream notes…"></textarea>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="coCancelBtn">Cancel</button>
+      <button class="btn btn-red" id="coConfirmBtn">Close Out Stream</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL (generic) -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="max-width:400px;">
+    <h2 id="confirmTitle">Confirm Action</h2>
+    <p class="confirm-text" id="confirmText"></p>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="confirmCancelBtn">Cancel</button>
+      <button class="btn btn-red" id="confirmOkBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCT EDIT MODAL -->
+<div class="modal-overlay" id="productEditModal">
+  <div class="modal">
+    <h2 id="prodModalTitle">Edit Product</h2>
+    <div class="inv-form" id="prodModalForm">
+      <input type="hidden" id="pm-id" />
+      <div class="form-group">
+        <label for="pm-name">Product Name</label>
+        <input type="text" id="pm-name" />
+      </div>
+      <div class="form-group">
+        <label for="pm-category">Category</label>
+        <input type="text" id="pm-category" />
+      </div>
+      <div class="form-group">
+        <label for="pm-unitCost">Unit Cost ($)</label>
+        <input type="number" id="pm-unitCost" min="0" step="0.01" />
+      </div>
+      <div class="form-group">
+        <label for="pm-stock">Current Stock</label>
+        <input type="number" id="pm-stock" min="0" />
+      </div>
+      <div class="form-group">
+        <label for="pm-minAlert">Low Stock Alert At</label>
+        <input type="number" id="pm-minAlert" min="0" />
+      </div>
+      <div class="form-group">
+        <label for="pm-displayOrder">Display Order</label>
+        <input type="number" id="pm-displayOrder" min="0" />
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label for="pm-notes">Notes</label>
+        <textarea id="pm-notes"></textarea>
+      </div>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="pmCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="pmSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const { createClient } = supabase;
+const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+// ── Global State ──────────────────────────────────────────
+let currentUser = null;
+let currentProfile = null;
+let orgProducts = [];
+let beCurrentStream = null;
+let beSubmittedBreaks = [];
+let beBreakNumber = 1;
+let allProfiles = [];
+let confirmCallback = null;
+
+// ── Utility ───────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function fmt(n) {
+  const v = parseFloat(n) || 0;
+  return '$' + v.toFixed(2);
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString();
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function showLoading(text) {
+  document.getElementById('loadingText').textContent = text || 'Loading…';
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+function showGlobalError(msg) {
+  const el = document.getElementById('globalError');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('globalSuccess').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showGlobalSuccess(msg) {
+  const el = document.getElementById('globalSuccess');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('globalError').style.display = 'none';
+  setTimeout(function () { el.style.display = 'none'; }, 4000);
+}
+
+function hideGlobalMessages() {
+  document.getElementById('globalError').style.display = 'none';
+  document.getElementById('globalSuccess').style.display = 'none';
+}
+
+function openConfirm(title, text, callback) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmText').textContent = text;
+  confirmCallback = callback;
+  document.getElementById('confirmModal').classList.add('active');
+}
+
+// ── Auth ──────────────────────────────────────────────────
+async function initAuth() {
+  showLoading('Checking session…');
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    currentUser = session.user;
+
+    const { data: profile, error } = await sb
+      .from('profiles').select('*').eq('id', currentUser.id).single();
+
+    if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
+    if (profile.role !== 'owner') { window.location.href = profile.role === 'breaker' ? 'breaker.html' : 'index.html'; return; }
+
+    currentProfile = profile;
+    document.getElementById('ownerBadge').textContent = escHtml(profile.display_name);
+
+    await Promise.all([loadProducts(), loadAllProfiles()]);
+    setupTabNav();
+    setupBreakEntry();
+    setupInventory();
+    setupHistory();
+    setupStreamSummary();
+    setupDashboard();
+    setupTeam();
+    setupGlobalButtons();
+    setupConfirmModal();
+    setupCloseOutModal();
+
+    // Load initial tab data
+    await loadDashboard();
+
+    hideLoading();
+  } catch (err) {
+    hideLoading();
+    showGlobalError('Failed to initialize: ' + escHtml(err.message));
+    console.error(err);
+  }
+}
+
+// ── Tab Navigation ────────────────────────────────────────
+function setupTabNav() {
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+      hideGlobalMessages();
+
+      // Reload tab data on switch
+      try {
+        if (tab === 'inventory') await loadInventoryTable();
+        else if (tab === 'history') await loadHistory();
+        else if (tab === 'streamSummary') await loadStreamSummary();
+        else if (tab === 'dashboard') await loadDashboard();
+        else if (tab === 'productRoi') await loadProductRoi();
+        else if (tab === 'leaderboard') await loadLeaderboard();
+        else if (tab === 'team') await loadTeam();
+      } catch (err) {
+        showGlobalError('Failed to load tab: ' + escHtml(err.message));
+        console.error(err);
+      }
+    });
+  });
+}
+
+// ── Global Buttons ────────────────────────────────────────
+function setupGlobalButtons() {
+  document.getElementById('signOutBtn').addEventListener('click', async function () {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  document.getElementById('resetDataBtn').addEventListener('click', function () {
+    openConfirm(
+      'Reset All Data',
+      'WARNING: This will permanently delete ALL breaks, streams, and products for your organization. This cannot be undone. Are you absolutely sure?',
+      async function () {
+        showLoading('Resetting data…');
+        try {
+          await sb.from('breaks').delete().eq('org_id', currentProfile.org_id);
+          await sb.from('streams').delete().eq('org_id', currentProfile.org_id);
+          await sb.from('products').delete().eq('org_id', currentProfile.org_id);
+          await loadProducts();
+          beSubmittedBreaks = [];
+          beBreakNumber = 1;
+          beCurrentStream = null;
+          beRenderRunningTotal();
+          document.getElementById('be-breakNum').textContent = '1';
+          showGlobalSuccess('All data has been reset.');
+        } catch (err) {
+          showGlobalError('Reset failed: ' + escHtml(err.message));
+        } finally {
+          hideLoading();
+        }
+      }
+    );
+  });
+}
+
+function setupConfirmModal() {
+  document.getElementById('confirmCancelBtn').addEventListener('click', function () {
+    document.getElementById('confirmModal').classList.remove('active');
+    confirmCallback = null;
+  });
+  document.getElementById('confirmOkBtn').addEventListener('click', async function () {
+    document.getElementById('confirmModal').classList.remove('active');
+    if (confirmCallback) {
+      await confirmCallback();
+      confirmCallback = null;
+    }
+  });
+  document.getElementById('confirmModal').addEventListener('click', function (e) {
+    if (e.target === this) { this.classList.remove('active'); confirmCallback = null; }
+  });
+}
+
+// ── Products (shared) ─────────────────────────────────────
+async function loadProducts() {
+  const { data, error } = await sb
+    .from('products')
+    .select('*')
+    .eq('org_id', currentProfile.org_id)
+    .order('display_order', { ascending: true });
+
+  if (error) throw error;
+  orgProducts = data || [];
+  return orgProducts;
+}
+
+async function loadAllProfiles() {
+  const { data, error } = await sb
+    .from('profiles')
+    .select('*')
+    .eq('org_id', currentProfile.org_id);
+  if (error) throw error;
+  allProfiles = data || [];
+}
+
+function getProfileName(breakerId) {
+  const p = allProfiles.find(function (x) { return x.id === breakerId; });
+  return p ? p.display_name : '—';
+}
+
+// ══════════════════════════════════════════════════════════
+//  BREAK ENTRY TAB
+// ══════════════════════════════════════════════════════════
+function setupBreakEntry() {
+  document.getElementById('be-date').value = today();
+  beRenderRunningTotal();
+
+  document.getElementById('be-revenue').addEventListener('input', beRecalc);
+  document.getElementById('be-spots').addEventListener('input', beRecalc);
+  document.getElementById('be-feeRate').addEventListener('input', beRecalc);
+  document.getElementById('be-otherCosts').addEventListener('input', beRecalc);
+
+  let streamKeyTimer = null;
+  document.getElementById('be-streamKey').addEventListener('input', function () {
+    clearTimeout(streamKeyTimer);
+    streamKeyTimer = setTimeout(beOnStreamKeyChange, 600);
+  });
+  document.getElementById('be-date').addEventListener('change', beOnStreamKeyChange);
+
+  document.getElementById('be-submitBtn').addEventListener('click', beHandleSubmit);
+  document.getElementById('be-closeStreamBtn').addEventListener('click', beOpenCloseOut);
+  document.getElementById('be-resetBtn').addEventListener('click', beResetEntry);
+  document.getElementById('be-refreshProducts').addEventListener('click', async function () {
+    await loadProducts();
+    beRenderProductTable();
+  });
+
+  beRenderProductTable();
+}
+
+function beRenderProductTable() {
+  const activeProducts = orgProducts.filter(function (p) { return p.active; });
+  const loadingEl = document.getElementById('be-productsLoading');
+  const wrapEl = document.getElementById('be-productsWrap');
+  const noMsg = document.getElementById('be-noProducts');
+
+  if (activeProducts.length === 0) {
+    loadingEl.style.display = 'none';
+    wrapEl.style.display = 'none';
+    noMsg.style.display = 'block';
+    return;
+  }
+
+  const tbody = document.getElementById('be-productBody');
+  tbody.innerHTML = '';
+
+  activeProducts.forEach(function (p, idx) {
+    const tr = document.createElement('tr');
+    const stockClass = p.current_stock === 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
+    const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
+    tr.innerHTML =
+      '<td>' + escHtml(p.name) + '</td>' +
+      '<td style="color:var(--muted);">' + escHtml(p.category || '—') + '</td>' +
+      '<td>' + fmt(p.unit_cost) + '</td>' +
+      '<td><input type="number" class="qty-input" data-prod-id="' + p.id + '" data-idx="' + idx + '" data-unit-cost="' + p.unit_cost + '" data-stock="' + p.current_stock + '" data-min="' + p.min_stock_alert + '" min="0" max="' + p.current_stock + '" value="0" /></td>' +
+      '<td class="ext-cost" id="be-extCost_' + idx + '">$0.00</td>' +
+      '<td class="' + stockClass + '" id="be-stockAfter_' + idx + '">' + stockLabel + '</td>';
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.qty-input').forEach(function (input) {
+    input.addEventListener('input', function () {
+      beUpdateProductRow(input);
+      beRecalc();
+    });
+  });
+
+  loadingEl.style.display = 'none';
+  wrapEl.style.display = 'block';
+  noMsg.style.display = 'none';
+}
+
+function beUpdateProductRow(input) {
+  const idx = parseInt(input.dataset.idx, 10);
+  const unitCost = parseFloat(input.dataset.unitCost) || 0;
+  const stock = parseInt(input.dataset.stock, 10) || 0;
+  const minAlert = parseInt(input.dataset.min, 10) || 5;
+  const qty = Math.max(0, Math.min(parseInt(input.value, 10) || 0, stock));
+  input.value = qty;
+
+  const extEl = document.getElementById('be-extCost_' + idx);
+  if (extEl) extEl.textContent = fmt(qty * unitCost);
+
+  const afterEl = document.getElementById('be-stockAfter_' + idx);
+  if (afterEl) {
+    const remaining = stock - qty;
+    afterEl.textContent = remaining === 0 ? '0 — OUT' : remaining <= minAlert ? remaining + ' — LOW' : remaining;
+    afterEl.className = remaining === 0 ? 'stock-out' : remaining <= minAlert ? 'stock-low' : 'stock-ok';
+  }
+}
+
+function beGetBoxCost() {
+  let total = 0;
+  document.querySelectorAll('#be-productBody .qty-input').forEach(function (inp) {
+    total += (parseInt(inp.value, 10) || 0) * (parseFloat(inp.dataset.unitCost) || 0);
+  });
+  return total;
+}
+
+function beGetProductsUsed() {
+  const used = [];
+  document.querySelectorAll('#be-productBody .qty-input').forEach(function (inp) {
+    const qty = parseInt(inp.value, 10) || 0;
+    if (qty > 0) {
+      const product = orgProducts.find(function (p) { return p.id === inp.dataset.prodId; });
+      if (product) {
+        used.push({ product_id: product.id, name: product.name, qty, unit_cost: product.unit_cost, ext_cost: qty * product.unit_cost });
+      }
+    }
+  });
+  return used;
+}
+
+function beGetTotalUnits() {
+  let t = 0;
+  document.querySelectorAll('#be-productBody .qty-input').forEach(function (inp) { t += parseInt(inp.value, 10) || 0; });
+  return t;
+}
+
+function beGetPrevCumulativeTotal() {
+  return beSubmittedBreaks.reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+}
+
+function beGetThisBreakRevenue() {
+  const currentWhatnotTotal = parseFloat(document.getElementById('be-revenue').value) || 0;
+  return Math.max(0, currentWhatnotTotal - beGetPrevCumulativeTotal());
+}
+
+function beRecalc() {
+  const currentWhatnotTotal = parseFloat(document.getElementById('be-revenue').value) || 0;
+  const thisBreakRevenue = beGetThisBreakRevenue();
+  const spots = parseInt(document.getElementById('be-spots').value, 10) || 0;
+  const feeRate = (parseFloat(document.getElementById('be-feeRate').value) || 0) / 100;
+  const other = parseFloat(document.getElementById('be-otherCosts').value) || 0;
+  const boxCost = beGetBoxCost();
+  const fees = thisBreakRevenue * feeRate;
+  const profit = thisBreakRevenue - boxCost - fees - other;
+  const pps = spots > 0 ? profit / spots : null;
+  const breakEven = spots > 0 ? (boxCost + fees + other) / spots : null;
+
+  document.getElementById('be-totalBoxCostCell').textContent = fmt(boxCost);
+  document.getElementById('be-statBox').textContent = fmt(boxCost);
+  document.getElementById('be-statFees').textContent = fmt(fees);
+
+  const profitEl = document.getElementById('be-statProfit');
+  profitEl.textContent = fmt(profit);
+  profitEl.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+
+  document.getElementById('be-statPPS').textContent = pps !== null ? fmt(pps) : '—';
+  document.getElementById('be-statBE').textContent = breakEven !== null ? fmt(breakEven) : '—';
+
+  const previewEl = document.getElementById('be-breakRevenuePreview');
+  if (previewEl) {
+    const prev = beGetPrevCumulativeTotal();
+    previewEl.innerHTML = 'This break\'s revenue: <strong style="color:' + (thisBreakRevenue > 0 ? 'var(--green)' : 'var(--text)') + ';">' + fmt(thisBreakRevenue) + '</strong>'
+      + (beSubmittedBreaks.length > 0 ? ' <span style="color:var(--muted);font-size:0.75rem;">(' + fmt(currentWhatnotTotal) + ' − ' + fmt(prev) + ')</span>' : '');
+  }
+
+  beUpdateLivePreview(currentWhatnotTotal);
+}
+
+function beRenderRunningTotal() {
+  const list = document.getElementById('be-breakList');
+  list.innerHTML = '';
+
+  if (beSubmittedBreaks.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'empty-stream-msg';
+    li.textContent = 'No breaks yet for this stream.';
+    list.appendChild(li);
+  } else {
+    beSubmittedBreaks.forEach(function (b) {
+      const li = document.createElement('li');
+      li.innerHTML = '<span>Break ' + b.break_number + '</span><span style="font-weight:700;">' + fmt(b.cumulativeTotal || b.revenue) + '</span>';
+      list.appendChild(li);
+    });
+  }
+
+  const currentWhatnotTotal = parseFloat(document.getElementById('be-revenue').value) || 0;
+  const preview = document.createElement('li');
+  preview.className = 'live-preview';
+  preview.id = 'be-livePreview';
+  preview.innerHTML = '<span>Break ' + beBreakNumber + ' (typing...)</span><span class="preview-amount">' + fmt(currentWhatnotTotal) + '</span>';
+  list.appendChild(preview);
+
+  // The typed number IS the stream total
+  const displayTotal = currentWhatnotTotal > 0 ? currentWhatnotTotal : beGetPrevCumulativeTotal();
+  document.getElementById('be-streamTotal').textContent = fmt(displayTotal);
+}
+
+function beUpdateLivePreview(currentWhatnotTotal) {
+  const preview = document.getElementById('be-livePreview');
+  if (!preview) { beRenderRunningTotal(); return; }
+  preview.innerHTML = '<span>Break ' + beBreakNumber + ' (typing...)</span><span class="preview-amount">' + fmt(currentWhatnotTotal) + '</span>';
+  const displayTotal = currentWhatnotTotal > 0 ? currentWhatnotTotal : beGetPrevCumulativeTotal();
+  document.getElementById('be-streamTotal').textContent = fmt(displayTotal);
+}
+
+async function beOnStreamKeyChange() {
+  const streamKey = document.getElementById('be-streamKey').value.trim();
+  const breakDate = document.getElementById('be-date').value;
+
+  if (!streamKey) {
+    beSubmittedBreaks = [];
+    beBreakNumber = 1;
+    beCurrentStream = null;
+    beRenderRunningTotal();
+    document.getElementById('be-breakNum').textContent = '1';
+    return;
+  }
+
+  try {
+    const { data: existing } = await sb
+      .from('streams').select('*')
+      .eq('org_id', currentProfile.org_id)
+      .eq('stream_key', streamKey)
+      .eq('break_date', breakDate)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (existing) {
+      beCurrentStream = existing;
+      const { data: breaks } = await sb
+        .from('breaks').select('*')
+        .eq('stream_id', existing.id)
+        .order('break_number', { ascending: true });
+      beSubmittedBreaks = breaks || [];
+      beBreakNumber = beSubmittedBreaks.length + 1;
+    } else {
+      beCurrentStream = null;
+      beSubmittedBreaks = [];
+      beBreakNumber = 1;
+    }
+
+    beRenderRunningTotal();
+    document.getElementById('be-breakNum').textContent = beBreakNumber;
+  } catch (err) {
+    console.error('Stream key change error:', err);
+  }
+}
+
+async function beGetOrCreateStream() {
+  const streamKey = document.getElementById('be-streamKey').value.trim();
+  const breakDate = document.getElementById('be-date').value;
+
+  const { data: existing, error: fetchErr } = await sb
+    .from('streams').select('*')
+    .eq('org_id', currentProfile.org_id)
+    .eq('breaker_id', currentUser.id)
+    .eq('stream_key', streamKey)
+    .eq('break_date', breakDate)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (fetchErr) throw fetchErr;
+  if (existing) return existing;
+
+  const { data: newStream, error: createErr } = await sb
+    .from('streams')
+    .insert({
+      org_id: currentProfile.org_id,
+      breaker_id: currentUser.id,
+      stream_key: streamKey,
+      break_date: breakDate,
+      status: 'active',
+      total_submitted_revenue: 0,
+      break_count: 0
+    })
+    .select().single();
+
+  if (createErr) throw createErr;
+  return newStream;
+}
+
+async function beHandleSubmit() {
+  hideGlobalMessages();
+  const streamKey = document.getElementById('be-streamKey').value.trim();
+  const breakDate = document.getElementById('be-date').value;
+  const revenueStr = document.getElementById('be-revenue').value.trim();
+
+  if (!streamKey) { showGlobalError('Please enter a Stream Key.'); return; }
+  if (!breakDate) { showGlobalError('Please select a date.'); return; }
+  if (!revenueStr || isNaN(parseFloat(revenueStr))) { showGlobalError('Please enter a valid Whatnot total.'); return; }
+
+  const currentWhatnotTotal = parseFloat(revenueStr);
+  const prevTotal = beGetPrevCumulativeTotal();
+
+  if (currentWhatnotTotal < prevTotal) {
+    showGlobalError('The Whatnot total entered ($' + currentWhatnotTotal.toFixed(2) + ') is less than the previous total ($' + prevTotal.toFixed(2) + '). Enter the current running total shown on your platform.');
+    return;
+  }
+
+  // Individual break revenue = new cumulative total minus previous total
+  const revenue = currentWhatnotTotal - prevTotal;
+  const spots = parseInt(document.getElementById('be-spots').value, 10) || 0;
+  const feeRate = (parseFloat(document.getElementById('be-feeRate').value) || 0) / 100;
+  const otherCosts = parseFloat(document.getElementById('be-otherCosts').value) || 0;
+  const boxCost = beGetBoxCost();
+  const fees = revenue * feeRate;
+  const netProfit = revenue - boxCost - fees - otherCosts;
+  const productsUsed = beGetProductsUsed();
+  const totalUnits = beGetTotalUnits();
+
+  const btn = document.getElementById('be-submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  showLoading('Saving break…');
+
+  try {
+    const stream = await beGetOrCreateStream();
+    beCurrentStream = stream;
+
+    const { error: breakErr } = await sb.from('breaks').insert({
+      org_id: currentProfile.org_id,
+      stream_id: stream.id,
+      breaker_id: currentUser.id,
+      break_number: beBreakNumber,
+      break_date: breakDate,
+      revenue, spots,
+      fee_rate: feeRate,
+      other_costs: otherCosts,
+      total_product_cost: boxCost,
+      estimated_fees: fees,
+      net_profit: netProfit,
+      total_units_used: totalUnits,
+      products_used: productsUsed
+    });
+    if (breakErr) throw breakErr;
+
+    // Deduct stock
+    for (const used of productsUsed) {
+      const product = orgProducts.find(function (p) { return p.id === used.product_id; });
+      if (!product) continue;
+      const newStock = Math.max(0, product.current_stock - used.qty);
+      await sb.from('products').update({ current_stock: newStock }).eq('id', used.product_id);
+      product.current_stock = newStock;
+    }
+
+    // Update stream
+    const newRevTotal = (parseFloat(stream.total_submitted_revenue) || 0) + revenue;
+    const newBoxTotal = (parseFloat(stream.total_product_cost) || 0) + boxCost;
+    const newFeesTotal = (parseFloat(stream.total_fees) || 0) + fees;
+    const newOtherTotal = (parseFloat(stream.total_other_costs) || 0) + otherCosts;
+    const newBreakCount = (stream.break_count || 0) + 1;
+
+    await sb.from('streams').update({
+      total_submitted_revenue: newRevTotal,
+      total_product_cost: newBoxTotal,
+      total_fees: newFeesTotal,
+      total_other_costs: newOtherTotal,
+      break_count: newBreakCount
+    }).eq('id', stream.id);
+
+    beSubmittedBreaks.push({ break_number: beBreakNumber, revenue, cumulativeTotal: currentWhatnotTotal });
+    beBreakNumber += 1;
+    beCurrentStream = { ...stream, total_submitted_revenue: newRevTotal, break_count: newBreakCount };
+
+    // Clear inputs
+    document.getElementById('be-revenue').value = '';
+    document.querySelectorAll('#be-productBody .qty-input').forEach(function (inp) {
+      inp.value = 0;
+      beUpdateProductRow(inp);
+    });
+
+    document.getElementById('be-breakNum').textContent = beBreakNumber;
+    beRenderRunningTotal();
+    beRecalc();
+    beRenderProductTable();
+
+    showGlobalSuccess('Break ' + (beBreakNumber - 1) + ' submitted!');
+  } catch (err) {
+    showGlobalError('Submit failed: ' + escHtml(err.message));
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'SUBMIT BREAK';
+    hideLoading();
+  }
+}
+
+async function beOpenCloseOut() {
+  hideGlobalMessages();
+  if (beSubmittedBreaks.length === 0) {
+    showGlobalError('No breaks have been submitted for this stream yet.');
+    return;
+  }
+
+  const tbody = document.getElementById('coTableBody');
+  tbody.innerHTML = '';
+  let totalRev = 0, totalBox = 0, totalFees = 0;
+
+  let fullBreaks = beSubmittedBreaks;
+  if (beCurrentStream) {
+    try {
+      const { data } = await sb.from('breaks').select('*').eq('stream_id', beCurrentStream.id).order('break_number');
+      fullBreaks = data || beSubmittedBreaks;
+    } catch (e) { /* use local */ }
+  }
+
+  fullBreaks.forEach(function (b) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>Break ' + b.break_number + '</td>' +
+      '<td>' + fmt(b.revenue) + '</td>' +
+      '<td>' + fmt(b.total_product_cost) + '</td>' +
+      '<td>' + fmt(b.estimated_fees) + '</td>';
+    tbody.appendChild(tr);
+    totalRev += parseFloat(b.revenue) || 0;
+    totalBox += parseFloat(b.total_product_cost) || 0;
+    totalFees += parseFloat(b.estimated_fees) || 0;
+  });
+
+  document.getElementById('coTotalRev').textContent = fmt(totalRev);
+  document.getElementById('coTotalBox').textContent = fmt(totalBox);
+  document.getElementById('coTotalFees').textContent = fmt(totalFees);
+  document.getElementById('coFinalSales').value = '';
+  document.getElementById('coNotes').value = '';
+  document.getElementById('coNetPreview').textContent = '—';
+  document.getElementById('coNetPreview').className = 'net-val';
+
+  const modal = document.getElementById('closeOutModal');
+  modal.dataset.totalBox = totalBox;
+  modal.dataset.totalFees = totalFees;
+  modal.dataset.totalOther = beCurrentStream ? (parseFloat(beCurrentStream.total_other_costs) || 0) : 0;
+  modal.classList.add('active');
+}
+
+function beResetEntry() {
+  document.getElementById('be-revenue').value = '';
+  document.querySelectorAll('#be-productBody .qty-input').forEach(function (inp) {
+    inp.value = 0;
+    beUpdateProductRow(inp);
+  });
+  beRecalc();
+  beRenderRunningTotal();
+}
+
+function setupCloseOutModal() {
+  document.getElementById('coFinalSales').addEventListener('input', function () {
+    const val = parseFloat(this.value) || 0;
+    const modal = document.getElementById('closeOutModal');
+    const totalBox = parseFloat(modal.dataset.totalBox) || 0;
+    const totalFees = parseFloat(modal.dataset.totalFees) || 0;
+    const totalOther = parseFloat(modal.dataset.totalOther) || 0;
+    const net = val - totalBox - totalFees - totalOther;
+    const el = document.getElementById('coNetPreview');
+    el.textContent = fmt(net);
+    el.className = 'net-val ' + (net >= 0 ? 'positive' : 'negative');
+  });
+
+  document.getElementById('coCancelBtn').addEventListener('click', function () {
+    document.getElementById('closeOutModal').classList.remove('active');
+  });
+
+  document.getElementById('coConfirmBtn').addEventListener('click', async function () {
+    const finalSalesStr = document.getElementById('coFinalSales').value.trim();
+    const notes = document.getElementById('coNotes').value.trim();
+
+    if (!finalSalesStr || isNaN(parseFloat(finalSalesStr))) {
+      showGlobalError('Final Sales amount is required.');
+      document.getElementById('closeOutModal').classList.remove('active');
+      return;
+    }
+
+    const finalSales = parseFloat(finalSalesStr);
+    const modal = document.getElementById('closeOutModal');
+    const totalBox = parseFloat(modal.dataset.totalBox) || 0;
+    const totalFees = parseFloat(modal.dataset.totalFees) || 0;
+    const totalOther = parseFloat(modal.dataset.totalOther) || 0;
+    const netProfit = finalSales - totalBox - totalFees - totalOther;
+
+    const btn = document.getElementById('coConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = 'Closing…';
+    showLoading('Closing stream…');
+
+    try {
+      if (!beCurrentStream) throw new Error('No active stream found.');
+
+      const { error } = await sb.from('streams').update({
+        status: 'closed',
+        final_sales: finalSales,
+        net_profit: netProfit,
+        notes: notes || null,
+        closed_at: new Date().toISOString()
+      }).eq('id', beCurrentStream.id);
+
+      if (error) throw error;
+
+      document.getElementById('closeOutModal').classList.remove('active');
+      document.getElementById('be-streamKey').value = '';
+      beSubmittedBreaks = [];
+      beBreakNumber = 1;
+      beCurrentStream = null;
+      document.getElementById('be-breakNum').textContent = '1';
+      document.getElementById('be-revenue').value = '';
+      document.querySelectorAll('#be-productBody .qty-input').forEach(function (inp) { inp.value = 0; beUpdateProductRow(inp); });
+      beRenderRunningTotal();
+      beRecalc();
+      await loadProducts();
+      beRenderProductTable();
+
+      showGlobalSuccess('Stream closed! Net Profit: ' + fmt(netProfit));
+    } catch (err) {
+      showGlobalError('Close out failed: ' + escHtml(err.message));
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Close Out Stream';
+      hideLoading();
+    }
+  });
+
+  document.getElementById('closeOutModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  INVENTORY TAB
+// ══════════════════════════════════════════════════════════
+function setupInventory() {
+  document.getElementById('invSaveBtn').addEventListener('click', invHandleSave);
+  document.getElementById('invCancelEdit').addEventListener('click', invClearForm);
+  document.getElementById('pmCancelBtn').addEventListener('click', function () {
+    document.getElementById('productEditModal').classList.remove('active');
+  });
+  document.getElementById('pmSaveBtn').addEventListener('click', pmHandleSave);
+  document.getElementById('productEditModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+}
+
+async function loadInventoryTable() {
+  await loadProducts();
+  const tbody = document.getElementById('invTableBody');
+  tbody.innerHTML = '';
+
+  if (orgProducts.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No products yet. Add your first product above.</td></tr>';
+    return;
+  }
+
+  orgProducts.forEach(function (p) {
+    const tr = document.createElement('tr');
+    const stockClass = p.current_stock === 0 ? 'badge-red' : p.current_stock <= p.min_stock_alert ? 'badge-yellow' : 'badge-green';
+    const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
+    tr.innerHTML =
+      '<td><strong>' + escHtml(p.name) + '</strong>' + (p.notes ? '<br><small style="color:var(--muted);">' + escHtml(p.notes) + '</small>' : '') + '</td>' +
+      '<td>' + escHtml(p.category || '—') + '</td>' +
+      '<td>' + fmt(p.unit_cost) + '</td>' +
+      '<td><span class="badge ' + stockClass + '">' + escHtml(String(stockLabel)) + '</span></td>' +
+      '<td><span class="badge ' + (p.active ? 'badge-green' : 'badge-gray') + '">' + (p.active ? 'Active' : 'Inactive') + '</span></td>' +
+      '<td>' +
+        '<div class="btn-row">' +
+          '<button class="btn btn-outline btn-sm" data-action="edit" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Edit</button>' +
+          '<button class="btn btn-sm" data-action="toggle" data-id="' + p.id + '" data-active="' + p.active + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:' + (p.active ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)') + ';color:' + (p.active ? 'var(--red)' : 'var(--green)') + ';">' + (p.active ? 'Deactivate' : 'Activate') + '</button>' +
+          '<button class="btn btn-sm btn-danger-sm" data-action="delete" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:rgba(239,68,68,0.15);color:var(--red);">Delete</button>' +
+        '</div>' +
+      '</td>';
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('[data-action]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      if (action === 'edit') invOpenEditModal(id);
+      else if (action === 'toggle') await invToggleActive(id, btn.dataset.active === 'true');
+      else if (action === 'delete') invDeleteProduct(id);
+    });
+  });
+}
+
+function invClearForm() {
+  document.getElementById('invEditId').value = '';
+  document.getElementById('invFormTitle').textContent = 'Add Product';
+  document.getElementById('invCancelEdit').style.display = 'none';
+  document.getElementById('invName').value = '';
+  document.getElementById('invCategory').value = '';
+  document.getElementById('invUnitCost').value = '';
+  document.getElementById('invStock').value = '';
+  document.getElementById('invMinAlert').value = '5';
+  document.getElementById('invDisplayOrder').value = '0';
+  document.getElementById('invNotes').value = '';
+}
+
+async function invHandleSave() {
+  const name = document.getElementById('invName').value.trim();
+  const category = document.getElementById('invCategory').value.trim();
+  const unitCost = parseFloat(document.getElementById('invUnitCost').value) || 0;
+  const stock = parseInt(document.getElementById('invStock').value, 10) || 0;
+  const minAlert = parseInt(document.getElementById('invMinAlert').value, 10) || 5;
+  const displayOrder = parseInt(document.getElementById('invDisplayOrder').value, 10) || 0;
+  const notes = document.getElementById('invNotes').value.trim();
+
+  if (!name) { showGlobalError('Product name is required.'); return; }
+
+  const btn = document.getElementById('invSaveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const { error } = await sb.from('products').insert({
+      org_id: currentProfile.org_id,
+      name, category: category || null,
+      unit_cost: unitCost,
+      current_stock: stock,
+      min_stock_alert: minAlert,
+      display_order: displayOrder,
+      notes: notes || null,
+      active: true
+    });
+    if (error) throw error;
+
+    invClearForm();
+    await loadInventoryTable();
+    beRenderProductTable();
+    showGlobalSuccess('Product added!');
+  } catch (err) {
+    showGlobalError('Failed to save: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Product';
+  }
+}
+
+function invOpenEditModal(id) {
+  const product = orgProducts.find(function (p) { return p.id === id; });
+  if (!product) return;
+
+  document.getElementById('pm-id').value = product.id;
+  document.getElementById('pm-name').value = product.name;
+  document.getElementById('pm-category').value = product.category || '';
+  document.getElementById('pm-unitCost').value = product.unit_cost;
+  document.getElementById('pm-stock').value = product.current_stock;
+  document.getElementById('pm-minAlert').value = product.min_stock_alert;
+  document.getElementById('pm-displayOrder').value = product.display_order || 0;
+  document.getElementById('pm-notes').value = product.notes || '';
+  document.getElementById('productEditModal').classList.add('active');
+}
+
+async function pmHandleSave() {
+  const id = document.getElementById('pm-id').value;
+  const name = document.getElementById('pm-name').value.trim();
+  const category = document.getElementById('pm-category').value.trim();
+  const unitCost = parseFloat(document.getElementById('pm-unitCost').value) || 0;
+  const stock = parseInt(document.getElementById('pm-stock').value, 10) || 0;
+  const minAlert = parseInt(document.getElementById('pm-minAlert').value, 10) || 5;
+  const displayOrder = parseInt(document.getElementById('pm-displayOrder').value, 10) || 0;
+  const notes = document.getElementById('pm-notes').value.trim();
+
+  if (!name) { showGlobalError('Product name is required.'); return; }
+
+  const btn = document.getElementById('pmSaveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const { error } = await sb.from('products').update({
+      name, category: category || null,
+      unit_cost: unitCost,
+      current_stock: stock,
+      min_stock_alert: minAlert,
+      display_order: displayOrder,
+      notes: notes || null
+    }).eq('id', id);
+    if (error) throw error;
+
+    document.getElementById('productEditModal').classList.remove('active');
+    await loadProducts();
+    await loadInventoryTable();
+    beRenderProductTable();
+    showGlobalSuccess('Product updated!');
+  } catch (err) {
+    showGlobalError('Save failed: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
+  }
+}
+
+async function invToggleActive(id, currentActive) {
+  try {
+    const { error } = await sb.from('products').update({ active: !currentActive }).eq('id', id);
+    if (error) throw error;
+    await loadInventoryTable();
+    await loadProducts();
+    beRenderProductTable();
+    showGlobalSuccess('Product ' + (!currentActive ? 'activated' : 'deactivated') + '.');
+  } catch (err) {
+    showGlobalError('Toggle failed: ' + escHtml(err.message));
+  }
+}
+
+function invDeleteProduct(id) {
+  const product = orgProducts.find(function (p) { return p.id === id; });
+  openConfirm(
+    'Delete Product',
+    'Delete "' + (product ? product.name : 'this product') + '"? This cannot be undone.',
+    async function () {
+      try {
+        const { error } = await sb.from('products').delete().eq('id', id);
+        if (error) throw error;
+        await loadInventoryTable();
+        await loadProducts();
+        beRenderProductTable();
+        showGlobalSuccess('Product deleted.');
+      } catch (err) {
+        showGlobalError('Delete failed: ' + escHtml(err.message));
+      }
+    }
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+//  HISTORY TAB
+// ══════════════════════════════════════════════════════════
+function setupHistory() {
+  const today = new Date().toISOString().slice(0, 10);
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  document.getElementById('histDateFrom').value = monthAgo;
+  document.getElementById('histDateTo').value = today;
+
+  // Populate breaker filter
+  const sel = document.getElementById('histBreaker');
+  allProfiles.forEach(function (p) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.display_name + ' (' + p.role + ')';
+    sel.appendChild(opt);
+  });
+
+  document.getElementById('histFilterBtn').addEventListener('click', loadHistory);
+  document.getElementById('histExportBtn').addEventListener('click', exportHistoryCsv);
+}
+
+let historyData = [];
+
+async function loadHistory() {
+  const from = document.getElementById('histDateFrom').value;
+  const to = document.getElementById('histDateTo').value;
+  const breakerId = document.getElementById('histBreaker').value;
+
+  let query = sb.from('breaks').select('*')
+    .eq('org_id', currentProfile.org_id)
+    .order('break_date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (from) query = query.gte('break_date', from);
+  if (to) query = query.lte('break_date', to);
+  if (breakerId) query = query.eq('breaker_id', breakerId);
+
+  try {
+    const { data, error } = await query;
+    if (error) throw error;
+    historyData = data || [];
+    renderHistoryTable(historyData);
+  } catch (err) {
+    showGlobalError('Failed to load history: ' + escHtml(err.message));
+  }
+}
+
+function renderHistoryTable(breaks) {
+  const tbody = document.getElementById('histTableBody');
+  tbody.innerHTML = '';
+
+  if (breaks.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No breaks found for the selected filters.</td></tr>';
+    return;
+  }
+
+  // Need stream keys — load streams map
+  const streamIds = [...new Set(breaks.map(function (b) { return b.stream_id; }))];
+  loadStreamsMap(streamIds).then(function (streamsMap) {
+    breaks.forEach(function (b) {
+      const tr = document.createElement('tr');
+      const profit = parseFloat(b.net_profit) || 0;
+      const streamKey = streamsMap[b.stream_id] || '—';
+      tr.innerHTML =
+        '<td>' + escHtml(b.break_date) + '</td>' +
+        '<td>' + escHtml(streamKey) + '</td>' +
+        '<td style="text-align:center;">' + b.break_number + '</td>' +
+        '<td>' + escHtml(getProfileName(b.breaker_id)) + '</td>' +
+        '<td>' + fmt(b.revenue) + '</td>' +
+        '<td>' + fmt(b.total_product_cost) + '</td>' +
+        '<td>' + fmt(b.estimated_fees) + '</td>' +
+        '<td style="color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>' +
+        '<td style="text-align:center;">' + (b.spots || 0) + '</td>';
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+async function loadStreamsMap(streamIds) {
+  if (!streamIds.length) return {};
+  const { data } = await sb.from('streams').select('id, stream_key').in('id', streamIds);
+  const map = {};
+  (data || []).forEach(function (s) { map[s.id] = s.stream_key; });
+  return map;
+}
+
+function exportHistoryCsv() {
+  if (!historyData.length) { showGlobalError('No data to export.'); return; }
+
+  const rows = [['Date', 'Stream ID', 'Break #', 'Breaker', 'Revenue', 'Box Cost', 'Fees', 'Other Costs', 'Net Profit', 'Spots']];
+  historyData.forEach(function (b) {
+    rows.push([
+      b.break_date,
+      b.stream_id,
+      b.break_number,
+      getProfileName(b.breaker_id),
+      b.revenue,
+      b.total_product_cost,
+      b.estimated_fees,
+      b.other_costs,
+      b.net_profit,
+      b.spots || 0
+    ]);
+  });
+
+  const csv = rows.map(function (r) {
+    return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+  }).join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'break-history-' + today() + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════════════
+//  STREAM SUMMARY TAB
+// ══════════════════════════════════════════════════════════
+function setupStreamSummary() {
+  document.getElementById('ssRefreshBtn').addEventListener('click', loadStreamSummary);
+}
+
+async function loadStreamSummary() {
+  const tbody = document.getElementById('ssTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Loading…</td></tr>';
+
+  try {
+    const { data, error } = await sb
+      .from('streams').select('*')
+      .eq('org_id', currentProfile.org_id)
+      .order('break_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    tbody.innerHTML = '';
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No streams recorded yet.</td></tr>';
+      return;
+    }
+
+    data.forEach(function (s) {
+      const tr = document.createElement('tr');
+      const profit = parseFloat(s.net_profit);
+      const profitDisplay = isNaN(profit) ? '—' : '<span style="color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</span>';
+      tr.innerHTML =
+        '<td>' + escHtml(s.break_date) + '</td>' +
+        '<td>' + escHtml(s.stream_key) + '</td>' +
+        '<td>' + escHtml(getProfileName(s.breaker_id)) + '</td>' +
+        '<td style="text-align:center;">' + (s.break_count || 0) + '</td>' +
+        '<td>' + fmt(s.total_submitted_revenue) + '</td>' +
+        '<td>' + (s.final_sales != null ? fmt(s.final_sales) : '<span style="color:var(--muted)">—</span>') + '</td>' +
+        '<td>' + fmt(s.total_product_cost) + '</td>' +
+        '<td>' + fmt(s.total_fees) + '</td>' +
+        '<td>' + profitDisplay + '</td>' +
+        '<td><span class="badge ' + (s.status === 'active' ? 'badge-green' : 'badge-gray') + '">' + escHtml(s.status) + '</span></td>';
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    showGlobalError('Failed to load streams: ' + escHtml(err.message));
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Error loading data.</td></tr>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  DASHBOARD TAB
+// ══════════════════════════════════════════════════════════
+function setupDashboard() {
+  // no additional setup needed — loaded on tab switch
+}
+
+async function loadDashboard() {
+  const todayStr = today();
+
+  try {
+    // Today's breaks
+    const { data: todayBreaks, error: tbErr } = await sb
+      .from('breaks').select('*')
+      .eq('org_id', currentProfile.org_id)
+      .eq('break_date', todayStr);
+    if (tbErr) throw tbErr;
+
+    const todayRev = (todayBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+    const todayProfit = (todayBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
+    const todayCount = (todayBreaks || []).length;
+    const todayAvg = todayCount > 0 ? todayRev / todayCount : 0;
+
+    document.getElementById('dash-revenue').textContent = fmt(todayRev);
+    const profitEl = document.getElementById('dash-profit');
+    profitEl.textContent = fmt(todayProfit);
+    profitEl.className = 'stat-value ' + (todayProfit >= 0 ? 'green' : 'red');
+    document.getElementById('dash-breaks').textContent = todayCount;
+    document.getElementById('dash-avg').textContent = todayCount > 0 ? fmt(todayAvg) : '—';
+
+    // All-time breaks
+    const { data: allBreaks, error: abErr } = await sb
+      .from('breaks').select('revenue, net_profit')
+      .eq('org_id', currentProfile.org_id);
+    if (abErr) throw abErr;
+
+    const totalRev = (allBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+    const totalProfit = (allBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
+    document.getElementById('dash-totalRevenue').textContent = fmt(totalRev);
+    const totalProfitEl = document.getElementById('dash-totalProfit');
+    totalProfitEl.textContent = fmt(totalProfit);
+    totalProfitEl.className = 'stat-value ' + (totalProfit >= 0 ? 'green' : 'red');
+    document.getElementById('dash-totalBreaks').textContent = (allBreaks || []).length;
+
+    // Streams count
+    const { count: streamsCount } = await sb
+      .from('streams').select('id', { count: 'exact', head: true })
+      .eq('org_id', currentProfile.org_id);
+    document.getElementById('dash-totalStreams').textContent = streamsCount || 0;
+
+    // Recent breaks
+    const { data: recentBreaks, error: rbErr } = await sb
+      .from('breaks').select('*')
+      .eq('org_id', currentProfile.org_id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    if (rbErr) throw rbErr;
+
+    // Load streams map for recent breaks
+    const sIds = [...new Set((recentBreaks || []).map(function (b) { return b.stream_id; }))];
+    const streamsMap = await loadStreamsMap(sIds);
+
+    const tbody = document.getElementById('dashRecentBody');
+    tbody.innerHTML = '';
+    if (!recentBreaks || recentBreaks.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No breaks yet.</td></tr>';
+    } else {
+      recentBreaks.forEach(function (b) {
+        const tr = document.createElement('tr');
+        const profit = parseFloat(b.net_profit) || 0;
+        tr.innerHTML =
+          '<td>' + escHtml(b.break_date) + '</td>' +
+          '<td>' + escHtml(streamsMap[b.stream_id] || '—') + '</td>' +
+          '<td style="text-align:center;">' + b.break_number + '</td>' +
+          '<td>' + escHtml(getProfileName(b.breaker_id)) + '</td>' +
+          '<td>' + fmt(b.revenue) + '</td>' +
+          '<td style="color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+  } catch (err) {
+    showGlobalError('Dashboard load error: ' + escHtml(err.message));
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  PRODUCT ROI TAB
+// ══════════════════════════════════════════════════════════
+async function loadProductRoi() {
+  const tbody = document.getElementById('roiTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Loading…</td></tr>';
+
+  try {
+    const { data: breaks, error } = await sb
+      .from('breaks').select('revenue, products_used')
+      .eq('org_id', currentProfile.org_id);
+    if (error) throw error;
+
+    const productMap = {};
+
+    (breaks || []).forEach(function (b) {
+      const pu = b.products_used || [];
+      if (!Array.isArray(pu)) return;
+      const perUnitRevShare = pu.length > 0 ? (parseFloat(b.revenue) || 0) / pu.reduce(function (s, p) { return s + (p.qty || 0); }, 0) : 0;
+
+      pu.forEach(function (p) {
+        const key = p.product_id || p.name;
+        if (!productMap[key]) {
+          productMap[key] = { name: p.name, timesUsed: 0, totalUnits: 0, totalCost: 0, totalRevenue: 0 };
+        }
+        productMap[key].timesUsed += 1;
+        productMap[key].totalUnits += p.qty || 0;
+        productMap[key].totalCost += p.ext_cost || 0;
+        productMap[key].totalRevenue += (perUnitRevShare * (p.qty || 0));
+      });
+    });
+
+    const rows = Object.values(productMap);
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No product usage data yet.</td></tr>';
+      return;
+    }
+
+    // Sort by totalRevenue desc
+    rows.sort(function (a, b) { return b.totalRevenue - a.totalRevenue; });
+    const maxRev = rows[0].totalRevenue || 1;
+
+    tbody.innerHTML = '';
+    rows.forEach(function (r) {
+      const profit = r.totalRevenue - r.totalCost;
+      const roi = r.totalCost > 0 ? ((profit / r.totalCost) * 100) : 0;
+      const barWidth = Math.max(0, Math.min(100, (r.totalRevenue / maxRev) * 100));
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><strong>' + escHtml(r.name) + '</strong></td>' +
+        '<td style="text-align:center;">' + r.timesUsed + '</td>' +
+        '<td style="text-align:center;">' + r.totalUnits + '</td>' +
+        '<td>' + fmt(r.totalCost) + '</td>' +
+        '<td>' + fmt(r.totalRevenue) + '</td>' +
+        '<td style="color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>' +
+        '<td style="font-weight:700;color:' + (roi >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + roi.toFixed(1) + '%</td>' +
+        '<td style="min-width:80px;"><div class="roi-bar-wrap"><div class="roi-bar" style="width:' + barWidth.toFixed(1) + '%"></div></div></td>';
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    showGlobalError('ROI load error: ' + escHtml(err.message));
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Error loading data.</td></tr>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  LEADERBOARD TAB
+// ══════════════════════════════════════════════════════════
+async function loadLeaderboard() {
+  const tbody = document.getElementById('lbTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
+
+  try {
+    const { data: breaks, error } = await sb
+      .from('breaks').select('breaker_id, revenue, net_profit, stream_id')
+      .eq('org_id', currentProfile.org_id);
+    if (error) throw error;
+
+    const breakerMap = {};
+    (breaks || []).forEach(function (b) {
+      if (!breakerMap[b.breaker_id]) {
+        breakerMap[b.breaker_id] = { totalRevenue: 0, totalProfit: 0, breakCount: 0, streams: new Set() };
+      }
+      breakerMap[b.breaker_id].totalRevenue += parseFloat(b.revenue) || 0;
+      breakerMap[b.breaker_id].totalProfit += parseFloat(b.net_profit) || 0;
+      breakerMap[b.breaker_id].breakCount += 1;
+      if (b.stream_id) breakerMap[b.breaker_id].streams.add(b.stream_id);
+    });
+
+    const rows = Object.entries(breakerMap).map(function (entry) {
+      return {
+        breakerId: entry[0],
+        name: getProfileName(entry[0]),
+        totalRevenue: entry[1].totalRevenue,
+        totalProfit: entry[1].totalProfit,
+        breakCount: entry[1].breakCount,
+        streamCount: entry[1].streams.size,
+        avgRevenue: entry[1].breakCount > 0 ? entry[1].totalRevenue / entry[1].breakCount : 0
+      };
+    });
+
+    rows.sort(function (a, b) { return b.totalRevenue - a.totalRevenue; });
+
+    tbody.innerHTML = '';
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No data yet.</td></tr>';
+      return;
+    }
+
+    rows.forEach(function (r, idx) {
+      const rank = idx + 1;
+      const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="lb-rank ' + rankClass + '">' + rank + '</td>' +
+        '<td><strong>' + escHtml(r.name) + '</strong></td>' +
+        '<td style="text-align:center;">' + r.breakCount + '</td>' +
+        '<td style="color:var(--primary);font-weight:700;">' + fmt(r.totalRevenue) + '</td>' +
+        '<td style="color:' + (r.totalProfit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(r.totalProfit) + '</td>' +
+        '<td>' + fmt(r.avgRevenue) + '</td>' +
+        '<td style="text-align:center;">' + r.streamCount + '</td>';
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    showGlobalError('Leaderboard load error: ' + escHtml(err.message));
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Error loading data.</td></tr>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  TEAM TAB
+// ══════════════════════════════════════════════════════════
+function setupTeam() {
+  document.getElementById('genInviteBtn').addEventListener('click', generateInviteCode);
+  document.getElementById('copyCodeBtn').addEventListener('click', function () {
+    const code = document.getElementById('inviteCodeText').textContent;
+    navigator.clipboard.writeText(code).then(function () {
+      showGlobalSuccess('Code copied to clipboard!');
+    }).catch(function () {
+      showGlobalError('Copy failed — please copy the code manually.');
+    });
+  });
+}
+
+function randomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+async function generateInviteCode() {
+  const btn = document.getElementById('genInviteBtn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  let code = randomCode();
+  let attempts = 0;
+
+  try {
+    while (attempts < 5) {
+      const { data: existing } = await sb.from('invite_codes').select('id').eq('code', code).maybeSingle();
+      if (!existing) break;
+      code = randomCode();
+      attempts++;
+    }
+
+    const { error } = await sb.from('invite_codes').insert({
+      org_id: currentProfile.org_id,
+      code
+    });
+    if (error) throw error;
+
+    document.getElementById('inviteCodeText').textContent = code;
+    document.getElementById('inviteCodeDisplay').style.display = 'block';
+    await loadTeam();
+    showGlobalSuccess('Invite code generated!');
+  } catch (err) {
+    showGlobalError('Failed to generate code: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Invite Code';
+  }
+}
+
+async function loadTeam() {
+  await loadAllProfiles();
+
+  // Unused codes
+  try {
+    const { data: codes, error: cErr } = await sb
+      .from('invite_codes').select('*')
+      .eq('org_id', currentProfile.org_id)
+      .eq('used', false)
+      .order('created_at', { ascending: false });
+
+    if (cErr) throw cErr;
+
+    const codesBody = document.getElementById('unusedCodesBody');
+    codesBody.innerHTML = '';
+    if (!codes || codes.length === 0) {
+      codesBody.innerHTML = '<tr class="empty-row"><td colspan="3">No unused codes.</td></tr>';
+    } else {
+      codes.forEach(function (c) {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td style="font-family:monospace;font-weight:700;font-size:1rem;letter-spacing:2px;">' + escHtml(c.code) + '</td>' +
+          '<td>' + fmtDate(c.created_at) + '</td>' +
+          '<td><span class="badge badge-green">Available</span></td>';
+        codesBody.appendChild(tr);
+      });
+    }
+  } catch (err) {
+    showGlobalError('Failed to load codes: ' + escHtml(err.message));
+  }
+
+  // Team members
+  const tbody = document.getElementById('teamTableBody');
+  tbody.innerHTML = '';
+
+  if (allProfiles.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No team members yet.</td></tr>';
+    return;
+  }
+
+  allProfiles.forEach(function (p) {
+    const tr = document.createElement('tr');
+    const isMe = p.id === currentUser.id;
+    const isOwner = p.role === 'owner';
+    tr.innerHTML =
+      '<td><strong>' + escHtml(p.display_name) + '</strong>' + (isMe ? ' <span style="color:var(--muted);font-size:0.75rem;">(you)</span>' : '') + '</td>' +
+      '<td><span class="badge ' + (isOwner ? 'badge-blue' : 'badge-green') + '">' + escHtml(p.role) + '</span></td>' +
+      '<td>' + fmtDate(p.created_at) + '</td>' +
+      '<td>' +
+        (!isMe && !isOwner ?
+          '<button class="btn btn-sm" data-action="remove" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:rgba(239,68,68,0.15);color:var(--red);">Remove</button>'
+          : '—'
+        ) +
+      '</td>';
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('[data-action="remove"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const id = btn.dataset.id;
+      const name = btn.dataset.name;
+      openConfirm(
+        'Remove Breaker',
+        'Remove "' + name + '" from your team? They will lose access to the platform.',
+        async function () {
+          try {
+            const { error } = await sb.from('profiles').delete().eq('id', id);
+            if (error) throw error;
+            await loadTeam();
+            showGlobalSuccess(name + ' has been removed from the team.');
+          } catch (err) {
+            showGlobalError('Remove failed: ' + escHtml(err.message));
+          }
+        }
+      );
+    });
+  });
+}
+
+// ── Boot ──────────────────────────────────────────────────
+initAuth();
+</script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Card Break Pro — Register Your Business</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d14;
+      --card: #13131e;
+      --border: #2d2d3d;
+      --primary: #4f6ef7;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 440px;
+    }
+    .brand {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .brand h1 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--text);
+    }
+    .brand h1 span { color: var(--primary); }
+    .brand p {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 0.4rem;
+    }
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .form-group {
+      margin-bottom: 1.1rem;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.4rem;
+    }
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 0.75rem 1rem;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus { border-color: var(--primary); }
+    .btn {
+      width: 100%;
+      padding: 0.875rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.5px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .error-box {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      color: var(--red);
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    .success-box {
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.3);
+      border-radius: 8px;
+      color: var(--green);
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    .links {
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+    .links a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+    .links a:hover { text-decoration: underline; }
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.5rem 0;
+    }
+    .spacer { margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <h1>CARD <span>BREAK</span> PRO</h1>
+      <p>Register Your Business</p>
+    </div>
+
+    <div id="errorBox" class="error-box"></div>
+    <div id="successBox" class="success-box"></div>
+
+    <form id="registerForm">
+      <div class="section-title">Business Info</div>
+
+      <div class="form-group">
+        <label for="businessName">Business Name</label>
+        <input type="text" id="businessName" placeholder="e.g. Rip &amp; Ship Cards" required />
+      </div>
+
+      <div class="form-group">
+        <label for="displayName">Your Name</label>
+        <input type="text" id="displayName" placeholder="e.g. Mike" required />
+      </div>
+
+      <div class="spacer"></div>
+      <div class="section-title">Account Credentials</div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="you@example.com" required autocomplete="email" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Min 8 characters" required autocomplete="new-password" />
+      </div>
+
+      <div class="form-group">
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" placeholder="Repeat password" required autocomplete="new-password" />
+      </div>
+
+      <button type="submit" id="registerBtn" class="btn btn-primary">Create Business Account</button>
+    </form>
+
+    <hr class="divider" />
+
+    <div class="links">
+      <a href="index.html">Already have an account? Sign in</a>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    const { createClient } = supabase;
+    const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+    const errorBox = document.getElementById('errorBox');
+    const successBox = document.getElementById('successBox');
+    const registerBtn = document.getElementById('registerBtn');
+    const registerForm = document.getElementById('registerForm');
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.style.display = 'block';
+      successBox.style.display = 'none';
+    }
+
+    function showSuccess(msg) {
+      successBox.textContent = msg;
+      successBox.style.display = 'block';
+      errorBox.style.display = 'none';
+    }
+
+    function hideMessages() {
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+    }
+
+    registerForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      hideMessages();
+
+      const businessName = document.getElementById('businessName').value.trim();
+      const displayName = document.getElementById('displayName').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (!businessName || !displayName || !email || !password || !confirmPassword) {
+        showError('All fields are required.');
+        return;
+      }
+
+      if (password.length < 8) {
+        showError('Password must be at least 8 characters.');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        showError('Passwords do not match.');
+        return;
+      }
+
+      registerBtn.disabled = true;
+      registerBtn.textContent = 'Creating account…';
+
+      let userId = null;
+
+      try {
+        // Step 1: Create Supabase auth user
+        const { data: authData, error: authError } = await sb.auth.signUp({
+          email,
+          password
+        });
+
+        if (authError) {
+          showError(escHtml(authError.message));
+          return;
+        }
+
+        if (!authData.user) {
+          showError('Registration failed. Please try again.');
+          return;
+        }
+
+        userId = authData.user.id;
+
+        // Step 2: Create organization
+        const { data: orgData, error: orgError } = await sb
+          .from('organizations')
+          .insert({ name: businessName, owner_id: userId })
+          .select('id')
+          .single();
+
+        if (orgError) {
+          showError('Failed to create organization: ' + escHtml(orgError.message));
+          return;
+        }
+
+        const orgId = orgData.id;
+
+        // Step 3: Create owner profile
+        const { error: profileError } = await sb
+          .from('profiles')
+          .insert({
+            id: userId,
+            org_id: orgId,
+            role: 'owner',
+            display_name: displayName
+          });
+
+        if (profileError) {
+          showError('Failed to create profile: ' + escHtml(profileError.message));
+          return;
+        }
+
+        showSuccess('Account created! Redirecting to your dashboard…');
+
+        setTimeout(function () {
+          window.location.href = 'owner.html';
+        }, 1200);
+
+      } catch (err) {
+        showError('An unexpected error occurred. Please try again.');
+        console.error('Registration error:', err);
+      } finally {
+        registerBtn.disabled = false;
+        registerBtn.textContent = 'Create Business Account';
+      }
+    });
+  </script>
+</body>
+</html>

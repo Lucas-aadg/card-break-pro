@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Card Break Pro — Login</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d14;
+      --card: #13131e;
+      --border: #2d2d3d;
+      --primary: #4f6ef7;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 420px;
+    }
+    .brand {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .brand h1 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--text);
+    }
+    .brand h1 span { color: var(--primary); }
+    .brand p {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 0.4rem;
+    }
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+    }
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 0.75rem 1rem;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus { border-color: var(--primary); }
+    .btn {
+      width: 100%;
+      padding: 0.875rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.5px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .error-box {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      color: var(--red);
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    .links {
+      margin-top: 1.5rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .links a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 0.875rem;
+      transition: opacity 0.2s;
+    }
+    .links a:hover { opacity: 0.8; text-decoration: underline; }
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.5rem 0;
+    }
+    .links-label {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <h1>CARD <span>BREAK</span> PRO</h1>
+      <p>Sports Card Breaking Platform</p>
+    </div>
+
+    <div id="errorBox" class="error-box"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="you@example.com" required autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password" />
+      </div>
+      <button type="submit" id="loginBtn" class="btn btn-primary">Sign In</button>
+    </form>
+
+    <hr class="divider" />
+
+    <div class="links">
+      <span class="links-label">Don't have an account?</span>
+      <a href="register.html">New business? Register here</a>
+      <a href="join.html">Breaker? Join with invite code</a>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    const { createClient } = supabase;
+    const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+    const errorBox = document.getElementById('errorBox');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginForm = document.getElementById('loginForm');
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.style.display = 'block';
+    }
+
+    function hideError() {
+      errorBox.style.display = 'none';
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function checkExistingSession() {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) {
+          await redirectByRole(session.user.id);
+        }
+      } catch (err) {
+        console.error('Session check error:', err);
+      }
+    }
+
+    async function redirectByRole(userId) {
+      try {
+        const { data: profile, error } = await sb
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .single();
+
+        if (error || !profile) return;
+
+        if (profile.role === 'owner') {
+          window.location.href = 'owner.html';
+        } else if (profile.role === 'breaker') {
+          window.location.href = 'breaker.html';
+        }
+      } catch (err) {
+        console.error('Role check error:', err);
+      }
+    }
+
+    loginForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      hideError();
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) {
+        showError('Please enter your email and password.');
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in…';
+
+      try {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+        if (error) {
+          showError(escHtml(error.message));
+          return;
+        }
+
+        if (!data.user) {
+          showError('Login failed. Please try again.');
+          return;
+        }
+
+        await redirectByRole(data.user.id);
+      } catch (err) {
+        showError('An unexpected error occurred. Please try again.');
+        console.error('Login error:', err);
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign In';
+      }
+    });
+
+    checkExistingSession();
+  </script>
+</body>
+</html>
