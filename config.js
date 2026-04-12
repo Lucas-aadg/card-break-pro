@@ -6,6 +6,6 @@
 // ============================================================
 
 window.SUPABASE_CONFIG = {
-  url: 'https://YOUR_PROJECT_ID.supabase.co',
-  anonKey: 'YOUR_ANON_KEY_HERE'
+  url: 'https://qvkxcmruejbvzmjvphqh.supabase.co',
+  anonKey: 'sb_publishable_AslX9_gsBcDQwjRFZ6TplA_RE6tpO99'
 };
