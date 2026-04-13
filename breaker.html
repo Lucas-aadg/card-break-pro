@@ -505,12 +505,7 @@
     <div class="panel">
       <div class="panel-title">My Payouts</div>
 
-      <!-- Commission Rate -->
-      <div style="padding:0.875rem;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.2);border-radius:8px;margin-bottom:1.25rem;">
-        <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.25rem;">My Commission Rate</div>
-        <div style="font-size:1.6rem;font-weight:800;color:var(--primary);" id="myCommissionRate">0%</div>
-        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.25rem;">Applied to: (Final Sales − Box Cost) per closed stream</div>
-      </div>
+      <div id="myCommissionRate" style="display:none;"></div>
 
       <!-- Period filter -->
       <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem;flex-wrap:wrap;">
@@ -1311,6 +1306,11 @@ async function handleConfirmClose() {
   const finalFee = Math.max(0, totalSubmitted - finalSales);
   const netProfit = finalSales - totalBox - totalFees - totalOther;
 
+  // Commission payout: (final_sales - box_cost) * rate
+  const commissionRate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
+  const streamProfit = finalSales - totalBox;
+  const commissionPayout = streamProfit > 0 ? streamProfit * commissionRate : 0;
+
   const confirmBtn = document.getElementById('confirmCloseBtn');
   confirmBtn.disabled = true;
   confirmBtn.textContent = 'Closing…';
@@ -1326,6 +1326,7 @@ async function handleConfirmClose() {
         final_sales: finalSales,
         final_fee: finalFee,
         net_profit: netProfit,
+        commission_payout: commissionPayout,
         notes: notes || null,
         closed_at: new Date().toISOString()
       })

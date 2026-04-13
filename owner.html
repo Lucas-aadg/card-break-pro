@@ -2057,10 +2057,19 @@ async function loadDashboard() {
     const todayCount = (todayBreaks || []).length;
     const todayAvg = todayCount > 0 ? todayRev / todayCount : 0;
 
+    // Deduct commission payouts from today's closed streams
+    const { data: todayStreams } = await sb
+      .from('streams').select('commission_payout')
+      .eq('org_id', currentProfile.org_id)
+      .eq('status', 'closed')
+      .eq('break_date', todayStr);
+    const todayCommission = (todayStreams || []).reduce(function (s, x) { return s + (parseFloat(x.commission_payout) || 0); }, 0);
+    const todayProfitAfterCommission = todayProfit - todayCommission;
+
     document.getElementById('dash-revenue').textContent = fmt(todayRev);
     const profitEl = document.getElementById('dash-profit');
-    profitEl.textContent = fmt(todayProfit);
-    profitEl.className = 'stat-value ' + (todayProfit >= 0 ? 'green' : 'red');
+    profitEl.textContent = fmt(todayProfitAfterCommission);
+    profitEl.className = 'stat-value ' + (todayProfitAfterCommission >= 0 ? 'green' : 'red');
     document.getElementById('dash-breaks').textContent = todayCount;
     document.getElementById('dash-avg').textContent = todayCount > 0 ? fmt(todayAvg) : '—';
 
@@ -2072,10 +2081,19 @@ async function loadDashboard() {
 
     const totalRev = (allBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
     const totalProfit = (allBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
+
+    // Deduct all-time commission payouts
+    const { data: allStreams } = await sb
+      .from('streams').select('commission_payout')
+      .eq('org_id', currentProfile.org_id)
+      .eq('status', 'closed');
+    const totalCommission = (allStreams || []).reduce(function (s, x) { return s + (parseFloat(x.commission_payout) || 0); }, 0);
+    const totalProfitAfterCommission = totalProfit - totalCommission;
+
     document.getElementById('dash-totalRevenue').textContent = fmt(totalRev);
     const totalProfitEl = document.getElementById('dash-totalProfit');
-    totalProfitEl.textContent = fmt(totalProfit);
-    totalProfitEl.className = 'stat-value ' + (totalProfit >= 0 ? 'green' : 'red');
+    totalProfitEl.textContent = fmt(totalProfitAfterCommission);
+    totalProfitEl.className = 'stat-value ' + (totalProfitAfterCommission >= 0 ? 'green' : 'red');
     document.getElementById('dash-totalBreaks').textContent = (allBreaks || []).length;
 
     // Streams count
