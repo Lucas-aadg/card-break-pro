@@ -720,6 +720,48 @@
        TAB: TEAM
   ════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-team">
+    <!-- Commission Toggle -->
+    <div class="panel">
+      <div class="panel-title">Commission Settings</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <div style="flex:1;">
+          <div style="font-weight:700;color:var(--text);margin-bottom:0.35rem;">Commission Breakers</div>
+          <div style="font-size:0.82rem;color:var(--muted);max-width:480px;">When enabled, breakers will see a Payouts tab showing their commission earnings and tips. Set each breaker's commission rate below. Tips logged by breakers go directly to them and are tracked separately from business expenses.</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;flex-shrink:0;">
+          <div style="position:relative;width:44px;height:24px;">
+            <input type="checkbox" id="commissionToggle" style="opacity:0;width:0;height:0;position:absolute;" />
+            <span id="toggleTrack" style="position:absolute;inset:0;background:var(--border);border-radius:24px;transition:background 0.2s;cursor:pointer;"></span>
+            <span id="toggleThumb" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform 0.2s;"></span>
+          </div>
+          <span id="commissionToggleLabel" style="font-size:0.85rem;font-weight:600;color:var(--muted);">Off</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Payout Overview (visible when commission enabled) -->
+    <div id="payoutOverviewPanel" style="display:none;">
+      <div class="panel">
+        <div class="panel-title">Team Payout Overview</div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+          <button class="owner-payout-btn active" data-period="daily" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;">Today</button>
+          <button class="owner-payout-btn" data-period="weekly" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">This Week</button>
+          <button class="owner-payout-btn" data-period="monthly" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">This Month</button>
+          <button class="owner-payout-btn" data-period="all" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">All Time</button>
+        </div>
+        <div class="tbl-wrap">
+          <table class="data-table">
+            <thead><tr><th>Breaker</th><th>Rate</th><th>Revenue</th><th>Commission</th><th>Tips</th><th>Total Payout</th></tr></thead>
+            <tbody id="payoutTableBody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:0.75rem;padding:0.75rem;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;display:flex;justify-content:space-between;">
+          <span style="font-weight:700;color:var(--muted);">Total Commission Expense</span>
+          <span style="font-weight:800;color:var(--red);" id="totalPayoutExpense">$0.00</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Generate Invite Code -->
     <div class="panel">
       <div class="panel-title">Invite a New Breaker</div>
@@ -760,6 +802,7 @@
               <th>Name</th>
               <th>Role</th>
               <th>Joined</th>
+              <th id="commissionRateHeader" style="display:none;">Commission %</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -1021,7 +1064,7 @@ function setupTabNav() {
         else if (tab === 'dashboard') await loadDashboard();
         else if (tab === 'productRoi') await loadProductRoi();
         else if (tab === 'leaderboard') await loadLeaderboard();
-        else if (tab === 'team') await loadTeam();
+        else if (tab === 'team') { await setupCommissionToggle(); await loadTeam(); }
       } catch (err) {
         showGlobalError('Failed to load tab: ' + escHtml(err.message));
         console.error(err);
@@ -2298,8 +2341,12 @@ async function loadTeam() {
   const tbody = document.getElementById('teamTableBody');
   tbody.innerHTML = '';
 
+  const commissionEnabled = await getCommissionEnabled();
+  const showCommission = commissionEnabled;
+  document.getElementById('commissionRateHeader').style.display = showCommission ? '' : 'none';
+
   if (allProfiles.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No team members yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="' + (showCommission ? '5' : '4') + '">No team members yet.</td></tr>';
     return;
   }
 
@@ -2307,10 +2354,16 @@ async function loadTeam() {
     const tr = document.createElement('tr');
     const isMe = p.id === currentUser.id;
     const isOwner = p.role === 'owner';
+    const commissionCell = showCommission
+      ? (isOwner
+          ? '<td>—</td>'
+          : '<td><div style="display:flex;align-items:center;gap:0.4rem;"><input type="number" class="commission-rate-input" data-id="' + p.id + '" value="' + (parseFloat(p.commission_rate) || 0) + '" min="0" max="100" step="0.1" style="width:70px;padding:0.25rem 0.5rem;font-size:0.85rem;text-align:center;" /><span style="color:var(--muted);font-size:0.8rem;">%</span></div></td>')
+        : '';
     tr.innerHTML =
       '<td><strong>' + escHtml(p.display_name) + '</strong>' + (isMe ? ' <span style="color:var(--muted);font-size:0.75rem;">(you)</span>' : '') + '</td>' +
       '<td><span class="badge ' + (isOwner ? 'badge-blue' : 'badge-green') + '">' + escHtml(p.role) + '</span></td>' +
       '<td>' + fmtDate(p.created_at) + '</td>' +
+      commissionCell +
       '<td>' +
         (!isMe && !isOwner ?
           '<button class="btn btn-sm" data-action="remove" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:rgba(239,68,68,0.15);color:var(--red);">Remove</button>'
@@ -2318,6 +2371,17 @@ async function loadTeam() {
         ) +
       '</td>';
     tbody.appendChild(tr);
+  });
+
+  // Commission rate save on change
+  tbody.querySelectorAll('.commission-rate-input').forEach(function (input) {
+    input.addEventListener('change', async function () {
+      const id = this.dataset.id;
+      const rate = parseFloat(this.value) || 0;
+      const { error } = await sb.from('profiles').update({ commission_rate: rate }).eq('id', id);
+      if (error) showGlobalError('Failed to save rate.');
+      else showGlobalSuccess('Commission rate updated.');
+    });
   });
 
   tbody.querySelectorAll('[data-action="remove"]').forEach(function (btn) {
@@ -2340,6 +2404,102 @@ async function loadTeam() {
       );
     });
   });
+
+  if (commissionEnabled) await loadPayoutOverview('daily');
+}
+
+// ── Commission ────────────────────────────────────────────
+let ownerPayoutPeriod = 'daily';
+
+async function getCommissionEnabled() {
+  try {
+    const { data: org } = await sb.from('organizations').select('commission_enabled').eq('id', currentProfile.org_id).single();
+    return org ? !!org.commission_enabled : false;
+  } catch { return false; }
+}
+
+async function setupCommissionToggle() {
+  const toggle = document.getElementById('commissionToggle');
+  const track = document.getElementById('toggleTrack');
+  const thumb = document.getElementById('toggleThumb');
+  const label = document.getElementById('commissionToggleLabel');
+  const overviewPanel = document.getElementById('payoutOverviewPanel');
+
+  const enabled = await getCommissionEnabled();
+  toggle.checked = enabled;
+  if (enabled) {
+    track.style.background = 'var(--primary)';
+    thumb.style.transform = 'translateX(20px)';
+    label.textContent = 'On';
+    label.style.color = 'var(--primary)';
+    overviewPanel.style.display = 'block';
+  }
+
+  toggle.addEventListener('change', async function () {
+    const on = this.checked;
+    track.style.background = on ? 'var(--primary)' : 'var(--border)';
+    thumb.style.transform = on ? 'translateX(20px)' : 'translateX(0)';
+    label.textContent = on ? 'On' : 'Off';
+    label.style.color = on ? 'var(--primary)' : 'var(--muted)';
+    overviewPanel.style.display = on ? 'block' : 'none';
+    const { error } = await sb.from('organizations').update({ commission_enabled: on }).eq('id', currentProfile.org_id);
+    if (error) showGlobalError('Failed to update commission setting.');
+    else await loadTeam();
+  });
+
+  document.querySelectorAll('.owner-payout-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      ownerPayoutPeriod = this.dataset.period;
+      document.querySelectorAll('.owner-payout-btn').forEach(function (b) {
+        b.style.background = 'var(--bg)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
+      });
+      this.style.background = 'var(--primary)'; this.style.color = '#fff'; this.style.borderColor = 'var(--primary)';
+      loadPayoutOverview(ownerPayoutPeriod);
+    });
+  });
+}
+
+function getOwnerPeriodRange(period) {
+  const now = new Date();
+  let from;
+  if (period === 'daily') from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  else if (period === 'weekly') { const d = now.getDay(); from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - d); }
+  else if (period === 'monthly') from = new Date(now.getFullYear(), now.getMonth(), 1);
+  else from = new Date(2000, 0, 1);
+  return from.toISOString();
+}
+
+async function loadPayoutOverview(period) {
+  const from = getOwnerPeriodRange(period);
+  const breakers = allProfiles.filter(function (p) { return p.role === 'breaker'; });
+  const tbody = document.getElementById('payoutTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  let grandTotal = 0;
+
+  for (const b of breakers) {
+    const rate = (parseFloat(b.commission_rate) || 0) / 100;
+    const { data: breaksData } = await sb.from('breaks').select('revenue').eq('breaker_id', b.id).gte('created_at', from);
+    const revenue = (breaksData || []).reduce(function (s, x) { return s + (parseFloat(x.revenue) || 0); }, 0);
+    const commission = revenue * rate;
+    const { data: tipsData } = await sb.from('tips').select('amount').eq('breaker_id', b.id).gte('created_at', from);
+    const tips = (tipsData || []).reduce(function (s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
+    const total = commission + tips;
+    grandTotal += total;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escHtml(b.display_name) + '</td>' +
+      '<td>' + (parseFloat(b.commission_rate) || 0) + '%</td>' +
+      '<td>' + fmt(revenue) + '</td>' +
+      '<td style="color:var(--red);">' + fmt(commission) + '</td>' +
+      '<td>' + fmt(tips) + '</td>' +
+      '<td style="font-weight:700;">' + fmt(total) + '</td>';
+    tbody.appendChild(tr);
+  }
+
+  if (breakers.length === 0) tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No breakers on team yet.</td></tr>';
+  document.getElementById('totalPayoutExpense').textContent = fmt(grandTotal);
 }
 
 // ── Boot ──────────────────────────────────────────────────

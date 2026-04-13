@@ -482,6 +482,66 @@
       <button class="btn btn-outline" id="refreshProductsBtn">REFRESH PRODUCTS</button>
     </div>
   </div>
+
+  <!-- PAYOUTS TAB (only shown when commission is enabled) -->
+  <div id="payoutsSection" style="display:none;">
+    <div class="panel">
+      <div class="panel-title">My Payouts</div>
+
+      <!-- Commission Rate -->
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;padding:0.875rem;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.2);border-radius:8px;">
+        <div style="flex:1;">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">My Commission Rate</div>
+          <div style="font-size:1.6rem;font-weight:800;color:var(--primary);" id="myCommissionRate">0%</div>
+        </div>
+      </div>
+
+      <!-- Period filter -->
+      <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem;flex-wrap:wrap;">
+        <button class="payout-period-btn active" data-period="daily" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">Today</button>
+        <button class="payout-period-btn" data-period="weekly" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.8rem;font-weight:600;cursor:pointer;">This Week</button>
+        <button class="payout-period-btn" data-period="monthly" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.8rem;font-weight:600;cursor:pointer;">This Month</button>
+        <button class="payout-period-btn" data-period="all" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.8rem;font-weight:600;cursor:pointer;">All Time</button>
+      </div>
+
+      <!-- Payout summary -->
+      <div class="grid-3" style="margin-bottom:1.25rem;">
+        <div class="stat-card">
+          <div class="stat-label">Revenue Generated</div>
+          <div class="stat-value" id="payoutRevenue">$0.00</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Commission Earned</div>
+          <div class="stat-value green" id="payoutCommission">$0.00</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tips Received</div>
+          <div class="stat-value green" id="payoutTips">$0.00</div>
+        </div>
+      </div>
+
+      <div style="padding:0.75rem;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+        <span style="font-weight:700;color:var(--muted);">Total Payout</span>
+        <span style="font-size:1.4rem;font-weight:800;color:var(--green);" id="payoutTotal">$0.00</span>
+      </div>
+
+      <!-- Log a tip -->
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Log a Customer Tip</div>
+        <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:1;min-width:120px;">
+            <label>Tip Amount ($)</label>
+            <input type="number" id="tipAmountInput" placeholder="0.00" min="0" step="0.01" />
+          </div>
+          <div style="flex:2;min-width:160px;">
+            <label>Note (optional)</label>
+            <input type="text" id="tipNoteInput" placeholder="e.g. From John" />
+          </div>
+          <button class="btn btn-primary" id="logTipBtn" style="padding:0.65rem 1.25rem;white-space:nowrap;">Log Tip</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- CLOSE OUT MODAL -->
@@ -516,8 +576,13 @@
       <input type="number" id="finalSalesInput" placeholder="0.00" min="0" step="0.01" style="font-size:1.3rem;font-weight:700;font-family:'Consolas',monospace;margin-top:8px;border-color:var(--primary);" />
     </div>
 
+    <div id="finalFeeRow" style="display:none;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 14px;margin-bottom:0.75rem;font-size:0.875rem;">
+      <span style="color:var(--muted);">Final Fee (giveaways/overages):</span>
+      <strong style="color:var(--red);float:right;" id="finalFeeDisplay">$0.00</strong>
+    </div>
+
     <div class="net-preview">
-      <span class="net-label">Estimated Net Profit</span>
+      <span class="net-label">Final Net Profit</span>
       <span class="net-val" id="netProfitPreview">—</span>
     </div>
 
@@ -629,6 +694,7 @@ async function initAuth() {
     await loadProducts();
     setupEventListeners();
     initSession();
+    await checkCommissionEnabled();
     hideLoading();
   } catch (err) {
     hideLoading();
@@ -1166,7 +1232,8 @@ async function openCloseOutModal() {
     totalFees += parseFloat(b.estimated_fees) || 0;
   });
 
-  document.getElementById('coTotalRevenue').textContent = fmt(totalRev);
+  const totalRevenue = totalRev;
+  document.getElementById('coTotalRevenue').textContent = fmt(totalRevenue);
   document.getElementById('coTotalBoxCost').textContent = fmt(totalBox);
   document.getElementById('coTotalFees').textContent = fmt(totalFees);
 
@@ -1176,10 +1243,12 @@ async function openCloseOutModal() {
   document.getElementById('netProfitPreview').className = 'net-val';
 
   // Store totals for net calc
+  document.getElementById('closeOutModal').dataset.totalRevenue = totalRevenue;
   document.getElementById('closeOutModal').dataset.totalBox = totalBox;
   document.getElementById('closeOutModal').dataset.totalFees = totalFees;
   document.getElementById('closeOutModal').dataset.totalOther =
     currentStream ? (parseFloat(currentStream.total_other_costs) || 0) : 0;
+  document.getElementById('finalFeeRow').style.display = 'none';
 
   document.getElementById('closeOutModal').classList.add('active');
 }
@@ -1195,9 +1264,11 @@ async function handleConfirmClose() {
 
   const finalSales = parseFloat(finalSalesStr);
   const modal = document.getElementById('closeOutModal');
+  const totalSubmitted = parseFloat(modal.dataset.totalRevenue) || 0;
   const totalBox = parseFloat(modal.dataset.totalBox) || 0;
   const totalFees = parseFloat(modal.dataset.totalFees) || 0;
   const totalOther = parseFloat(modal.dataset.totalOther) || 0;
+  const finalFee = Math.max(0, totalSubmitted - finalSales);
   const netProfit = finalSales - totalBox - totalFees - totalOther;
 
   const confirmBtn = document.getElementById('confirmCloseBtn');
@@ -1213,6 +1284,7 @@ async function handleConfirmClose() {
       .update({
         status: 'closed',
         final_sales: finalSales,
+        final_fee: finalFee,
         net_profit: netProfit,
         notes: notes || null,
         closed_at: new Date().toISOString()
@@ -1237,7 +1309,7 @@ async function handleConfirmClose() {
 
     await loadProducts();
 
-    showSuccess('Stream closed out! Net Profit: ' + fmt(netProfit));
+    showSuccess('Stream closed out! Final Fee: ' + fmt(finalFee) + ' | Net Profit: ' + fmt(netProfit));
   } catch (err) {
     showError('Failed to close stream: ' + escHtml(err.message));
     console.error(err);
@@ -1288,12 +1360,25 @@ function setupEventListeners() {
   document.getElementById('breakDate').addEventListener('change', onStreamKeyChange);
 
   document.getElementById('finalSalesInput').addEventListener('input', function () {
-    const val = parseFloat(this.value) || 0;
+    const finalSales = parseFloat(this.value) || 0;
     const modal = document.getElementById('closeOutModal');
+    const totalSubmitted = parseFloat(modal.dataset.totalRevenue) || 0;
     const totalBox = parseFloat(modal.dataset.totalBox) || 0;
     const totalFees = parseFloat(modal.dataset.totalFees) || 0;
     const totalOther = parseFloat(modal.dataset.totalOther) || 0;
-    const net = val - totalBox - totalFees - totalOther;
+
+    // Final fee = difference between what was submitted vs actual collected
+    const finalFee = Math.max(0, totalSubmitted - finalSales);
+    const finalFeeRow = document.getElementById('finalFeeRow');
+    const finalFeeDisplay = document.getElementById('finalFeeDisplay');
+    if (finalFee > 0) {
+      finalFeeRow.style.display = 'block';
+      finalFeeDisplay.textContent = fmt(finalFee);
+    } else {
+      finalFeeRow.style.display = 'none';
+    }
+
+    const net = finalSales - totalBox - totalFees - totalOther;
     const el = document.getElementById('netProfitPreview');
     el.textContent = fmt(net);
     el.className = 'net-val ' + (net >= 0 ? 'positive' : 'negative');
@@ -1302,6 +1387,119 @@ function setupEventListeners() {
   // Close modal on overlay click
   document.getElementById('closeOutModal').addEventListener('click', function (e) {
     if (e.target === this) this.classList.remove('active');
+  });
+}
+
+// ── Commission / Payouts ──────────────────────────────────
+let currentPeriod = 'daily';
+
+async function checkCommissionEnabled() {
+  try {
+    const { data: org } = await sb
+      .from('organizations')
+      .select('commission_enabled')
+      .eq('id', currentProfile.org_id)
+      .single();
+
+    if (org && org.commission_enabled) {
+      document.getElementById('payoutsSection').style.display = 'block';
+      const rate = parseFloat(currentProfile.commission_rate) || 0;
+      document.getElementById('myCommissionRate').textContent = rate + '%';
+      await loadPayouts();
+      setupPayoutListeners();
+    }
+  } catch (err) {
+    console.error('Commission check error:', err);
+  }
+}
+
+function getPeriodRange(period) {
+  const now = new Date();
+  let from;
+  if (period === 'daily') {
+    from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (period === 'weekly') {
+    const day = now.getDay();
+    from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+  } else if (period === 'monthly') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else {
+    from = new Date(2000, 0, 1);
+  }
+  return from.toISOString();
+}
+
+async function loadPayouts() {
+  const from = getPeriodRange(currentPeriod);
+  const rate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
+
+  // Load breaks for this breaker in the period
+  const { data: breaksData } = await sb
+    .from('breaks')
+    .select('revenue, created_at')
+    .eq('breaker_id', currentUser.id)
+    .gte('created_at', from);
+
+  const totalRevenue = (breaksData || []).reduce(function (sum, b) { return sum + (parseFloat(b.revenue) || 0); }, 0);
+  const commission = totalRevenue * rate;
+
+  // Load tips
+  const { data: tipsData } = await sb
+    .from('tips')
+    .select('amount')
+    .eq('breaker_id', currentUser.id)
+    .gte('created_at', from);
+
+  const totalTips = (tipsData || []).reduce(function (sum, t) { return sum + (parseFloat(t.amount) || 0); }, 0);
+
+  document.getElementById('payoutRevenue').textContent = fmt(totalRevenue);
+  document.getElementById('payoutCommission').textContent = fmt(commission);
+  document.getElementById('payoutTips').textContent = fmt(totalTips);
+  document.getElementById('payoutTotal').textContent = fmt(commission + totalTips);
+}
+
+function setupPayoutListeners() {
+  document.querySelectorAll('.payout-period-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      currentPeriod = this.dataset.period;
+      document.querySelectorAll('.payout-period-btn').forEach(function (b) {
+        b.style.background = 'var(--bg)';
+        b.style.color = 'var(--muted)';
+        b.style.borderColor = 'var(--border)';
+      });
+      this.style.background = 'var(--primary)';
+      this.style.color = '#fff';
+      this.style.borderColor = 'var(--primary)';
+      loadPayouts();
+    });
+  });
+
+  document.getElementById('logTipBtn').addEventListener('click', async function () {
+    const amount = parseFloat(document.getElementById('tipAmountInput').value) || 0;
+    const note = document.getElementById('tipNoteInput').value.trim();
+    if (!amount || amount <= 0) { showError('Enter a valid tip amount.'); return; }
+
+    this.disabled = true;
+    this.textContent = 'Saving…';
+    try {
+      const { error } = await sb.from('tips').insert({
+        org_id: currentProfile.org_id,
+        breaker_id: currentUser.id,
+        stream_id: currentStream ? currentStream.id : null,
+        amount,
+        note: note || null
+      });
+      if (error) throw error;
+      document.getElementById('tipAmountInput').value = '';
+      document.getElementById('tipNoteInput').value = '';
+      showSuccess('Tip logged: ' + fmt(amount));
+      await loadPayouts();
+    } catch (err) {
+      showError('Failed to log tip: ' + escHtml(err.message));
+    } finally {
+      this.disabled = false;
+      this.textContent = 'Log Tip';
+    }
   });
 }
 
