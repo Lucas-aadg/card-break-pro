@@ -689,7 +689,7 @@ let activeCategory = 'All';
 
 function buildCategoryFilter() {
   const categories = ['All', ...new Set(products.map(function (p) { return p.category || 'Uncategorized'; }))];
-  if (categories.length <= 2) return; // only show filter if there are multiple categories
+  if (categories.length <= 1) return;
 
   const filterEl = document.getElementById('categoryFilter');
   filterEl.style.display = 'flex';
