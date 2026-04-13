@@ -386,6 +386,7 @@
   <!-- PRODUCTS -->
   <div class="panel">
     <div class="panel-title">Products Used This Break</div>
+    <div id="categoryFilter" style="display:none;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;"></div>
     <div id="productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
     <div id="productsWrap" style="display:none;overflow-x:auto;">
       <table class="product-table">
@@ -675,6 +676,7 @@ async function loadProducts() {
       return;
     }
 
+    buildCategoryFilter();
     renderProductTable();
     loadingEl.style.display = 'none';
     wrapEl.style.display = 'block';
@@ -683,11 +685,43 @@ async function loadProducts() {
   }
 }
 
+let activeCategory = 'All';
+
+function buildCategoryFilter() {
+  const categories = ['All', ...new Set(products.map(function (p) { return p.category || 'Uncategorized'; }))];
+  if (categories.length <= 2) return; // only show filter if there are multiple categories
+
+  const filterEl = document.getElementById('categoryFilter');
+  filterEl.style.display = 'flex';
+  filterEl.innerHTML = '';
+
+  categories.forEach(function (cat) {
+    const btn = document.createElement('button');
+    btn.textContent = cat;
+    btn.style.cssText = 'padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:' +
+      (cat === activeCategory ? 'var(--primary)' : 'var(--bg)') +
+      ';color:' + (cat === activeCategory ? '#fff' : 'var(--muted)') +
+      ';font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s;';
+    btn.addEventListener('click', function () {
+      activeCategory = cat;
+      buildCategoryFilter();
+      renderProductTable();
+    });
+    filterEl.appendChild(btn);
+  });
+}
+
 function renderProductTable() {
   const tbody = document.getElementById('productTableBody');
   tbody.innerHTML = '';
 
-  products.forEach(function (p, idx) {
+  const filtered = products.filter(function (p) {
+    if (activeCategory === 'All') return true;
+    return (p.category || 'Uncategorized') === activeCategory;
+  });
+
+  filtered.forEach(function (p) {
+    const idx = products.indexOf(p);
     const tr = document.createElement('tr');
     const stockClass = p.current_stock === 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
     const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
