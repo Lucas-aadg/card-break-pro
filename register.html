@@ -314,12 +314,21 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: authData.user.id, email: authData.user.email, orgId: orgId })
         });
-        const { url, error: checkoutError } = await response.json();
-        if (checkoutError) throw new Error(checkoutError);
+
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (parseErr) {
+          throw new Error('Checkout server error (status ' + response.status + '). Check Vercel logs.');
+        }
+
+        const { url, error: checkoutError } = responseData;
+        if (checkoutError) throw new Error('Stripe error: ' + checkoutError);
+        if (!url) throw new Error('No checkout URL returned. Check Stripe env vars in Vercel.');
         window.location.href = url;
 
       } catch (err) {
-        showError('An unexpected error occurred. Please try again.');
+        showError(err.message || 'An unexpected error occurred. Please try again.');
         console.error('Registration error:', err);
       } finally {
         registerBtn.disabled = false;
