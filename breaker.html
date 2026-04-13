@@ -62,6 +62,14 @@
     .btn-sm:hover { opacity: 0.8; }
     .btn-signout { background: var(--border); color: var(--text); }
 
+    /* TABS */
+    .breaker-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--card); padding: 0 1.5rem; }
+    .breaker-tab-btn { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 0.85rem 1.25rem; cursor: pointer; transition: color 0.2s, border-color 0.2s; }
+    .breaker-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .breaker-tab-btn:hover:not(.active) { color: var(--text); }
+    .breaker-tab-content { display: none; }
+    .breaker-tab-content.active { display: block; }
+
     /* LAYOUT */
     .main { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
@@ -360,9 +368,16 @@
   </div>
 </nav>
 
+<div class="breaker-tabs">
+  <button class="breaker-tab-btn active" data-tab="entry">Break Entry</button>
+  <button class="breaker-tab-btn" data-tab="payouts" id="payoutsTabBtn" style="display:none;">My Payouts</button>
+</div>
+
 <div class="main">
   <div id="errorBox" class="error-box"></div>
   <div id="successBox" class="success-box"></div>
+
+  <div class="breaker-tab-content active" id="breaker-tab-entry">
 
   <!-- SESSION -->
   <div class="panel">
@@ -483,17 +498,18 @@
     </div>
   </div>
 
-  <!-- PAYOUTS TAB (only shown when commission is enabled) -->
-  <div id="payoutsSection" style="display:none;">
+  </div><!-- end breaker-tab-entry -->
+
+  <!-- PAYOUTS TAB -->
+  <div class="breaker-tab-content" id="breaker-tab-payouts">
     <div class="panel">
       <div class="panel-title">My Payouts</div>
 
       <!-- Commission Rate -->
-      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;padding:0.875rem;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.2);border-radius:8px;">
-        <div style="flex:1;">
-          <div style="font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">My Commission Rate</div>
-          <div style="font-size:1.6rem;font-weight:800;color:var(--primary);" id="myCommissionRate">0%</div>
-        </div>
+      <div style="padding:0.875rem;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.2);border-radius:8px;margin-bottom:1.25rem;">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.25rem;">My Commission Rate</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--primary);" id="myCommissionRate">0%</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.25rem;">Applied to: (Final Sales − Box Cost) per closed stream</div>
       </div>
 
       <!-- Period filter -->
@@ -507,8 +523,8 @@
       <!-- Payout summary -->
       <div class="grid-3" style="margin-bottom:1.25rem;">
         <div class="stat-card">
-          <div class="stat-label">Revenue Generated</div>
-          <div class="stat-value" id="payoutRevenue">$0.00</div>
+          <div class="stat-label">Stream Profit (My Streams)</div>
+          <div class="stat-value" id="payoutProfit">$0.00</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Commission Earned</div>
@@ -520,13 +536,35 @@
         </div>
       </div>
 
+      <!-- Per stream breakdown -->
+      <div style="margin-bottom:1.25rem;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Stream Breakdown</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Stream</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Date</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Final Sales</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Box Cost</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Profit</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Commission</th>
+              </tr>
+            </thead>
+            <tbody id="payoutStreamBody">
+              <tr><td colspan="6" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No closed streams in this period.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div style="padding:0.75rem;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-        <span style="font-weight:700;color:var(--muted);">Total Payout</span>
+        <span style="font-weight:700;color:var(--muted);">Total Payout (Commission + Tips)</span>
         <span style="font-size:1.4rem;font-weight:800;color:var(--green);" id="payoutTotal">$0.00</span>
       </div>
 
       <!-- Log a tip -->
-      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
+      <div style="border-top:1px solid var(--border);padding-top:1rem;">
         <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Log a Customer Tip</div>
         <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
           <div style="flex:1;min-width:120px;">
@@ -542,7 +580,8 @@
       </div>
     </div>
   </div>
-</div>
+
+</div><!-- end main -->
 
 <!-- CLOSE OUT MODAL -->
 <div class="modal-overlay" id="closeOutModal">
@@ -692,6 +731,7 @@ async function initAuth() {
     document.getElementById('breakerBadge').textContent = escHtml(profile.display_name);
 
     await loadProducts();
+    setupBreakerTabs();
     setupEventListeners();
     initSession();
     await checkCommissionEnabled();
@@ -1390,6 +1430,19 @@ function setupEventListeners() {
   });
 }
 
+// ── Tabs ─────────────────────────────────────────────────
+function setupBreakerTabs() {
+  document.querySelectorAll('.breaker-tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.breaker-tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.breaker-tab-content').forEach(function (c) { c.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('breaker-tab-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'payouts') loadPayouts();
+    });
+  });
+}
+
 // ── Commission / Payouts ──────────────────────────────────
 let currentPeriod = 'daily';
 
@@ -1402,10 +1455,9 @@ async function checkCommissionEnabled() {
       .single();
 
     if (org && org.commission_enabled) {
-      document.getElementById('payoutsSection').style.display = 'block';
+      document.getElementById('payoutsTabBtn').style.display = '';
       const rate = parseFloat(currentProfile.commission_rate) || 0;
       document.getElementById('myCommissionRate').textContent = rate + '%';
-      await loadPayouts();
       setupPayoutListeners();
     }
   } catch (err) {
@@ -1416,16 +1468,10 @@ async function checkCommissionEnabled() {
 function getPeriodRange(period) {
   const now = new Date();
   let from;
-  if (period === 'daily') {
-    from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  } else if (period === 'weekly') {
-    const day = now.getDay();
-    from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
-  } else if (period === 'monthly') {
-    from = new Date(now.getFullYear(), now.getMonth(), 1);
-  } else {
-    from = new Date(2000, 0, 1);
-  }
+  if (period === 'daily') from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  else if (period === 'weekly') { const d = now.getDay(); from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - d); }
+  else if (period === 'monthly') from = new Date(now.getFullYear(), now.getMonth(), 1);
+  else from = new Date(2000, 0, 1);
   return from.toISOString();
 }
 
@@ -1433,29 +1479,58 @@ async function loadPayouts() {
   const from = getPeriodRange(currentPeriod);
   const rate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
 
-  // Load breaks for this breaker in the period
-  const { data: breaksData } = await sb
-    .from('breaks')
-    .select('revenue, created_at')
+  // Load CLOSED streams for this breaker in the period — commission is based on profit
+  const { data: streamsData } = await sb
+    .from('streams')
+    .select('id, stream_key, break_date, final_sales, total_product_cost, net_profit')
     .eq('breaker_id', currentUser.id)
-    .gte('created_at', from);
+    .eq('status', 'closed')
+    .gte('closed_at', from)
+    .order('break_date', { ascending: false });
 
-  const totalRevenue = (breaksData || []).reduce(function (sum, b) { return sum + (parseFloat(b.revenue) || 0); }, 0);
-  const commission = totalRevenue * rate;
+  const streams = streamsData || [];
+  let totalProfit = 0;
+  let totalCommission = 0;
 
-  // Load tips
+  const tbody = document.getElementById('payoutStreamBody');
+  tbody.innerHTML = '';
+
+  streams.forEach(function (s) {
+    const finalSales = parseFloat(s.final_sales) || 0;
+    const boxCost = parseFloat(s.total_product_cost) || 0;
+    const profit = finalSales - boxCost;
+    const commission = profit * rate;
+    totalProfit += profit;
+    totalCommission += commission;
+
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
+    tr.innerHTML =
+      '<td style="padding:0.4rem 0.5rem;">' + escHtml(s.stream_key) + '</td>' +
+      '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + s.break_date + '</td>' +
+      '<td style="padding:0.4rem 0.5rem;">' + fmt(finalSales) + '</td>' +
+      '<td style="padding:0.4rem 0.5rem;">' + fmt(boxCost) + '</td>' +
+      '<td style="padding:0.4rem 0.5rem;color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(profit) + '</td>' +
+      '<td style="padding:0.4rem 0.5rem;font-weight:700;color:var(--green);">' + fmt(commission) + '</td>';
+    tbody.appendChild(tr);
+  });
+
+  if (streams.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No closed streams in this period.</td></tr>';
+  }
+
+  // Tips
   const { data: tipsData } = await sb
     .from('tips')
     .select('amount')
     .eq('breaker_id', currentUser.id)
     .gte('created_at', from);
+  const totalTips = (tipsData || []).reduce(function (s, t) { return s + (parseFloat(t.amount) || 0); }, 0);
 
-  const totalTips = (tipsData || []).reduce(function (sum, t) { return sum + (parseFloat(t.amount) || 0); }, 0);
-
-  document.getElementById('payoutRevenue').textContent = fmt(totalRevenue);
-  document.getElementById('payoutCommission').textContent = fmt(commission);
+  document.getElementById('payoutProfit').textContent = fmt(totalProfit);
+  document.getElementById('payoutCommission').textContent = fmt(totalCommission);
   document.getElementById('payoutTips').textContent = fmt(totalTips);
-  document.getElementById('payoutTotal').textContent = fmt(commission + totalTips);
+  document.getElementById('payoutTotal').textContent = fmt(totalCommission + totalTips);
 }
 
 function setupPayoutListeners() {
@@ -1463,13 +1538,9 @@ function setupPayoutListeners() {
     btn.addEventListener('click', function () {
       currentPeriod = this.dataset.period;
       document.querySelectorAll('.payout-period-btn').forEach(function (b) {
-        b.style.background = 'var(--bg)';
-        b.style.color = 'var(--muted)';
-        b.style.borderColor = 'var(--border)';
+        b.style.background = 'var(--bg)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
       });
-      this.style.background = 'var(--primary)';
-      this.style.color = '#fff';
-      this.style.borderColor = 'var(--primary)';
+      this.style.background = 'var(--primary)'; this.style.color = '#fff'; this.style.borderColor = 'var(--primary)';
       loadPayouts();
     });
   });
@@ -1478,9 +1549,7 @@ function setupPayoutListeners() {
     const amount = parseFloat(document.getElementById('tipAmountInput').value) || 0;
     const note = document.getElementById('tipNoteInput').value.trim();
     if (!amount || amount <= 0) { showError('Enter a valid tip amount.'); return; }
-
-    this.disabled = true;
-    this.textContent = 'Saving…';
+    this.disabled = true; this.textContent = 'Saving…';
     try {
       const { error } = await sb.from('tips').insert({
         org_id: currentProfile.org_id,
@@ -1497,8 +1566,7 @@ function setupPayoutListeners() {
     } catch (err) {
       showError('Failed to log tip: ' + escHtml(err.message));
     } finally {
-      this.disabled = false;
-      this.textContent = 'Log Tip';
+      this.disabled = false; this.textContent = 'Log Tip';
     }
   });
 }

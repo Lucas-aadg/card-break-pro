@@ -2479,9 +2479,16 @@ async function loadPayoutOverview(period) {
 
   for (const b of breakers) {
     const rate = (parseFloat(b.commission_rate) || 0) / 100;
-    const { data: breaksData } = await sb.from('breaks').select('revenue').eq('breaker_id', b.id).gte('created_at', from);
-    const revenue = (breaksData || []).reduce(function (s, x) { return s + (parseFloat(x.revenue) || 0); }, 0);
-    const commission = revenue * rate;
+    // Commission based on profit from closed streams: (final_sales - box_cost) * rate
+    const { data: streamsData } = await sb.from('streams')
+      .select('final_sales, total_product_cost')
+      .eq('breaker_id', b.id)
+      .eq('status', 'closed')
+      .gte('closed_at', from);
+    const profit = (streamsData || []).reduce(function (s, x) {
+      return s + (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0);
+    }, 0);
+    const commission = profit * rate;
     const { data: tipsData } = await sb.from('tips').select('amount').eq('breaker_id', b.id).gte('created_at', from);
     const tips = (tipsData || []).reduce(function (s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
     const total = commission + tips;
@@ -2491,7 +2498,7 @@ async function loadPayoutOverview(period) {
     tr.innerHTML =
       '<td>' + escHtml(b.display_name) + '</td>' +
       '<td>' + (parseFloat(b.commission_rate) || 0) + '%</td>' +
-      '<td>' + fmt(revenue) + '</td>' +
+      '<td>' + fmt(profit) + '</td>' +
       '<td style="color:var(--red);">' + fmt(commission) + '</td>' +
       '<td>' + fmt(tips) + '</td>' +
       '<td style="font-weight:700;">' + fmt(total) + '</td>';
