@@ -26,8 +26,8 @@ module.exports = async (req, res) => {
         user_id: userId,
         org_id: orgId
       },
-      success_url: process.env.APP_URL + '/dashboard?subscribed=true',
-      cancel_url: process.env.APP_URL + '/register?cancelled=true'
+      success_url: 'https://cardbreakpro.com/dashboard?subscribed=true',
+      cancel_url: 'https://cardbreakpro.com/register?cancelled=true'
     });
 
     res.status(200).json({ url: session.url });
