@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Card Break Pro — Billing</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d14;
+      --card: #13131e;
+      --border: #2d2d3d;
+      --primary: #4f6ef7;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --yellow: #f59e0b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* NAV */
+    nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 52px;
+    }
+    .nav-brand {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-brand span { color: var(--primary); }
+    .nav-actions { display: flex; gap: 0.75rem; align-items: center; }
+    .btn-sm {
+      padding: 0.35rem 0.8rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-sm:hover { opacity: 0.8; }
+    .btn-back { background: var(--border); color: var(--text); }
+    .btn-signout { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+
+    /* MAIN */
+    .main {
+      max-width: 600px;
+      margin: 3rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+    .page-sub {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    /* STATUS CARD */
+    .billing-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.25rem;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .status-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.9rem;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-active { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .status-past_due { background: rgba(245,158,11,0.12); color: var(--yellow); border: 1px solid rgba(245,158,11,0.25); }
+    .status-cancelled { background: rgba(239,68,68,0.12); color: var(--red); border: 1px solid rgba(239,68,68,0.25); }
+    .status-inactive { background: rgba(100,116,139,0.12); color: var(--muted); border: 1px solid rgba(100,116,139,0.25); }
+
+    .plan-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .plan-name { font-weight: 700; font-size: 1rem; }
+    .plan-price { font-size: 1.4rem; font-weight: 800; color: var(--primary); }
+    .plan-period { font-size: 0.8rem; color: var(--muted); }
+
+    .btn-full {
+      width: 100%;
+      padding: 0.875rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.5px;
+      margin-top: 1.25rem;
+    }
+    .btn-full:active { transform: scale(0.98); }
+    .btn-full:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-reactivate { background: var(--green); color: #fff; }
+    .btn-reactivate:hover:not(:disabled) { opacity: 0.9; }
+
+    /* WARNING BOX */
+    .warning-box {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    .warning-box h4 { color: var(--red); font-size: 0.9rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .warning-box p { color: var(--muted); font-size: 0.875rem; line-height: 1.5; }
+
+    .past-due-warning {
+      background: rgba(245,158,11,0.08);
+      border-color: rgba(245,158,11,0.25);
+    }
+    .past-due-warning h4 { color: var(--yellow); }
+
+    /* ERROR / INFO */
+    .error-box {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      color: var(--red);
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    .info-box {
+      background: rgba(79,110,247,0.08);
+      border: 1px solid rgba(79,110,247,0.2);
+      border-radius: 8px;
+      color: var(--primary);
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+
+    /* LOADING */
+    #loadingState {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    #billingContent { display: none; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="owner.html" class="nav-brand">CARD <span>BREAK</span> PRO</a>
+    <div class="nav-actions">
+      <a href="owner.html" class="btn-sm btn-back">Back to Dashboard</a>
+      <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div id="loadingState">Loading billing info&hellip;</div>
+
+    <div id="billingContent">
+      <div class="page-title">Billing &amp; Subscription</div>
+      <div class="page-sub">Manage your Card Break Pro subscription.</div>
+
+      <div id="errorBox" class="error-box"></div>
+      <div id="infoBox" class="info-box"></div>
+
+      <!-- Warning: cancelled -->
+      <div id="cancelledWarning" class="warning-box">
+        <h4>Subscription Cancelled</h4>
+        <p>Your subscription has been cancelled. Reactivate to regain access to your owner dashboard.</p>
+      </div>
+
+      <!-- Warning: past due -->
+      <div id="pastDueWarning" class="warning-box past-due-warning">
+        <h4>Payment Past Due</h4>
+        <p>Your last payment failed. Please update your payment method to avoid losing dashboard access.</p>
+      </div>
+
+      <div class="billing-card">
+        <div class="status-row">
+          <div>
+            <div class="status-label">Subscription Status</div>
+          </div>
+          <div id="statusBadge" class="status-badge status-inactive">inactive</div>
+        </div>
+
+        <div class="plan-row">
+          <div>
+            <div class="plan-name">Card Break Pro</div>
+            <div class="plan-period">Billed monthly</div>
+          </div>
+          <div class="plan-price">$250<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span></div>
+        </div>
+
+        <!-- Active: manage via Stripe portal -->
+        <button id="manageBtn" class="btn-full btn-primary" style="display:none;">
+          Manage Subscription
+        </button>
+
+        <!-- Inactive / cancelled / past_due: reactivate -->
+        <a href="register.html" id="reactivateBtn" class="btn-full btn-reactivate" style="display:none;text-align:center;text-decoration:none;">
+          Reactivate Subscription
+        </a>
+      </div>
+
+      <div style="text-align:center;margin-top:1.5rem;">
+        <a href="owner.html" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">
+          &larr; Back to Dashboard
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    const { createClient } = supabase;
+    const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+    const loadingState = document.getElementById('loadingState');
+    const billingContent = document.getElementById('billingContent');
+    const errorBox = document.getElementById('errorBox');
+    const infoBox = document.getElementById('infoBox');
+    const statusBadge = document.getElementById('statusBadge');
+    const manageBtn = document.getElementById('manageBtn');
+    const reactivateBtn = document.getElementById('reactivateBtn');
+    const cancelledWarning = document.getElementById('cancelledWarning');
+    const pastDueWarning = document.getElementById('pastDueWarning');
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.style.display = 'block';
+    }
+
+    function showInfo(msg) {
+      infoBox.textContent = msg;
+      infoBox.style.display = 'block';
+    }
+
+    function setStatus(status) {
+      const labels = {
+        active: 'Active',
+        past_due: 'Past Due',
+        cancelled: 'Cancelled',
+        inactive: 'Inactive'
+      };
+      statusBadge.textContent = labels[status] || status;
+      statusBadge.className = 'status-badge status-' + (status || 'inactive');
+    }
+
+    async function init() {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { window.location.href = 'index.html'; return; }
+
+        const { data: profile, error: profileError } = await sb
+          .from('profiles')
+          .select('role, org_id')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError || !profile) { window.location.href = 'index.html'; return; }
+        if (profile.role !== 'owner') { window.location.href = 'breaker.html'; return; }
+
+        const { data: sub, error: subError } = await sb
+          .from('subscriptions')
+          .select('status, stripe_customer_id')
+          .eq('org_id', profile.org_id)
+          .maybeSingle();
+
+        if (subError) {
+          showError('Failed to load subscription info: ' + subError.message);
+        }
+
+        const status = sub ? sub.status : 'inactive';
+        setStatus(status);
+
+        // Check for ?subscribed=true query param
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('subscribed') === 'true') {
+          showInfo('Your subscription is now active. Welcome to Card Break Pro!');
+        }
+
+        if (status === 'active') {
+          manageBtn.style.display = 'block';
+          manageBtn.addEventListener('click', async function () {
+            if (!sub || !sub.stripe_customer_id) {
+              showError('No Stripe customer found. Please contact support.');
+              return;
+            }
+            manageBtn.disabled = true;
+            manageBtn.textContent = 'Opening portal\u2026';
+            try {
+              const resp = await fetch('/api/create-portal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customerId: sub.stripe_customer_id })
+              });
+              const { url, error } = await resp.json();
+              if (error) throw new Error(error);
+              window.location.href = url;
+            } catch (err) {
+              showError('Failed to open portal: ' + err.message);
+              manageBtn.disabled = false;
+              manageBtn.textContent = 'Manage Subscription';
+            }
+          });
+        } else {
+          if (status === 'cancelled') {
+            cancelledWarning.style.display = 'block';
+          } else if (status === 'past_due') {
+            pastDueWarning.style.display = 'block';
+            // Also show manage btn if we have a customer id to fix payment
+            if (sub && sub.stripe_customer_id) {
+              manageBtn.style.display = 'block';
+              manageBtn.textContent = 'Update Payment Method';
+              manageBtn.addEventListener('click', async function () {
+                manageBtn.disabled = true;
+                manageBtn.textContent = 'Opening portal\u2026';
+                try {
+                  const resp = await fetch('/api/create-portal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customerId: sub.stripe_customer_id })
+                  });
+                  const { url, error } = await resp.json();
+                  if (error) throw new Error(error);
+                  window.location.href = url;
+                } catch (err) {
+                  showError('Failed to open portal: ' + err.message);
+                  manageBtn.disabled = false;
+                  manageBtn.textContent = 'Update Payment Method';
+                }
+              });
+            }
+          }
+          reactivateBtn.style.display = 'block';
+        }
+
+        loadingState.style.display = 'none';
+        billingContent.style.display = 'block';
+
+      } catch (err) {
+        console.error('Billing init error:', err);
+        showError('An unexpected error occurred.');
+        loadingState.style.display = 'none';
+        billingContent.style.display = 'block';
+      }
+    }
+
+    document.getElementById('signOutBtn').addEventListener('click', async function () {
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
+    });
+
+    init();
+  </script>
+</body>
+</html>

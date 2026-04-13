@@ -360,6 +360,7 @@
   <div class="nav-actions">
     <span id="ownerBadge" style="color:var(--muted);font-size:0.8rem;"></span>
     <button class="btn-sm btn-danger-sm" id="resetDataBtn">Reset Data</button>
+    <a href="/billing.html" style="color:var(--muted);font-size:13px;text-decoration:none;">Billing</a>
     <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
   </div>
 </nav>
@@ -949,6 +950,30 @@ async function initAuth() {
 
     if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
     if (profile.role !== 'owner') { window.location.href = profile.role === 'breaker' ? 'breaker.html' : 'index.html'; return; }
+
+    // Check subscription status
+    const { data: sub } = await sb
+      .from('subscriptions')
+      .select('status')
+      .eq('org_id', profile.org_id)
+      .maybeSingle();
+
+    if (!sub || sub.status !== 'active') {
+      // Show a full-page paywall overlay instead of the dashboard
+      document.body.innerHTML = `
+        <div style="min-height:100vh;background:#0d0d14;display:flex;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;">
+          <div style="background:#13131e;border:1px solid #2d2d3d;border-radius:12px;padding:40px;max-width:480px;text-align:center;">
+            <div style="font-size:2rem;font-weight:800;color:#e2e8f0;margin-bottom:8px;">CARD <span style="color:#4f6ef7;">BREAK</span> PRO</div>
+            <div style="color:#ef4444;font-size:1.1rem;font-weight:600;margin-bottom:12px;">Subscription Required</div>
+            <div style="color:#64748b;margin-bottom:24px;font-size:0.95rem;">Your subscription is ${sub ? sub.status : 'inactive'}. Activate your subscription to access the dashboard.</div>
+            <a href="/billing.html" style="display:inline-block;background:#4f6ef7;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;text-decoration:none;margin-bottom:12px;">Manage Subscription</a>
+            <br>
+            <button onclick="sb.auth.signOut().then(()=>location.href='/index.html')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.85rem;margin-top:8px;">Sign Out</button>
+          </div>
+        </div>
+      `;
+      return;
+    }
 
     currentProfile = profile;
     document.getElementById('ownerBadge').textContent = escHtml(profile.display_name);

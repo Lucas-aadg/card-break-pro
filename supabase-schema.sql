@@ -249,3 +249,39 @@ create index if not exists idx_breaks_stream_id    on breaks(stream_id);
 create index if not exists idx_breaks_breaker_id   on breaks(breaker_id);
 create index if not exists idx_breaks_break_date   on breaks(break_date);
 create index if not exists idx_invite_codes_code   on invite_codes(code);
+
+-- ============================================================
+-- SUBSCRIPTIONS (added for Stripe integration)
+-- ============================================================
+
+create table if not exists subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid references organizations(id) unique not null,
+  user_id uuid references auth.users(id),
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  status text not null default 'inactive',
+  updated_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+
+alter table subscriptions enable row level security;
+
+-- Org members can read their own subscription
+create policy "subscriptions_select"
+  on subscriptions for select
+  using (org_id = get_my_org_id());
+
+-- Only service role (webhook) can insert/update subscriptions
+-- App uses supabase service key in the webhook, bypasses RLS
+create policy "subscriptions_insert"
+  on subscriptions for insert
+  with check (true);
+
+create policy "subscriptions_update"
+  on subscriptions for update
+  using (true);
+
+create index if not exists idx_subscriptions_org_id on subscriptions(org_id);
+create index if not exists idx_subscriptions_stripe_customer on subscriptions(stripe_customer_id);
+create index if not exists idx_subscriptions_stripe_sub on subscriptions(stripe_subscription_id);

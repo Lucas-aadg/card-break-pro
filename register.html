@@ -305,11 +305,18 @@
           return;
         }
 
-        showSuccess('Account created! Redirecting to your dashboard…');
+        showSuccess('Account created! Redirecting to checkout…');
+        registerBtn.textContent = 'Redirecting to checkout…';
 
-        setTimeout(function () {
-          window.location.href = 'owner.html';
-        }, 1200);
+        // Redirect to Stripe Checkout for $250/mo subscription
+        const response = await fetch('/api/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: authData.user.id, email: authData.user.email, orgId: orgId })
+        });
+        const { url, error: checkoutError } = await response.json();
+        if (checkoutError) throw new Error(checkoutError);
+        window.location.href = url;
 
       } catch (err) {
         showError('An unexpected error occurred. Please try again.');

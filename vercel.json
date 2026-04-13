@@ -4,6 +4,12 @@
     { "source": "/register", "destination": "/register.html" },
     { "source": "/join", "destination": "/join.html" },
     { "source": "/dashboard", "destination": "/owner.html" },
-    { "source": "/break", "destination": "/breaker.html" }
-  ]
+    { "source": "/break", "destination": "/breaker.html" },
+    { "source": "/billing", "destination": "/billing.html" }
+  ],
+  "functions": {
+    "api/stripe-webhook.js": {
+      "bodyParser": false
+    }
+  }
 }
