@@ -1,15 +1,32 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 
-// Must use raw body for Stripe signature verification
+// Disable body parsing so we get the raw body for Stripe signature verification
+module.exports.config = {
+  api: {
+    bodyParser: false
+  }
+};
+
+function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 module.exports = async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    const rawBody = await getRawBody(req);
+    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    return res.status(400).json({ error: 'Webhook signature verification failed' });
+    console.error('Webhook signature error:', err.message);
+    return res.status(400).json({ error: 'Webhook signature verification failed: ' + err.message });
   }
 
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -25,7 +42,7 @@ module.exports = async (req, res) => {
         const session = event.data.object;
         const { userId, orgId } = getMetadata(session);
         if (!orgId) break;
-        await sb.from('subscriptions').upsert({
+        const { error } = await sb.from('subscriptions').upsert({
           org_id: orgId,
           user_id: userId,
           stripe_customer_id: session.customer,
@@ -33,6 +50,7 @@ module.exports = async (req, res) => {
           status: 'active',
           updated_at: new Date().toISOString()
         }, { onConflict: 'org_id' });
+        if (error) console.error('Supabase upsert error:', error);
         break;
       }
       case 'customer.subscription.updated': {
@@ -59,7 +77,7 @@ module.exports = async (req, res) => {
     }
     res.status(200).json({ received: true });
   } catch (err) {
-    console.error(err);
+    console.error('Webhook handler error:', err);
     res.status(500).json({ error: err.message });
   }
 };

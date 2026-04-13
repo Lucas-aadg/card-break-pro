@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
   <title>Card Break Pro — The Platform Built for Live Card Breakers</title>
   <style>
     :root {
@@ -29,14 +30,15 @@
       background: var(--card);
       border-bottom: 1px solid var(--border);
       padding: 0 2rem;
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      justify-content: space-between;
       position: sticky;
       top: 0;
       z-index: 100;
       min-height: 60px;
     }
+    nav .nav-login { justify-self: end; }
     .nav-brand {
       font-size: 1.15rem;
       font-weight: 800;
@@ -351,6 +353,7 @@
 
   <!-- NAV -->
   <nav>
+    <div></div>
     <a href="/" class="nav-brand"><img src="/logo.png?v=3" alt="Card Break Pro" style="height:50px;vertical-align:middle;" /></a>
     <a href="/login" class="nav-login">Login</a>
   </nav>
