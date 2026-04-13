@@ -370,6 +370,7 @@
 
 <div class="breaker-tabs">
   <button class="breaker-tab-btn active" data-tab="entry">Break Entry</button>
+  <button class="breaker-tab-btn" data-tab="shifts">My Shifts</button>
   <button class="breaker-tab-btn" data-tab="payouts" id="payoutsTabBtn" style="display:none;">My Payouts</button>
 </div>
 
@@ -451,7 +452,10 @@
       <span>$</span>
       <input type="number" id="revenueInput" placeholder="0.00" min="0" step="0.01" />
     </div>
-    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1.25rem;" id="breakRevenuePreview">This break's revenue: <strong style="color:var(--text);">$0.00</strong></div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+      <div style="font-size:0.8rem;color:var(--muted);" id="breakRevenuePreview">This break's revenue: <strong style="color:var(--text);">$0.00</strong></div>
+      <div style="font-size:0.8rem;color:var(--muted);" id="costPerSpotPreview" style="display:none;">Cost per spot: <strong style="color:var(--text);">—</strong></div>
+    </div>
     <div class="calc-grid">
       <div>
         <label for="spotsInput">Spots Sold</label>
@@ -572,6 +576,32 @@
           </div>
           <button class="btn btn-primary" id="logTipBtn" style="padding:0.65rem 1.25rem;white-space:nowrap;">Log Tip</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHIFTS TAB -->
+  <div class="breaker-tab-content" id="breaker-tab-shifts">
+    <div class="panel">
+      <div class="panel-title">My Upcoming Shifts</div>
+      <div id="shiftsLoading" style="color:var(--muted);font-size:0.85rem;">Loading shifts…</div>
+      <div id="shiftsWrap" style="display:none;"></div>
+      <div id="noShiftsMsg" style="display:none;color:var(--muted);font-size:0.85rem;font-style:italic;">No upcoming shifts scheduled. Check with your manager.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Past Shifts</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Date</th>
+              <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Time</th>
+              <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Stream Key</th>
+              <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="pastShiftsBody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -730,6 +760,7 @@ async function initAuth() {
     setupEventListeners();
     initSession();
     await checkCommissionEnabled();
+    await checkTodayShiftAndNotify();
     hideLoading();
   } catch (err) {
     hideLoading();
@@ -947,6 +978,18 @@ function recalcTotals() {
   if (previewEl) {
     previewEl.innerHTML = 'This break\'s revenue: <strong style="color:' + (thisBreakRevenue > 0 ? 'var(--green)' : 'var(--text)') + ';">' + fmt(thisBreakRevenue) + '</strong>'
       + (submittedBreaks.length > 0 ? ' <span style="color:var(--muted);font-size:0.75rem;">(' + fmt(currentWhatnotTotal) + ' total − ' + fmt(getPreviousCumulativeTotal()) + ' prev)</span>' : '');
+  }
+
+  // Cost per spot
+  const cpsEl = document.getElementById('costPerSpotPreview');
+  if (cpsEl) {
+    if (spots > 0 && thisBreakRevenue > 0) {
+      const costPerSpot = thisBreakRevenue / spots;
+      cpsEl.innerHTML = 'Cost per spot: <strong style="color:var(--primary);">' + fmt(costPerSpot) + '</strong>';
+      cpsEl.style.display = '';
+    } else {
+      cpsEl.style.display = 'none';
+    }
   }
 
   updateRunningTotalLivePreview(currentWhatnotTotal);
@@ -1350,6 +1393,17 @@ async function handleConfirmClose() {
 
     await loadProducts();
 
+    // Clock out if shift is active
+    if (activeShiftId) {
+      await sb.from('schedules').update({
+        status: 'completed',
+        clocked_out_at: new Date().toISOString()
+      }).eq('id', activeShiftId);
+      activeShiftId = null;
+      const clockedInBanner = document.getElementById('clockedInBanner');
+      if (clockedInBanner) clockedInBanner.remove();
+    }
+
     showSuccess('Stream closed out! Final Fee: ' + fmt(finalFee) + ' | Net Profit: ' + fmt(netProfit));
   } catch (err) {
     showError('Failed to close stream: ' + escHtml(err.message));
@@ -1440,8 +1494,147 @@ function setupBreakerTabs() {
       btn.classList.add('active');
       document.getElementById('breaker-tab-' + btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'payouts') loadPayouts();
+      if (btn.dataset.tab === 'shifts') loadShifts();
     });
   });
+}
+
+// ── Shifts ────────────────────────────────────────────────
+async function loadShifts() {
+  const loading = document.getElementById('shiftsLoading');
+  const wrap = document.getElementById('shiftsWrap');
+  const noMsg = document.getElementById('noShiftsMsg');
+  loading.style.display = 'block';
+  wrap.style.display = 'none';
+  noMsg.style.display = 'none';
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await sb
+    .from('schedules')
+    .select('*')
+    .eq('breaker_id', currentUser.id)
+    .order('scheduled_date', { ascending: true });
+
+  loading.style.display = 'none';
+  if (error || !data) { noMsg.style.display = 'block'; return; }
+
+  const upcoming = data.filter(function (s) { return s.scheduled_date >= today && s.status !== 'cancelled'; });
+  const past = data.filter(function (s) { return s.scheduled_date < today || s.status === 'cancelled'; });
+
+  // Past shifts table
+  const pastBody = document.getElementById('pastShiftsBody');
+  pastBody.innerHTML = '';
+  if (past.length === 0) {
+    pastBody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No past shifts.</td></tr>';
+  } else {
+    past.slice().reverse().forEach(function (s) {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
+      const statusColor = s.status === 'completed' ? 'var(--green)' : s.status === 'cancelled' ? 'var(--red)' : 'var(--muted)';
+      tr.innerHTML =
+        '<td style="padding:0.4rem 0.5rem;">' + s.scheduled_date + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + (s.start_time ? s.start_time.slice(0,5) : '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + escHtml(s.stream_key || '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:' + statusColor + ';">' + s.status.toUpperCase() + '</td>';
+      pastBody.appendChild(tr);
+    });
+  }
+
+  if (upcoming.length === 0) { noMsg.style.display = 'block'; return; }
+
+  // Upcoming shift cards
+  wrap.style.display = 'block';
+  wrap.innerHTML = '';
+  upcoming.forEach(function (s) {
+    const isToday = s.scheduled_date === today;
+    const card = document.createElement('div');
+    card.style.cssText = 'border:1px solid ' + (isToday ? 'var(--primary)' : 'var(--border)') + ';border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.75rem;background:' + (isToday ? 'rgba(79,110,247,0.06)' : 'var(--bg)') + ';display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;';
+    card.innerHTML =
+      '<div>' +
+        '<div style="font-weight:800;font-size:1rem;color:var(--text);">' + s.scheduled_date + (isToday ? ' <span style="background:var(--primary);color:#fff;font-size:0.65rem;padding:2px 7px;border-radius:100px;vertical-align:middle;">TODAY</span>' : '') + '</div>' +
+        '<div style="color:var(--muted);font-size:0.83rem;margin-top:0.25rem;">' +
+          (s.start_time ? '&#128336; ' + s.start_time.slice(0,5) + '&nbsp;&nbsp;' : '') +
+          (s.stream_key ? '&#128273; ' + escHtml(s.stream_key) + '&nbsp;&nbsp;' : '') +
+          (s.notes ? '&#128203; ' + escHtml(s.notes) : '') +
+        '</div>' +
+      '</div>' +
+      (s.status === 'in_progress' ? '<span style="font-size:0.78rem;font-weight:700;color:var(--green);">&#9200; Clocked In</span>' : isToday ? '<span style="font-size:0.78rem;font-weight:700;color:var(--primary);">Today — Clock In Above</span>' : '<span style="font-size:0.78rem;color:var(--muted);">Scheduled</span>');
+    wrap.appendChild(card);
+  });
+}
+
+let activeShiftId = null;
+
+async function checkTodayShiftAndNotify() {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await sb
+    .from('schedules')
+    .select('*')
+    .eq('breaker_id', currentUser.id)
+    .eq('scheduled_date', today)
+    .neq('status', 'cancelled');
+
+  if (!data || data.length === 0) return;
+
+  const shift = data[0];
+
+  // If already clocked in, just restore state silently
+  if (shift.status === 'in_progress') {
+    activeShiftId = shift.id;
+    showClockedInBanner(shift);
+    return;
+  }
+
+  // Show clock-in banner
+  const banner = document.createElement('div');
+  banner.id = 'shiftBanner';
+  banner.style.cssText = 'background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);border-radius:10px;padding:0.875rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;';
+  banner.innerHTML =
+    '<div>' +
+      '<div style="font-weight:700;color:var(--primary);margin-bottom:0.2rem;">&#128336; You have a shift today!</div>' +
+      '<div style="font-size:0.83rem;color:var(--muted);">' +
+        (shift.start_time ? 'Start time: ' + shift.start_time.slice(0,5) + '&nbsp;&nbsp;' : '') +
+        (shift.stream_key ? '&#128273; ' + escHtml(shift.stream_key) + '&nbsp;&nbsp;' : '') +
+        (shift.notes ? escHtml(shift.notes) : '') +
+      '</div>' +
+    '</div>' +
+    '<button id="clockInBtn" class="btn btn-green" style="padding:0.55rem 1.25rem;font-size:0.875rem;white-space:nowrap;">&#9200; Clock In</button>';
+
+  const errorBox = document.getElementById('errorBox');
+  errorBox.parentNode.insertBefore(banner, errorBox);
+
+  document.getElementById('clockInBtn').addEventListener('click', async function () {
+    this.disabled = true;
+    this.textContent = 'Clocking in…';
+    await sb.from('schedules').update({
+      status: 'in_progress',
+      clocked_in_at: new Date().toISOString()
+    }).eq('id', shift.id);
+    activeShiftId = shift.id;
+    // Pre-fill stream key
+    if (shift.stream_key) {
+      document.getElementById('streamKey').value = shift.stream_key;
+      await onStreamKeyChange();
+    }
+    banner.remove();
+    showClockedInBanner(shift);
+    showSuccess('Clocked in! Have a great stream.');
+  });
+}
+
+function showClockedInBanner(shift) {
+  const existing = document.getElementById('clockedInBanner');
+  if (existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'clockedInBanner';
+  banner.style.cssText = 'background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:0.7rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;';
+  banner.innerHTML =
+    '<span style="color:var(--green);font-size:1rem;">&#9200;</span>' +
+    '<span style="font-size:0.85rem;color:var(--green);font-weight:700;">Clocked In</span>' +
+    (shift.stream_key ? '<span style="font-size:0.82rem;color:var(--muted);">— ' + escHtml(shift.stream_key) + '</span>' : '');
+  const errorBox = document.getElementById('errorBox');
+  errorBox.parentNode.insertBefore(banner, errorBox);
 }
 
 // ── Commission / Payouts ──────────────────────────────────

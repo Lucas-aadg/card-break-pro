@@ -357,6 +357,7 @@
     <button class="tab-btn" data-tab="productRoi">Product ROI</button>
     <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
     <button class="tab-btn" data-tab="team">Team</button>
+    <button class="tab-btn" data-tab="schedule">Schedule</button>
     <button class="tab-btn" data-tab="settings">Settings</button>
   </div>
   <div class="nav-actions">
@@ -814,6 +815,84 @@
 </div>
 
   <!-- ═══════════════════════════════════════════
+       TAB: SCHEDULE
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-schedule">
+
+    <!-- Create Shift -->
+    <div class="panel">
+      <div class="panel-title">Schedule a Shift</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div>
+          <label for="schedBreaker">Breaker</label>
+          <select id="schedBreaker" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem;padding:0.65rem 1rem;outline:none;">
+            <option value="">Select breaker…</option>
+          </select>
+        </div>
+        <div>
+          <label for="schedDate">Date</label>
+          <input type="date" id="schedDate" />
+        </div>
+        <div>
+          <label for="schedTime">Start Time</label>
+          <input type="time" id="schedTime" />
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div>
+          <label for="schedStreamKey">Stream Key (optional)</label>
+          <input type="text" id="schedStreamKey" placeholder="e.g. STREAM-001" />
+        </div>
+        <div>
+          <label for="schedNotes">Notes (optional)</label>
+          <input type="text" id="schedNotes" placeholder="e.g. Baseball boxes only" />
+        </div>
+      </div>
+      <button class="btn btn-primary" id="schedSaveBtn" style="min-width:160px;">Add Shift</button>
+    </div>
+
+    <!-- Calendar -->
+    <div class="panel">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Schedule Calendar</span>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <button id="calPrevBtn" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.25rem 0.65rem;cursor:pointer;font-size:1rem;">&#8592;</button>
+          <span id="calMonthLabel" style="font-weight:700;font-size:0.95rem;min-width:120px;text-align:center;"></span>
+          <button id="calNextBtn" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.25rem 0.65rem;cursor:pointer;font-size:1rem;">&#8594;</button>
+        </div>
+      </div>
+      <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
+      <div style="display:flex;gap:1rem;margin-top:0.75rem;flex-wrap:wrap;">
+        <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(79,110,247,0.4);border-radius:3px;display:inline-block;"></span> Scheduled</span>
+        <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(34,197,94,0.4);border-radius:3px;display:inline-block;"></span> Completed</span>
+      </div>
+    </div>
+
+    <!-- Upcoming Shifts List -->
+    <div class="panel">
+      <div class="panel-title">Upcoming Shifts</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Breaker</th>
+              <th>Stream Key</th>
+              <th>Notes</th>
+              <th>Status</th>
+              <th>Clock In</th>
+              <th>Clock Out</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="schedTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
        TAB: SETTINGS
   ════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-settings">
@@ -1081,6 +1160,7 @@ function setupTabNav() {
         else if (tab === 'productRoi') await loadProductRoi();
         else if (tab === 'leaderboard') await loadLeaderboard();
         else if (tab === 'team') { await setupCommissionToggle(); await loadTeam(); }
+        else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
       } catch (err) {
         showGlobalError('Failed to load tab: ' + escHtml(err.message));
         console.error(err);
@@ -2541,6 +2621,189 @@ async function loadPayoutOverview(period) {
 
   if (breakers.length === 0) tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No breakers on team yet.</td></tr>';
   document.getElementById('totalPayoutExpense').textContent = fmt(grandTotal);
+}
+
+// ── Schedule ──────────────────────────────────────────────
+let calYear, calMonth, allSchedules = [];
+
+async function setupSchedule() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  await loadScheduleBreakers();
+  await loadSchedules();
+  setupCalControls();
+  setupSchedSave();
+}
+
+async function loadScheduleBreakers() {
+  const sel = document.getElementById('schedBreaker');
+  sel.innerHTML = '<option value="">Select breaker…</option>';
+  const breakers = allProfiles.filter(function (p) { return p.role === 'breaker'; });
+  breakers.forEach(function (b) {
+    const opt = document.createElement('option');
+    opt.value = b.id;
+    opt.textContent = b.display_name;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadSchedules() {
+  const { data, error } = await sb
+    .from('schedules')
+    .select('*, profiles(display_name)')
+    .eq('org_id', currentProfile.org_id)
+    .order('scheduled_date', { ascending: true });
+  if (error) { showGlobalError('Failed to load schedules.'); return; }
+  allSchedules = data || [];
+  renderCalendar();
+  renderSchedTable();
+}
+
+function setupCalControls() {
+  document.getElementById('calPrevBtn').addEventListener('click', function () {
+    calMonth--;
+    if (calMonth < 0) { calMonth = 11; calYear--; }
+    renderCalendar();
+  });
+  document.getElementById('calNextBtn').addEventListener('click', function () {
+    calMonth++;
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    renderCalendar();
+  });
+}
+
+function renderCalendar() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calMonthLabel').textContent = months[calMonth] + ' ' + calYear;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  // Day headers
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function (d) {
+    const el = document.createElement('div');
+    el.style.cssText = 'text-align:center;font-size:0.7rem;font-weight:700;color:var(--muted);padding:0.25rem;';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Empty cells
+  for (let i = 0; i < firstDay; i++) {
+    grid.appendChild(document.createElement('div'));
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const dayShifts = allSchedules.filter(function (s) { return s.scheduled_date === dateStr; });
+    const isToday = dateStr === today;
+
+    const cell = document.createElement('div');
+    cell.style.cssText = 'min-height:64px;border-radius:8px;padding:4px;border:1px solid ' +
+      (isToday ? 'var(--primary)' : 'var(--border)') + ';background:' +
+      (isToday ? 'rgba(79,110,247,0.06)' : 'var(--bg)') + ';';
+
+    const dayNum = document.createElement('div');
+    dayNum.style.cssText = 'font-size:0.75rem;font-weight:' + (isToday ? '800' : '600') + ';color:' + (isToday ? 'var(--primary)' : 'var(--muted)') + ';margin-bottom:3px;';
+    dayNum.textContent = d;
+    cell.appendChild(dayNum);
+
+    dayShifts.forEach(function (s) {
+      const chip = document.createElement('div');
+      const isDone = s.status === 'completed';
+      chip.style.cssText = 'font-size:0.65rem;font-weight:600;border-radius:4px;padding:2px 4px;margin-bottom:2px;background:' +
+        (isDone ? 'rgba(34,197,94,0.2)' : 'rgba(79,110,247,0.2)') + ';color:' +
+        (isDone ? 'var(--green)' : 'var(--primary)') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      chip.textContent = (s.start_time ? s.start_time.slice(0,5) + ' ' : '') + (s.profiles ? s.profiles.display_name : '');
+      chip.title = (s.profiles ? s.profiles.display_name : '') + (s.stream_key ? ' — ' + s.stream_key : '');
+      cell.appendChild(chip);
+    });
+
+    grid.appendChild(cell);
+  }
+}
+
+function renderSchedTable() {
+  const tbody = document.getElementById('schedTableBody');
+  tbody.innerHTML = '';
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = allSchedules.filter(function (s) { return s.scheduled_date >= today; });
+
+  if (upcoming.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No upcoming shifts scheduled.</td></tr>';
+    return;
+  }
+
+  upcoming.forEach(function (s) {
+    const tr = document.createElement('tr');
+    const statusColor = s.status === 'completed' ? 'var(--green)' : s.status === 'in_progress' ? 'var(--yellow)' : s.status === 'cancelled' ? 'var(--red)' : 'var(--primary)';
+    const statusLabel = s.status === 'in_progress' ? 'CLOCKED IN' : s.status.toUpperCase();
+    const clockIn = s.clocked_in_at ? new Date(s.clocked_in_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+    const clockOut = s.clocked_out_at ? new Date(s.clocked_out_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+    tr.innerHTML =
+      '<td>' + s.scheduled_date + '</td>' +
+      '<td>' + (s.start_time ? s.start_time.slice(0,5) : '—') + '</td>' +
+      '<td><strong>' + escHtml(s.profiles ? s.profiles.display_name : '—') + '</strong></td>' +
+      '<td>' + escHtml(s.stream_key || '—') + '</td>' +
+      '<td style="color:var(--muted);">' + escHtml(s.notes || '—') + '</td>' +
+      '<td><span style="font-size:0.75rem;font-weight:700;color:' + statusColor + ';">' + statusLabel + '</span></td>' +
+      '<td style="color:var(--green);font-size:0.83rem;">' + clockIn + '</td>' +
+      '<td style="color:var(--muted);font-size:0.83rem;">' + clockOut + '</td>' +
+      '<td><button class="btn-sm btn-danger-sm" data-schedid="' + s.id + '" style="font-size:0.72rem;padding:0.2rem 0.5rem;">Cancel</button></td>';
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('[data-schedid]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const id = this.dataset.schedid;
+      openConfirm('Cancel Shift', 'Cancel this scheduled shift?', async function () {
+        await sb.from('schedules').update({ status: 'cancelled' }).eq('id', id);
+        await loadSchedules();
+        showGlobalSuccess('Shift cancelled.');
+      });
+    });
+  });
+}
+
+function setupSchedSave() {
+  document.getElementById('schedSaveBtn').addEventListener('click', async function () {
+    const breakerId = document.getElementById('schedBreaker').value;
+    const date = document.getElementById('schedDate').value;
+    const time = document.getElementById('schedTime').value;
+    const streamKey = document.getElementById('schedStreamKey').value.trim();
+    const notes = document.getElementById('schedNotes').value.trim();
+
+    if (!breakerId) { showGlobalError('Please select a breaker.'); return; }
+    if (!date) { showGlobalError('Please select a date.'); return; }
+
+    this.disabled = true; this.textContent = 'Saving…';
+    try {
+      const { error } = await sb.from('schedules').insert({
+        org_id: currentProfile.org_id,
+        breaker_id: breakerId,
+        scheduled_date: date,
+        start_time: time || null,
+        stream_key: streamKey || null,
+        notes: notes || null
+      });
+      if (error) throw error;
+      document.getElementById('schedDate').value = '';
+      document.getElementById('schedTime').value = '';
+      document.getElementById('schedStreamKey').value = '';
+      document.getElementById('schedNotes').value = '';
+      document.getElementById('schedBreaker').value = '';
+      await loadSchedules();
+      showGlobalSuccess('Shift scheduled!');
+    } catch (err) {
+      showGlobalError('Failed to schedule shift: ' + escHtml(err.message));
+    } finally {
+      this.disabled = false; this.textContent = 'Add Shift';
+    }
+  });
 }
 
 // ── Boot ──────────────────────────────────────────────────
