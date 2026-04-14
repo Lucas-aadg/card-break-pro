@@ -308,7 +308,7 @@
         try {
           const { data, error } = await sb
             .from('invite_codes')
-            .select('org_id, used, organizations(name)')
+            .select('org_id, used')
             .eq('code', code)
             .single();
 
@@ -321,8 +321,16 @@
             orgBadge.style.display = 'block';
             return;
           }
-          const orgName = data.organizations ? data.organizations.name : 'Unknown';
-          orgBadge.textContent = 'Joining: ' + escHtml(orgName);
+
+          // Separate query for org name — more reliable than join
+          const { data: orgData } = await sb
+            .from('organizations')
+            .select('name')
+            .eq('id', data.org_id)
+            .single();
+
+          const orgName = orgData ? orgData.name : 'your team';
+          orgBadge.textContent = '✓ Joining: ' + escHtml(orgName);
           orgBadge.style.color = 'var(--primary)';
           orgBadge.style.borderColor = 'rgba(79,110,247,0.3)';
           orgBadge.style.background = 'rgba(79,110,247,0.1)';
