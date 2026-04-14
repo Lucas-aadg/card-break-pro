@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>Card Break Pro — Privacy Policy</title>
+  <style>
+    :root {
+      --bg: #0d0d14; --card: #13131e; --border: #2d2d3d;
+      --primary: #4f6ef7; --text: #e2e8f0; --muted: #64748b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.7; }
+    nav {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 0 2rem; display: flex; align-items: center; justify-content: space-between;
+      min-height: 52px; position: sticky; top: 0; z-index: 100;
+    }
+    .brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 2px; color: var(--text); text-decoration: none; }
+    .brand span { color: var(--primary); }
+    .nav-back { color: var(--muted); font-size: 0.82rem; text-decoration: none; transition: color 0.2s; }
+    .nav-back:hover { color: var(--text); }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+    h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.4rem; }
+    .updated { color: var(--muted); font-size: 0.82rem; margin-bottom: 3rem; }
+    h2 { font-size: 1.05rem; font-weight: 700; margin: 2rem 0 0.5rem; color: var(--text); }
+    p { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.75rem; }
+    ul { padding-left: 1.25rem; margin-bottom: 0.75rem; }
+    ul li { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.3rem; }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+    .highlight {
+      background: rgba(79,110,247,0.08); border: 1px solid rgba(79,110,247,0.2);
+      border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+    }
+    .highlight p { margin: 0; color: var(--text); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="brand">CARD <span>BREAK</span> PRO</a>
+  <a href="/" class="nav-back">← Back to Home</a>
+</nav>
+<div class="wrap">
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: April 14, 2026</p>
+
+  <div class="highlight">
+    <p><strong>The short version:</strong> We collect only what we need to run the platform. We never sell your data. Your business information is private and isolated from other users. You can request deletion of your data at any time.</p>
+  </div>
+
+  <p>This Privacy Policy explains how Card Break Pro ("we," "us," or "our") collects, uses, and protects information about you when you use our platform at cardbreakpro.com (the "Service"). By using the Service, you agree to the practices described here.</p>
+
+  <hr class="divider" />
+
+  <h2>1. Information We Collect</h2>
+  <p><strong>Account information:</strong> When you register, we collect your name, email address, and password (stored securely, never in plain text). Business owners also provide a business name.</p>
+  <p><strong>Business data:</strong> Information you enter into the platform — including inventory, break records, stream data, revenue figures, commission settings, and schedules — is stored and associated with your organization.</p>
+  <p><strong>Payment information:</strong> We use Stripe to process payments. We never store your credit card number, CVV, or full payment details on our servers. Stripe's privacy policy governs how your payment data is handled.</p>
+  <p><strong>Usage data:</strong> We may collect basic technical information such as browser type and IP address for security and troubleshooting purposes.</p>
+
+  <h2>2. How We Use Your Information</h2>
+  <ul>
+    <li>To provide and operate the Service</li>
+    <li>To process your subscription and manage billing</li>
+    <li>To send important account communications (billing receipts, password resets, service updates)</li>
+    <li>To respond to your support requests</li>
+    <li>To detect and prevent fraud or unauthorized access</li>
+    <li>To improve the platform based on aggregate, anonymized usage patterns</li>
+  </ul>
+  <p>We do not use your data for advertising. We do not sell your data to third parties. Ever.</p>
+
+  <h2>3. Data Isolation and Security</h2>
+  <p>Your business data is fully isolated from other organizations on the platform. Row-level security is enforced at the database level — no other owner, breaker, or sorter from a different organization can access your data under any circumstances.</p>
+  <p>We use industry-standard measures to protect your information, including:</p>
+  <ul>
+    <li>Encrypted connections (HTTPS/TLS) for all data transmission</li>
+    <li>Secure, hashed password storage via Supabase Auth</li>
+    <li>Database-level access controls and row-level security policies</li>
+    <li>Payment processing via PCI-compliant Stripe infrastructure</li>
+  </ul>
+  <p>No security system is 100% foolproof. If you suspect a breach or unauthorized access to your account, contact us immediately at <a href="mailto:hello@cardbreakpro.com">hello@cardbreakpro.com</a>.</p>
+
+  <h2>4. Who We Share Data With</h2>
+  <p>We only share data with third-party services that are necessary to operate the platform:</p>
+  <ul>
+    <li><strong>Supabase</strong> — database and authentication infrastructure. Your data is stored on Supabase servers. See <a href="https://supabase.com/privacy" target="_blank">Supabase's Privacy Policy</a>.</li>
+    <li><strong>Stripe</strong> — payment processing. See <a href="https://stripe.com/privacy" target="_blank">Stripe's Privacy Policy</a>.</li>
+    <li><strong>Vercel</strong> — hosting and deployment. See <a href="https://vercel.com/legal/privacy-policy" target="_blank">Vercel's Privacy Policy</a>.</li>
+  </ul>
+  <p>We do not share your data with any other third parties, advertisers, or data brokers.</p>
+
+  <h2>5. Team Members</h2>
+  <p>When you invite team members (breakers or sorters) to your organization, their account information (name, email, role) is visible to you as the organization owner. Team members can only see data relevant to their own role — they cannot see your financials, other team members' payouts, or owner-level reports.</p>
+
+  <h2>6. Data Retention</h2>
+  <p>We retain your data for as long as your account is active. If you cancel your subscription, your data is retained for 30 days before being permanently deleted, giving you time to export or reconsider. After 30 days, all organization data is permanently removed from our systems.</p>
+  <p>You may request immediate deletion of your account and all associated data at any time by emailing <a href="mailto:hello@cardbreakpro.com">hello@cardbreakpro.com</a>.</p>
+
+  <h2>7. Your Rights</h2>
+  <p>Depending on where you are located, you may have the following rights regarding your personal data:</p>
+  <ul>
+    <li><strong>Access:</strong> Request a copy of the personal data we hold about you.</li>
+    <li><strong>Correction:</strong> Request correction of inaccurate or incomplete data.</li>
+    <li><strong>Deletion:</strong> Request deletion of your personal data.</li>
+    <li><strong>Portability:</strong> Request your data in a portable format.</li>
+    <li><strong>Objection:</strong> Object to certain types of processing.</li>
+  </ul>
+  <p>To exercise any of these rights, email us at <a href="mailto:hello@cardbreakpro.com">hello@cardbreakpro.com</a> and we will respond within 30 days.</p>
+
+  <h2>8. Cookies</h2>
+  <p>We use minimal, essential cookies only — specifically the authentication session cookie required to keep you logged in. We do not use advertising cookies, tracking cookies, or third-party analytics cookies.</p>
+
+  <h2>9. Children's Privacy</h2>
+  <p>The Service is intended for use by adults (18+) operating businesses. We do not knowingly collect personal information from anyone under 18. If you believe a minor has provided us with personal information, contact us immediately.</p>
+
+  <h2>10. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy from time to time. We will notify you of material changes by email or by a notice on the platform. Continued use of the Service after changes take effect constitutes acceptance of the updated policy.</p>
+
+  <h2>11. Contact</h2>
+  <p>Questions, concerns, or data requests? Contact us at:<br>
+  <a href="mailto:hello@cardbreakpro.com">hello@cardbreakpro.com</a></p>
+</div>
+</body>
+</html>

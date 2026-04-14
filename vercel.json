@@ -9,6 +9,8 @@
     { "source": "/billing", "destination": "/billing.html" },
     { "source": "/help-owner", "destination": "/help-owner.html" },
     { "source": "/help-breaker", "destination": "/help-breaker.html" },
-    { "source": "/sorter", "destination": "/sorter.html" }
+    { "source": "/sorter", "destination": "/sorter.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/privacy", "destination": "/privacy.html" }
   ]
 }
