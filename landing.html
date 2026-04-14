@@ -183,8 +183,20 @@
 
     /* ── PAIN SECTION ── */
     .pain-section { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-    .pain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-    @media (max-width: 700px) { .pain-grid { grid-template-columns: 1fr; } }
+    .pain-hero-card {
+      background: rgba(239,68,68,0.07);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 14px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .pain-hero-card .pain-q {
+      font-size: 1.5rem; font-weight: 900; color: var(--text);
+      margin-bottom: 0.6rem; line-height: 1.3; letter-spacing: -0.3px;
+    }
+    .pain-hero-card .pain-a { font-size: 0.95rem; color: var(--muted); max-width: 680px; }
+    .pain-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+    @media (max-width: 640px) { .pain-grid { grid-template-columns: 1fr; } }
     .pain-card {
       background: rgba(239,68,68,0.05);
       border: 1px solid rgba(239,68,68,0.15);
@@ -192,10 +204,10 @@
       padding: 1.5rem;
     }
     .pain-card .pain-q {
-      font-size: 1.05rem; font-weight: 700; color: var(--text);
+      font-size: 1rem; font-weight: 700; color: var(--text);
       margin-bottom: 0.5rem; line-height: 1.4;
     }
-    .pain-card .pain-a { font-size: 0.875rem; color: var(--muted); }
+    .pain-card .pain-a { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
 
     /* ── FEATURES ── */
     .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
@@ -272,15 +284,17 @@
     .step-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; }
     .step-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
 
-    /* ── TWO LOGINS ── */
-    .two-logins { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-    @media (max-width: 640px) { .two-logins { grid-template-columns: 1fr; } }
+    /* ── THREE ROLES ── */
+    .two-logins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    @media (max-width: 840px) { .two-logins { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .two-logins { grid-template-columns: 1fr; } }
     .login-card {
       background: var(--card); border: 1px solid var(--border);
       border-radius: 14px; padding: 2rem;
     }
     .login-card.owner { border-color: rgba(79,110,247,0.3); }
     .login-card.breaker { border-color: rgba(34,197,94,0.3); }
+    .login-card.sorter { border-color: rgba(168,85,247,0.3); }
     .login-chip {
       display: inline-block; padding: 0.25rem 0.7rem;
       border-radius: 100px; font-size: 0.7rem; font-weight: 700;
@@ -288,6 +302,7 @@
     }
     .login-chip.blue { background: rgba(79,110,247,0.12); color: var(--primary); }
     .login-chip.green { background: rgba(34,197,94,0.12); color: var(--green); }
+    .login-chip.purple { background: rgba(168,85,247,0.12); color: #a855f7; }
     .login-card h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.75rem; }
     .login-card ul { list-style: none; }
     .login-card ul li {
@@ -481,8 +496,8 @@
     <div class="num-label">Hidden Fees or Commissions</div>
   </div>
   <div class="num-item">
-    <div class="num-value">2</div>
-    <div class="num-label">Login Roles (Owner + Breaker)</div>
+    <div class="num-value">3</div>
+    <div class="num-label">Roles — Owner, Breaker, Sorter</div>
   </div>
   <div class="num-item">
     <div class="num-value">∞</div>
@@ -511,19 +526,27 @@
 <section class="pain-section">
   <div class="section-inner">
     <div class="section-label">Sound familiar?</div>
-    <div class="section-title" style="margin-bottom:2.5rem;">Running a break without this feels like this.</div>
+    <div class="section-title" style="margin-bottom:2.5rem;">Every one of these is killing your business.</div>
+    <div class="pain-hero-card">
+      <div class="pain-q">"Do you actually know if you made money last night?"</div>
+      <div class="pain-a">Most breakers genuinely don't know their real profit until days later — if ever. Stream ends, you close out Whatnot, and you're doing math in your head at midnight. That uncertainty has a cost. Card Break Pro gives you the answer the second you close out.</div>
+    </div>
     <div class="pain-grid">
       <div class="pain-card">
-        <div class="pain-q">"Did I even make money tonight?"</div>
-        <div class="pain-a">Stream ends and you're guessing. You don't know exactly what you had, what it cost, or what came in — until it's too late to change anything.</div>
+        <div class="pain-q">How many hours a week are you losing to admin work?</div>
+        <div class="pain-a">Tracking breaks in spreadsheets. Texting breakers about their schedule. Calculating commissions by hand. Hours every single week doing work a system should be doing for you.</div>
       </div>
       <div class="pain-card">
-        <div class="pain-q">"What do I have, and how much is it worth?"</div>
-        <div class="pain-a">You're pulling boxes without knowing your exact inventory, cost per box, or how much stock is actually left. You find out when something runs out mid-stream.</div>
+        <div class="pain-q">One wrong commission number breaks trust permanently.</div>
+        <div class="pain-a">Manual payout math means mistakes. One miscalculation and your breaker thinks you're shorting them — even if it's an honest error. The platform calculates it automatically, to the penny, every time.</div>
       </div>
       <div class="pain-card">
-        <div class="pain-q">"What do I owe my breakers this week?"</div>
-        <div class="pain-a">Commission math done manually in your head or on a calculator. Every week. One wrong number and trust breaks down.</div>
+        <div class="pain-q">You're going live blind.</div>
+        <div class="pain-a">Starting a stream without knowing your break even is like opening a store without knowing your costs. Card Break Pro shows you exactly what you need to bring in — before you sell a single spot.</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain-q">You don't know what you have or what it's worth.</div>
+        <div class="pain-a">You're pulling boxes without knowing your exact inventory, cost per box, or how much stock is left. You find out something's gone when a buyer asks mid-stream. That stops here.</div>
       </div>
     </div>
   </div>
@@ -608,6 +631,11 @@
         <h3>Commission & Payouts</h3>
         <p>Set commission rates per breaker. Every stream close auto-calculates payout based on profit. Logged by period so you always know what you owe, to the penny.</p>
       </div>
+      <div class="feat-card">
+        <div class="feat-icon purple">📦</div>
+        <h3>Sort Queue & Shipping</h3>
+        <p>Sorters see every closed stream as a to-do card — oldest first, always. Live progress status (pending, in progress, complete) so you know exactly where every order stands and nothing ships late.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -642,12 +670,73 @@
   </div>
 </section>
 
-<!-- ── TWO LOGINS ── -->
+<!-- ── SORTER SECTION ── -->
+<section style="background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <div class="section-inner">
+    <div class="section-label">The sorting & shipping layer</div>
+    <div class="section-title">Breaks shipped fast. <span>Every time.</span></div>
+    <p class="section-sub">Card Break Pro has a built-in sorter role — the person who packages and ships cards to buyers after each stream. They get their own login, their own queue, and you get full visibility on where every order stands.</p>
+    <div class="callout-box" style="border-color:rgba(168,85,247,0.3);">
+      <div>
+        <p style="font-size:0.85rem;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:1px;margin-bottom:1rem;">What Sorters See</p>
+        <ul style="list-style:none;padding:0;margin-bottom:1.5rem;">
+          <li style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.92rem;padding:0.55rem 0;border-bottom:1px solid rgba(45,45,61,0.5);">
+            <span style="color:#a855f7;font-weight:700;flex-shrink:0;">→</span>
+            <span><strong>Oldest first, always.</strong> Streams are queued from oldest to newest — priority is built in so the right orders ship first and buyers aren't left waiting.</span>
+          </li>
+          <li style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.92rem;padding:0.55rem 0;border-bottom:1px solid rgba(45,45,61,0.5);">
+            <span style="color:#a855f7;font-weight:700;flex-shrink:0;">→</span>
+            <span><strong>Break count per stream.</strong> Each queue card shows the stream name, date, and how many breaks need to be sorted — so they always know the size of the job before they start.</span>
+          </li>
+          <li style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.92rem;padding:0.55rem 0;border-bottom:1px solid rgba(45,45,61,0.5);">
+            <span style="color:#a855f7;font-weight:700;flex-shrink:0;">→</span>
+            <span><strong>Start Sorting / Mark Complete.</strong> One tap to go In Progress, one tap to complete. Status updates instantly — you see it on your end in real time.</span>
+          </li>
+          <li style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.92rem;padding:0.55rem 0;">
+            <span style="color:#a855f7;font-weight:700;flex-shrink:0;">→</span>
+            <span><strong>Their own schedule.</strong> Clock in/out tied to their assigned shifts. Full time log, same as breakers.</span>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <div class="be-demo" style="border-color:rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);">
+          <div class="be-demo-label" style="color:#a855f7;">Sort Queue — Live View</div>
+          <div style="display:flex;flex-direction:column;gap:0.75rem;">
+            <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:0.75rem 1rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+                <span style="font-size:0.8rem;font-weight:700;">Stream: WN-0421</span>
+                <span style="font-size:0.65rem;font-weight:700;background:rgba(245,158,11,0.15);color:#f59e0b;padding:0.15rem 0.5rem;border-radius:100px;">PENDING</span>
+              </div>
+              <div style="font-size:0.75rem;color:var(--muted);">Apr 18 · 6 breaks to sort</div>
+            </div>
+            <div style="background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.2);border-radius:8px;padding:0.75rem 1rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+                <span style="font-size:0.8rem;font-weight:700;">Stream: WN-0422</span>
+                <span style="font-size:0.65rem;font-weight:700;background:rgba(79,110,247,0.15);color:var(--primary);padding:0.15rem 0.5rem;border-radius:100px;">IN PROGRESS</span>
+              </div>
+              <div style="font-size:0.75rem;color:var(--muted);">Apr 19 · 4 breaks to sort · Maria</div>
+            </div>
+            <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:0.75rem 1rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+                <span style="font-size:0.8rem;font-weight:700;">Stream: WN-0420</span>
+                <span style="font-size:0.65rem;font-weight:700;background:rgba(34,197,94,0.12);color:var(--green);padding:0.15rem 0.5rem;border-radius:100px;">COMPLETE</span>
+              </div>
+              <div style="font-size:0.75rem;color:var(--muted);">Apr 17 · 8 breaks · Shipped</div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.75rem;text-align:center;">Owner sees all of this in real time from their Sorting tab.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── THREE ROLES ── -->
 <section>
   <div class="section-inner">
     <div class="section-label">Built for the whole team</div>
-    <div class="section-title">One platform. <span>Two logins.</span></div>
-    <p class="section-sub">Your manager account and your breaker accounts are separate — everyone sees exactly what they need and nothing they don't.</p>
+    <div class="section-title">One platform. <span>Three roles.</span></div>
+    <p class="section-sub">Every person on your team gets their own login and sees exactly what they need — nothing more, nothing less.</p>
     <div class="two-logins">
       <div class="login-card owner">
         <div class="login-chip blue">Owner / Manager</div>
@@ -657,8 +746,9 @@
           <li>Product ROI and break history across all streams</li>
           <li>Team management with invite codes</li>
           <li>Set and manage commission rates per breaker</li>
-          <li>Build and publish schedules</li>
-          <li>See clock in/out times and payout totals</li>
+          <li>Build and publish schedules for all roles</li>
+          <li>Clock in/out log for every team member</li>
+          <li>Sorting tab — live status of every stream order</li>
           <li>Inventory management by category</li>
         </ul>
       </div>
@@ -674,6 +764,18 @@
           <li>View their payout history by period</li>
         </ul>
       </div>
+      <div class="login-card sorter">
+        <div class="login-chip purple">Sorter</div>
+        <h3>They ship it fast</h3>
+        <ul>
+          <li>Sort queue ordered oldest to newest — always</li>
+          <li>Break count per stream so they know the job size</li>
+          <li>Start Sorting / Mark Complete with one tap</li>
+          <li>See their assigned schedule and shifts</li>
+          <li>Clock in/out tied to their shifts</li>
+          <li>No access to financials, payouts, or analytics</li>
+        </ul>
+      </div>
     </div>
   </div>
 </section>
@@ -687,21 +789,24 @@
       <div class="ba-card before">
         <div class="ba-label">Without Card Break Pro</div>
         <div class="ba-item"><span class="ba-icon">✗</span> No idea if you made money until days later</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> Commission calculated manually every week</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Commission calculated manually, mistakes happen</div>
         <div class="ba-item"><span class="ba-icon">✗</span> No way to know which boxes are profitable</div>
         <div class="ba-item"><span class="ba-icon">✗</span> Breakers texting you for their schedule</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> Forgot to track break 3's revenue separately</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> No record of who clocked in or when</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> Going live hoping you'll break even</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Going live with no clue what you need to break even</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> No idea what order to ship or what's been sent</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Buyers waiting because sorting has no system</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Hours per week on admin that should be automated</div>
       </div>
       <div class="ba-card after">
         <div class="ba-label">With Card Break Pro</div>
         <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Profit shows the second you close out</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Commission auto-calculated and logged per stream</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Commission auto-calculated to the penny, every stream</div>
         <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Product ROI ranks every box by performance</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Breakers see their schedule in their account</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Every break tracked — Whatnot, Fanatics, or TikTok Shop</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Full clock in/out log per shift per breaker</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Breakers and sorters see their schedule in their account</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Break even shown live before you go live</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Sorters work oldest-first — nothing ships out of order</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Live sort queue status — pending, in progress, complete</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Full clock in/out log for every team member</div>
         <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Break even shown before you go live</div>
       </div>
     </div>
@@ -766,6 +871,10 @@
       <div class="faq-item">
         <div class="faq-q">Is my data secure?</div>
         <div class="faq-a">Yes. Built on Supabase with row-level security — each business's data is fully isolated. No other owner can see your numbers, team, or history.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">What is the sorter role?</div>
+        <div class="faq-a">Sorters are the people who package and ship cards to buyers after each stream. They get their own login, see a queue of streams to sort (oldest first), and update status as they go. You see their live progress from your owner dashboard.</div>
       </div>
     </div>
   </div>
