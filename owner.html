@@ -426,6 +426,7 @@
         <div class="dd-section-label">Business</div>
         <button class="nav-dd-item" data-tab="inventory">Inventory</button>
         <button class="nav-dd-item" data-tab="team">Team & Payouts</button>
+        <button class="nav-dd-item" data-tab="sorting">Sorting</button>
         <button class="nav-dd-item" data-tab="settings">Settings</button>
       </div>
     </div>
@@ -966,6 +967,40 @@
   </div>
 
   <!-- ═══════════════════════════════════════════
+       TAB: SORTING
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-sorting">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Sort Queue</div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="sort-filter-btn active" data-filter="all" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;">All</button>
+          <button class="sort-filter-btn" data-filter="pending" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Pending</button>
+          <button class="sort-filter-btn" data-filter="in_progress" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">In Progress</button>
+          <button class="sort-filter-btn" data-filter="completed" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Completed</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table" id="sortingTable">
+          <thead>
+            <tr>
+              <th>Stream Key</th>
+              <th>Break Date</th>
+              <th>Breaks</th>
+              <th>Status</th>
+              <th>Assigned To</th>
+              <th>Completed At</th>
+            </tr>
+          </thead>
+          <tbody id="sortingTableBody">
+            <tr class="empty-row"><td colspan="6">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
        TAB: SETTINGS
   ════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-settings">
@@ -1218,7 +1253,7 @@ async function initAuth() {
 const TAB_GROUP_MAP = {
   breakEntry: 'ng-live', schedule: 'ng-live',
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', leaderboard: 'ng-reports',
-  inventory: 'ng-manage', team: 'ng-manage', settings: 'ng-manage'
+  inventory: 'ng-manage', team: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
 };
 const GROUP_BTN_MAP = {
   'ng-live': 'ngb-live', 'ng-reports': 'ngb-reports', 'ng-manage': 'ngb-manage'
@@ -1261,6 +1296,7 @@ async function switchTab(tab) {
     else if (tab === 'leaderboard') await loadLeaderboard();
     else if (tab === 'team') { await setupCommissionToggle(); await loadTeam(); }
     else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
+    else if (tab === 'sorting') await loadSorting();
   } catch (err) {
     showGlobalError('Failed to load tab: ' + escHtml(err.message));
     console.error(err);
@@ -2931,8 +2967,90 @@ function setupSchedSave() {
   });
 }
 
+// ── Sorting ───────────────────────────────────────────────
+let sortingFilter = 'all';
+
+async function loadSorting() {
+  const tbody = document.getElementById('sortingTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading…</td></tr>';
+
+  try {
+    const { data, error } = await sb
+      .from('sort_tasks')
+      .select('id, status, sorter_id, completed_at, created_at, streams(id, stream_key, break_date, break_count), profiles(display_name)')
+      .eq('org_id', currentProfile.org_id)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const allTasks = data || [];
+
+    // Also load sorter display names by sorter_id
+    const sorterIds = [...new Set(allTasks.filter(t => t.sorter_id).map(t => t.sorter_id))];
+    let sorterMap = {};
+    if (sorterIds.length > 0) {
+      const { data: sorters } = await sb.from('profiles').select('id, display_name').in('id', sorterIds);
+      if (sorters) sorters.forEach(s => { sorterMap[s.id] = s.display_name; });
+    }
+
+    const filtered = sortingFilter === 'all' ? allTasks : allTasks.filter(t => t.status === sortingFilter);
+
+    tbody.innerHTML = '';
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No sort tasks found.</td></tr>';
+      return;
+    }
+
+    filtered.forEach(function (task) {
+      const s = task.streams || {};
+      const tr = document.createElement('tr');
+      const statusBadge = task.status === 'completed'
+        ? '<span class="badge badge-green">Completed</span>'
+        : task.status === 'in_progress'
+        ? '<span class="badge badge-yellow">In Progress</span>'
+        : '<span class="badge badge-gray">Pending</span>';
+
+      const sorterName = task.sorter_id && sorterMap[task.sorter_id] ? escHtml(sorterMap[task.sorter_id]) : '<span style="color:var(--muted);">—</span>';
+      const completedAt = task.completed_at ? new Date(task.completed_at).toLocaleString() : '<span style="color:var(--muted);">—</span>';
+      const breakCount = s.break_count || '—';
+
+      tr.innerHTML =
+        '<td style="font-weight:600;">' + escHtml(s.stream_key || '—') + '</td>' +
+        '<td style="color:var(--muted);">' + (s.break_date || '—') + '</td>' +
+        '<td style="text-align:center;">' + breakCount + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td>' + sorterName + '</td>' +
+        '<td style="font-size:0.82rem;color:var(--muted);">' + completedAt + '</td>';
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Failed to load sort tasks.</td></tr>';
+    console.error(err);
+  }
+}
+
+function setupSortingFilters() {
+  document.querySelectorAll('.sort-filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.sort-filter-btn').forEach(function (b) {
+        b.style.background = 'var(--bg)';
+        b.style.color = 'var(--muted)';
+        b.style.borderColor = 'var(--border)';
+        b.classList.remove('active');
+      });
+      btn.style.background = 'var(--primary)';
+      btn.style.color = '#fff';
+      btn.style.borderColor = 'var(--primary)';
+      btn.classList.add('active');
+      sortingFilter = btn.dataset.filter;
+      loadSorting();
+    });
+  });
+}
+
 // ── Boot ──────────────────────────────────────────────────
 initAuth();
+setupSortingFilters();
 </script>
 </body>
 </html>

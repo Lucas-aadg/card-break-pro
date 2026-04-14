@@ -1420,6 +1420,13 @@ async function handleConfirmClose() {
 
     await loadProducts();
 
+    // Create sort task for this stream
+    await sb.from('sort_tasks').insert({
+      org_id: currentProfile.org_id,
+      stream_id: currentStream.id,
+      status: 'pending'
+    });
+
     // Clock out if shift is active
     if (activeShiftId) {
       await sb.from('schedules').update({

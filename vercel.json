@@ -8,6 +8,7 @@
     { "source": "/break", "destination": "/breaker.html" },
     { "source": "/billing", "destination": "/billing.html" },
     { "source": "/help-owner", "destination": "/help-owner.html" },
-    { "source": "/help-breaker", "destination": "/help-breaker.html" }
+    { "source": "/help-breaker", "destination": "/help-breaker.html" },
+    { "source": "/sorter", "destination": "/sorter.html" }
   ]
 }

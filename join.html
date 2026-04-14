@@ -168,7 +168,7 @@
   <div class="card">
     <div class="brand">
       <h1>CARD <span>BREAK</span> PRO</h1>
-      <p>Join as a Breaker</p>
+      <p>Join Your Team</p>
     </div>
 
     <div id="errorBox" class="error-box"></div>
@@ -193,6 +193,31 @@
       </div>
 
       <div id="orgBadge" class="org-badge"></div>
+
+      <div class="spacer"></div>
+      <div class="section-title">Your Role</div>
+
+      <div class="form-group">
+        <label>I am joining as a</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.25rem;">
+          <label style="all:unset;cursor:pointer;">
+            <input type="radio" name="role" value="breaker" id="roleBreaker" required style="display:none;" />
+            <div class="role-option" id="roleBreakerCard" onclick="selectRole('breaker')" style="border:2px solid var(--border);border-radius:8px;padding:0.9rem;text-align:center;transition:border-color 0.2s,background 0.2s;">
+              <div style="font-size:1.3rem;margin-bottom:0.3rem;">🎴</div>
+              <div style="font-weight:700;font-size:0.88rem;">Breaker</div>
+              <div style="font-size:0.75rem;color:var(--muted);margin-top:0.2rem;">I run live breaks</div>
+            </div>
+          </label>
+          <label style="all:unset;cursor:pointer;">
+            <input type="radio" name="role" value="sorter" id="roleSorter" style="display:none;" />
+            <div class="role-option" id="roleSorterCard" onclick="selectRole('sorter')" style="border:2px solid var(--border);border-radius:8px;padding:0.9rem;text-align:center;transition:border-color 0.2s,background 0.2s;">
+              <div style="font-size:1.3rem;margin-bottom:0.3rem;">📦</div>
+              <div style="font-weight:700;font-size:0.88rem;">Sorter</div>
+              <div style="font-size:0.75rem;color:var(--muted);margin-top:0.2rem;">I sort & ship cards</div>
+            </div>
+          </label>
+        </div>
+      </div>
 
       <div class="spacer"></div>
       <div class="section-title">Your Info</div>
@@ -308,6 +333,24 @@
       }, 500);
     });
 
+    function selectRole(role) {
+      document.getElementById('roleBreaker').checked = (role === 'breaker');
+      document.getElementById('roleSorter').checked = (role === 'sorter');
+      const bCard = document.getElementById('roleBreakerCard');
+      const sCard = document.getElementById('roleSorterCard');
+      if (role === 'breaker') {
+        bCard.style.borderColor = 'var(--primary)';
+        bCard.style.background = 'rgba(79,110,247,0.08)';
+        sCard.style.borderColor = 'var(--border)';
+        sCard.style.background = 'transparent';
+      } else {
+        sCard.style.borderColor = 'var(--primary)';
+        sCard.style.background = 'rgba(79,110,247,0.08)';
+        bCard.style.borderColor = 'var(--border)';
+        bCard.style.background = 'transparent';
+      }
+    }
+
     joinForm.addEventListener('submit', async function (e) {
       e.preventDefault();
       hideMessages();
@@ -317,9 +360,16 @@
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
+      const roleEl = document.querySelector('input[name="role"]:checked');
+      const role = roleEl ? roleEl.value : null;
 
       if (!inviteCode || !displayName || !email || !password || !confirmPassword) {
         showError('All fields are required.');
+        return;
+      }
+
+      if (!role) {
+        showError('Please select your role — Breaker or Sorter.');
         return;
       }
 
@@ -375,13 +425,13 @@
 
         const userId = authData.user.id;
 
-        // Step 3: Create breaker profile
+        // Step 3: Create profile with selected role
         const { error: profileError } = await sb
           .from('profiles')
           .insert({
             id: userId,
             org_id: orgId,
-            role: 'breaker',
+            role: role,
             display_name: displayName
           });
 
@@ -404,7 +454,7 @@
         showSuccess('Welcome to the team! Redirecting…');
 
         setTimeout(function () {
-          window.location.href = 'breaker.html';
+          window.location.href = role === 'sorter' ? 'sorter.html' : 'breaker.html';
         }, 1200);
 
       } catch (err) {

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>Card Break Pro — Sorter</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d14; --card: #13131e; --border: #2d2d3d;
+      --primary: #4f6ef7; --green: #22c55e; --red: #ef4444;
+      --yellow: #f59e0b; --text: #e2e8f0; --muted: #64748b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    /* NAV */
+    nav {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 100;
+    }
+    .brand { font-size: 1.2rem; font-weight: 800; letter-spacing: 2px; }
+    .brand span { color: var(--primary); }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .sorter-badge {
+      background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 20px; color: var(--yellow); font-size: 0.8rem;
+      font-weight: 600; padding: 0.3rem 0.8rem;
+    }
+    .btn-sm { padding: 0.4rem 0.9rem; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn-sm:hover { opacity: 0.8; }
+    .btn-signout { background: var(--border); color: var(--text); }
+
+    /* TABS */
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--card); padding: 0 1.5rem; }
+    .tab-btn { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 0.85rem 1.25rem; cursor: pointer; transition: color 0.2s, border-color 0.2s; }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* LAYOUT */
+    .main { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+
+    /* PANELS */
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem; }
+    .panel-title { font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1rem; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .panel-header .panel-title { margin-bottom: 0; }
+
+    /* ALERTS */
+    .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; color: var(--red); font-size: 0.875rem; padding: 0.75rem 1rem; margin-bottom: 1rem; display: none; }
+    .success-box { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; color: var(--green); font-size: 0.875rem; padding: 0.75rem 1rem; margin-bottom: 1rem; display: none; }
+
+    /* BUTTONS */
+    .btn { padding: 0.6rem 1.1rem; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn:hover:not(:disabled) { opacity: 0.85; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-yellow { background: var(--yellow); color: #000; }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+
+    /* BADGES */
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .badge-gray { background: rgba(100,116,139,0.15); color: var(--muted); }
+
+    /* SORT QUEUE CARDS */
+    .sort-queue { display: flex; flex-direction: column; gap: 0.85rem; }
+    .sort-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.1rem 1.25rem;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+      transition: border-color 0.2s;
+    }
+    .sort-card.in-progress { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.04); }
+    .sort-card.completed { border-color: rgba(34,197,94,0.3); opacity: 0.65; }
+    .sort-card-info { flex: 1; min-width: 0; }
+    .sort-card-key { font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sort-card-meta { font-size: 0.8rem; color: var(--muted); display: flex; gap: 1.25rem; flex-wrap: wrap; }
+    .sort-card-actions { display: flex; gap: 0.6rem; flex-shrink: 0; flex-wrap: wrap; }
+
+    /* SHIFTS TABLE */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .data-table th { text-align: left; color: var(--muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    .data-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid rgba(45,45,61,0.5); vertical-align: middle; }
+    .data-table tr:last-child td { border-bottom: none; }
+    .empty-row td { color: var(--muted); font-style: italic; text-align: center; padding: 1.5rem; }
+    .tbl-wrap { overflow-x: auto; }
+
+    /* LOADING */
+    .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(13,13,20,0.7); z-index: 999; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
+    .loading-overlay.active { display: flex; }
+    .loading-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 0.9rem; }
+
+    /* TODAY BADGE */
+    .today-badge { background: var(--primary); color: #fff; font-size: 0.65rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 0.5rem; }
+  </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Loading…</div>
+</div>
+
+<nav>
+  <div class="brand">CARD <span>BREAK</span> PRO</div>
+  <div class="nav-right">
+    <span class="sorter-badge" id="sorterBadge">Sorter</span>
+    <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
+  </div>
+</nav>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="queue">Sort Queue</button>
+  <button class="tab-btn" data-tab="shifts">My Shifts</button>
+</div>
+
+<div class="main">
+  <div id="errorBox" class="error-box"></div>
+  <div id="successBox" class="success-box"></div>
+
+  <!-- ── SORT QUEUE TAB ── -->
+  <div class="tab-content active" id="tab-queue">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Sort Queue — Oldest First</div>
+        <button class="btn btn-outline" id="refreshQueueBtn" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
+      </div>
+      <div id="sortQueueList" class="sort-queue">
+        <div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading queue…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MY SHIFTS TAB ── -->
+  <div class="tab-content" id="tab-shifts">
+    <div id="shiftsContent">
+      <div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading shifts…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const { createClient } = supabase;
+const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+let currentUser = null;
+let currentProfile = null;
+let activeShiftId = null;
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function showError(msg) { const el = document.getElementById('errorBox'); el.textContent = msg; el.style.display = 'block'; }
+function showSuccess(msg) { const el = document.getElementById('successBox'); el.textContent = msg; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 4000); }
+function hideMessages() { document.getElementById('errorBox').style.display = 'none'; document.getElementById('successBox').style.display = 'none'; }
+function showLoading(msg) { document.getElementById('loadingOverlay').classList.add('active'); document.getElementById('loadingText').textContent = msg || 'Loading…'; }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+// ── Tabs ──────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    hideMessages();
+    if (btn.dataset.tab === 'queue') loadSortQueue();
+    if (btn.dataset.tab === 'shifts') loadShifts();
+  });
+});
+
+// ── Sort Queue ────────────────────────────────────────────
+async function loadSortQueue() {
+  const list = document.getElementById('sortQueueList');
+  list.innerHTML = '<div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading…</div>';
+
+  try {
+    const { data, error } = await sb
+      .from('sort_tasks')
+      .select('id, status, sorter_id, completed_at, created_at, streams(id, stream_key, break_date, break_count)')
+      .eq('org_id', currentProfile.org_id)
+      .neq('status', 'completed')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const tasks = data || [];
+
+    if (!tasks.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">All caught up — no streams to sort.</div>';
+      return;
+    }
+
+    list.innerHTML = '';
+    tasks.forEach(function (task) {
+      const s = task.streams || {};
+      const isInProgress = task.status === 'in_progress' && task.sorter_id === currentUser.id;
+      const isOtherProgress = task.status === 'in_progress' && task.sorter_id !== currentUser.id;
+
+      const card = document.createElement('div');
+      card.className = 'sort-card' + (task.status === 'in_progress' ? ' in-progress' : '');
+
+      let statusBadge = '';
+      if (task.status === 'pending') statusBadge = '<span class="badge badge-gray">Pending</span>';
+      else if (task.status === 'in_progress') statusBadge = '<span class="badge badge-yellow">In Progress</span>';
+
+      let actionsHtml = '';
+      if (task.status === 'pending') {
+        actionsHtml = '<button class="btn btn-yellow" data-action="start" data-id="' + task.id + '" style="font-size:0.8rem;padding:0.45rem 0.9rem;">Start Sorting</button>';
+      } else if (isInProgress) {
+        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '" style="font-size:0.8rem;padding:0.45rem 0.9rem;">Mark Complete</button>';
+      } else if (isOtherProgress) {
+        actionsHtml = '<span style="font-size:0.8rem;color:var(--muted);">In progress by another sorter</span>';
+      }
+
+      const breakCount = s.break_count || '?';
+
+      card.innerHTML =
+        '<div class="sort-card-info">' +
+          '<div class="sort-card-key">' + escHtml(s.stream_key || 'Unknown Stream') + ' ' + statusBadge + '</div>' +
+          '<div class="sort-card-meta">' +
+            '<span>📅 ' + (s.break_date || '—') + '</span>' +
+            '<span>📦 ' + breakCount + ' break' + (breakCount !== 1 ? 's' : '') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sort-card-actions">' + actionsHtml + '</div>';
+
+      list.appendChild(card);
+    });
+
+    // Wire up action buttons
+    list.querySelectorAll('[data-action]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const action = btn.dataset.action;
+        const taskId = btn.dataset.id;
+        btn.disabled = true;
+
+        try {
+          if (action === 'start') {
+            await sb.from('sort_tasks').update({
+              status: 'in_progress',
+              sorter_id: currentUser.id
+            }).eq('id', taskId);
+            showSuccess('Started sorting. Mark complete when done.');
+          } else if (action === 'complete') {
+            await sb.from('sort_tasks').update({
+              status: 'completed',
+              completed_at: new Date().toISOString()
+            }).eq('id', taskId);
+            showSuccess('Stream marked as sorted and shipped!');
+          }
+          await loadSortQueue();
+        } catch (err) {
+          showError('Action failed: ' + escHtml(err.message));
+          btn.disabled = false;
+        }
+      });
+    });
+
+  } catch (err) {
+    list.innerHTML = '<div style="color:var(--red);text-align:center;padding:2rem;">Failed to load queue.</div>';
+    console.error(err);
+  }
+}
+
+// ── My Shifts ─────────────────────────────────────────────
+async function loadShifts() {
+  const container = document.getElementById('shiftsContent');
+  container.innerHTML = '<div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading…</div>';
+
+  const today = new Date().toISOString().split('T')[0];
+
+  try {
+    const { data, error } = await sb
+      .from('schedules')
+      .select('*')
+      .eq('breaker_id', currentUser.id)
+      .order('scheduled_date', { ascending: false });
+
+    if (error) throw error;
+
+    const shifts = data || [];
+    const upcoming = shifts.filter(s => s.scheduled_date >= today && s.status !== 'cancelled');
+    const past = shifts.filter(s => s.scheduled_date < today || s.status === 'completed' || s.status === 'cancelled');
+
+    let html = '';
+
+    // Upcoming
+    html += '<div class="panel"><div class="panel-title">Upcoming Shifts</div>';
+    if (!upcoming.length) {
+      html += '<div style="color:var(--muted);font-style:italic;font-size:0.875rem;">No upcoming shifts scheduled.</div>';
+    } else {
+      upcoming.forEach(function (sh) {
+        const isToday = sh.scheduled_date === today;
+        const statusColor = sh.status === 'in_progress' ? 'var(--yellow)' : 'var(--muted)';
+        const statusLabel = sh.status === 'in_progress' ? '🟡 CLOCKED IN' : sh.status === 'scheduled' ? 'Scheduled' : sh.status;
+        html +=
+          '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem 1.1rem;margin-bottom:0.75rem;">' +
+            '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">' +
+              '<span style="font-weight:700;">' + escHtml(sh.scheduled_date) + '</span>' +
+              (isToday ? '<span class="today-badge">Today</span>' : '') +
+              (sh.start_time ? '<span style="color:var(--muted);font-size:0.82rem;">· ' + sh.start_time.slice(0,5) + '</span>' : '') +
+            '</div>' +
+            '<div style="font-size:0.82rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap;">' +
+              (sh.stream_key ? '<span>🔑 ' + escHtml(sh.stream_key) + '</span>' : '') +
+              (sh.notes ? '<span>📝 ' + escHtml(sh.notes) + '</span>' : '') +
+              '<span style="color:' + statusColor + ';font-weight:600;">' + statusLabel + '</span>' +
+            '</div>' +
+          '</div>';
+      });
+    }
+    html += '</div>';
+
+    // Past
+    if (past.length) {
+      html += '<div class="panel"><div class="panel-title">Past Shifts</div><div class="tbl-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Stream Key</th><th>Status</th><th>Clock In</th><th>Clock Out</th></tr></thead><tbody>';
+      past.forEach(function (sh) {
+        const statusLabel = sh.status === 'completed' ? '<span class="badge badge-green">Completed</span>'
+          : sh.status === 'cancelled' ? '<span class="badge badge-gray">Cancelled</span>'
+          : '<span class="badge badge-gray">' + sh.status + '</span>';
+        const cin = sh.clocked_in_at ? new Date(sh.clocked_in_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+        const cout = sh.clocked_out_at ? new Date(sh.clocked_out_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+        html += '<tr><td>' + escHtml(sh.scheduled_date) + '</td><td>' + escHtml(sh.stream_key || '—') + '</td><td>' + statusLabel + '</td><td>' + cin + '</td><td>' + cout + '</td></tr>';
+      });
+      html += '</tbody></table></div></div>';
+    }
+
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<div style="color:var(--red);text-align:center;padding:2rem;">Failed to load shifts.</div>';
+    console.error(err);
+  }
+}
+
+// ── Today Shift Banner ────────────────────────────────────
+async function checkTodayShift() {
+  const today = new Date().toISOString().split('T')[0];
+  const { data: shifts } = await sb
+    .from('schedules')
+    .select('*')
+    .eq('breaker_id', currentUser.id)
+    .eq('scheduled_date', today)
+    .in('status', ['scheduled', 'in_progress'])
+    .order('start_time', { ascending: true })
+    .limit(1);
+
+  if (!shifts || !shifts.length) return;
+  const shift = shifts[0];
+
+  if (shift.status === 'in_progress') {
+    activeShiftId = shift.id;
+    showClockedInBanner(shift);
+    return;
+  }
+
+  // Show clock-in banner
+  const banner = document.createElement('div');
+  banner.id = 'shiftBanner';
+  banner.style.cssText = 'background:rgba(79,110,247,0.1);border:1px solid rgba(79,110,247,0.3);border-radius:8px;padding:0.85rem 1.1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;';
+  banner.innerHTML =
+    '<div>' +
+      '<div style="font-weight:700;color:var(--primary);margin-bottom:0.2rem;">📅 You have a sorting shift today!</div>' +
+      '<div style="font-size:0.82rem;color:var(--muted);">' +
+        (shift.start_time ? 'Start time: ' + shift.start_time.slice(0,5) : 'Check your schedule') +
+      '</div>' +
+    '</div>' +
+    '<button id="sorterClockInBtn" class="btn btn-green" style="padding:0.5rem 1.1rem;font-size:0.875rem;">⏱ Clock In</button>';
+
+  const main = document.querySelector('.main');
+  main.insertBefore(banner, main.firstChild);
+
+  document.getElementById('sorterClockInBtn').addEventListener('click', async function () {
+    this.disabled = true;
+    this.textContent = 'Clocking in…';
+    try {
+      await sb.from('schedules').update({
+        status: 'in_progress',
+        clocked_in_at: new Date().toISOString()
+      }).eq('id', shift.id);
+      activeShiftId = shift.id;
+      banner.remove();
+      showClockedInBanner(shift);
+    } catch (err) {
+      this.disabled = false;
+      this.textContent = '⏱ Clock In';
+      showError('Failed to clock in.');
+    }
+  });
+}
+
+function showClockedInBanner(shift) {
+  const existing = document.getElementById('clockedInBanner');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'clockedInBanner';
+  banner.style.cssText = 'background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:0.85rem 1.1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;';
+  banner.innerHTML = '<span style="color:var(--green);font-weight:700;">✓ Clocked In</span><span style="color:var(--muted);font-size:0.83rem;">Your shift is active. Clock out when done.</span>';
+  const main = document.querySelector('.main');
+  main.insertBefore(banner, main.firstChild);
+}
+
+// ── Buttons ───────────────────────────────────────────────
+document.getElementById('signOutBtn').addEventListener('click', async function () {
+  await sb.auth.signOut();
+  window.location.href = 'index.html';
+});
+
+document.getElementById('refreshQueueBtn').addEventListener('click', loadSortQueue);
+
+// ── Auth ──────────────────────────────────────────────────
+async function initAuth() {
+  showLoading('Loading…');
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    currentUser = session.user;
+
+    const { data: profile, error } = await sb
+      .from('profiles').select('*').eq('id', currentUser.id).single();
+
+    if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
+    if (profile.role !== 'sorter') {
+      window.location.href = profile.role === 'owner' ? 'owner.html' : profile.role === 'breaker' ? 'breaker.html' : 'index.html';
+      return;
+    }
+
+    currentProfile = profile;
+    document.getElementById('sorterBadge').textContent = escHtml(profile.display_name);
+
+    await loadSortQueue();
+    await checkTodayShift();
+
+    hideLoading();
+  } catch (err) {
+    hideLoading();
+    showError('Failed to load: ' + escHtml(err.message));
+  }
+}
+
+initAuth();
+</script>
+</body>
+</html>
