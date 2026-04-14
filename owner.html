@@ -2975,17 +2975,28 @@ async function loadSorting() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading…</td></tr>';
 
   try {
-    const { data, error } = await sb
+    // Step 1: load sort tasks
+    const { data: tasks, error } = await sb
       .from('sort_tasks')
-      .select('id, status, sorter_id, completed_at, created_at, streams(id, stream_key, break_date, break_count), profiles(display_name)')
+      .select('id, status, sorter_id, completed_at, created_at, stream_id')
       .eq('org_id', currentProfile.org_id)
       .order('created_at', { ascending: true });
 
     if (error) throw error;
+    const allTasks = tasks || [];
 
-    const allTasks = data || [];
+    // Step 2: load stream details
+    const streamIds = [...new Set(allTasks.map(t => t.stream_id).filter(Boolean))];
+    let streamMap = {};
+    if (streamIds.length > 0) {
+      const { data: streams } = await sb
+        .from('streams')
+        .select('id, stream_key, break_date, break_count')
+        .in('id', streamIds);
+      if (streams) streams.forEach(s => { streamMap[s.id] = s; });
+    }
 
-    // Also load sorter display names by sorter_id
+    // Step 3: load sorter display names
     const sorterIds = [...new Set(allTasks.filter(t => t.sorter_id).map(t => t.sorter_id))];
     let sorterMap = {};
     if (sorterIds.length > 0) {
@@ -3002,7 +3013,7 @@ async function loadSorting() {
     }
 
     filtered.forEach(function (task) {
-      const s = task.streams || {};
+      const s = streamMap[task.stream_id] || {};
       const tr = document.createElement('tr');
       const statusBadge = task.status === 'completed'
         ? '<span class="badge badge-green">Completed</span>'
