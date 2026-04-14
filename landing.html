@@ -460,6 +460,7 @@
     footer a { color: var(--primary); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
     .divider-line { border: none; border-top: 1px solid var(--border); margin: 5rem auto 0; max-width: 1100px; }
+    @media (max-width: 640px) { .auto-grid { grid-template-columns: 1fr !important; } }
   </style>
 </head>
 <body>
@@ -474,10 +475,10 @@
 <div class="hero">
   <div class="hero-badge">Built for Whatnot · Fanatics · TikTok Shop</div>
   <h1>
-    Stop guessing.<br>
-    <span class="accent">Start knowing</span> your numbers.
+    Ditch the spreadsheets.<br>
+    <span class="accent">One system</span> runs everything.
   </h1>
-  <p>Card Break Pro is the complete business platform for live card breaking — track every break, manage your team, schedule streams, and know your profit before you even go live. Works on any platform.</p>
+  <p>Add your inventory once. After that — break tracking, commission math, profit reports, and shipping queues all run and document themselves, automatically. You just go live.</p>
   <div class="hero-cta-group">
     <a href="register.html" class="hero-cta">Start Free 14-Day Trial</a>
     <a href="#demo" class="hero-cta-outline">▶ Watch Demo</a>
@@ -488,20 +489,20 @@
 <!-- ── NUMBERS STRIP ── -->
 <div class="numbers-strip">
   <div class="num-item">
-    <div class="num-value">10</div>
-    <div class="num-label">Tools in One Platform</div>
+    <div class="num-value">0</div>
+    <div class="num-label">Spreadsheets Needed</div>
   </div>
   <div class="num-item">
-    <div class="num-value">$0</div>
-    <div class="num-label">Hidden Fees or Commissions</div>
+    <div class="num-value">1×</div>
+    <div class="num-label">Add Inventory — Rest Is Automatic</div>
   </div>
   <div class="num-item">
     <div class="num-value">3</div>
     <div class="num-label">Roles — Owner, Breaker, Sorter</div>
   </div>
   <div class="num-item">
-    <div class="num-value">∞</div>
-    <div class="num-label">Breaks, Streams & Team Members</div>
+    <div class="num-value">$0</div>
+    <div class="num-label">Hidden Fees or Per-Seat Charges</div>
   </div>
 </div>
 
@@ -526,27 +527,27 @@
 <section class="pain-section">
   <div class="section-inner">
     <div class="section-label">Sound familiar?</div>
-    <div class="section-title" style="margin-bottom:2.5rem;">Every one of these is killing your business.</div>
+    <div class="section-title" style="margin-bottom:2.5rem;">You're running a real business on sticky notes and guesswork.</div>
     <div class="pain-hero-card">
       <div class="pain-q">"Do you actually know if you made money last night?"</div>
-      <div class="pain-a">Most breakers genuinely don't know their real profit until days later — if ever. Stream ends, you close out Whatnot, and you're doing math in your head at midnight. That uncertainty has a cost. Card Break Pro gives you the answer the second you close out.</div>
+      <div class="pain-a">Stream ends, you close out Whatnot, and you're doing math in your head at midnight. Maybe you check a spreadsheet. Maybe you just hope the numbers are good. That's not running a business — that's gambling with your own money. Card Break Pro gives you the exact answer the second you close out. No math. No guessing. No spreadsheet.</div>
     </div>
     <div class="pain-grid">
       <div class="pain-card">
-        <div class="pain-q">How many hours a week are you losing to admin work?</div>
-        <div class="pain-a">Tracking breaks in spreadsheets. Texting breakers about their schedule. Calculating commissions by hand. Hours every single week doing work a system should be doing for you.</div>
+        <div class="pain-q">You're spending hours every week doing admin by hand.</div>
+        <div class="pain-a">Logging breaks in spreadsheets. Texting your team their schedule. Calculating commissions on a calculator. Copy-pasting numbers into reports. Every one of those hours is wasted — a system should be doing all of it.</div>
       </div>
       <div class="pain-card">
-        <div class="pain-q">One wrong commission number breaks trust permanently.</div>
-        <div class="pain-a">Manual payout math means mistakes. One miscalculation and your breaker thinks you're shorting them — even if it's an honest error. The platform calculates it automatically, to the penny, every time.</div>
+        <div class="pain-q">Manual commission math destroys trust when it goes wrong.</div>
+        <div class="pain-a">One miscalculation and your breaker thinks you're shorting them. Even an honest mistake looks shady. When the platform calculates it automatically from the actual numbers, disputes disappear.</div>
       </div>
       <div class="pain-card">
-        <div class="pain-q">You're going live blind.</div>
-        <div class="pain-a">Starting a stream without knowing your break even is like opening a store without knowing your costs. Card Break Pro shows you exactly what you need to bring in — before you sell a single spot.</div>
+        <div class="pain-q">You go live without knowing your break even.</div>
+        <div class="pain-a">Going into a stream without knowing your costs is like opening a store with no price tags. Card Break Pro shows your exact break-even number before you sell a single spot — based on box cost and platform fee.</div>
       </div>
       <div class="pain-card">
-        <div class="pain-q">You don't know what you have or what it's worth.</div>
-        <div class="pain-a">You're pulling boxes without knowing your exact inventory, cost per box, or how much stock is left. You find out something's gone when a buyer asks mid-stream. That stops here.</div>
+        <div class="pain-q">Buyers waiting because shipping has no system.</div>
+        <div class="pain-a">Cards pile up after streams, nothing is prioritized, and your sorter has no clear queue. Fastest shipping builds the best reputation. The platform creates a priority queue — oldest streams first — automatically, the moment a stream closes.</div>
       </div>
     </div>
   </div>
@@ -579,12 +580,74 @@
   </div>
 </section>
 
+<!-- ── WHAT RUNS AUTOMATICALLY ── -->
+<section style="background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <div class="section-inner">
+    <div class="section-label">Set up once. Runs forever.</div>
+    <div class="section-title">Add your inventory. <span>The rest is automatic.</span></div>
+    <p class="section-sub">After a 10-minute setup, this is everything Card Break Pro does without you touching anything.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:860px;" class="auto-grid">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:1.5rem;">
+        <div style="font-size:0.7rem;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--primary);margin-bottom:1rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);">During Every Stream</div>
+        <div style="display:flex;flex-direction:column;gap:0.6rem;">
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Break even calculated the moment products are selected</span>
+          </div>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Revenue tracked from your platform's running total — no separate math</span>
+          </div>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Every break logged and documented as it happens</span>
+          </div>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Inventory decremented automatically as boxes are opened</span>
+          </div>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Clock in/out tracked per team member per shift</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:1.5rem;">
+        <div style="font-size:0.7rem;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--green);margin-bottom:1rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);">The Moment You Close Out</div>
+        <div style="display:flex;flex-direction:column;gap:0.6rem;">
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Net profit calculated and saved — revenue minus costs minus fees</span>
+          </div>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Commission calculated to the penny for every breaker on that stream</span>
+          </div>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Product ROI updated across your entire history</span>
+          </div>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Sort queue updated — stream added to sorter's list, prioritized by date</span>
+          </div>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;font-size:0.88rem;color:var(--muted);">
+            <span style="color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px;">✓</span>
+            <span>Breaker clocked out automatically — no manual check</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:1.5rem;font-size:0.875rem;color:var(--muted);max-width:600px;text-align:center;margin-left:auto;margin-right:auto;">You add new inventory when you buy boxes. That's the only thing you do manually after setup. <strong style="color:var(--text);">Everything else is documented for you.</strong></p>
+  </div>
+</section>
+
 <!-- ── FEATURES ── -->
 <section id="features">
   <div class="section-inner">
-    <div class="section-label">Everything you need</div>
-    <div class="section-title">One platform. <span>Every tool.</span></div>
-    <p class="section-sub">Every feature your breaking business needs, built to work together from day one.</p>
+    <div class="section-label">Every tool you need</div>
+    <div class="section-title">One platform. <span>Runs everything.</span></div>
+    <p class="section-sub">Every feature your breaking business needs, built to work together and replace every spreadsheet you're using right now.</p>
     <div class="features-grid">
       <div class="feat-card">
         <div class="feat-icon blue">📡</div>
@@ -644,27 +707,28 @@
 <section class="how-section">
   <div class="section-inner">
     <div class="section-label">How it works</div>
-    <div class="section-title" style="margin-bottom:2.5rem;">Live in <span>four steps.</span></div>
+    <div class="section-title" style="margin-bottom:0.75rem;">Set up once. <span>Let it run.</span></div>
+    <p class="section-sub" style="margin-bottom:2.5rem;">Ten minutes of setup replaces every spreadsheet, group text, and manual calculation you're doing right now.</p>
     <div class="steps-grid">
       <div class="step-card">
         <div class="step-num-large">01</div>
-        <h3>Register your business</h3>
-        <p>Create your owner account, add your inventory and set up your team. Takes under 10 minutes.</p>
+        <h3>Add your inventory</h3>
+        <p>Enter your products with cost and category. This is the one manual input the system needs. Stock tracks itself from here forward.</p>
       </div>
       <div class="step-card">
         <div class="step-num-large">02</div>
-        <h3>Invite your breakers</h3>
-        <p>Share your invite code. Breakers join with their own login and see their schedule, shifts, and payouts.</p>
+        <h3>Invite your team</h3>
+        <p>One invite code. Breakers and sorters join, pick their role, and immediately see their schedule, shifts, and tasks — no setup on their end.</p>
       </div>
       <div class="step-card">
         <div class="step-num-large">03</div>
-        <h3>Go live and track in real time</h3>
-        <p>Select products, know the break even, submit breaks as you open boxes. Everything updates live.</p>
+        <h3>Go live — it tracks itself</h3>
+        <p>Break even is waiting before you go live. Submit each break as boxes open. Revenue, inventory, and profit all update automatically in real time.</p>
       </div>
       <div class="step-card">
         <div class="step-num-large">04</div>
-        <h3>Close out and see your profit</h3>
-        <p>Close the stream and see your exact net profit, commission payouts, and how each product performed.</p>
+        <h3>Close out — everything is done</h3>
+        <p>One tap to close the stream. Profit logged. Commissions calculated. Shipping queue updated. Breaker clocked out. Nothing left to do manually.</p>
       </div>
     </div>
   </div>
@@ -787,26 +851,26 @@
     <div class="section-title" style="margin-bottom:2.5rem;">Before and <span>after.</span></div>
     <div class="ba-grid">
       <div class="ba-card before">
-        <div class="ba-label">Without Card Break Pro</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> No idea if you made money until days later</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> Commission calculated manually, mistakes happen</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> No way to know which boxes are profitable</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> Breakers texting you for their schedule</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> Going live with no clue what you need to break even</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> No idea what order to ship or what's been sent</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> Buyers waiting because sorting has no system</div>
-        <div class="ba-item"><span class="ba-icon">✗</span> Hours per week on admin that should be automated</div>
+        <div class="ba-label">Running on Spreadsheets</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Profit unknown until you do the math yourself — hours later</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Commission calculated manually on a calculator every week</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Inventory tracked in a spreadsheet you forget to update</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Breakers texting you asking what shift they're on</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Going live with no idea what you need to break even</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Cards piled up with no system for who ships what first</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> No record of who worked, when, or for how long</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Hours of admin every week — none of it building anything</div>
       </div>
       <div class="ba-card after">
-        <div class="ba-label">With Card Break Pro</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Profit shows the second you close out</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Commission auto-calculated to the penny, every stream</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Product ROI ranks every box by performance</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Breakers and sorters see their schedule in their account</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Break even shown live before you go live</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Sorters work oldest-first — nothing ships out of order</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Live sort queue status — pending, in progress, complete</div>
-        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Full clock in/out log for every team member</div>
+        <div class="ba-label">Running on Card Break Pro</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Exact profit the second you close out — no math required</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Commission calculated and logged automatically, to the penny</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Inventory tracked live — decrements as each box opens</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Team sees their schedule in their own account</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Break even shown before you sell your first spot</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Sorter queue auto-fills oldest-first — fastest shipping, always</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Full clock in/out log — every team member, every shift</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Zero admin hours — the platform documents everything</div>
         <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Break even shown before you go live</div>
       </div>
     </div>
@@ -884,8 +948,8 @@
 <section class="pricing-section">
   <div class="section-inner">
     <div class="section-label">Simple pricing</div>
-    <div class="section-title" style="margin-bottom:0.5rem;">One price. <span>Everything included.</span></div>
-    <p class="section-sub" style="margin:0 auto 3rem;">No per-seat fees. No upsells. No feature gates. One flat monthly fee and your entire business is covered.</p>
+    <div class="section-title" style="margin-bottom:0.5rem;">One price. <span>Replaces everything.</span></div>
+    <p class="section-sub" style="margin:0 auto 3rem;">No spreadsheets. No calculators. No group texts. No manual payout math. One flat monthly fee — and your entire operation runs on autopilot.</p>
     <div class="price-card">
       <div class="trial-pill">14-Day Free Trial</div>
       <div class="price-badge" style="display:block;margin-top:0.5rem;">All Features Included</div>
