@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/png" href="/logo.png" />
-  <title>Card Break Pro — The Platform Built for Live Card Breakers</title>
+  <title>Card Break Pro — The Business OS for Live Card Breakers</title>
   <style>
     :root {
       --bg: #0d0d14;
@@ -13,6 +13,7 @@
       --primary: #4f6ef7;
       --green: #22c55e;
       --red: #ef4444;
+      --yellow: #f59e0b;
       --text: #e2e8f0;
       --muted: #64748b;
     }
@@ -27,7 +28,8 @@
 
     /* ── NAV ── */
     nav {
-      background: var(--card);
+      background: rgba(13,13,20,0.92);
+      backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
       padding: 0 2rem;
       display: grid;
@@ -40,7 +42,7 @@
     }
     nav .nav-login { justify-self: end; }
     .nav-brand {
-      font-size: 1.15rem;
+      font-size: 1.1rem;
       font-weight: 800;
       letter-spacing: 2px;
       color: var(--text);
@@ -48,30 +50,42 @@
     }
     .nav-brand span { color: var(--primary); }
     .nav-login {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.45rem 1.1rem;
+      background: var(--primary);
+      border: none;
+      color: #fff;
+      padding: 0.45rem 1.2rem;
       border-radius: 7px;
       font-size: 0.875rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       text-decoration: none;
-      transition: border-color 0.2s, color 0.2s;
+      transition: opacity 0.2s;
     }
-    .nav-login:hover { border-color: var(--primary); color: var(--primary); }
+    .nav-login:hover { opacity: 0.85; }
 
     /* ── HERO ── */
     .hero {
       text-align: center;
-      padding: 6rem 2rem 5rem;
-      max-width: 800px;
+      padding: 7rem 2rem 6rem;
+      max-width: 860px;
       margin: 0 auto;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 600px; height: 400px;
+      background: radial-gradient(ellipse at center, rgba(79,110,247,0.12) 0%, transparent 70%);
+      pointer-events: none;
     }
     .hero-badge {
-      display: inline-block;
-      background: rgba(79, 110, 247, 0.12);
-      border: 1px solid rgba(79, 110, 247, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(79,110,247,0.1);
+      border: 1px solid rgba(79,110,247,0.3);
       color: var(--primary);
       font-size: 0.75rem;
       font-weight: 700;
@@ -79,24 +93,26 @@
       text-transform: uppercase;
       padding: 0.35rem 0.9rem;
       border-radius: 100px;
-      margin-bottom: 1.75rem;
+      margin-bottom: 2rem;
     }
     .hero h1 {
-      font-size: clamp(2.2rem, 5vw, 3.6rem);
-      font-weight: 800;
-      line-height: 1.15;
-      letter-spacing: -0.5px;
-      margin-bottom: 1.25rem;
+      font-size: clamp(2.4rem, 5.5vw, 4rem);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -1px;
+      margin-bottom: 1.5rem;
       color: var(--text);
     }
-    .hero h1 span { color: var(--primary); }
+    .hero h1 .accent { color: var(--primary); }
+    .hero h1 .accent-green { color: var(--green); }
     .hero p {
-      font-size: 1.15rem;
+      font-size: 1.2rem;
       color: var(--muted);
-      max-width: 560px;
+      max-width: 580px;
       margin: 0 auto 2.5rem;
-      line-height: 1.7;
+      line-height: 1.75;
     }
+    .hero-cta-group { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
     .hero-cta {
       display: inline-block;
       background: var(--primary);
@@ -108,426 +124,543 @@
       text-decoration: none;
       letter-spacing: 0.3px;
       transition: opacity 0.2s, transform 0.15s;
-      box-shadow: 0 4px 24px rgba(79, 110, 247, 0.35);
+      box-shadow: 0 4px 30px rgba(79,110,247,0.4);
     }
-    .hero-cta:hover { opacity: 0.9; transform: translateY(-1px); }
-    .hero-cta:active { transform: scale(0.98); }
-    .hero-sub {
-      margin-top: 1rem;
-      font-size: 0.825rem;
-      color: var(--muted);
+    .hero-cta:hover { opacity: 0.9; transform: translateY(-2px); }
+    .hero-cta-outline {
+      display: inline-block;
+      background: transparent;
+      color: var(--text);
+      font-size: 1.05rem;
+      font-weight: 600;
+      padding: 0.95rem 2.4rem;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      transition: border-color 0.2s, color 0.2s;
     }
+    .hero-cta-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .hero-sub { margin-top: 1.5rem; font-size: 0.82rem; color: var(--muted); }
 
-    /* ── SECTION WRAPPER ── */
-    section { padding: 5rem 2rem; }
-    .section-label {
+    /* ── NUMBERS STRIP ── */
+    .numbers-strip {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+    @media (max-width: 640px) { .numbers-strip { grid-template-columns: repeat(2, 1fr); } }
+    .num-item {
       text-align: center;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--primary);
-      margin-bottom: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-right: 1px solid var(--border);
+    }
+    .num-item:last-child { border-right: none; }
+    @media (max-width: 640px) { .num-item:nth-child(2) { border-right: none; } .num-item:nth-child(3) { border-right: 1px solid var(--border); } }
+    .num-value { font-size: 2rem; font-weight: 900; color: var(--primary); letter-spacing: -1px; }
+    .num-label { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
+
+    /* ── SHARED SECTION ── */
+    section { padding: 6rem 2rem; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--primary); margin-bottom: 0.75rem;
     }
     .section-title {
-      text-align: center;
-      font-size: clamp(1.6rem, 3vw, 2.2rem);
-      font-weight: 800;
-      margin-bottom: 0.75rem;
-      color: var(--text);
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      font-weight: 900; margin-bottom: 1rem;
+      color: var(--text); line-height: 1.2; letter-spacing: -0.5px;
     }
+    .section-title span { color: var(--primary); }
     .section-sub {
-      text-align: center;
-      color: var(--muted);
-      max-width: 500px;
-      margin: 0 auto 3.5rem;
-      font-size: 1rem;
+      font-size: 1.05rem; color: var(--muted);
+      max-width: 580px; line-height: 1.7; margin-bottom: 3rem;
     }
 
-    /* ── FEATURES ── */
-    .features-section { background: var(--bg); }
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
-      max-width: 1080px;
-      margin: 0 auto;
+    /* ── PAIN SECTION ── */
+    .pain-section { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .pain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    @media (max-width: 700px) { .pain-grid { grid-template-columns: 1fr; } }
+    .pain-card {
+      background: rgba(239,68,68,0.05);
+      border: 1px solid rgba(239,68,68,0.15);
+      border-radius: 12px;
+      padding: 1.5rem;
     }
-    @media (max-width: 900px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 580px) { .features-grid { grid-template-columns: 1fr; } }
-    .feature-card {
+    .pain-card .pain-q {
+      font-size: 1.05rem; font-weight: 700; color: var(--text);
+      margin-bottom: 0.5rem; line-height: 1.4;
+    }
+    .pain-card .pain-a { font-size: 0.875rem; color: var(--muted); }
+
+    /* ── FEATURES ── */
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    @media (max-width: 840px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .features-grid { grid-template-columns: 1fr; } }
+    .feat-card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 1.75rem 1.5rem;
+      padding: 1.5rem;
       transition: border-color 0.2s;
     }
-    .feature-card:hover { border-color: rgba(79, 110, 247, 0.4); }
-    .feature-icon {
-      width: 42px;
-      height: 42px;
-      background: rgba(79, 110, 247, 0.12);
-      border-radius: 10px;
-      display: flex;
+    .feat-card:hover { border-color: rgba(79,110,247,0.4); }
+    .feat-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; margin-bottom: 1rem;
+    }
+    .feat-icon.blue { background: rgba(79,110,247,0.12); }
+    .feat-icon.green { background: rgba(34,197,94,0.12); }
+    .feat-icon.yellow { background: rgba(245,158,11,0.12); }
+    .feat-icon.red { background: rgba(239,68,68,0.12); }
+    .feat-icon.purple { background: rgba(168,85,247,0.12); }
+    .feat-icon.teal { background: rgba(20,184,166,0.12); }
+    .feat-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .feat-card p { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── BREAK EVEN CALLOUT ── */
+    .callout-section { background: linear-gradient(135deg, rgba(79,110,247,0.08) 0%, rgba(13,13,20,0) 60%); }
+    .callout-box {
+      background: var(--card);
+      border: 1px solid rgba(79,110,247,0.3);
+      border-radius: 16px;
+      padding: 3rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
       align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
-      margin-bottom: 1rem;
     }
-    .feature-card h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 0.5rem;
+    @media (max-width: 700px) { .callout-box { grid-template-columns: 1fr; gap: 2rem; padding: 2rem; } }
+    .callout-box h2 { font-size: 1.9rem; font-weight: 900; line-height: 1.2; margin-bottom: 1rem; letter-spacing: -0.5px; }
+    .callout-box h2 span { color: var(--primary); }
+    .callout-box p { color: var(--muted); font-size: 0.95rem; line-height: 1.7; margin-bottom: 1rem; }
+    .be-demo {
+      background: rgba(79,110,247,0.08);
+      border: 1px solid rgba(79,110,247,0.25);
+      border-radius: 12px;
+      padding: 1.5rem;
     }
-    .feature-card p {
-      font-size: 0.875rem;
-      color: var(--muted);
-      line-height: 1.6;
-    }
+    .be-demo-label { font-size: 0.65rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1rem; }
+    .be-demo-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; font-size: 0.875rem; }
+    .be-demo-row:last-child { margin-bottom: 0; border-top: 1px solid rgba(79,110,247,0.2); padding-top: 0.75rem; margin-top: 0.25rem; }
+    .be-demo-row span:first-child { color: var(--muted); }
+    .be-demo-row span:last-child { font-weight: 700; }
+    .be-result { font-size: 1.5rem; font-weight: 900; color: var(--primary); }
 
     /* ── HOW IT WORKS ── */
-    .how-section {
-      background: linear-gradient(180deg, var(--card) 0%, var(--bg) 100%);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2rem;
-      max-width: 900px;
-      margin: 0 auto;
+    .how-section { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .steps-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; position: relative; }
+    @media (max-width: 700px) { .steps-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 440px) { .steps-grid { grid-template-columns: 1fr; } }
+    .step-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.25rem;
       position: relative;
     }
-    @media (max-width: 640px) { .steps-grid { grid-template-columns: 1fr; } }
-    .step {
-      text-align: center;
-      padding: 0 1rem;
+    .step-num-large {
+      font-size: 2.5rem; font-weight: 900;
+      color: rgba(79,110,247,0.15);
+      line-height: 1; margin-bottom: 0.75rem;
     }
-    .step-number {
-      width: 52px;
-      height: 52px;
-      background: rgba(79, 110, 247, 0.12);
-      border: 2px solid rgba(79, 110, 247, 0.3);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: var(--primary);
-      margin: 0 auto 1.25rem;
+    .step-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .step-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── TWO LOGINS ── */
+    .two-logins { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 640px) { .two-logins { grid-template-columns: 1fr; } }
+    .login-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 2rem;
     }
-    .step h3 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 0.5rem;
+    .login-card.owner { border-color: rgba(79,110,247,0.3); }
+    .login-card.breaker { border-color: rgba(34,197,94,0.3); }
+    .login-chip {
+      display: inline-block; padding: 0.25rem 0.7rem;
+      border-radius: 100px; font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 1rem;
     }
-    .step p {
-      font-size: 0.875rem;
-      color: var(--muted);
-      line-height: 1.6;
+    .login-chip.blue { background: rgba(79,110,247,0.12); color: var(--primary); }
+    .login-chip.green { background: rgba(34,197,94,0.12); color: var(--green); }
+    .login-card h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.75rem; }
+    .login-card ul { list-style: none; }
+    .login-card ul li {
+      font-size: 0.875rem; color: var(--muted);
+      padding: 0.35rem 0; border-bottom: 1px solid rgba(45,45,61,0.5);
+      display: flex; align-items: flex-start; gap: 0.5rem;
     }
+    .login-card ul li:last-child { border-bottom: none; }
+    .login-card ul li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── BEFORE / AFTER ── */
+    .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 640px) { .ba-grid { grid-template-columns: 1fr; } }
+    .ba-card { border-radius: 14px; padding: 2rem; }
+    .ba-card.before { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.2); }
+    .ba-card.after { background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.2); }
+    .ba-label {
+      font-size: 0.7rem; font-weight: 800; letter-spacing: 1.5px;
+      text-transform: uppercase; margin-bottom: 1.25rem;
+    }
+    .ba-card.before .ba-label { color: var(--red); }
+    .ba-card.after .ba-label { color: var(--green); }
+    .ba-item {
+      display: flex; gap: 0.6rem; align-items: flex-start;
+      font-size: 0.88rem; padding: 0.45rem 0;
+      border-bottom: 1px solid rgba(45,45,61,0.4);
+    }
+    .ba-item:last-child { border-bottom: none; }
+    .ba-card.before .ba-item { color: var(--muted); }
+    .ba-card.after .ba-item { color: var(--text); }
+    .ba-icon { flex-shrink: 0; margin-top: 1px; }
 
     /* ── PRICING ── */
-    .pricing-section { background: var(--bg); }
-    .pricing-card {
+    .pricing-section { text-align: center; }
+    .price-card {
       background: var(--card);
-      border: 1px solid var(--primary);
-      border-radius: 16px;
-      padding: 2.75rem 2.5rem;
-      max-width: 460px;
+      border: 1px solid rgba(79,110,247,0.3);
+      border-radius: 20px;
+      padding: 3rem;
+      max-width: 480px;
       margin: 0 auto;
-      text-align: center;
-      box-shadow: 0 0 40px rgba(79, 110, 247, 0.12);
+      box-shadow: 0 0 60px rgba(79,110,247,0.1);
     }
-    .pricing-badge {
+    .price-badge {
       display: inline-block;
-      background: rgba(79, 110, 247, 0.15);
+      background: rgba(79,110,247,0.12);
       color: var(--primary);
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
       padding: 0.3rem 0.8rem;
       border-radius: 100px;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.5rem;
     }
-    .pricing-amount {
-      font-size: 3.5rem;
-      font-weight: 800;
-      color: var(--text);
-      line-height: 1;
+    .price-amount { font-size: 4rem; font-weight: 900; color: var(--text); letter-spacing: -2px; line-height: 1; }
+    .price-amount sup { font-size: 1.5rem; vertical-align: top; margin-top: 0.7rem; display: inline-block; font-weight: 700; }
+    .price-period { color: var(--muted); font-size: 1rem; margin-bottom: 2rem; }
+    .price-includes { list-style: none; text-align: left; margin-bottom: 2rem; }
+    .price-includes li {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      font-size: 0.9rem; padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(45,45,61,0.5);
     }
-    .pricing-amount sup {
-      font-size: 1.5rem;
-      vertical-align: super;
-      font-weight: 700;
+    .price-includes li:last-child { border-bottom: none; }
+    .price-includes li::before { content: '✓'; color: var(--green); font-weight: 800; flex-shrink: 0; }
+    .price-cta {
+      display: block; width: 100%;
+      background: var(--primary); color: #fff;
+      font-size: 1.05rem; font-weight: 700;
+      padding: 1rem; border-radius: 10px;
+      text-decoration: none; letter-spacing: 0.3px;
+      transition: opacity 0.2s; border: none; cursor: pointer;
+      box-shadow: 0 4px 24px rgba(79,110,247,0.35);
     }
-    .pricing-period {
-      font-size: 0.9rem;
-      color: var(--muted);
-      margin-top: 0.4rem;
-      margin-bottom: 2rem;
-    }
-    .pricing-features {
-      list-style: none;
-      text-align: left;
-      margin-bottom: 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .pricing-features li {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.75rem;
-      font-size: 0.9rem;
-      color: var(--text);
-    }
-    .pricing-features li .check {
-      color: var(--green);
-      font-weight: 700;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .pricing-cta {
-      display: block;
-      background: var(--primary);
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 700;
-      padding: 0.95rem;
-      border-radius: 10px;
-      text-decoration: none;
-      transition: opacity 0.2s, transform 0.15s;
-      box-shadow: 0 4px 20px rgba(79, 110, 247, 0.35);
-    }
-    .pricing-cta:hover { opacity: 0.9; transform: translateY(-1px); }
-    .pricing-note {
-      margin-top: 1rem;
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
+    .price-cta:hover { opacity: 0.9; }
+    .price-note { font-size: 0.78rem; color: var(--muted); margin-top: 1rem; }
 
     /* ── FOOTER ── */
     footer {
       background: var(--card);
       border-top: 1px solid var(--border);
-      padding: 2rem;
+      padding: 2.5rem 2rem;
       text-align: center;
     }
-    .footer-brand {
-      font-size: 1rem;
-      font-weight: 800;
-      letter-spacing: 2px;
-      color: var(--text);
-      margin-bottom: 0.5rem;
-    }
+    .footer-brand { font-size: 1.05rem; font-weight: 800; letter-spacing: 2px; margin-bottom: 0.5rem; }
     .footer-brand span { color: var(--primary); }
-    .footer-tagline {
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-    .footer-copy {
-      margin-top: 1.25rem;
-      font-size: 0.78rem;
-      color: var(--muted);
-      opacity: 0.6;
-    }
-
-    /* ── DIVIDER ── */
-    .section-divider {
-      width: 48px;
-      height: 3px;
-      background: var(--primary);
-      border-radius: 2px;
-      margin: 0 auto 3rem;
-      opacity: 0.5;
-    }
+    footer p { color: var(--muted); font-size: 0.82rem; margin-bottom: 0.4rem; }
+    footer a { color: var(--primary); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .divider-line { border: none; border-top: 1px solid var(--border); margin: 5rem auto 0; max-width: 1100px; }
   </style>
 </head>
 <body>
 
-  <!-- NAV -->
-  <nav>
-    <div></div>
-    <a href="/" class="nav-brand"><img src="/logo.png?v=3" alt="Card Break Pro" style="height:50px;vertical-align:middle;" /></a>
-    <a href="/login" class="nav-login">Login</a>
-  </nav>
+<nav>
+  <div></div>
+  <a href="/" class="nav-brand">CARD <span>BREAK</span> PRO</a>
+  <a href="index.html" class="nav-login">Log In</a>
+</nav>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-badge">The #1 Platform for Live Card Breakers</div>
-    <h1>Know Your Numbers.<br><span>Every Break. Every Stream.</span></h1>
-    <p>Card Break Pro gives you real-time inventory tracking, automatic profit calculation, and product ROI — so you always know exactly where your money is going, live on stream.</p>
-    <a href="/register" class="hero-cta">Start Your Business &mdash; $250/mo</a>
-    <div class="hero-sub">No free trial &middot; Instant access after payment &middot; Cancel anytime</div>
-  </section>
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="hero-badge">Built for live card breakers</div>
+  <h1>
+    Stop guessing.<br>
+    <span class="accent">Start knowing</span> your numbers.
+  </h1>
+  <p>Card Break Pro is the complete business platform for live card breaking — track every break, manage your team, schedule streams, and know your profit before you even go live.</p>
+  <div class="hero-cta-group">
+    <a href="register.html" class="hero-cta">Start Your Business — $250/mo</a>
+    <a href="#features" class="hero-cta-outline">See What's Inside</a>
+  </div>
+  <p class="hero-sub">No contracts. Cancel anytime. Full platform, day one.</p>
+</div>
 
-  <!-- CORE VALUE PROPS -->
-  <section style="background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:3rem 2rem;">
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;max-width:900px;margin:0 auto;text-align:center;">
-      <div>
-        <div style="font-size:2rem;margin-bottom:0.5rem;">&#128230;</div>
-        <div style="font-weight:700;color:var(--text);margin-bottom:0.25rem;">Live Inventory</div>
-        <div style="font-size:0.85rem;color:var(--muted);">Stock deducts automatically every break</div>
+<!-- ── NUMBERS STRIP ── -->
+<div class="numbers-strip">
+  <div class="num-item">
+    <div class="num-value">10</div>
+    <div class="num-label">Tools in One Platform</div>
+  </div>
+  <div class="num-item">
+    <div class="num-value">$0</div>
+    <div class="num-label">Hidden Fees or Commissions</div>
+  </div>
+  <div class="num-item">
+    <div class="num-value">2</div>
+    <div class="num-label">Login Roles (Owner + Breaker)</div>
+  </div>
+  <div class="num-item">
+    <div class="num-value">∞</div>
+    <div class="num-label">Breaks, Streams & Team Members</div>
+  </div>
+</div>
+
+<!-- ── PAIN POINTS ── -->
+<section class="pain-section">
+  <div class="section-inner">
+    <div class="section-label">Sound familiar?</div>
+    <div class="section-title" style="margin-bottom:2.5rem;">Running a break without this feels like this.</div>
+    <div class="pain-grid">
+      <div class="pain-card">
+        <div class="pain-q">"Did I even make money tonight?"</div>
+        <div class="pain-a">Stream ends, you're counting receipts in your head trying to remember what you spent vs what came in. No clear answer.</div>
       </div>
-      <div>
-        <div style="font-size:2rem;margin-bottom:0.5rem;">&#128200;</div>
-        <div style="font-weight:700;color:var(--text);margin-bottom:0.25rem;">Product ROI</div>
-        <div style="font-size:0.85rem;color:var(--muted);">Know what's profitable and what's not</div>
+      <div class="pain-card">
+        <div class="pain-q">"Which boxes are actually worth breaking?"</div>
+        <div class="pain-a">You're guessing which products perform best. One box feels hot, but you have no data to back it up or kill it.</div>
       </div>
-      <div>
-        <div style="font-size:2rem;margin-bottom:0.5rem;">&#9889;</div>
-        <div style="font-weight:700;color:var(--text);margin-bottom:0.25rem;">Real-Time Profit</div>
-        <div style="font-size:0.85rem;color:var(--muted);">Revenue calculated automatically, no math needed</div>
+      <div class="pain-card">
+        <div class="pain-q">"What do I owe my breakers this week?"</div>
+        <div class="pain-a">Commission math done manually in your head or on a calculator. Every week. One wrong number and trust breaks down.</div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- MAIN FEATURES -->
-  <section class="features-section">
-    <div class="section-label">Core Features</div>
-    <div class="section-title">Built Around What Actually Matters</div>
-    <div class="section-sub">Every feature exists because a live breaker needed it.</div>
-    <div class="section-divider"></div>
+<!-- ── BREAK EVEN CALLOUT ── -->
+<section class="callout-section">
+  <div class="section-inner">
+    <div class="callout-box">
+      <div>
+        <div class="section-label">The most important number in breaking</div>
+        <h2>Know your <span>break even</span> before you go live.</h2>
+        <p>Before you sell a single spot, Card Break Pro tells you exactly how much you need to earn to not lose money — based on your box cost and platform fees. That number shows up the second you pick your products.</p>
+        <p>No more finishing a stream and realizing you lost money. You'll know going in.</p>
+      </div>
+      <div>
+        <div class="be-demo">
+          <div class="be-demo-label">Break Even Preview</div>
+          <div class="be-demo-row"><span>Box Cost</span><span>$240.00</span></div>
+          <div class="be-demo-row"><span>Platform Fee (8%)</span><span>$19.20</span></div>
+          <div class="be-demo-row"><span>Spots Sold</span><span>30</span></div>
+          <div class="be-demo-row">
+            <span>Break Even / Spot</span>
+            <span class="be-result">$8.64</span>
+          </div>
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.75rem;text-align:center;">Updates live as you select products.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
+<!-- ── FEATURES ── -->
+<section id="features">
+  <div class="section-inner">
+    <div class="section-label">Everything you need</div>
+    <div class="section-title">One platform. <span>Every tool.</span></div>
+    <p class="section-sub">Every feature your breaking business needs, built to work together from day one.</p>
     <div class="features-grid">
-
-      <div class="feature-card" style="border-color:rgba(79,110,247,0.4);">
-        <div class="feature-icon">&#128230;</div>
+      <div class="feat-card">
+        <div class="feat-icon blue">📡</div>
+        <h3>Live Break Entry</h3>
+        <p>Track every break in real time. Submit each break as you open boxes — the app calculates this break's revenue from the running Whatnot total automatically.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon green">🎯</div>
+        <h3>Break Even Calculator</h3>
+        <p>Before revenue is entered, you see your target. Box cost plus estimated platform fees divided by spots — shown live the moment you pick your products.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon yellow">📦</div>
         <h3>Inventory Management</h3>
-        <p>Add every product with cost per unit and stock quantity. As breaks are submitted, inventory deducts automatically — no manual tracking, no guessing what you have left mid-stream.</p>
+        <p>Add every product you carry with cost and category. Stock tracks automatically as you break. Filter products by sport during a live stream.</p>
       </div>
-
-      <div class="feature-card" style="border-color:rgba(79,110,247,0.4);">
-        <div class="feature-icon">&#128200;</div>
-        <h3>Product ROI Tracking</h3>
-        <p>Get a clear picture of how each product is performing across your streams. Revenue and cost data is tracked per product so you can make smarter buying decisions and focus on what's working.</p>
+      <div class="feat-card">
+        <div class="feat-icon purple">📊</div>
+        <h3>Full Analytics Dashboard</h3>
+        <p>Revenue, net profit, platform fees, and total units sold — all in one view across every closed stream, with commission already deducted.</p>
       </div>
-
-      <div class="feature-card" style="border-color:rgba(79,110,247,0.4);">
-        <div class="feature-icon">&#9889;</div>
-        <h3>Live Break Updates</h3>
-        <p>Your breaker enters the running Whatnot total after each break — the system calculates the revenue automatically. No subtraction, no math, no mistakes. Just the number, live.</p>
+      <div class="feat-card">
+        <div class="feat-icon red">🏷</div>
+        <h3>Product ROI</h3>
+        <p>See which boxes make you money and which don't. Revenue, cost, and profit ranked by product across your entire history. Kill the losers, double down on winners.</p>
       </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">&#127942;</div>
-        <h3>Breaker Leaderboard</h3>
-        <p>Track which breakers are driving the most revenue across streams. Performance data helps you build a stronger team and reward your top earners.</p>
+      <div class="feat-card">
+        <div class="feat-icon teal">🏆</div>
+        <h3>Leaderboard</h3>
+        <p>Rank your breakers by revenue generated. Know who performs, reward the top, and make informed decisions about your team.</p>
       </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">&#128196;</div>
-        <h3>Stream Close-Out</h3>
-        <p>Enter your final Whatnot total when you go offline — giveaways and overages are accounted for automatically. Get a clean profit summary the moment your stream ends.</p>
+      <div class="feat-card">
+        <div class="feat-icon blue">📅</div>
+        <h3>Scheduling System</h3>
+        <p>Build weekly schedules and assign shifts to breakers. They see it in their account immediately. Calendar view, shift notes, stream keys — all organized in one place.</p>
       </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">&#128101;</div>
-        <h3>Two Logins. One Team.</h3>
-        <p>Your business runs on two types of access. You log in as the manager — full visibility over everything. Your breakers each get their own login to submit breaks live. Add as many breakers as your team needs, no extra cost.</p>
+      <div class="feat-card">
+        <div class="feat-icon green">⏱</div>
+        <h3>Clock In / Clock Out</h3>
+        <p>Breakers clock in when their stream starts and auto clock out when they close out. Full time log per shift so you know when your team was actually working.</p>
       </div>
-
-    </div>
-  </section>
-
-  <!-- PAIN POINT SECTION -->
-  <section class="how-section">
-    <div class="section-label">Why Card Break Pro</div>
-    <div class="section-title">Stop Running Your Business Blind</div>
-    <div class="section-sub">Most breakers have no idea how much they actually made until days after a stream. Card Break Pro changes that.</div>
-    <div class="section-divider"></div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;max-width:800px;margin:0 auto;">
-      <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:1.75rem;">
-        <div style="font-weight:800;color:#ef4444;margin-bottom:1rem;font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;">Without Card Break Pro</div>
-        <ul style="list-style:none;display:flex;flex-direction:column;gap:0.75rem;">
-          <li style="font-size:0.875rem;color:var(--muted);">&#10005; &nbsp;Tracking inventory on spreadsheets</li>
-          <li style="font-size:0.875rem;color:var(--muted);">&#10005; &nbsp;Doing math mid-stream on a calculator</li>
-          <li style="font-size:0.875rem;color:var(--muted);">&#10005; &nbsp;No idea which products actually profit</li>
-          <li style="font-size:0.875rem;color:var(--muted);">&#10005; &nbsp;Guessing your numbers after the show</li>
-          <li style="font-size:0.875rem;color:var(--muted);">&#10005; &nbsp;No breaker accountability or tracking</li>
-        </ul>
-      </div>
-      <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:1.75rem;">
-        <div style="font-weight:800;color:#22c55e;margin-bottom:1rem;font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;">With Card Break Pro</div>
-        <ul style="list-style:none;display:flex;flex-direction:column;gap:0.75rem;">
-          <li style="font-size:0.875rem;color:var(--text);">&#10003; &nbsp;Inventory updates live every single break</li>
-          <li style="font-size:0.875rem;color:var(--text);">&#10003; &nbsp;Revenue calculated automatically, always</li>
-          <li style="font-size:0.875rem;color:var(--text);">&#10003; &nbsp;Full product ROI after every stream</li>
-          <li style="font-size:0.875rem;color:var(--text);">&#10003; &nbsp;Profit summary the moment you close out</li>
-          <li style="font-size:0.875rem;color:var(--text);">&#10003; &nbsp;Leaderboard tracks every breaker's output</li>
-        </ul>
+      <div class="feat-card">
+        <div class="feat-icon yellow">💰</div>
+        <h3>Commission & Payouts</h3>
+        <p>Set commission rates per breaker. Every stream close auto-calculates payout based on profit. Logged by period so you always know what you owe, to the penny.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- HOW IT WORKS -->
-  <section class="features-section">
-    <div class="section-label">How It Works</div>
-    <div class="section-title">Up and Running in Minutes</div>
-    <div class="section-sub">Three steps from sign-up to your first live break session.</div>
-    <div class="section-divider"></div>
-
+<!-- ── HOW IT WORKS ── -->
+<section class="how-section">
+  <div class="section-inner">
+    <div class="section-label">How it works</div>
+    <div class="section-title" style="margin-bottom:2.5rem;">Live in <span>four steps.</span></div>
     <div class="steps-grid">
-      <div class="step">
-        <div class="step-number">1</div>
-        <h3>Register Your Business</h3>
-        <p>Create your owner account and activate your subscription. Your full dashboard is ready immediately after checkout.</p>
+      <div class="step-card">
+        <div class="step-num-large">01</div>
+        <h3>Register your business</h3>
+        <p>Create your owner account, add your inventory and set up your team. Takes under 10 minutes.</p>
       </div>
-      <div class="step">
-        <div class="step-number">2</div>
-        <h3>Add Products &amp; Breakers</h3>
-        <p>Load your inventory with costs and stock levels. Invite your breakers with a code — they get their own login instantly.</p>
+      <div class="step-card">
+        <div class="step-num-large">02</div>
+        <h3>Invite your breakers</h3>
+        <p>Share your invite code. Breakers join with their own login and see their schedule, shifts, and payouts.</p>
       </div>
-      <div class="step">
-        <div class="step-number">3</div>
-        <h3>Run Your Stream</h3>
-        <p>Breakers log breaks live. Inventory drops. Revenue calculates. You watch the profit roll in from your owner dashboard.</p>
+      <div class="step-card">
+        <div class="step-num-large">03</div>
+        <h3>Go live and track in real time</h3>
+        <p>Select products, know the break even, submit breaks as you open boxes. Everything updates live.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num-large">04</div>
+        <h3>Close out and see your profit</h3>
+        <p>Close the stream and see your exact net profit, commission payouts, and how each product performed.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- PRICING -->
-  <section class="pricing-section">
-    <div class="section-label">Pricing</div>
-    <div class="section-title">One Plan. Everything Included.</div>
-    <div class="section-sub">No per-seat fees. No hidden costs. No tiers. Just one flat rate for your whole business.</div>
-    <div class="section-divider"></div>
+<!-- ── TWO LOGINS ── -->
+<section>
+  <div class="section-inner">
+    <div class="section-label">Built for the whole team</div>
+    <div class="section-title">One platform. <span>Two logins.</span></div>
+    <p class="section-sub">Your manager account and your breaker accounts are separate — everyone sees exactly what they need and nothing they don't.</p>
+    <div class="two-logins">
+      <div class="login-card owner">
+        <div class="login-chip blue">Owner / Manager</div>
+        <h3>You run the business</h3>
+        <ul>
+          <li>Full analytics dashboard and profit reports</li>
+          <li>Product ROI and break history across all streams</li>
+          <li>Team management with invite codes</li>
+          <li>Set and manage commission rates per breaker</li>
+          <li>Build and publish schedules</li>
+          <li>See clock in/out times and payout totals</li>
+          <li>Inventory management by category</li>
+        </ul>
+      </div>
+      <div class="login-card breaker">
+        <div class="login-chip green">Breaker</div>
+        <h3>They focus on the stream</h3>
+        <ul>
+          <li>See their upcoming shifts and schedule</li>
+          <li>Clock in and start their stream with one tap</li>
+          <li>Break entry with live profit and break even</li>
+          <li>Submit breaks in real time, no guesswork</li>
+          <li>Close out the stream and auto clock out</li>
+          <li>View their payout history by period</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <div class="pricing-card">
-      <div class="pricing-badge">Pro Plan</div>
-      <div class="pricing-amount"><sup>$</sup>250</div>
-      <div class="pricing-period">per month &mdash; billed monthly</div>
+<!-- ── BEFORE / AFTER ── -->
+<section style="background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <div class="section-inner">
+    <div class="section-label">The transformation</div>
+    <div class="section-title" style="margin-bottom:2.5rem;">Before and <span>after.</span></div>
+    <div class="ba-grid">
+      <div class="ba-card before">
+        <div class="ba-label">Without Card Break Pro</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> No idea if you made money until days later</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Commission calculated manually every week</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> No way to know which boxes are profitable</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Breakers texting you for their schedule</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Forgot to track break 3's revenue separately</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> No record of who clocked in or when</div>
+        <div class="ba-item"><span class="ba-icon">✗</span> Going live hoping you'll break even</div>
+      </div>
+      <div class="ba-card after">
+        <div class="ba-label">With Card Break Pro</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Profit shows the second you close out</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Commission auto-calculated and logged per stream</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Product ROI ranks every box by performance</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Breakers see their schedule in their account</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Every break tracked from the running total automatically</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Full clock in/out log per shift per breaker</div>
+        <div class="ba-item"><span class="ba-icon" style="color:var(--green);">✓</span> Break even shown before you go live</div>
+      </div>
+    </div>
+  </div>
+</section>
 
-      <ul class="pricing-features">
-        <li><span class="check">&#10003;</span> Full inventory management with live deduction</li>
-        <li><span class="check">&#10003;</span> Product ROI tracking across every stream</li>
-        <li><span class="check">&#10003;</span> Automatic revenue calculation — no math needed</li>
-        <li><span class="check">&#10003;</span> Owner dashboard with profit &amp; break history</li>
-        <li><span class="check">&#10003;</span> Breaker leaderboard &amp; performance tracking</li>
-        <li><span class="check">&#10003;</span> Unlimited breaker accounts via invite codes</li>
-        <li><span class="check">&#10003;</span> Stream close-out with giveaway accounting</li>
-        <li><span class="check">&#10003;</span> Works on any device — phone, tablet, desktop</li>
+<!-- ── PRICING ── -->
+<section class="pricing-section">
+  <div class="section-inner">
+    <div class="section-label">Simple pricing</div>
+    <div class="section-title" style="margin-bottom:0.5rem;">One price. <span>Everything included.</span></div>
+    <p class="section-sub" style="margin:0 auto 3rem;">No per-seat fees. No upsells. No feature gates. One flat monthly fee and your entire business is covered.</p>
+    <div class="price-card">
+      <div class="price-badge">All Features Included</div>
+      <div class="price-amount"><sup>$</sup>250</div>
+      <div class="price-period">per month</div>
+      <ul class="price-includes">
+        <li>Unlimited breaks and streams</li>
+        <li>Unlimited breaker accounts</li>
+        <li>Live break entry with break even calculator</li>
+        <li>Full analytics — dashboard, ROI, leaderboard</li>
+        <li>Team scheduling with clock in/out</li>
+        <li>Commission tracking and payout logs</li>
+        <li>Inventory management by category</li>
+        <li>Stream history and summaries</li>
+        <li>Owner and breaker logins included</li>
+        <li>No contracts — cancel anytime</li>
       </ul>
-
-      <a href="/register" class="pricing-cta">Start Now &mdash; $250/mo</a>
-      <div class="pricing-note">No free trial &middot; Secure payment via Stripe &middot; Cancel anytime</div>
+      <a href="register.html" class="price-cta">Start Your Business Today</a>
+      <p class="price-note">Full access from day one. No free trial needed — you'll know immediately if this is for you.</p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- FOOTER -->
-  <footer>
-    <div class="footer-brand">CARD <span>BREAK</span> PRO</div>
-    <div class="footer-tagline">Built for breakers, by breakers.</div>
-    <div style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted);">Questions? <a href="mailto:enterprisesmello@gmail.com" style="color:var(--primary);text-decoration:none;">enterprisesmello@gmail.com</a></div>
-    <div class="footer-copy">&copy; Card Break Pro. All rights reserved.</div>
-  </footer>
+<hr class="divider-line" />
+
+<footer>
+  <div class="footer-brand">CARD <span>BREAK</span> PRO</div>
+  <p>The business OS for live card breakers.</p>
+  <p><a href="mailto:enterprisesmello@gmail.com">enterprisesmello@gmail.com</a></p>
+  <p style="margin-top:1.5rem;">&copy; 2026 Card Break Pro. All rights reserved.</p>
+</footer>
 
 </body>
 </html>

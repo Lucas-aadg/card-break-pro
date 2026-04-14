@@ -363,6 +363,7 @@
 <nav>
   <div class="brand">CARD <span>BREAK</span> PRO</div>
   <div class="nav-right">
+    <a href="help-breaker.html" target="_blank" style="color:var(--muted);font-size:0.8rem;font-weight:600;text-decoration:none;padding:0.35rem 0.7rem;border:1px solid var(--border);border-radius:6px;transition:color 0.2s,border-color 0.2s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--border)'" onmouseout="this.style.color='var(--muted)'">Help</a>
     <span class="breaker-badge" id="breakerBadge">Breaker</span>
     <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
   </div>
@@ -468,6 +469,24 @@
       <div>
         <label for="otherCostsInput">Other Costs ($)</label>
         <input type="number" id="otherCostsInput" placeholder="0.00" min="0" step="0.01" />
+      </div>
+    </div>
+  </div>
+
+  <!-- BREAK EVEN BANNER -->
+  <div id="breakEvenBanner" style="background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.4);border-radius:10px;padding:0.9rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+    <div>
+      <div style="font-size:0.7rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.2rem;">Break Even Target</div>
+      <div style="font-size:0.78rem;color:var(--muted);">Box Cost + Platform Fees — must earn this to break even</div>
+    </div>
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;text-align:right;">
+      <div>
+        <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Total Needed</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--primary);" id="statBreakEven">—</div>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Per Spot</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--primary);" id="statBreakEvenSpot">—</div>
       </div>
     </div>
   </div>
@@ -991,6 +1010,14 @@ function recalcTotals() {
       cpsEl.style.display = 'none';
     }
   }
+
+  // Break Even: box cost + (box cost × fee rate) — what you need to earn to not lose money
+  const breakEvenTotal = boxCost + (boxCost * feeRate);
+  const breakEvenSpot = spots > 0 ? breakEvenTotal / spots : null;
+  const beEl = document.getElementById('statBreakEven');
+  const beSpotEl = document.getElementById('statBreakEvenSpot');
+  if (beEl) beEl.textContent = boxCost > 0 ? fmt(breakEvenTotal) : '—';
+  if (beSpotEl) beSpotEl.textContent = (boxCost > 0 && breakEvenSpot !== null) ? fmt(breakEvenSpot) : '—';
 
   updateRunningTotalLivePreview(currentWhatnotTotal);
 }

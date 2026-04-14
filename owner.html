@@ -33,31 +33,77 @@
       gap: 0;
       position: sticky;
       top: 0;
-      z-index: 100;
+      z-index: 200;
       min-height: 52px;
-      flex-wrap: wrap;
     }
     .brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 2px; margin-right: 1.5rem; white-space: nowrap; }
     .brand span { color: var(--primary); }
-    .tab-bar { display: flex; flex: 1; overflow-x: auto; gap: 0; }
-    .tab-bar::-webkit-scrollbar { height: 2px; }
-    .tab-bar::-webkit-scrollbar-thumb { background: var(--border); }
-    .tab-btn {
+    .nav-menu { display: flex; flex: 1; align-items: center; gap: 0; }
+    .nav-group { position: relative; }
+    .nav-group-btn {
       background: none;
       border: none;
       color: var(--muted);
       font-size: 0.8rem;
       font-weight: 600;
-      padding: 0 0.9rem;
+      padding: 0 1rem;
       height: 52px;
       cursor: pointer;
       white-space: nowrap;
       border-bottom: 2px solid transparent;
       transition: color 0.2s, border-color 0.2s;
       letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
     }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .nav-group-btn:hover { color: var(--text); }
+    .nav-group-btn.has-active { color: var(--primary); border-bottom-color: var(--primary); }
+    .nav-help-link {
+      display: flex; align-items: center; height: 52px; padding: 0 1rem;
+      color: var(--muted); font-size: 0.8rem; font-weight: 600;
+      text-decoration: none; letter-spacing: 0.3px; border-bottom: 2px solid transparent;
+      transition: color 0.2s;
+    }
+    .nav-help-link:hover { color: var(--text); }
+    .nav-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 2px);
+      left: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      min-width: 175px;
+      z-index: 300;
+      overflow: hidden;
+      animation: ddFadeIn 0.12s ease;
+    }
+    @keyframes ddFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+    .nav-group.open .nav-dropdown { display: block; }
+    .nav-dd-item {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 0.7rem 1rem;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.12s, color 0.12s;
+      letter-spacing: 0.3px;
+      border-left: 3px solid transparent;
+    }
+    .nav-dd-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .nav-dd-item.active { color: var(--primary); background: rgba(79,110,247,0.08); border-left-color: var(--primary); }
+    .dd-section-label {
+      font-size: 0.65rem; font-weight: 700; color: rgba(100,116,139,0.6);
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 0.5rem 1rem 0.2rem; pointer-events: none;
+    }
     .nav-actions { display: flex; gap: 0.5rem; align-items: center; padding: 0.5rem 0; margin-left: auto; }
     .btn-sm {
       padding: 0.35rem 0.8rem;
@@ -348,18 +394,45 @@
 
 <nav>
   <div class="brand">CARD <span>BREAK</span> PRO</div>
-  <div class="tab-bar" id="tabBar">
-    <button class="tab-btn active" data-tab="breakEntry">Break Entry</button>
-    <button class="tab-btn" data-tab="inventory">Inventory</button>
-    <button class="tab-btn" data-tab="history">History</button>
-    <button class="tab-btn" data-tab="streamSummary">Stream Summary</button>
-    <button class="tab-btn" data-tab="dashboard">Dashboard</button>
-    <button class="tab-btn" data-tab="productRoi">Product ROI</button>
-    <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
-    <button class="tab-btn" data-tab="team">Team</button>
-    <button class="tab-btn" data-tab="schedule">Schedule</button>
-    <button class="tab-btn" data-tab="settings">Settings</button>
+  <div class="nav-menu" id="navMenu">
+
+    <!-- Live Operations -->
+    <div class="nav-group" id="ng-live">
+      <button class="nav-group-btn has-active" id="ngb-live">Live ▾</button>
+      <div class="nav-dropdown">
+        <div class="dd-section-label">Stream</div>
+        <button class="nav-dd-item active" data-tab="breakEntry">Break Entry</button>
+        <button class="nav-dd-item" data-tab="schedule">Schedule</button>
+      </div>
+    </div>
+
+    <!-- Reports -->
+    <div class="nav-group" id="ng-reports">
+      <button class="nav-group-btn" id="ngb-reports">Reports ▾</button>
+      <div class="nav-dropdown">
+        <div class="dd-section-label">Analytics</div>
+        <button class="nav-dd-item" data-tab="dashboard">Dashboard</button>
+        <button class="nav-dd-item" data-tab="streamSummary">Stream Summary</button>
+        <button class="nav-dd-item" data-tab="history">Break History</button>
+        <button class="nav-dd-item" data-tab="productRoi">Product ROI</button>
+        <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
+      </div>
+    </div>
+
+    <!-- Manage -->
+    <div class="nav-group" id="ng-manage">
+      <button class="nav-group-btn" id="ngb-manage">Manage ▾</button>
+      <div class="nav-dropdown">
+        <div class="dd-section-label">Business</div>
+        <button class="nav-dd-item" data-tab="inventory">Inventory</button>
+        <button class="nav-dd-item" data-tab="team">Team & Payouts</button>
+        <button class="nav-dd-item" data-tab="settings">Settings</button>
+      </div>
+    </div>
+
+    <a href="help-owner.html" class="nav-help-link" target="_blank">Help</a>
   </div>
+
   <div class="nav-actions">
     <span id="ownerBadge" style="color:var(--muted);font-size:0.8rem;"></span>
     <a href="/billing.html" style="color:var(--muted);font-size:13px;text-decoration:none;">Billing</a>
@@ -1140,33 +1213,85 @@ async function initAuth() {
   }
 }
 
-// ── Tab Navigation ────────────────────────────────────────
-function setupTabNav() {
-  document.querySelectorAll('.tab-btn').forEach(function (btn) {
-    btn.addEventListener('click', async function () {
-      const tab = btn.dataset.tab;
-      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
-      document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });
-      btn.classList.add('active');
-      document.getElementById('tab-' + tab).classList.add('active');
-      hideGlobalMessages();
+// ── Tab Navigation (Dropdown) ─────────────────────────────
+// Maps each tab to its parent dropdown group
+const TAB_GROUP_MAP = {
+  breakEntry: 'ng-live', schedule: 'ng-live',
+  dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', leaderboard: 'ng-reports',
+  inventory: 'ng-manage', team: 'ng-manage', settings: 'ng-manage'
+};
+const GROUP_BTN_MAP = {
+  'ng-live': 'ngb-live', 'ng-reports': 'ngb-reports', 'ng-manage': 'ngb-manage'
+};
 
-      // Reload tab data on switch
-      try {
-        if (tab === 'inventory') await loadInventoryTable();
-        else if (tab === 'history') await loadHistory();
-        else if (tab === 'streamSummary') await loadStreamSummary();
-        else if (tab === 'dashboard') await loadDashboard();
-        else if (tab === 'productRoi') await loadProductRoi();
-        else if (tab === 'leaderboard') await loadLeaderboard();
-        else if (tab === 'team') { await setupCommissionToggle(); await loadTeam(); }
-        else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
-      } catch (err) {
-        showGlobalError('Failed to load tab: ' + escHtml(err.message));
-        console.error(err);
-      }
+function updateNavActiveState(activeTab) {
+  // Clear all dropdown item active states
+  document.querySelectorAll('.nav-dd-item').forEach(function (el) { el.classList.remove('active'); });
+  // Clear all group button active states
+  document.querySelectorAll('.nav-group-btn').forEach(function (el) { el.classList.remove('has-active'); });
+  // Set active item
+  const activeItem = document.querySelector('.nav-dd-item[data-tab="' + activeTab + '"]');
+  if (activeItem) activeItem.classList.add('active');
+  // Set active group
+  const groupId = TAB_GROUP_MAP[activeTab];
+  if (groupId) {
+    const groupBtnId = GROUP_BTN_MAP[groupId];
+    if (groupBtnId) document.getElementById(groupBtnId).classList.add('has-active');
+  }
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.nav-group').forEach(function (g) { g.classList.remove('open'); });
+}
+
+async function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });
+  const tabEl = document.getElementById('tab-' + tab);
+  if (tabEl) tabEl.classList.add('active');
+  updateNavActiveState(tab);
+  hideGlobalMessages();
+  closeAllDropdowns();
+
+  try {
+    if (tab === 'inventory') await loadInventoryTable();
+    else if (tab === 'history') await loadHistory();
+    else if (tab === 'streamSummary') await loadStreamSummary();
+    else if (tab === 'dashboard') await loadDashboard();
+    else if (tab === 'productRoi') await loadProductRoi();
+    else if (tab === 'leaderboard') await loadLeaderboard();
+    else if (tab === 'team') { await setupCommissionToggle(); await loadTeam(); }
+    else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
+  } catch (err) {
+    showGlobalError('Failed to load tab: ' + escHtml(err.message));
+    console.error(err);
+  }
+}
+
+function setupTabNav() {
+  // Dropdown open/close toggle
+  document.querySelectorAll('.nav-group-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const group = btn.closest('.nav-group');
+      const isOpen = group.classList.contains('open');
+      closeAllDropdowns();
+      if (!isOpen) group.classList.add('open');
     });
   });
+
+  // Tab item clicks
+  document.querySelectorAll('.nav-dd-item').forEach(function (item) {
+    item.addEventListener('click', async function () {
+      const tab = item.dataset.tab;
+      await switchTab(tab);
+    });
+  });
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', function () { closeAllDropdowns(); });
+
+  // Initial active state
+  updateNavActiveState('breakEntry');
 }
 
 // ── Global Buttons ────────────────────────────────────────

@@ -6,6 +6,8 @@
     { "source": "/join", "destination": "/join.html" },
     { "source": "/dashboard", "destination": "/owner.html" },
     { "source": "/break", "destination": "/breaker.html" },
-    { "source": "/billing", "destination": "/billing.html" }
+    { "source": "/billing", "destination": "/billing.html" },
+    { "source": "/help-owner", "destination": "/help-owner.html" },
+    { "source": "/help-breaker", "destination": "/help-breaker.html" }
   ]
 }

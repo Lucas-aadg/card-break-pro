@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>Card Break Pro — Owner Help & Setup Guide</title>
+  <style>
+    :root {
+      --bg: #0d0d14;
+      --card: #13131e;
+      --border: #2d2d3d;
+      --primary: #4f6ef7;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.7; }
+    nav {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 0 2rem; display: flex; align-items: center; justify-content: space-between;
+      min-height: 52px; position: sticky; top: 0; z-index: 100;
+    }
+    .brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 2px; color: var(--text); text-decoration: none; }
+    .brand span { color: var(--primary); }
+    .nav-back { color: var(--muted); font-size: 0.82rem; text-decoration: none; transition: color 0.2s; }
+    .nav-back:hover { color: var(--text); }
+    .wrap { max-width: 780px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+    h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.4rem; }
+    h1 span { color: var(--primary); }
+    .subtitle { color: var(--muted); margin-bottom: 3rem; }
+    .section { margin-bottom: 3rem; }
+    .section-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 1.25rem; padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; flex-shrink: 0;
+    }
+    .icon-blue { background: rgba(79,110,247,0.15); }
+    .icon-green { background: rgba(34,197,94,0.15); }
+    .icon-yellow { background: rgba(245,158,11,0.15); }
+    .icon-red { background: rgba(239,68,68,0.15); }
+    .icon-purple { background: rgba(168,85,247,0.15); }
+    h2 { font-size: 1.15rem; font-weight: 700; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+    }
+    .step-list { list-style: none; counter-reset: steps; }
+    .step-list li {
+      counter-increment: steps;
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 0.75rem 0; border-bottom: 1px solid rgba(45,45,61,0.5);
+    }
+    .step-list li:last-child { border-bottom: none; }
+    .step-num {
+      background: var(--primary); color: #fff;
+      font-size: 0.75rem; font-weight: 800;
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .step-body strong { display: block; font-size: 0.92rem; margin-bottom: 0.2rem; }
+    .step-body p { font-size: 0.85rem; color: var(--muted); }
+    .tip {
+      background: rgba(79,110,247,0.08); border: 1px solid rgba(79,110,247,0.2);
+      border-radius: 8px; padding: 0.75rem 1rem;
+      font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem;
+    }
+    .tip strong { color: var(--primary); }
+    .warn {
+      background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 8px; padding: 0.75rem 1rem;
+      font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem;
+    }
+    .warn strong { color: var(--yellow); }
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 580px) { .feature-grid { grid-template-columns: 1fr; } }
+    .feature-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1rem 1.25rem;
+    }
+    .feature-card h3 { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.35rem; }
+    .feature-card p { font-size: 0.82rem; color: var(--muted); }
+    .badge {
+      display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px;
+      font-size: 0.7rem; font-weight: 700; margin-right: 0.3rem;
+    }
+    .badge-blue { background: rgba(79,110,247,0.15); color: var(--primary); }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 3rem; }
+    .toc h3 { font-size: 0.75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.75rem; }
+    .toc a { display: block; color: var(--primary); text-decoration: none; font-size: 0.875rem; padding: 0.2rem 0; }
+    .toc a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="owner.html" class="brand">CARD <span>BREAK</span> PRO</a>
+  <a href="owner.html" class="nav-back">← Back to Dashboard</a>
+</nav>
+
+<div class="wrap">
+  <h1>Owner <span>Help</span> & Setup Guide</h1>
+  <p class="subtitle">Everything you need to run your breaking business on Card Break Pro.</p>
+
+  <div class="toc">
+    <h3>Jump to</h3>
+    <a href="#setup">Initial Setup</a>
+    <a href="#break-entry">Break Entry (Live Stream)</a>
+    <a href="#inventory">Inventory</a>
+    <a href="#reports">Reports & Analytics</a>
+    <a href="#team">Team & Commission</a>
+    <a href="#schedule">Schedule</a>
+    <a href="#settings">Settings</a>
+  </div>
+
+  <!-- SETUP -->
+  <div class="section" id="setup">
+    <div class="section-header">
+      <div class="section-icon icon-blue">🚀</div>
+      <h2>Initial Setup — Do This First</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Add your inventory</strong>
+            <p>Go to <strong>Manage → Inventory</strong>. Add every product (box) you carry. Include the cost per box and the product category (e.g. Baseball, Basketball, Football). This is what your breakers select during a live stream.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Add your breakers</strong>
+            <p>Go to <strong>Manage → Team</strong>. Copy the invite code from the top of the page. Send it to your breakers — they go to the login page, click "Breaker? Join with invite code", and create their account. They'll show up in your team list automatically.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Set commission rates (optional)</strong>
+            <p>In <strong>Manage → Team</strong>, toggle commission on and set a rate per breaker. This auto-calculates and deducts from your net profit when streams close out.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Create your first schedule</strong>
+            <p>Go to <strong>Live → Schedule</strong>. Assign shifts to your breakers with a date, time, and stream key. They'll see it in their "My Shifts" tab when they log in.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <strong>You're live</strong>
+            <p>Your breakers clock in from their account, select products, and submit breaks in real time. You see everything in <strong>Reports → Dashboard</strong>.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- BREAK ENTRY -->
+  <div class="section" id="break-entry">
+    <div class="section-header">
+      <div class="section-icon icon-green">📡</div>
+      <h2>Break Entry — Live Stream Tracking</h2>
+    </div>
+    <div class="card">
+      <p style="margin-bottom:1rem;font-size:0.9rem;">This is the main screen your breakers use during a live stream. As the owner you can also enter breaks yourself from this tab.</p>
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Enter a Stream Key</strong>
+            <p>This is the Whatnot event ID or your own label (e.g. "Saturday Night Break"). The system auto-loads any in-progress stream for that key.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Select products (box cost)</strong>
+            <p>Use the quantity fields next to each product. The break even and box cost update live. Filter by category using the pill buttons above the table.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Enter spots and fee %</strong>
+            <p>Spots = how many slots you sold. Platform Fee % = your Whatnot fee (typically 8%). The <strong>Break Even</strong> banner will show you the minimum you need to earn — before you even go live.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Submit breaks as you go</strong>
+            <p>After each break (each product opened), type the current running Whatnot total and click <strong>SUBMIT BREAK</strong>. The system calculates each individual break's revenue automatically (new total minus previous total).</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <strong>Close Out Stream</strong>
+            <p>At the end of the stream, enter the final Whatnot sales number and click <strong>CLOSE OUT STREAM</strong>. This locks in all the numbers, calculates commission, and moves the stream to History.</p>
+          </div>
+        </li>
+      </ol>
+      <div class="tip"><strong>Tip:</strong> The "Current Whatnot Total" field is cumulative — you're typing the running total shown on Whatnot, not each individual break's amount. The app subtracts for you.</div>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div class="section" id="inventory">
+    <div class="section-header">
+      <div class="section-icon icon-yellow">📦</div>
+      <h2>Inventory</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Add products</strong>
+            <p>Name, cost per box, and category. Category is used for filtering during breaks and grouping in Product ROI.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Set stock quantity</strong>
+            <p>Track how many boxes you have on hand. This decrements automatically as breaks are submitted.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Edit and delete</strong>
+            <p>Click Edit to update cost or category. Deleting a product removes it from future breaks but doesn't affect past history.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="section" id="reports">
+    <div class="section-header">
+      <div class="section-icon icon-purple">📊</div>
+      <h2>Reports & Analytics</h2>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>📈 Dashboard</h3>
+        <p>Total revenue, net profit, platform fees, and units sold across all closed streams. Profit automatically deducts commission payouts.</p>
+      </div>
+      <div class="feature-card">
+        <h3>📋 Stream Summary</h3>
+        <p>Full breakdown of a single stream — every break, revenue, costs, fees, and final profit for that session.</p>
+      </div>
+      <div class="feature-card">
+        <h3>🗂 Break History</h3>
+        <p>Every individual break logged, filterable by date. See which breaks made money and which didn't.</p>
+      </div>
+      <div class="feature-card">
+        <h3>🏷 Product ROI</h3>
+        <p>Which boxes make you the most money? See revenue, cost, and profit per product across all time.</p>
+      </div>
+      <div class="feature-card">
+        <h3>🏆 Leaderboard</h3>
+        <p>Rank your breakers by revenue generated. Useful for performance reviews and commission conversations.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEAM -->
+  <div class="section" id="team">
+    <div class="section-header">
+      <div class="section-icon icon-green">👥</div>
+      <h2>Team & Commission</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Get the invite code</strong>
+            <p>Your unique invite code is displayed at the top of the Team tab. Share it with breakers — they use it to create their account from the login page.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Enable commissions</strong>
+            <p>Toggle commission on to activate the payout system. Set individual rates per breaker (e.g. 20%). Rates can be changed at any time.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>How commission is calculated</strong>
+            <p>Payout = (Final Sales − Box Cost) × Commission Rate. This is the profit the breaker generated, times their cut. It gets logged per stream and deducted from your net profit on the Dashboard.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Payout overview</strong>
+            <p>The Team tab shows a running total of each breaker's payouts by time period — today, this week, this month, or all time.</p>
+          </div>
+        </li>
+      </ol>
+      <div class="warn"><strong>Note:</strong> Commission payouts are tracked in the system but paid out manually — Card Break Pro does not transfer funds. The numbers are there for your record-keeping.</div>
+    </div>
+  </div>
+
+  <!-- SCHEDULE -->
+  <div class="section" id="schedule">
+    <div class="section-header">
+      <div class="section-icon icon-blue">📅</div>
+      <h2>Schedule</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Create a shift</strong>
+            <p>Select a breaker, date, time, stream key, and optional notes. Click Schedule Shift. The breaker sees it immediately in their "My Shifts" tab.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Clock in / Clock out</strong>
+            <p>When a breaker starts their shift, they clock in from their dashboard — the shift turns yellow (IN PROGRESS). When they close out the stream, they're automatically clocked out.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Edit or cancel shifts</strong>
+            <p>Use the Edit and Cancel buttons in the upcoming shifts table. Cancelled shifts remain visible but are marked cancelled.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Calendar view</strong>
+            <p>The monthly calendar shows color-coded shift chips. Click the arrows to navigate months. Shifts are color coded by status: blue = scheduled, yellow = in progress, green = completed.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="section" id="settings">
+    <div class="section-header">
+      <div class="section-icon icon-red">⚙️</div>
+      <h2>Settings</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Reset Data</strong>
+            <p>This permanently deletes all breaks, streams, and history for your organization. Use this only if you need to start fresh. This cannot be undone.</p>
+          </div>
+        </li>
+      </ol>
+      <div class="warn"><strong>Warning:</strong> Reset Data is irreversible. Inventory and team accounts are not deleted — only break history and stream data.</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:var(--muted);font-size:0.8rem;margin-top:2rem;">
+    Need more help? Email <a href="mailto:enterprisesmello@gmail.com" style="color:var(--primary);">enterprisesmello@gmail.com</a>
+  </div>
+</div>
+</body>
+</html>
