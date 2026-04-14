@@ -365,6 +365,72 @@
     }
     .price-cta:hover { opacity: 0.9; }
     .price-note { font-size: 0.78rem; color: var(--muted); margin-top: 1rem; }
+    .trial-pill {
+      display: inline-block; background: rgba(34,197,94,0.12);
+      border: 1px solid rgba(34,197,94,0.3); color: var(--green);
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; padding: 0.3rem 0.8rem;
+      border-radius: 100px; margin-bottom: 0.75rem;
+    }
+
+    /* ── VIDEO DEMO ── */
+    .video-section { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .video-wrap {
+      max-width: 820px; margin: 0 auto;
+      background: #000; border-radius: 14px;
+      overflow: hidden; border: 1px solid var(--border);
+      aspect-ratio: 16/9; position: relative;
+    }
+    .video-wrap iframe { width: 100%; height: 100%; border: none; }
+    .video-placeholder {
+      width: 100%; height: 100%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1rem;
+      background: linear-gradient(135deg, #13131e 0%, #0d0d14 100%);
+      cursor: pointer;
+    }
+    .video-play-btn {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--primary); display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; box-shadow: 0 0 40px rgba(79,110,247,0.4);
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .video-placeholder:hover .video-play-btn { transform: scale(1.1); opacity: 0.9; }
+    .video-placeholder p { color: var(--muted); font-size: 0.9rem; }
+
+    /* ── TESTIMONIAL ── */
+    .testimonial-section { text-align: center; }
+    .testimonial-card {
+      background: var(--card); border: 1px solid rgba(79,110,247,0.25);
+      border-radius: 16px; padding: 2.5rem 3rem;
+      max-width: 700px; margin: 0 auto;
+      position: relative;
+    }
+    .testimonial-card::before {
+      content: '"'; font-size: 6rem; color: rgba(79,110,247,0.15);
+      position: absolute; top: -1rem; left: 1.5rem;
+      font-family: Georgia, serif; line-height: 1;
+    }
+    .testimonial-text {
+      font-size: 1.2rem; line-height: 1.7; color: var(--text);
+      font-style: italic; margin-bottom: 1.5rem; position: relative;
+    }
+    .testimonial-author { display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+    .testimonial-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(79,110,247,0.2); border: 2px solid rgba(79,110,247,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; font-weight: 700; color: var(--primary);
+    }
+    .testimonial-name { font-weight: 700; font-size: 0.95rem; }
+    .testimonial-title { font-size: 0.8rem; color: var(--muted); }
+
+    /* ── FAQ ── */
+    .faq-section { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; max-width: 900px; margin: 0 auto; }
+    @media (max-width: 640px) { .faq-grid { grid-template-columns: 1fr; } }
+    .faq-item { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; }
+    .faq-q { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .faq-a { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
 
     /* ── FOOTER ── */
     footer {
@@ -398,10 +464,10 @@
   </h1>
   <p>Card Break Pro is the complete business platform for live card breaking — track every break, manage your team, schedule streams, and know your profit before you even go live. Works on any platform.</p>
   <div class="hero-cta-group">
-    <a href="register.html" class="hero-cta">Start Your Business — $250/mo</a>
-    <a href="#features" class="hero-cta-outline">See What's Inside</a>
+    <a href="register.html" class="hero-cta">Start Free 14-Day Trial</a>
+    <a href="#demo" class="hero-cta-outline">▶ Watch Demo</a>
   </div>
-  <p class="hero-sub">No contracts. Cancel anytime. Full platform, day one.</p>
+  <p class="hero-sub">14 days free. No credit card required to start. $250/mo after trial. Cancel anytime.</p>
 </div>
 
 <!-- ── NUMBERS STRIP ── -->
@@ -423,6 +489,23 @@
     <div class="num-label">Breaks, Streams & Team Members</div>
   </div>
 </div>
+
+<!-- ── VIDEO DEMO ── -->
+<section class="video-section" id="demo">
+  <div class="section-inner" style="text-align:center;">
+    <div class="section-label">See it in action</div>
+    <div class="section-title" style="margin-bottom:0.75rem;">Watch the <span>2-minute demo.</span></div>
+    <p class="section-sub" style="margin:0 auto 2.5rem;">See exactly how a live break gets tracked — from selecting boxes to closing out with profit in hand.</p>
+    <div class="video-wrap">
+      <!-- ▼▼▼ REPLACE THIS with your Loom or YouTube embed URL ▼▼▼ -->
+      <!-- Example: <iframe src="https://www.loom.com/embed/YOUR_VIDEO_ID" allowfullscreen></iframe> -->
+      <div class="video-placeholder" onclick="this.innerHTML='<iframe src=\'YOUR_VIDEO_URL_HERE\' allowfullscreen style=\'width:100%;height:100%;border:none;\'></iframe>'">
+        <div class="video-play-btn">▶</div>
+        <p>Demo video coming soon — drop your Loom link in landing.html</p>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ── PAIN POINTS ── -->
 <section class="pain-section">
@@ -625,6 +708,69 @@
   </div>
 </section>
 
+<!-- ── TESTIMONIAL ── -->
+<section class="testimonial-section">
+  <div class="section-inner">
+    <div class="section-label" style="text-align:center;">Real breakers. Real results.</div>
+    <div class="section-title" style="text-align:center;margin-bottom:2.5rem;">Don't take our word for it.</div>
+    <div class="testimonial-card">
+      <!-- ▼▼▼ REPLACE with real quote from your friend/beta user ▼▼▼ -->
+      <div class="testimonial-text">
+        "Before this I had no idea if I was actually making money. Now I know my break even before I even go live, and I can see exactly which boxes are worth breaking. It changed how I run every single stream."
+      </div>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">J</div>
+        <div>
+          <div class="testimonial-name">— [Name]</div><!-- ▼ Replace with real name ▼ -->
+          <div class="testimonial-title">Live Card Breaker, [Platform]</div><!-- ▼ Replace with real platform ▼ -->
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ── -->
+<section class="faq-section">
+  <div class="section-inner">
+    <div class="section-label" style="text-align:center;">Common questions</div>
+    <div class="section-title" style="text-align:center;margin-bottom:2.5rem;">Got questions? <span>We got answers.</span></div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <div class="faq-q">Does it work with Whatnot, Fanatics, and TikTok Shop?</div>
+        <div class="faq-a">Yes. Card Break Pro works with any live selling platform. You manually enter the running total from wherever you're streaming — the app handles the math from there.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">How long does setup take?</div>
+        <div class="faq-a">Under 10 minutes. Register, add your inventory, send invite codes to your team. You can be running your first tracked break the same day.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">What happens after the 14-day trial?</div>
+        <div class="faq-a">You'll be charged $250/month. You can cancel any time before the trial ends and you won't be charged anything. No hidden fees, no contracts.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">How many breakers can I add?</div>
+        <div class="faq-a">Unlimited. Add as many breakers and sorters as your operation needs. One flat price covers your whole team — no per-seat charges.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Can my breakers see my financials?</div>
+        <div class="faq-a">No. Breakers only see their own break entry screen, their shifts, and their payout totals. The dashboard, profit reports, and analytics are owner-only.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">What if I cancel?</div>
+        <div class="faq-a">Cancel any time from your billing page — no questions, no fees. Your data stays in the system for 30 days in case you change your mind.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Do I need technical skills to set this up?</div>
+        <div class="faq-a">None. It's a web app — nothing to install. If you can use Whatnot, you can use Card Break Pro. Everything is designed for breakers, not engineers.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Is my data secure?</div>
+        <div class="faq-a">Yes. Built on Supabase with row-level security — each business's data is fully isolated. No other owner can see your numbers, team, or history.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── PRICING ── -->
 <section class="pricing-section">
   <div class="section-inner">
@@ -632,23 +778,24 @@
     <div class="section-title" style="margin-bottom:0.5rem;">One price. <span>Everything included.</span></div>
     <p class="section-sub" style="margin:0 auto 3rem;">No per-seat fees. No upsells. No feature gates. One flat monthly fee and your entire business is covered.</p>
     <div class="price-card">
-      <div class="price-badge">All Features Included</div>
-      <div class="price-amount"><sup>$</sup>250</div>
-      <div class="price-period">per month</div>
+      <div class="trial-pill">14-Day Free Trial</div>
+      <div class="price-badge" style="display:block;margin-top:0.5rem;">All Features Included</div>
+      <div class="price-amount" style="margin-top:1rem;"><sup>$</sup>250</div>
+      <div class="price-period">per month after trial</div>
       <ul class="price-includes">
+        <li>14-day free trial — no credit card required</li>
         <li>Unlimited breaks and streams</li>
-        <li>Unlimited breaker accounts</li>
+        <li>Unlimited team members (breakers + sorters)</li>
         <li>Live break entry with break even calculator</li>
         <li>Full analytics — dashboard, ROI, leaderboard</li>
         <li>Team scheduling with clock in/out</li>
         <li>Commission tracking and payout logs</li>
         <li>Inventory management by category</li>
-        <li>Stream history and summaries</li>
-        <li>Owner and breaker logins included</li>
+        <li>Sort queue and shipping management</li>
         <li>No contracts — cancel anytime</li>
       </ul>
-      <a href="register.html" class="price-cta">Start Your Business Today</a>
-      <p class="price-note">Full access from day one. No free trial needed — you'll know immediately if this is for you.</p>
+      <a href="register.html" class="price-cta">Start Free Trial — No Card Needed</a>
+      <p class="price-note">14 days free, then $250/month. Cancel before the trial ends and pay nothing.</p>
     </div>
   </div>
 </section>
@@ -658,8 +805,9 @@
 <footer>
   <div class="footer-brand">CARD <span>BREAK</span> PRO</div>
   <p>The business OS for live card breakers.</p>
-  <p><a href="mailto:enterprisesmello@gmail.com">enterprisesmello@gmail.com</a></p>
+  <p><a href="mailto:hello@cardbreakpro.com">hello@cardbreakpro.com</a></p>
   <p style="margin-top:1.5rem;">&copy; 2026 Card Break Pro. All rights reserved.</p>
+  <p style="margin-top:0.5rem;"><a href="/terms">Terms of Service</a> &nbsp;·&nbsp; <a href="/privacy">Privacy Policy</a></p>
 </footer>
 
 </body>

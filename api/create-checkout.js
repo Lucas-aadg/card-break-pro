@@ -22,6 +22,9 @@ module.exports = async (req, res) => {
         price: process.env.STRIPE_PRICE_ID,
         quantity: 1
       }],
+      subscription_data: {
+        trial_period_days: 14
+      },
       metadata: {
         user_id: userId,
         org_id: orgId
