@@ -898,13 +898,13 @@
       <div class="panel-title">Schedule a Shift</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
         <div>
-          <label for="schedBreaker">Breaker</label>
+          <label for="schedBreaker">Team Member</label>
           <select id="schedBreaker" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem;padding:0.65rem 1rem;outline:none;">
-            <option value="">Select breaker…</option>
+            <option value="">Select person…</option>
           </select>
         </div>
         <div>
-          <label for="schedDate">Date</label>
+          <label for="schedDate">Start Date</label>
           <input type="date" id="schedDate" />
         </div>
         <div>
@@ -921,6 +921,10 @@
           <label for="schedNotes">Notes (optional)</label>
           <input type="text" id="schedNotes" placeholder="e.g. Baseball boxes only" />
         </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.1rem;">
+        <input type="checkbox" id="schedRepeat" style="width:auto;accent-color:var(--primary);width:16px;height:16px;cursor:pointer;" />
+        <label for="schedRepeat" style="text-transform:none;letter-spacing:0;font-size:0.875rem;color:var(--muted);cursor:pointer;margin:0;">Repeat for next 7 days (same time, same person)</label>
       </div>
       <button class="btn btn-primary" id="schedSaveBtn" style="min-width:160px;">Add Shift</button>
     </div>
@@ -951,7 +955,7 @@
             <tr>
               <th>Date</th>
               <th>Time</th>
-              <th>Breaker</th>
+              <th>Team Member</th>
               <th>Stream Key</th>
               <th>Notes</th>
               <th>Status</th>
@@ -2799,14 +2803,33 @@ async function setupSchedule() {
 
 async function loadScheduleBreakers() {
   const sel = document.getElementById('schedBreaker');
-  sel.innerHTML = '<option value="">Select breaker…</option>';
+  sel.innerHTML = '<option value="">Select person…</option>';
   const breakers = allProfiles.filter(function (p) { return p.role === 'breaker'; });
-  breakers.forEach(function (b) {
-    const opt = document.createElement('option');
-    opt.value = b.id;
-    opt.textContent = b.display_name;
-    sel.appendChild(opt);
-  });
+  const sorters = allProfiles.filter(function (p) { return p.role === 'sorter'; });
+
+  if (breakers.length) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Breakers';
+    breakers.forEach(function (b) {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.display_name;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  }
+
+  if (sorters.length) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Sorters';
+    sorters.forEach(function (s) {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.display_name;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  }
 }
 
 async function loadSchedules() {
@@ -2937,28 +2960,49 @@ function setupSchedSave() {
     const time = document.getElementById('schedTime').value;
     const streamKey = document.getElementById('schedStreamKey').value.trim();
     const notes = document.getElementById('schedNotes').value.trim();
+    const repeat = document.getElementById('schedRepeat').checked;
 
-    if (!breakerId) { showGlobalError('Please select a breaker.'); return; }
+    if (!breakerId) { showGlobalError('Please select a team member.'); return; }
     if (!date) { showGlobalError('Please select a date.'); return; }
 
-    this.disabled = true; this.textContent = 'Saving…';
+    this.disabled = true;
+    this.textContent = repeat ? 'Saving 7 shifts…' : 'Saving…';
+
     try {
-      const { error } = await sb.from('schedules').insert({
-        org_id: currentProfile.org_id,
-        breaker_id: breakerId,
-        scheduled_date: date,
-        start_time: time || null,
-        stream_key: streamKey || null,
-        notes: notes || null
+      // Build list of dates to insert
+      const dates = [date];
+      if (repeat) {
+        const base = new Date(date + 'T12:00:00'); // noon to avoid DST issues
+        for (let i = 1; i <= 6; i++) {
+          const d = new Date(base);
+          d.setDate(d.getDate() + i);
+          dates.push(d.toISOString().split('T')[0]);
+        }
+      }
+
+      const rows = dates.map(function (d) {
+        return {
+          org_id: currentProfile.org_id,
+          breaker_id: breakerId,
+          scheduled_date: d,
+          start_time: time || null,
+          stream_key: streamKey || null,
+          notes: notes || null
+        };
       });
+
+      const { error } = await sb.from('schedules').insert(rows);
       if (error) throw error;
+
       document.getElementById('schedDate').value = '';
       document.getElementById('schedTime').value = '';
       document.getElementById('schedStreamKey').value = '';
       document.getElementById('schedNotes').value = '';
       document.getElementById('schedBreaker').value = '';
+      document.getElementById('schedRepeat').checked = false;
+
       await loadSchedules();
-      showGlobalSuccess('Shift scheduled!');
+      showGlobalSuccess(repeat ? '7 shifts scheduled!' : 'Shift scheduled!');
     } catch (err) {
       showGlobalError('Failed to schedule shift: ' + escHtml(err.message));
     } finally {
