@@ -318,8 +318,13 @@ async function loadShifts() {
         const isToday = sh.scheduled_date === today;
         const statusColor = sh.status === 'in_progress' ? 'var(--yellow)' : 'var(--muted)';
         const statusLabel = sh.status === 'in_progress' ? '🟡 CLOCKED IN' : sh.status === 'scheduled' ? 'Scheduled' : sh.status;
+        const clockBtn = isToday && sh.status === 'scheduled'
+          ? '<button class="btn btn-green shift-clock-in" data-shiftid="' + sh.id + '" style="font-size:0.78rem;padding:0.35rem 0.8rem;margin-top:0.5rem;">⏱ Clock In</button>'
+          : isToday && sh.status === 'in_progress'
+          ? '<button class="btn btn-outline shift-clock-out" data-shiftid="' + sh.id + '" style="font-size:0.78rem;padding:0.35rem 0.8rem;margin-top:0.5rem;border-color:var(--green);color:var(--green);">Clock Out</button>'
+          : '';
         html +=
-          '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem 1.1rem;margin-bottom:0.75rem;">' +
+          '<div style="background:var(--bg);border:1px solid ' + (sh.status === 'in_progress' ? 'rgba(245,158,11,0.4)' : 'var(--border)') + ';border-radius:8px;padding:1rem 1.1rem;margin-bottom:0.75rem;">' +
             '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">' +
               '<span style="font-weight:700;">' + escHtml(sh.scheduled_date) + '</span>' +
               (isToday ? '<span class="today-badge">Today</span>' : '') +
@@ -330,6 +335,7 @@ async function loadShifts() {
               (sh.notes ? '<span>📝 ' + escHtml(sh.notes) + '</span>' : '') +
               '<span style="color:' + statusColor + ';font-weight:600;">' + statusLabel + '</span>' +
             '</div>' +
+            clockBtn +
           '</div>';
       });
     }
@@ -350,6 +356,34 @@ async function loadShifts() {
     }
 
     container.innerHTML = html;
+
+    // Wire up clock in/out buttons
+    container.querySelectorAll('.shift-clock-in').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        btn.disabled = true; btn.textContent = 'Clocking in…';
+        try {
+          await sb.from('schedules').update({ status: 'in_progress', clocked_in_at: new Date().toISOString() }).eq('id', btn.dataset.shiftid);
+          activeShiftId = btn.dataset.shiftid;
+          showSuccess('Clocked in!');
+          await loadShifts();
+          showClockedInBanner({});
+        } catch (e) { btn.disabled = false; btn.textContent = '⏱ Clock In'; showError('Failed to clock in.'); }
+      });
+    });
+
+    container.querySelectorAll('.shift-clock-out').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        btn.disabled = true; btn.textContent = 'Clocking out…';
+        try {
+          await sb.from('schedules').update({ status: 'completed', clocked_out_at: new Date().toISOString() }).eq('id', btn.dataset.shiftid);
+          activeShiftId = null;
+          const banner = document.getElementById('clockedInBanner');
+          if (banner) banner.remove();
+          showSuccess('Clocked out!');
+          await loadShifts();
+        } catch (e) { btn.disabled = false; btn.textContent = 'Clock Out'; showError('Failed to clock out.'); }
+      });
+    });
   } catch (err) {
     container.innerHTML = '<div style="color:var(--red);text-align:center;padding:2rem;">Failed to load shifts.</div>';
     console.error(err);
@@ -417,10 +451,34 @@ function showClockedInBanner(shift) {
   if (existing) existing.remove();
   const banner = document.createElement('div');
   banner.id = 'clockedInBanner';
-  banner.style.cssText = 'background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:0.85rem 1.1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;';
-  banner.innerHTML = '<span style="color:var(--green);font-weight:700;">✓ Clocked In</span><span style="color:var(--muted);font-size:0.83rem;">Your shift is active. Clock out when done.</span>';
+  banner.style.cssText = 'background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:0.85rem 1.1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;';
+  banner.innerHTML =
+    '<div style="display:flex;align-items:center;gap:0.75rem;">' +
+      '<span style="color:var(--green);font-weight:700;">✓ Clocked In</span>' +
+      '<span style="color:var(--muted);font-size:0.83rem;">Your shift is active.</span>' +
+    '</div>' +
+    '<button id="sorterClockOutBtn" class="btn btn-outline" style="font-size:0.8rem;padding:0.4rem 0.9rem;border-color:var(--green);color:var(--green);">Clock Out</button>';
   const main = document.querySelector('.main');
   main.insertBefore(banner, main.firstChild);
+
+  document.getElementById('sorterClockOutBtn').addEventListener('click', async function () {
+    this.disabled = true;
+    this.textContent = 'Clocking out…';
+    try {
+      await sb.from('schedules').update({
+        status: 'completed',
+        clocked_out_at: new Date().toISOString()
+      }).eq('id', activeShiftId);
+      activeShiftId = null;
+      banner.remove();
+      showSuccess('Clocked out successfully.');
+      loadShifts();
+    } catch (err) {
+      this.disabled = false;
+      this.textContent = 'Clock Out';
+      showError('Failed to clock out.');
+    }
+  });
 }
 
 // ── Buttons ───────────────────────────────────────────────

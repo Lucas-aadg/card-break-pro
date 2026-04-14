@@ -968,6 +968,33 @@
         </table>
       </div>
     </div>
+
+    <!-- Clock In/Out History Log -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Clock In / Out History — All Team</div>
+        <button class="btn-sm btn-signout" id="refreshClockLogBtn" style="font-size:0.75rem;">Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Team Member</th>
+              <th>Role</th>
+              <th>Stream Key</th>
+              <th>Clock In</th>
+              <th>Clock Out</th>
+              <th>Duration</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="clockLogTableBody">
+            <tr class="empty-row"><td colspan="8">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- ═══════════════════════════════════════════
@@ -2797,8 +2824,78 @@ async function setupSchedule() {
   calMonth = now.getMonth();
   await loadScheduleBreakers();
   await loadSchedules();
+  await loadClockLog();
   setupCalControls();
   setupSchedSave();
+  document.getElementById('refreshClockLogBtn').addEventListener('click', loadClockLog);
+}
+
+async function loadClockLog() {
+  const tbody = document.getElementById('clockLogTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Loading…</td></tr>';
+
+  try {
+    // Load all schedules that have been clocked in at some point, newest first
+    const { data, error } = await sb
+      .from('schedules')
+      .select('scheduled_date, start_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id')
+      .eq('org_id', currentProfile.org_id)
+      .not('clocked_in_at', 'is', null)
+      .order('clocked_in_at', { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    const rows = data || [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No clock in/out records yet.</td></tr>';
+      return;
+    }
+
+    // Build profile lookup
+    const profileMap = {};
+    allProfiles.forEach(function (p) { profileMap[p.id] = p; });
+
+    tbody.innerHTML = '';
+    rows.forEach(function (r) {
+      const profile = profileMap[r.breaker_id] || {};
+      const name = escHtml(profile.display_name || '—');
+      const role = profile.role === 'sorter' ? '<span class="badge badge-yellow">Sorter</span>' : '<span class="badge badge-blue">Breaker</span>';
+
+      const cin = r.clocked_in_at ? new Date(r.clocked_in_at) : null;
+      const cout = r.clocked_out_at ? new Date(r.clocked_out_at) : null;
+      const cinStr = cin ? cin.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+      const coutStr = cout ? cout.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '<span style="color:var(--yellow);font-weight:600;">Still in</span>';
+
+      let duration = '—';
+      if (cin && cout) {
+        const mins = Math.round((cout - cin) / 60000);
+        duration = mins >= 60 ? Math.floor(mins/60) + 'h ' + (mins%60) + 'm' : mins + 'm';
+      } else if (cin) {
+        const mins = Math.round((Date.now() - cin) / 60000);
+        duration = '<span style="color:var(--yellow);">' + (mins >= 60 ? Math.floor(mins/60) + 'h ' + (mins%60) + 'm' : mins + 'm') + ' (live)</span>';
+      }
+
+      const statusBadge = r.status === 'completed' ? '<span class="badge badge-green">Done</span>'
+        : r.status === 'in_progress' ? '<span class="badge badge-yellow">Active</span>'
+        : '<span class="badge badge-gray">' + r.status + '</span>';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escHtml(r.scheduled_date) + '</td>' +
+        '<td><strong>' + name + '</strong></td>' +
+        '<td>' + role + '</td>' +
+        '<td>' + escHtml(r.stream_key || '—') + '</td>' +
+        '<td style="color:var(--green);font-weight:600;">' + cinStr + '</td>' +
+        '<td>' + coutStr + '</td>' +
+        '<td style="color:var(--muted);">' + duration + '</td>' +
+        '<td>' + statusBadge + '</td>';
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Failed to load clock history.</td></tr>';
+    console.error(err);
+  }
 }
 
 async function loadScheduleBreakers() {
