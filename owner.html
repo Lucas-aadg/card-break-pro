@@ -610,7 +610,24 @@
     </div>
 
     <div class="panel">
-      <div class="panel-title">Product List</div>
+      <div class="panel-header" style="flex-wrap:wrap;gap:0.75rem;">
+        <div class="panel-title">Product List</div>
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="invSearch" placeholder="Search products…" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;width:180px;" />
+          <select id="invCatFilter" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;">
+            <option value="">All Categories</option>
+          </select>
+          <select id="invStatusFilter" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="low">Low Stock</option>
+            <option value="out">Out of Stock</option>
+          </select>
+          <button class="btn btn-outline btn-sm" id="invClearFilters" style="padding:0.4rem 0.75rem;font-size:0.82rem;">Clear</button>
+        </div>
+      </div>
+      <div id="invFilterCount" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem;display:none;"></div>
       <div class="tbl-wrap">
         <table class="data-table" id="invTable">
           <thead>
@@ -1974,15 +1991,68 @@ function setupInventory() {
 
 async function loadInventoryTable() {
   await loadProducts();
+
+  // Populate category dropdown
+  const catFilter = document.getElementById('invCatFilter');
+  if (catFilter) {
+    const cats = [...new Set(orgProducts.map(p => p.category).filter(Boolean))].sort();
+    const currentCat = catFilter.value;
+    catFilter.innerHTML = '<option value="">All Categories</option>' +
+      cats.map(c => '<option value="' + escHtml(c) + '"' + (currentCat === c ? ' selected' : '') + '>' + escHtml(c) + '</option>').join('');
+  }
+
+  invRenderFilteredProducts();
+
+  // Wire filters (only once)
+  if (!document.getElementById('invSearch')._wired) {
+    document.getElementById('invSearch')._wired = true;
+    document.getElementById('invSearch').addEventListener('input', invRenderFilteredProducts);
+    document.getElementById('invCatFilter').addEventListener('change', invRenderFilteredProducts);
+    document.getElementById('invStatusFilter').addEventListener('change', invRenderFilteredProducts);
+    document.getElementById('invClearFilters').addEventListener('click', function () {
+      document.getElementById('invSearch').value = '';
+      document.getElementById('invCatFilter').value = '';
+      document.getElementById('invStatusFilter').value = '';
+      invRenderFilteredProducts();
+    });
+  }
+}
+
+function invRenderFilteredProducts() {
   const tbody = document.getElementById('invTableBody');
+  const search = (document.getElementById('invSearch').value || '').toLowerCase();
+  const cat = document.getElementById('invCatFilter').value.toLowerCase();
+  const status = document.getElementById('invStatusFilter').value;
+  const countEl = document.getElementById('invFilterCount');
+
+  let filtered = orgProducts.filter(function (p) {
+    if (search && !p.name.toLowerCase().includes(search) && !(p.category || '').toLowerCase().includes(search)) return false;
+    if (cat && (p.category || '').toLowerCase() !== cat) return false;
+    if (status === 'active' && !p.active) return false;
+    if (status === 'inactive' && p.active) return false;
+    if (status === 'low' && !(p.current_stock > 0 && p.current_stock <= p.min_stock_alert)) return false;
+    if (status === 'out' && p.current_stock !== 0) return false;
+    return true;
+  });
+
   tbody.innerHTML = '';
 
-  if (orgProducts.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No products yet. Add your first product above.</td></tr>';
+  const hasFilter = search || cat || status;
+  if (countEl) {
+    if (hasFilter) {
+      countEl.textContent = 'Showing ' + filtered.length + ' of ' + orgProducts.length + ' products';
+      countEl.style.display = 'block';
+    } else {
+      countEl.style.display = 'none';
+    }
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">' + (orgProducts.length === 0 ? 'No products yet. Add your first product above.' : 'No products match your filters.') + '</td></tr>';
     return;
   }
 
-  orgProducts.forEach(function (p) {
+  filtered.forEach(function (p) {
     const tr = document.createElement('tr');
     const stockClass = p.current_stock === 0 ? 'badge-red' : p.current_stock <= p.min_stock_alert ? 'badge-yellow' : 'badge-green';
     const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
