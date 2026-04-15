@@ -1343,12 +1343,32 @@ async function initAuth() {
     if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
     if (profile.role !== 'owner') { window.location.href = profile.role === 'breaker' ? 'breaker.html' : 'index.html'; return; }
 
-    // Check subscription status
-    const { data: sub } = await sb
-      .from('subscriptions')
-      .select('status')
-      .eq('org_id', profile.org_id)
-      .maybeSingle();
+    // Check subscription status — retry if returning from Stripe checkout (webhook may be slow)
+    const justPaid = new URLSearchParams(window.location.search).get('subscribed') === 'true';
+    let sub = null;
+
+    if (justPaid) {
+      // Poll for up to 20 seconds (10 × 2s) waiting for the webhook to write the subscription
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const { data } = await sb
+          .from('subscriptions')
+          .select('status')
+          .eq('org_id', profile.org_id)
+          .maybeSingle();
+        sub = data;
+        if (sub && sub.status === 'active') break;
+        await new Promise(function(r) { setTimeout(r, 2000); });
+      }
+      // Remove ?subscribed=true from URL without reloading
+      history.replaceState(null, '', window.location.pathname);
+    } else {
+      const { data } = await sb
+        .from('subscriptions')
+        .select('status')
+        .eq('org_id', profile.org_id)
+        .maybeSingle();
+      sub = data;
+    }
 
     if (!sub || sub.status !== 'active') {
       // Show a full-page paywall overlay instead of the dashboard

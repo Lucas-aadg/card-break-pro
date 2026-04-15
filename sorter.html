@@ -298,7 +298,7 @@ async function loadShifts() {
     const { data, error } = await sb
       .from('schedules')
       .select('*')
-      .eq('breaker_id', currentUser.id)
+      .eq('sorter_id', currentUser.id)
       .order('scheduled_date', { ascending: false });
 
     if (error) throw error;
@@ -396,7 +396,7 @@ async function checkTodayShift() {
   const { data: shifts } = await sb
     .from('schedules')
     .select('*')
-    .eq('breaker_id', currentUser.id)
+    .eq('sorter_id', currentUser.id)
     .eq('scheduled_date', today)
     .in('status', ['scheduled', 'in_progress'])
     .order('start_time', { ascending: true })

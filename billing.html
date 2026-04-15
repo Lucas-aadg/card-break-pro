@@ -339,17 +339,13 @@
         if (status === 'active') {
           manageBtn.style.display = 'block';
           manageBtn.addEventListener('click', async function () {
-            if (!sub || !sub.stripe_customer_id) {
-              showError('No Stripe customer found. Please contact support.');
-              return;
-            }
             manageBtn.disabled = true;
             manageBtn.textContent = 'Opening portal\u2026';
             try {
               const resp = await fetch('/api/create-portal', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ customerId: sub.stripe_customer_id })
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+                body: JSON.stringify({})
               });
               const { url, error } = await resp.json();
               if (error) throw new Error(error);
@@ -375,8 +371,8 @@
                 try {
                   const resp = await fetch('/api/create-portal', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ customerId: sub.stripe_customer_id })
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+                    body: JSON.stringify({})
                   });
                   const { url, error } = await resp.json();
                   if (error) throw new Error(error);
