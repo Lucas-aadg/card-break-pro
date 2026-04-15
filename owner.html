@@ -1070,8 +1070,79 @@
        TAB: SETTINGS
   ════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-settings">
+
+    <!-- Profile -->
     <div class="panel">
-      <div class="panel-title">Danger Zone</div>
+      <div class="panel-title">Profile</div>
+      <div class="inv-form">
+        <div class="form-group">
+          <label for="settDisplayName">Display Name</label>
+          <input type="text" id="settDisplayName" placeholder="Your name" />
+        </div>
+        <div class="form-group">
+          <label for="settPhone">Phone Number</label>
+          <input type="tel" id="settPhone" placeholder="e.g. +1 555 000 0000" />
+        </div>
+      </div>
+      <div style="margin-top:1rem;">
+        <button class="btn btn-primary btn-sm" id="settSaveProfile" style="padding:0.5rem 1.25rem;">Save Profile</button>
+      </div>
+    </div>
+
+    <!-- Email -->
+    <div class="panel">
+      <div class="panel-title">Change Email</div>
+      <div class="inv-form" style="grid-template-columns:1fr 1fr;">
+        <div class="form-group">
+          <label for="settEmail">New Email Address</label>
+          <input type="email" id="settEmail" placeholder="new@email.com" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="settEmailConfirm">Confirm New Email</label>
+          <input type="email" id="settEmailConfirm" placeholder="Repeat new email" autocomplete="off" />
+        </div>
+      </div>
+      <div style="margin-top:1rem;">
+        <button class="btn btn-primary btn-sm" id="settSaveEmail" style="padding:0.5rem 1.25rem;">Update Email</button>
+      </div>
+    </div>
+
+    <!-- Password -->
+    <div class="panel">
+      <div class="panel-title">Change Password</div>
+      <div class="inv-form" style="grid-template-columns:1fr 1fr;">
+        <div class="form-group">
+          <label for="settPassword">New Password</label>
+          <input type="password" id="settPassword" placeholder="Min 8 characters" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label for="settPasswordConfirm">Confirm New Password</label>
+          <input type="password" id="settPasswordConfirm" placeholder="Repeat password" autocomplete="new-password" />
+        </div>
+      </div>
+      <div style="margin-top:1rem;">
+        <button class="btn btn-primary btn-sm" id="settSavePassword" style="padding:0.5rem 1.25rem;">Update Password</button>
+      </div>
+    </div>
+
+    <!-- Preferences -->
+    <div class="panel">
+      <div class="panel-title">Preferences</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-weight:600;font-size:0.9rem;">Time Format</div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">Choose how times appear across the platform</div>
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-sm" id="settTime12" style="padding:0.4rem 1rem;font-size:0.82rem;">12h (AM/PM)</button>
+          <button class="btn btn-sm" id="settTime24" style="padding:0.4rem 1rem;font-size:0.82rem;">24h</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="panel" style="border-color:rgba(239,68,68,0.25);">
+      <div class="panel-title" style="color:var(--red);">Danger Zone</div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
         <div>
           <div style="font-weight:700;color:var(--text);margin-bottom:0.35rem;">Reset All Data</div>
@@ -1080,6 +1151,7 @@
         <button class="btn-sm btn-danger-sm" id="resetDataBtn" style="flex-shrink:0;padding:0.5rem 1rem;">Reset Data</button>
       </div>
     </div>
+
   </div>
 
 <!-- ══════════════════════════════════════════
@@ -1197,6 +1269,13 @@ function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function fmtTime(dateOrStr) {
+  if (!dateOrStr) return '—';
+  const d = dateOrStr instanceof Date ? dateOrStr : new Date(dateOrStr);
+  const use12h = localStorage.getItem('cbp_time_format') !== '24h';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: use12h });
 }
 
 function fmt(n) {
@@ -1363,6 +1442,7 @@ async function switchTab(tab) {
     else if (tab === 'team') { await setupCommissionToggle(); await loadTeam(); }
     else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
     else if (tab === 'sorting') await loadSorting();
+    else if (tab === 'settings') await loadSettings();
   } catch (err) {
     showGlobalError('Failed to load tab: ' + escHtml(err.message));
     console.error(err);
@@ -2964,8 +3044,8 @@ async function loadClockLog() {
 
       const cin = r.clocked_in_at ? new Date(r.clocked_in_at) : null;
       const cout = r.clocked_out_at ? new Date(r.clocked_out_at) : null;
-      const cinStr = cin ? cin.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
-      const coutStr = cout ? cout.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '<span style="color:var(--yellow);font-weight:600;">Still in</span>';
+      const cinStr = cin ? fmtTime(cin) : '—';
+      const coutStr = cout ? fmtTime(cout) : '<span style="color:var(--yellow);font-weight:600;">Still in</span>';
 
       let duration = '—';
       if (cin && cout) {
@@ -3123,8 +3203,8 @@ function renderSchedTable() {
     const tr = document.createElement('tr');
     const statusColor = s.status === 'completed' ? 'var(--green)' : s.status === 'in_progress' ? 'var(--yellow)' : s.status === 'cancelled' ? 'var(--red)' : 'var(--primary)';
     const statusLabel = s.status === 'in_progress' ? 'CLOCKED IN' : s.status.toUpperCase();
-    const clockIn = s.clocked_in_at ? new Date(s.clocked_in_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
-    const clockOut = s.clocked_out_at ? new Date(s.clocked_out_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+    const clockIn = fmtTime(s.clocked_in_at);
+    const clockOut = fmtTime(s.clocked_out_at);
     tr.innerHTML =
       '<td>' + s.scheduled_date + '</td>' +
       '<td>' + (s.start_time ? s.start_time.slice(0,5) : '—') + '</td>' +
@@ -3303,6 +3383,92 @@ function setupSortingFilters() {
 // ── Boot ──────────────────────────────────────────────────
 initAuth();
 setupSortingFilters();
+
+// ── SETTINGS ──────────────────────────────────────────────
+async function loadSettings() {
+  // Load profile data into fields
+  if (currentProfile) {
+    document.getElementById('settDisplayName').value = currentProfile.display_name || '';
+    document.getElementById('settPhone').value = currentProfile.phone || '';
+  }
+
+  // Load current email
+  const { data: { user } } = await sb.auth.getUser();
+  if (user) {
+    document.getElementById('settEmail').placeholder = user.email || 'Current email';
+  }
+
+  // Time format buttons
+  updateTimeFormatBtns();
+
+  // Wire buttons (only once)
+  if (!document.getElementById('settSaveProfile')._wired) {
+    document.getElementById('settSaveProfile')._wired = true;
+
+    // Save profile
+    document.getElementById('settSaveProfile').addEventListener('click', async function () {
+      const name = document.getElementById('settDisplayName').value.trim();
+      const phone = document.getElementById('settPhone').value.trim();
+      if (!name) { showGlobalError('Display name cannot be empty.'); return; }
+      const { error } = await sb.from('profiles').update({ display_name: name, phone: phone || null }).eq('id', currentProfile.id);
+      if (error) { showGlobalError('Failed to update profile: ' + escHtml(error.message)); return; }
+      currentProfile.display_name = name;
+      currentProfile.phone = phone;
+      showGlobalSuccess('Profile updated!');
+    });
+
+    // Save email
+    document.getElementById('settSaveEmail').addEventListener('click', async function () {
+      const email = document.getElementById('settEmail').value.trim();
+      const confirm = document.getElementById('settEmailConfirm').value.trim();
+      if (!email) { showGlobalError('Please enter a new email address.'); return; }
+      if (email !== confirm) { showGlobalError('Email addresses do not match.'); return; }
+      const { error } = await sb.auth.updateUser({ email });
+      if (error) { showGlobalError('Failed to update email: ' + escHtml(error.message)); return; }
+      document.getElementById('settEmail').value = '';
+      document.getElementById('settEmailConfirm').value = '';
+      showGlobalSuccess('Email updated! Check your new inbox to confirm.');
+    });
+
+    // Save password
+    document.getElementById('settSavePassword').addEventListener('click', async function () {
+      const pw = document.getElementById('settPassword').value;
+      const confirm = document.getElementById('settPasswordConfirm').value;
+      if (!pw || pw.length < 8) { showGlobalError('Password must be at least 8 characters.'); return; }
+      if (pw !== confirm) { showGlobalError('Passwords do not match.'); return; }
+      const { error } = await sb.auth.updateUser({ password: pw });
+      if (error) { showGlobalError('Failed to update password: ' + escHtml(error.message)); return; }
+      document.getElementById('settPassword').value = '';
+      document.getElementById('settPasswordConfirm').value = '';
+      showGlobalSuccess('Password updated!');
+    });
+
+    // Time format
+    document.getElementById('settTime12').addEventListener('click', function () {
+      localStorage.setItem('cbp_time_format', '12h');
+      updateTimeFormatBtns();
+      showGlobalSuccess('Time format set to 12h (AM/PM).');
+    });
+    document.getElementById('settTime24').addEventListener('click', function () {
+      localStorage.setItem('cbp_time_format', '24h');
+      updateTimeFormatBtns();
+      showGlobalSuccess('Time format set to 24h.');
+    });
+  }
+}
+
+function updateTimeFormatBtns() {
+  const is24 = localStorage.getItem('cbp_time_format') === '24h';
+  const btn12 = document.getElementById('settTime12');
+  const btn24 = document.getElementById('settTime24');
+  if (!btn12 || !btn24) return;
+  btn12.style.background = !is24 ? 'var(--primary)' : 'transparent';
+  btn12.style.color = !is24 ? '#fff' : 'var(--text)';
+  btn12.style.border = !is24 ? 'none' : '1px solid var(--border)';
+  btn24.style.background = is24 ? 'var(--primary)' : 'transparent';
+  btn24.style.color = is24 ? '#fff' : 'var(--text)';
+  btn24.style.border = is24 ? 'none' : '1px solid var(--border)';
+}
 </script>
 </body>
 </html>
