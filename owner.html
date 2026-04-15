@@ -627,6 +627,24 @@
           <button class="btn btn-outline btn-sm" id="invClearFilters" style="padding:0.4rem 0.75rem;font-size:0.82rem;">Clear</button>
         </div>
       </div>
+      <!-- Inventory stats strip -->
+      <div id="invStatsStrip" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1rem;">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Total Boxes</div>
+          <div id="invStatBoxes" style="font-size:1.5rem;font-weight:900;color:var(--text);letter-spacing:-0.5px;">—</div>
+          <div id="invStatBoxesLabel" style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">units in stock</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Total Value</div>
+          <div id="invStatValue" style="font-size:1.5rem;font-weight:900;color:var(--primary);letter-spacing:-0.5px;">—</div>
+          <div id="invStatValueLabel" style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">in inventory</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Products Shown</div>
+          <div id="invStatCount" style="font-size:1.5rem;font-weight:900;color:var(--text);letter-spacing:-0.5px;">—</div>
+          <div id="invStatCountLabel" style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">of <span id="invStatTotal">0</span> total</div>
+        </div>
+      </div>
       <div id="invFilterCount" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem;display:none;"></div>
       <div class="tbl-wrap">
         <table class="data-table" id="invTable">
@@ -2037,7 +2055,19 @@ function invRenderFilteredProducts() {
 
   tbody.innerHTML = '';
 
+  // Update stats strip
+  const totalBoxes = filtered.reduce(function (sum, p) { return sum + (p.current_stock || 0); }, 0);
+  const totalValue = filtered.reduce(function (sum, p) { return sum + ((p.current_stock || 0) * (p.unit_cost || 0)); }, 0);
   const hasFilter = search || cat || status;
+  const catLabel = cat ? cat.charAt(0).toUpperCase() + cat.slice(1) : '';
+
+  document.getElementById('invStatBoxes').textContent = totalBoxes.toLocaleString();
+  document.getElementById('invStatBoxesLabel').textContent = (hasFilter && catLabel ? catLabel + ' ' : '') + 'units in stock';
+  document.getElementById('invStatValue').textContent = '$' + totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.getElementById('invStatValueLabel').textContent = (hasFilter && catLabel ? 'in ' + catLabel + ' inventory' : 'in inventory');
+  document.getElementById('invStatCount').textContent = filtered.length;
+  document.getElementById('invStatTotal').textContent = orgProducts.length;
+
   if (countEl) {
     if (hasFilter) {
       countEl.textContent = 'Showing ' + filtered.length + ' of ' + orgProducts.length + ' products';
