@@ -199,7 +199,7 @@
 
       <div class="form-group">
         <label>I am joining as a</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.25rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-top:0.25rem;">
           <label style="all:unset;cursor:pointer;">
             <input type="radio" name="role" value="breaker" id="roleBreaker" required style="display:none;" />
             <div class="role-option" id="roleBreakerCard" onclick="selectRole('breaker')" style="border:2px solid var(--border);border-radius:8px;padding:0.9rem;text-align:center;transition:border-color 0.2s,background 0.2s;">
@@ -214,6 +214,14 @@
               <div style="font-size:1.3rem;margin-bottom:0.3rem;">📦</div>
               <div style="font-weight:700;font-size:0.88rem;">Sorter</div>
               <div style="font-size:0.75rem;color:var(--muted);margin-top:0.2rem;">I sort & ship cards</div>
+            </div>
+          </label>
+          <label style="all:unset;cursor:pointer;">
+            <input type="radio" name="role" value="manager" id="roleManager" style="display:none;" />
+            <div class="role-option" id="roleManagerCard" onclick="selectRole('manager')" style="border:2px solid var(--border);border-radius:8px;padding:0.9rem;text-align:center;transition:border-color 0.2s,background 0.2s;">
+              <div style="font-size:1.3rem;margin-bottom:0.3rem;">🗂️</div>
+              <div style="font-weight:700;font-size:0.88rem;">Manager</div>
+              <div style="font-size:0.75rem;color:var(--muted);margin-top:0.2rem;">I manage the team</div>
             </div>
           </label>
         </div>
@@ -344,18 +352,18 @@
     function selectRole(role) {
       document.getElementById('roleBreaker').checked = (role === 'breaker');
       document.getElementById('roleSorter').checked = (role === 'sorter');
+      document.getElementById('roleManager').checked = (role === 'manager');
       const bCard = document.getElementById('roleBreakerCard');
       const sCard = document.getElementById('roleSorterCard');
-      if (role === 'breaker') {
-        bCard.style.borderColor = 'var(--primary)';
-        bCard.style.background = 'rgba(79,110,247,0.08)';
-        sCard.style.borderColor = 'var(--border)';
-        sCard.style.background = 'transparent';
-      } else {
-        sCard.style.borderColor = 'var(--primary)';
-        sCard.style.background = 'rgba(79,110,247,0.08)';
-        bCard.style.borderColor = 'var(--border)';
-        bCard.style.background = 'transparent';
+      const mCard = document.getElementById('roleManagerCard');
+      [bCard, sCard, mCard].forEach(function(c) {
+        c.style.borderColor = 'var(--border)';
+        c.style.background = 'transparent';
+      });
+      const selected = { breaker: bCard, sorter: sCard, manager: mCard }[role];
+      if (selected) {
+        selected.style.borderColor = 'var(--primary)';
+        selected.style.background = 'rgba(79,110,247,0.08)';
       }
     }
 
@@ -377,7 +385,7 @@
       }
 
       if (!role) {
-        showError('Please select your role — Breaker or Sorter.');
+        showError('Please select your role — Breaker, Sorter, or Manager.');
         return;
       }
 
@@ -462,7 +470,7 @@
         showSuccess('Welcome to the team! Redirecting…');
 
         setTimeout(function () {
-          window.location.href = role === 'sorter' ? 'sorter.html' : 'breaker.html';
+          window.location.href = role === 'manager' ? 'manager.html' : role === 'sorter' ? 'sorter.html' : 'breaker.html';
         }, 1200);
 
       } catch (err) {

@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>Card Break Pro — Manager Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d14; --card: #13131e; --border: #2d2d3d;
+      --primary: #4f6ef7; --green: #22c55e; --red: #ef4444;
+      --text: #e2e8f0; --muted: #64748b; --yellow: #f59e0b; --purple: #a855f7;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; min-height: 100vh; }
+    nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 200; min-height: 52px; }
+    .brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 2px; margin-right: 1.5rem; white-space: nowrap; }
+    .brand span { color: var(--primary); }
+    .nav-menu { display: flex; flex: 1; align-items: center; gap: 0; }
+    .nav-group { position: relative; }
+    .nav-group-btn { background: none; border: none; color: var(--muted); font-size: 0.8rem; font-weight: 600; padding: 0 1rem; height: 52px; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; letter-spacing: 0.3px; display: flex; align-items: center; gap: 0.3rem; }
+    .nav-group-btn:hover { color: var(--text); }
+    .nav-group-btn.has-active { color: var(--primary); border-bottom-color: var(--primary); }
+    .nav-help-link { display: flex; align-items: center; height: 52px; padding: 0 1rem; color: var(--muted); font-size: 0.8rem; font-weight: 600; text-decoration: none; letter-spacing: 0.3px; border-bottom: 2px solid transparent; transition: color 0.2s; }
+    .nav-help-link:hover { color: var(--text); }
+    .nav-dropdown { display: none; position: absolute; top: calc(100% + 2px); left: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.5); min-width: 175px; z-index: 300; overflow: hidden; animation: ddFadeIn 0.12s ease; }
+    @keyframes ddFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+    .nav-group.open .nav-dropdown { display: block; }
+    .nav-dd-item { display: block; width: 100%; background: none; border: none; color: var(--muted); font-size: 0.82rem; font-weight: 600; padding: 0.7rem 1rem; cursor: pointer; text-align: left; transition: background 0.12s, color 0.12s; letter-spacing: 0.3px; border-left: 3px solid transparent; }
+    .nav-dd-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .nav-dd-item.active { color: var(--primary); background: rgba(79,110,247,0.08); border-left-color: var(--primary); }
+    .dd-section-label { font-size: 0.65rem; font-weight: 700; color: rgba(100,116,139,0.6); text-transform: uppercase; letter-spacing: 1px; padding: 0.5rem 1rem 0.2rem; pointer-events: none; }
+    .nav-actions { display: flex; gap: 0.5rem; align-items: center; padding: 0.5rem 0; margin-left: auto; }
+    .btn-sm { padding: 0.35rem 0.8rem; border: none; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+    .btn-sm:hover { opacity: 0.8; }
+    .btn-signout { background: var(--border); color: var(--text); }
+    .main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem; }
+    .panel-title { font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1rem; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .panel-header .panel-title { margin-bottom: 0; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem; }
+    input, select, textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 0.9rem; padding: 0.6rem 0.85rem; outline: none; transition: border-color 0.2s; font-family: inherit; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 60px; }
+    .form-group { margin-bottom: 1rem; }
+    .btn { padding: 0.7rem 1.25rem; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s, transform 0.1s; letter-spacing: 0.4px; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn:hover:not(:disabled) { opacity: 0.85; }
+    .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+    .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; color: var(--red); font-size: 0.875rem; padding: 0.75rem 1rem; margin-bottom: 1rem; display: none; }
+    .success-box { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; color: var(--green); font-size: 0.875rem; padding: 0.75rem 1rem; margin-bottom: 1rem; display: none; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .data-table th { text-align: left; color: var(--muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    .data-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid rgba(45,45,61,0.5); vertical-align: middle; }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .empty-row td { color: var(--muted); font-style: italic; text-align: center; padding: 1.5rem; }
+    .tbl-wrap { overflow-x: auto; }
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.3px; }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge-blue { background: rgba(79,110,247,0.15); color: var(--primary); }
+    .badge-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .badge-gray { background: rgba(100,116,139,0.15); color: var(--muted); }
+    .badge-purple { background: rgba(168,85,247,0.15); color: var(--purple); }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    @media (max-width: 720px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.1rem; }
+    .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem; }
+    .stat-value { font-size: 1.3rem; font-weight: 800; color: var(--text); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.blue { color: var(--primary); }
+    .inv-form { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 560px) { .inv-form { grid-template-columns: 1fr; } }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); display: none; align-items: center; justify-content: center; z-index: 999; padding: 1rem; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
+    .modal h2 { font-size: 1.05rem; margin-bottom: 1.25rem; }
+    .modal-btn-row { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+    .modal-btn-row .btn { flex: 1; }
+    .loading-overlay { position: fixed; inset: 0; background: rgba(13,13,20,0.85); display: none; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; }
+    .loading-overlay.active { display: flex; }
+    .spinner { width: 38px; height: 38px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 0.9rem; }
+    .filter-row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; }
+    .filter-row > * { flex: 1; min-width: 130px; }
+    .filter-row .btn { flex: 0 0 auto; }
+    .roi-bar-wrap { background: var(--border); border-radius: 4px; height: 6px; width: 100%; }
+    .roi-bar { height: 6px; border-radius: 4px; background: var(--primary); }
+    .lb-rank { font-size: 1.1rem; font-weight: 800; color: var(--muted); text-align: center; }
+    .lb-rank.gold { color: #f59e0b; }
+    .lb-rank.silver { color: #94a3b8; }
+    .lb-rank.bronze { color: #b45309; }
+    .confirm-text { color: var(--text); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.25rem; }
+    .code-display { font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: 800; letter-spacing: 4px; color: var(--primary); background: rgba(79,110,247,0.08); border: 2px dashed rgba(79,110,247,0.4); border-radius: 8px; padding: 1rem 1.5rem; text-align: center; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Loading…</div>
+</div>
+
+<nav>
+  <div class="brand">CARD <span>BREAK</span> PRO</div>
+  <div class="nav-menu">
+    <!-- Schedule -->
+    <div class="nav-group" id="ng-schedule">
+      <button class="nav-group-btn has-active" id="ngb-schedule" data-tab="schedule">Schedule</button>
+    </div>
+
+    <!-- Reports -->
+    <div class="nav-group" id="ng-reports">
+      <button class="nav-group-btn" id="ngb-reports">Reports ▾</button>
+      <div class="nav-dropdown">
+        <div class="dd-section-label">Analytics</div>
+        <button class="nav-dd-item" data-tab="dashboard">Dashboard</button>
+        <button class="nav-dd-item" data-tab="streamSummary">Stream Summary</button>
+        <button class="nav-dd-item" data-tab="history">Break History</button>
+        <button class="nav-dd-item" data-tab="productRoi">Product ROI</button>
+        <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
+      </div>
+    </div>
+
+    <!-- Manage -->
+    <div class="nav-group" id="ng-manage">
+      <button class="nav-group-btn" id="ngb-manage">Manage ▾</button>
+      <div class="nav-dropdown">
+        <div class="dd-section-label">Operations</div>
+        <button class="nav-dd-item" data-tab="inventory">Inventory</button>
+        <button class="nav-dd-item" data-tab="invLog">Inventory Log</button>
+        <button class="nav-dd-item" data-tab="sorting">Sort Queue</button>
+        <button class="nav-dd-item" data-tab="team">Team</button>
+        <button class="nav-dd-item" data-tab="settings">Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-actions">
+    <span id="mgrBadge" style="color:var(--muted);font-size:0.8rem;"></span>
+    <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div id="globalError" class="error-box"></div>
+  <div id="globalSuccess" class="success-box"></div>
+
+  <!-- ═══════════════════ TAB: SCHEDULE ═══════════════════ -->
+  <div class="tab-content active" id="tab-schedule">
+    <div class="panel">
+      <div class="panel-title">Schedule a Shift</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div>
+          <label for="schedBreaker">Team Member</label>
+          <select id="schedBreaker"><option value="">Select person…</option></select>
+        </div>
+        <div>
+          <label for="schedDate">Start Date</label>
+          <input type="date" id="schedDate" />
+        </div>
+        <div>
+          <label for="schedTime">Start Time</label>
+          <input type="time" id="schedTime" />
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div>
+          <label for="schedStreamKey">Stream Key (optional)</label>
+          <input type="text" id="schedStreamKey" placeholder="e.g. STREAM-001" />
+        </div>
+        <div>
+          <label for="schedNotes">Notes (optional)</label>
+          <input type="text" id="schedNotes" placeholder="e.g. Baseball boxes only" />
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.1rem;">
+        <input type="checkbox" id="schedRepeat" style="width:auto;accent-color:var(--primary);width:16px;height:16px;cursor:pointer;" />
+        <label for="schedRepeat" style="text-transform:none;letter-spacing:0;font-size:0.875rem;color:var(--muted);cursor:pointer;margin:0;">Repeat for next 7 days (same time, same person)</label>
+      </div>
+      <button class="btn btn-primary" id="schedSaveBtn">Add Shift</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Schedule Calendar</span>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <button id="calPrevBtn" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.25rem 0.65rem;cursor:pointer;">&#8592;</button>
+          <span id="calMonthLabel" style="font-weight:700;font-size:0.95rem;min-width:120px;text-align:center;"></span>
+          <button id="calNextBtn" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.25rem 0.65rem;cursor:pointer;">&#8594;</button>
+        </div>
+      </div>
+      <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
+      <div style="display:flex;gap:1rem;margin-top:0.75rem;flex-wrap:wrap;">
+        <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(79,110,247,0.4);border-radius:3px;display:inline-block;"></span> Scheduled</span>
+        <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(34,197,94,0.4);border-radius:3px;display:inline-block;"></span> Completed</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Upcoming Shifts</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th><th>Time</th><th>Team Member</th><th>Role</th><th>Stream Key</th><th>Notes</th><th>Status</th><th>Clock In</th><th>Clock Out</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="schedTableBody"><tr class="empty-row"><td colspan="10">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Clock In / Out History</div>
+        <button class="btn-sm btn-signout" id="refreshClockLogBtn">Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Date</th><th>Team Member</th><th>Role</th><th>Stream Key</th><th>Clock In</th><th>Clock Out</th><th>Duration</th><th>Status</th></tr>
+          </thead>
+          <tbody id="clockLogTableBody"><tr class="empty-row"><td colspan="8">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: DASHBOARD ═══════════════════ -->
+  <div class="tab-content" id="tab-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Today's Revenue</div><div class="stat-value blue" id="dash-revenue">—</div></div>
+      <div class="stat-card"><div class="stat-label">Today's Profit</div><div class="stat-value green" id="dash-profit">—</div></div>
+      <div class="stat-card"><div class="stat-label">Breaks Today</div><div class="stat-value" id="dash-breaks">—</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Revenue/Break</div><div class="stat-value" id="dash-avg">—</div></div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Revenue (All Time)</div><div class="stat-value blue" id="dash-totalRevenue">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Profit (All Time)</div><div class="stat-value green" id="dash-totalProfit">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Breaks</div><div class="stat-value" id="dash-totalBreaks">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Streams</div><div class="stat-value" id="dash-totalStreams">—</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Recent Breaks (Last 10)</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Stream</th><th>Break #</th><th>Breaker</th><th>Revenue</th><th>Profit</th></tr></thead>
+          <tbody id="dashRecentBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: STREAM SUMMARY ═══════════════════ -->
+  <div class="tab-content" id="tab-streamSummary">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Stream Summary</div>
+      </div>
+      <div class="filter-row">
+        <div><label for="ssStreamSelect">Select Stream</label><select id="ssStreamSelect"><option value="">— select a stream —</option></select></div>
+      </div>
+    </div>
+    <div id="ssSummaryWrap" style="display:none;">
+      <div class="stats-grid" id="ssStatsRow"></div>
+      <div class="panel">
+        <div class="panel-title">Break Breakdown</div>
+        <div class="tbl-wrap">
+          <table class="data-table">
+            <thead><tr><th>Break #</th><th>Revenue</th><th>Box Cost</th><th>Est. Profit</th><th>Products Used</th></tr></thead>
+            <tbody id="ssBreakBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: BREAK HISTORY ═══════════════════ -->
+  <div class="tab-content" id="tab-history">
+    <div class="panel">
+      <div class="filter-row">
+        <div><label for="histFrom">From</label><input type="date" id="histFrom" /></div>
+        <div><label for="histTo">To</label><input type="date" id="histTo" /></div>
+        <button class="btn btn-primary" id="histFilterBtn">Filter</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Stream</th><th>Break #</th><th>Breaker</th><th>Revenue</th><th>Box Cost</th><th>Est. Profit</th><th>Units</th></tr></thead>
+          <tbody id="histTableBody"><tr class="empty-row"><td colspan="8">Select a date range and click Filter.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: PRODUCT ROI ═══════════════════ -->
+  <div class="tab-content" id="tab-productRoi">
+    <div class="panel">
+      <div class="panel-title">Product ROI Summary</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead><tr><th>Product</th><th>Times Used</th><th>Total Units</th><th>Total Cost</th><th>Total Revenue</th><th>Est. Profit</th><th>ROI %</th><th>Bar</th></tr></thead>
+          <tbody id="roiTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: LEADERBOARD ═══════════════════ -->
+  <div class="tab-content" id="tab-leaderboard">
+    <div class="panel">
+      <div class="panel-title">Breaker Leaderboard (All Time)</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead><tr><th style="width:50px;">#</th><th>Breaker</th><th>Breaks</th><th>Total Revenue</th><th>Total Profit</th><th>Avg Revenue/Break</th><th>Streams</th></tr></thead>
+          <tbody id="lbTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: INVENTORY ═══════════════════ -->
+  <div class="tab-content" id="tab-inventory">
+    <div class="panel">
+      <div class="panel-title">Add Product</div>
+      <div class="inv-form">
+        <div class="form-group">
+          <label for="invName">Product Name</label>
+          <input type="text" id="invName" placeholder="e.g. 2024 Topps Baseball Hobby" />
+        </div>
+        <div class="form-group">
+          <label for="invCost">Cost per Box ($)</label>
+          <input type="number" id="invCost" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div class="form-group">
+          <label for="invCategory">Category</label>
+          <select id="invCategory">
+            <option value="">Select…</option>
+            <option>Baseball</option><option>Basketball</option><option>Football</option>
+            <option>Hockey</option><option>Soccer</option><option>Pokemon</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="invStock">Starting Stock (qty)</label>
+          <input type="number" id="invStock" min="0" step="1" placeholder="0" />
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:0.6rem;padding-top:1.5rem;">
+          <input type="checkbox" id="invAvgCost" style="width:auto;accent-color:var(--primary);width:16px;height:16px;" />
+          <label for="invAvgCost" style="text-transform:none;letter-spacing:0;font-size:0.85rem;color:var(--muted);margin:0;cursor:pointer;">Track weighted avg cost on restock</label>
+        </div>
+      </div>
+      <div style="margin-top:1rem;">
+        <button class="btn btn-primary" id="invSaveBtn">Add Product</button>
+        <button class="btn btn-outline" id="invClearBtn" style="margin-left:0.5rem;">Clear</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Your Inventory</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="invCategoryPills"></div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead><tr><th>Product</th><th>Category</th><th>Cost/Box</th><th>Avg Cost</th><th>Stock</th><th>Actions</th></tr></thead>
+          <tbody id="invTableBody"><tr class="empty-row"><td colspan="6">No products yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: INVENTORY LOG ═══════════════════ -->
+  <div class="tab-content" id="tab-invLog">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Inventory Log</div>
+      </div>
+      <div class="filter-row">
+        <div><label for="ilPeriod">Period</label>
+          <select id="ilPeriod">
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month" selected>This Month</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+        <div><label for="ilAction">Action</label>
+          <select id="ilAction">
+            <option value="all">All Actions</option>
+            <option value="initial">Initial Stock</option>
+            <option value="restock">Restock</option>
+            <option value="used">Used in Break</option>
+          </select>
+        </div>
+        <div><label for="ilProduct">Product</label>
+          <select id="ilProduct"><option value="all">All Products</option></select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem;" id="ilSummaryStrip">
+        <div class="stat-card"><div class="stat-label">Units In (Restocks)</div><div class="stat-value green" id="ilStatIn">—</div></div>
+        <div class="stat-card"><div class="stat-label">Units Out (Used)</div><div class="stat-value" id="ilStatOut">—</div></div>
+        <div class="stat-card"><div class="stat-label">Net Change</div><div class="stat-value" id="ilStatNet">—</div></div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Product</th><th>Action</th><th>Qty</th><th>Cost/Unit</th><th>Notes</th></tr></thead>
+          <tbody id="ilTableBody"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: SORT QUEUE ═══════════════════ -->
+  <div class="tab-content" id="tab-sorting">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Sort Queue</div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="sort-filter-btn active" data-filter="all" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;">All</button>
+          <button class="sort-filter-btn" data-filter="pending" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Pending</button>
+          <button class="sort-filter-btn" data-filter="in_progress" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">In Progress</button>
+          <button class="sort-filter-btn" data-filter="completed" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Completed</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead><tr><th>Stream Key</th><th>Break Date</th><th>Breaks</th><th>Status</th><th>Assigned To</th><th>Completed At</th></tr></thead>
+          <tbody id="sortingTableBody"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: TEAM ═══════════════════ -->
+  <div class="tab-content" id="tab-team">
+    <div class="panel">
+      <div class="panel-title">Team Overview</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Shifts (30d)</th></tr></thead>
+          <tbody id="teamTableBody"><tr class="empty-row"><td colspan="4">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: SETTINGS ═══════════════════ -->
+  <div class="tab-content" id="tab-settings">
+    <div class="panel">
+      <div class="panel-title">Profile</div>
+      <div class="inv-form">
+        <div class="form-group"><label for="settDisplayName">Display Name</label><input type="text" id="settDisplayName" /></div>
+        <div class="form-group"><label for="settPhone">Phone Number</label><input type="tel" id="settPhone" placeholder="+1 555 000 0000" /></div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="settSaveProfile" style="margin-top:0.5rem;padding:0.5rem 1.25rem;">Save Profile</button>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Change Email</div>
+      <div class="inv-form">
+        <div class="form-group"><label for="settEmail">New Email</label><input type="email" id="settEmail" /></div>
+        <div class="form-group"><label for="settEmailConfirm">Confirm Email</label><input type="email" id="settEmailConfirm" /></div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="settSaveEmail" style="margin-top:0.5rem;padding:0.5rem 1.25rem;">Update Email</button>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Change Password</div>
+      <div class="inv-form">
+        <div class="form-group"><label for="settPassword">New Password</label><input type="password" id="settPassword" /></div>
+        <div class="form-group"><label for="settPasswordConfirm">Confirm Password</label><input type="password" id="settPasswordConfirm" /></div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="settSavePassword" style="margin-top:0.5rem;padding:0.5rem 1.25rem;">Update Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT PRODUCT MODAL -->
+<div class="modal-overlay" id="editProductModal">
+  <div class="modal">
+    <h2>Edit Product</h2>
+    <input type="hidden" id="pm-id" />
+    <div class="inv-form">
+      <div class="form-group"><label for="pm-name">Name</label><input type="text" id="pm-name" /></div>
+      <div class="form-group"><label for="pm-cost">Cost per Box ($)</label><input type="number" id="pm-cost" min="0" step="0.01" /></div>
+      <div class="form-group"><label for="pm-category">Category</label>
+        <select id="pm-category">
+          <option value="">Select…</option>
+          <option>Baseball</option><option>Basketball</option><option>Football</option>
+          <option>Hockey</option><option>Soccer</option><option>Pokemon</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label for="pm-stock">Current Stock</label><input type="number" id="pm-stock" min="0" step="1" /></div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;" />
+    <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.75rem;">Restock</div>
+    <div class="inv-form">
+      <div class="form-group"><label for="pm-restock">Add Qty</label><input type="number" id="pm-restock" min="0" step="1" placeholder="0" /></div>
+      <div class="form-group"><label for="pm-restockCost">Price Paid per Box ($)</label><input type="number" id="pm-restockCost" min="0" step="0.01" placeholder="0.00" /></div>
+    </div>
+    <div id="pm-avgCost" style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem;display:none;"></div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="pmCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="pmSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT SHIFT MODAL -->
+<div class="modal-overlay" id="editShiftModal">
+  <div class="modal">
+    <h2>Edit Shift</h2>
+    <input type="hidden" id="esShiftId" />
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+      <div class="form-group"><label for="esDate">Date</label><input type="date" id="esDate" /></div>
+      <div class="form-group"><label for="esTime">Time</label><input type="time" id="esTime" /></div>
+      <div class="form-group"><label for="esStreamKey">Stream Key</label><input type="text" id="esStreamKey" /></div>
+      <div class="form-group"><label for="esNotes">Notes</label><input type="text" id="esNotes" /></div>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="esCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="esSaveBtn">Save Shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="max-width:420px;">
+    <h2 id="confirmTitle">Confirm</h2>
+    <p class="confirm-text" id="confirmMsg"></p>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="confirmCancelBtn">Cancel</button>
+      <button class="btn btn-red" id="confirmOkBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const { createClient } = supabase;
+const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+let currentUser = null;
+let currentProfile = null;
+let orgProducts = [];
+let allProfiles = [];
+let confirmCallback = null;
+let calCurrentDate = new Date();
+let allSchedules = [];
+let sortingFilter = 'all';
+let invLogWired = false;
+
+function fmt(n) { return '$' + (parseFloat(n) || 0).toFixed(2); }
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function showLoading(msg) { document.getElementById('loadingText').textContent = msg || 'Loading…'; document.getElementById('loadingOverlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+function showGlobalError(msg) { const el = document.getElementById('globalError'); el.textContent = msg; el.style.display = 'block'; setTimeout(function(){ el.style.display='none'; }, 5000); }
+function showGlobalSuccess(msg) { const el = document.getElementById('globalSuccess'); el.textContent = msg; el.style.display = 'block'; setTimeout(function(){ el.style.display='none'; }, 4000); }
+
+function openConfirm(title, msg, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  confirmCallback = cb;
+  document.getElementById('confirmModal').classList.add('active');
+}
+
+// ── NAV ──────────────────────────────────────────────────
+const TAB_GROUP_MAP = {
+  schedule: 'ng-schedule',
+  dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', leaderboard: 'ng-reports',
+  inventory: 'ng-manage', invLog: 'ng-manage', sorting: 'ng-manage', team: 'ng-manage', settings: 'ng-manage'
+};
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-dd-item, .nav-group-btn[data-tab]').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-group-btn').forEach(function(el){ el.classList.remove('has-active'); });
+  document.querySelectorAll('.nav-group').forEach(function(el){ el.classList.remove('open'); });
+
+  const tabEl = document.getElementById('tab-' + tab);
+  if (tabEl) tabEl.classList.add('active');
+
+  const activeItem = document.querySelector('[data-tab="' + tab + '"]');
+  if (activeItem) activeItem.classList.add('active');
+
+  const groupId = TAB_GROUP_MAP[tab];
+  if (groupId) {
+    const groupBtn = document.getElementById('ng' + groupId.replace('ng','') + 'b-' + groupId.replace('ng-',''));
+    // simpler:
+    const gBtn = document.querySelector('#' + groupId + ' .nav-group-btn');
+    if (gBtn) gBtn.classList.add('has-active');
+  }
+
+  if (tab === 'schedule') { loadSchedule(); loadCalendar(); loadClockLog(); }
+  else if (tab === 'dashboard') loadDashboard();
+  else if (tab === 'streamSummary') loadStreamSummaryStreams();
+  else if (tab === 'history') { const t = new Date(); document.getElementById('histTo').value = t.toISOString().slice(0,10); t.setDate(t.getDate()-30); document.getElementById('histFrom').value = t.toISOString().slice(0,10); }
+  else if (tab === 'productRoi') loadProductRoi();
+  else if (tab === 'leaderboard') loadLeaderboard();
+  else if (tab === 'inventory') loadInventory();
+  else if (tab === 'invLog') loadInvLog();
+  else if (tab === 'sorting') loadSorting();
+  else if (tab === 'team') loadTeam();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  // Nav dropdowns
+  document.querySelectorAll('.nav-group-btn:not([data-tab])').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const group = btn.closest('.nav-group');
+      const wasOpen = group.classList.contains('open');
+      document.querySelectorAll('.nav-group').forEach(function(g){ g.classList.remove('open'); });
+      if (!wasOpen) group.classList.add('open');
+    });
+  });
+  document.querySelectorAll('.nav-group-btn[data-tab]').forEach(function(btn){
+    btn.addEventListener('click', function(){ switchTab(btn.dataset.tab); });
+  });
+  document.querySelectorAll('.nav-dd-item').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.nav-group').forEach(function(g){ g.classList.remove('open'); });
+      switchTab(btn.dataset.tab);
+    });
+  });
+  document.addEventListener('click', function(){ document.querySelectorAll('.nav-group').forEach(function(g){ g.classList.remove('open'); }); });
+
+  // Confirm modal
+  document.getElementById('confirmCancelBtn').addEventListener('click', function(){ document.getElementById('confirmModal').classList.remove('active'); });
+  document.getElementById('confirmOkBtn').addEventListener('click', function(){ document.getElementById('confirmModal').classList.remove('active'); if (confirmCallback) confirmCallback(); });
+
+  // Edit product modal
+  document.getElementById('pmCancelBtn').addEventListener('click', function(){ document.getElementById('editProductModal').classList.remove('active'); });
+  document.getElementById('pmSaveBtn').addEventListener('click', pmHandleSave);
+
+  // Edit shift modal
+  document.getElementById('esCancelBtn').addEventListener('click', function(){ document.getElementById('editShiftModal').classList.remove('active'); });
+  document.getElementById('esSaveBtn').addEventListener('click', esSaveShift);
+
+  // Sign out
+  document.getElementById('signOutBtn').addEventListener('click', async function(){
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  // Schedule
+  document.getElementById('schedSaveBtn').addEventListener('click', createShift);
+  document.getElementById('calPrevBtn').addEventListener('click', function(){ calCurrentDate.setMonth(calCurrentDate.getMonth()-1); loadCalendar(); });
+  document.getElementById('calNextBtn').addEventListener('click', function(){ calCurrentDate.setMonth(calCurrentDate.getMonth()+1); loadCalendar(); });
+  document.getElementById('refreshClockLogBtn').addEventListener('click', loadClockLog);
+
+  // Inventory
+  document.getElementById('invSaveBtn').addEventListener('click', invHandleSave);
+  document.getElementById('invClearBtn').addEventListener('click', invClearForm);
+  document.getElementById('pm-restock').addEventListener('input', pmUpdateAvgCostPreview);
+  document.getElementById('pm-restockCost').addEventListener('input', pmUpdateAvgCostPreview);
+
+  // Reports
+  document.getElementById('histFilterBtn').addEventListener('click', loadHistory);
+  document.getElementById('ssStreamSelect').addEventListener('change', loadStreamSummaryDetail);
+
+  // Sort queue filters
+  document.querySelectorAll('.sort-filter-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      sortingFilter = btn.dataset.filter;
+      document.querySelectorAll('.sort-filter-btn').forEach(function(b){
+        b.style.background = 'var(--bg)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
+      });
+      btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--primary)';
+      loadSorting();
+    });
+  });
+
+  // Settings
+  document.getElementById('settSaveProfile').addEventListener('click', saveProfile);
+  document.getElementById('settSaveEmail').addEventListener('click', saveEmail);
+  document.getElementById('settSavePassword').addEventListener('click', savePassword);
+
+  init();
+});
+
+async function init() {
+  showLoading('Loading…');
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    currentUser = session.user;
+
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (!profile || profile.role !== 'manager') { window.location.href = 'index.html'; return; }
+    currentProfile = profile;
+    document.getElementById('mgrBadge').textContent = profile.display_name || '';
+
+    // Prefill settings
+    document.getElementById('settDisplayName').value = profile.display_name || '';
+    document.getElementById('settPhone').value = profile.phone || '';
+
+    await loadAllProfiles();
+    await populateScheduleDropdown();
+    switchTab('schedule');
+  } catch (err) {
+    console.error(err);
+    showGlobalError('Failed to load. Please refresh.');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function loadAllProfiles() {
+  const { data } = await sb.from('profiles').select('id, display_name, role, email').eq('org_id', currentProfile.org_id).neq('role', 'owner');
+  allProfiles = data || [];
+}
+
+async function populateScheduleDropdown() {
+  const sel = document.getElementById('schedBreaker');
+  sel.innerHTML = '<option value="">Select person…</option>';
+  allProfiles.forEach(function(p){
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.display_name + ' (' + p.role + ')';
+    sel.appendChild(opt);
+  });
+}
+
+// ── SCHEDULE ─────────────────────────────────────────────
+async function loadSchedule() {
+  const tbody = document.getElementById('schedTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Loading…</td></tr>';
+  const { data: shifts } = await sb.from('schedules')
+    .select('*')
+    .eq('org_id', currentProfile.org_id)
+    .neq('status', 'cancelled')
+    .order('scheduled_date', { ascending: true });
+  allSchedules = shifts || [];
+  renderScheduleTable(allSchedules);
+}
+
+function renderScheduleTable(shifts) {
+  const tbody = document.getElementById('schedTableBody');
+  if (!shifts.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No upcoming shifts.</td></tr>'; return; }
+  tbody.innerHTML = '';
+  shifts.forEach(function(s) {
+    const profile = allProfiles.find(function(p){ return p.id === s.breaker_id || p.id === s.sorter_id; });
+    const name = profile ? escHtml(profile.display_name) : '—';
+    const role = profile ? profile.role : '—';
+    const statusBadge = s.status === 'completed' ? '<span class="badge badge-green">Completed</span>'
+      : s.status === 'in_progress' ? '<span class="badge badge-yellow">In Progress</span>'
+      : '<span class="badge badge-blue">Scheduled</span>';
+    const clockIn = s.clocked_in_at ? new Date(s.clocked_in_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+    const clockOut = s.clocked_out_at ? new Date(s.clocked_out_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escHtml(s.scheduled_date||'') + '</td>' +
+      '<td>' + escHtml(s.scheduled_time||'') + '</td>' +
+      '<td><strong>' + name + '</strong></td>' +
+      '<td><span class="badge badge-gray">' + role + '</span></td>' +
+      '<td>' + escHtml(s.stream_key||'—') + '</td>' +
+      '<td style="color:var(--muted);font-size:0.82rem;">' + escHtml(s.notes||'—') + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td style="color:var(--muted);font-size:0.82rem;">' + clockIn + '</td>' +
+      '<td style="color:var(--muted);font-size:0.82rem;">' + clockOut + '</td>' +
+      '<td><div class="btn-row">' +
+        '<button class="btn-sm btn-signout" onclick="openEditShift(\'' + s.id + '\')">Edit</button>' +
+        '<button class="btn-sm btn-danger-sm" style="background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);" onclick="cancelShift(\'' + s.id + '\')">Cancel</button>' +
+      '</div></td>';
+    tbody.appendChild(tr);
+  });
+}
+
+async function createShift() {
+  const personId = document.getElementById('schedBreaker').value;
+  const date = document.getElementById('schedDate').value;
+  const time = document.getElementById('schedTime').value;
+  const streamKey = document.getElementById('schedStreamKey').value.trim();
+  const notes = document.getElementById('schedNotes').value.trim();
+  const repeat = document.getElementById('schedRepeat').checked;
+
+  if (!personId || !date || !time) { showGlobalError('Please select a team member, date, and time.'); return; }
+
+  const profile = allProfiles.find(function(p){ return p.id === personId; });
+  if (!profile) { showGlobalError('Invalid team member.'); return; }
+
+  const btn = document.getElementById('schedSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    const shifts = [];
+    const baseDate = new Date(date + 'T12:00:00');
+    const days = repeat ? 8 : 1;
+    for (let i = 0; i < days; i++) {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + i);
+      const entry = {
+        org_id: currentProfile.org_id,
+        scheduled_date: d.toISOString().slice(0,10),
+        scheduled_time: time,
+        stream_key: streamKey || null,
+        notes: notes || null,
+        status: 'scheduled'
+      };
+      if (profile.role === 'sorter') entry.sorter_id = personId;
+      else entry.breaker_id = personId;
+      shifts.push(entry);
+    }
+    const { error } = await sb.from('schedules').insert(shifts);
+    if (error) throw error;
+    showGlobalSuccess('Shift' + (repeat ? 's' : '') + ' scheduled.');
+    document.getElementById('schedStreamKey').value = '';
+    document.getElementById('schedNotes').value = '';
+    document.getElementById('schedRepeat').checked = false;
+    await loadSchedule();
+    loadCalendar();
+  } catch(err) {
+    showGlobalError('Failed to schedule shift: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Add Shift';
+  }
+}
+
+function openEditShift(id) {
+  const s = allSchedules.find(function(x){ return x.id === id; });
+  if (!s) return;
+  document.getElementById('esShiftId').value = s.id;
+  document.getElementById('esDate').value = s.scheduled_date || '';
+  document.getElementById('esTime').value = s.scheduled_time || '';
+  document.getElementById('esStreamKey').value = s.stream_key || '';
+  document.getElementById('esNotes').value = s.notes || '';
+  document.getElementById('editShiftModal').classList.add('active');
+}
+
+async function esSaveShift() {
+  const id = document.getElementById('esShiftId').value;
+  const btn = document.getElementById('esSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const { error } = await sb.from('schedules').update({
+      scheduled_date: document.getElementById('esDate').value,
+      scheduled_time: document.getElementById('esTime').value,
+      stream_key: document.getElementById('esStreamKey').value.trim() || null,
+      notes: document.getElementById('esNotes').value.trim() || null
+    }).eq('id', id);
+    if (error) throw error;
+    document.getElementById('editShiftModal').classList.remove('active');
+    showGlobalSuccess('Shift updated.');
+    await loadSchedule();
+    loadCalendar();
+  } catch(err) {
+    showGlobalError('Failed to update shift: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Shift';
+  }
+}
+
+function cancelShift(id) {
+  openConfirm('Cancel Shift', 'Are you sure you want to cancel this shift? The team member will no longer see it.', async function() {
+    const { error } = await sb.from('schedules').update({ status: 'cancelled' }).eq('id', id);
+    if (error) { showGlobalError('Failed to cancel shift.'); return; }
+    showGlobalSuccess('Shift cancelled.');
+    await loadSchedule();
+    loadCalendar();
+  });
+}
+
+function loadCalendar() {
+  const grid = document.getElementById('calGrid');
+  const label = document.getElementById('calMonthLabel');
+  const year = calCurrentDate.getFullYear();
+  const month = calCurrentDate.getMonth();
+  label.textContent = calCurrentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  grid.innerHTML = '';
+
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(d){
+    const cell = document.createElement('div');
+    cell.style.cssText = 'text-align:center;font-size:0.65rem;font-weight:700;color:var(--muted);padding:0.25rem 0;';
+    cell.textContent = d;
+    grid.appendChild(cell);
+  });
+
+  for (let i = 0; i < firstDay; i++) {
+    grid.appendChild(document.createElement('div'));
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    const dayShifts = allSchedules.filter(function(s){ return s.scheduled_date === dateStr && s.status !== 'cancelled'; });
+    const cell = document.createElement('div');
+    cell.style.cssText = 'min-height:52px;border:1px solid var(--border);border-radius:5px;padding:3px 4px;font-size:0.72rem;background:var(--bg);';
+    let html = '<div style="font-weight:700;color:var(--muted);margin-bottom:2px;">' + day + '</div>';
+    dayShifts.slice(0,3).forEach(function(s){
+      const profile = allProfiles.find(function(p){ return p.id === s.breaker_id || p.id === s.sorter_id; });
+      const name = profile ? profile.display_name.split(' ')[0] : '?';
+      const color = s.status === 'completed' ? 'rgba(34,197,94,0.3)' : s.status === 'in_progress' ? 'rgba(245,158,11,0.3)' : 'rgba(79,110,247,0.3)';
+      html += '<div style="background:' + color + ';border-radius:3px;padding:1px 3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escHtml(name) + '">' + escHtml(name) + '</div>';
+    });
+    if (dayShifts.length > 3) html += '<div style="color:var(--muted);font-size:0.65rem;">+' + (dayShifts.length-3) + ' more</div>';
+    cell.innerHTML = html;
+    grid.appendChild(cell);
+  }
+}
+
+async function loadClockLog() {
+  const tbody = document.getElementById('clockLogTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Loading…</td></tr>';
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const { data: shifts } = await sb.from('schedules')
+    .select('*')
+    .eq('org_id', currentProfile.org_id)
+    .not('clocked_in_at', 'is', null)
+    .gte('scheduled_date', cutoff.toISOString().slice(0,10))
+    .order('clocked_in_at', { ascending: false });
+
+  if (!shifts || !shifts.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No clock-in records found.</td></tr>'; return; }
+  tbody.innerHTML = '';
+  shifts.forEach(function(s){
+    const profile = allProfiles.find(function(p){ return p.id === s.breaker_id || p.id === s.sorter_id; });
+    const name = profile ? escHtml(profile.display_name) : '—';
+    const role = profile ? profile.role : '—';
+    const inT = s.clocked_in_at ? new Date(s.clocked_in_at) : null;
+    const outT = s.clocked_out_at ? new Date(s.clocked_out_at) : null;
+    const hrs = (inT && outT) ? ((outT - inT) / 3600000).toFixed(2) + ' hrs' : '—';
+    const statusBadge = s.clocked_out_at ? '<span class="badge badge-green">Complete</span>' : '<span class="badge badge-yellow">In Progress</span>';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escHtml(s.scheduled_date||'') + '</td>' +
+      '<td>' + name + '</td>' +
+      '<td><span class="badge badge-gray">' + role + '</span></td>' +
+      '<td>' + escHtml(s.stream_key||'—') + '</td>' +
+      '<td style="font-size:0.82rem;">' + (inT ? inT.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—') + '</td>' +
+      '<td style="font-size:0.82rem;">' + (outT ? outT.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—') + '</td>' +
+      '<td>' + hrs + '</td>' +
+      '<td>' + statusBadge + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// ── INVENTORY ────────────────────────────────────────────
+async function loadInventory() {
+  const { data: products } = await sb.from('products').select('*').eq('org_id', currentProfile.org_id).order('name');
+  orgProducts = products || [];
+  renderInventoryTable();
+  renderCategoryPills();
+}
+
+function renderInventoryTable(filter) {
+  const tbody = document.getElementById('invTableBody');
+  const list = filter ? orgProducts.filter(function(p){ return p.category === filter; }) : orgProducts;
+  if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No products found.</td></tr>'; return; }
+  tbody.innerHTML = '';
+  list.forEach(function(p) {
+    const avgDisplay = p.unit_cost ? fmt(p.unit_cost) : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><strong>' + escHtml(p.name) + '</strong></td>' +
+      '<td>' + escHtml(p.category||'—') + '</td>' +
+      '<td>' + fmt(p.cost_per_unit||0) + '</td>' +
+      '<td style="color:var(--muted);">' + avgDisplay + '</td>' +
+      '<td>' + (p.current_stock || 0) + '</td>' +
+      '<td><div class="btn-row">' +
+        '<button class="btn-sm btn-signout" onclick="invOpenEdit(\'' + p.id + '\')">Edit</button>' +
+        '<button class="btn-sm btn-danger-sm" style="background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);" onclick="invDelete(\'' + p.id + '\')">Delete</button>' +
+      '</div></td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCategoryPills() {
+  const cats = [...new Set(orgProducts.map(function(p){ return p.category; }).filter(Boolean))];
+  const wrap = document.getElementById('invCategoryPills');
+  wrap.innerHTML = '';
+  if (!cats.length) return;
+  const allBtn = document.createElement('button');
+  allBtn.textContent = 'All'; allBtn.className = 'btn-sm btn-signout'; allBtn.style.borderRadius = '100px';
+  allBtn.addEventListener('click', function(){ renderInventoryTable(); });
+  wrap.appendChild(allBtn);
+  cats.forEach(function(cat){
+    const btn = document.createElement('button');
+    btn.textContent = cat; btn.className = 'btn-sm btn-signout'; btn.style.borderRadius = '100px';
+    btn.addEventListener('click', function(){ renderInventoryTable(cat); });
+    wrap.appendChild(btn);
+  });
+}
+
+async function invHandleSave() {
+  const name = document.getElementById('invName').value.trim();
+  const cost = parseFloat(document.getElementById('invCost').value) || 0;
+  const category = document.getElementById('invCategory').value;
+  const stock = parseInt(document.getElementById('invStock').value, 10) || 0;
+  const trackAvg = document.getElementById('invAvgCost').checked;
+
+  if (!name) { showGlobalError('Product name is required.'); return; }
+
+  const btn = document.getElementById('invSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const { data: inserted, error } = await sb.from('products').insert({
+      org_id: currentProfile.org_id, name, cost_per_unit: cost, unit_cost: trackAvg ? cost : null,
+      category: category || null, current_stock: stock
+    }).select('id').single();
+    if (error) throw error;
+
+    if (stock > 0) {
+      await sb.from('inventory_log').insert({
+        org_id: currentProfile.org_id, product_id: inserted.id, product_name: name,
+        action: 'initial', qty: stock, cost_per_unit: cost, notes: 'Initial stock'
+      });
+    }
+    invClearForm();
+    await loadInventory();
+    showGlobalSuccess('Product added.');
+  } catch(err) {
+    showGlobalError('Failed to add product: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Add Product';
+  }
+}
+
+function invClearForm() {
+  ['invName','invCost','invStock'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('invCategory').value = '';
+  document.getElementById('invAvgCost').checked = false;
+}
+
+function invOpenEdit(id) {
+  const p = orgProducts.find(function(x){ return x.id === id; });
+  if (!p) return;
+  document.getElementById('pm-id').value = p.id;
+  document.getElementById('pm-name').value = p.name || '';
+  document.getElementById('pm-cost').value = p.cost_per_unit || '';
+  document.getElementById('pm-category').value = p.category || '';
+  document.getElementById('pm-stock').value = p.current_stock || 0;
+  document.getElementById('pm-restock').value = '';
+  document.getElementById('pm-restockCost').value = '';
+  document.getElementById('pm-avgCost').style.display = 'none';
+  document.getElementById('editProductModal').classList.add('active');
+}
+
+function pmUpdateAvgCostPreview() {
+  const id = document.getElementById('pm-id').value;
+  const p = orgProducts.find(function(x){ return x.id === id; });
+  if (!p) return;
+  const restock = parseInt(document.getElementById('pm-restock').value, 10) || 0;
+  const restockCost = parseFloat(document.getElementById('pm-restockCost').value) || 0;
+  const existing = p.current_stock || 0;
+  const existingCost = p.unit_cost || p.cost_per_unit || 0;
+  const el = document.getElementById('pm-avgCost');
+  if (restock > 0 && restockCost > 0) {
+    const newAvg = (existing * existingCost + restock * restockCost) / (existing + restock);
+    el.textContent = 'New weighted avg cost: ' + fmt(newAvg) + ' per box';
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function pmHandleSave() {
+  const id = document.getElementById('pm-id').value;
+  const p = orgProducts.find(function(x){ return x.id === id; });
+  if (!p) return;
+  const name = document.getElementById('pm-name').value.trim();
+  const cost = parseFloat(document.getElementById('pm-cost').value) || 0;
+  const category = document.getElementById('pm-category').value;
+  const stock = parseInt(document.getElementById('pm-stock').value, 10) || 0;
+  const restock = parseInt(document.getElementById('pm-restock').value, 10) || 0;
+  const restockCost = parseFloat(document.getElementById('pm-restockCost').value) || 0;
+
+  const btn = document.getElementById('pmSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    const updates = { name, cost_per_unit: cost, category: category || null };
+    let newStock = stock;
+
+    if (restock > 0) {
+      newStock = stock + restock;
+      const existing = p.current_stock || 0;
+      const existingCost = p.unit_cost || cost;
+      if (existingCost > 0 && (existing + restock) > 0) {
+        updates.unit_cost = (existing * existingCost + restock * restockCost) / (existing + restock);
+      }
+      await sb.from('inventory_log').insert({
+        org_id: currentProfile.org_id, product_id: id, product_name: name,
+        action: 'restock', qty: restock, cost_per_unit: restockCost,
+        notes: 'Restock by manager'
+      });
+    }
+    updates.current_stock = newStock;
+
+    const { error } = await sb.from('products').update(updates).eq('id', id);
+    if (error) throw error;
+    document.getElementById('editProductModal').classList.remove('active');
+    await loadInventory();
+    showGlobalSuccess('Product updated.');
+  } catch(err) {
+    showGlobalError('Failed to update: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Changes';
+  }
+}
+
+async function invDelete(id) {
+  openConfirm('Delete Product', 'This removes the product from future breaks. Past history is unaffected.', async function(){
+    const { error } = await sb.from('products').delete().eq('id', id);
+    if (error) { showGlobalError('Delete failed.'); return; }
+    showGlobalSuccess('Product deleted.');
+    await loadInventory();
+  });
+}
+
+// ── INVENTORY LOG ────────────────────────────────────────
+async function loadInvLog() {
+  if (!invLogWired) {
+    ['ilPeriod','ilAction','ilProduct'].forEach(function(id){
+      document.getElementById(id).addEventListener('change', loadInvLog);
+    });
+    invLogWired = true;
+  }
+
+  const period = document.getElementById('ilPeriod').value;
+  const action = document.getElementById('ilAction').value;
+  const product = document.getElementById('ilProduct').value;
+
+  const now = new Date();
+  let from;
+  if (period === 'today') { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString(); }
+  else if (period === 'week') { const d = new Date(now); d.setDate(d.getDate()-7); from = d.toISOString(); }
+  else if (period === 'month') { const d = new Date(now); d.setDate(d.getDate()-30); from = d.toISOString(); }
+  else { from = null; }
+
+  let query = sb.from('inventory_log').select('*').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false });
+  if (from) query = query.gte('created_at', from);
+  if (action !== 'all') query = query.eq('action', action);
+  if (product !== 'all') query = query.eq('product_id', product);
+
+  const { data: logs } = await query;
+  const entries = logs || [];
+
+  // Populate product dropdown once
+  const prodSel = document.getElementById('ilProduct');
+  if (prodSel.children.length === 1) {
+    orgProducts.forEach(function(p){
+      const opt = document.createElement('option');
+      opt.value = p.id; opt.textContent = p.name;
+      prodSel.appendChild(opt);
+    });
+  }
+
+  const totalIn = entries.filter(function(e){ return e.action === 'restock' || e.action === 'initial'; }).reduce(function(s,e){ return s + (e.qty||0); }, 0);
+  const totalOut = entries.filter(function(e){ return e.action === 'used'; }).reduce(function(s,e){ return s + (e.qty||0); }, 0);
+  document.getElementById('ilStatIn').textContent = totalIn;
+  document.getElementById('ilStatOut').textContent = totalOut;
+  const net = totalIn - totalOut;
+  const netEl = document.getElementById('ilStatNet');
+  netEl.textContent = (net >= 0 ? '+' : '') + net;
+  netEl.className = 'stat-value ' + (net >= 0 ? 'green' : 'red');
+
+  const tbody = document.getElementById('ilTableBody');
+  if (!entries.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No entries found.</td></tr>'; return; }
+  tbody.innerHTML = '';
+  entries.forEach(function(e){
+    const actionLabel = e.action === 'initial' ? '<span class="badge badge-gray">Initial</span>'
+      : e.action === 'restock' ? '<span class="badge badge-green">Restock</span>'
+      : '<span class="badge badge-yellow">Used</span>';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td style="font-size:0.82rem;color:var(--muted);">' + new Date(e.created_at).toLocaleDateString() + '</td>' +
+      '<td>' + escHtml(e.product_name||'—') + '</td>' +
+      '<td>' + actionLabel + '</td>' +
+      '<td>' + (e.qty||0) + '</td>' +
+      '<td>' + (e.cost_per_unit ? fmt(e.cost_per_unit) : '—') + '</td>' +
+      '<td style="color:var(--muted);font-size:0.82rem;">' + escHtml(e.notes||'—') + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// ── SORT QUEUE ───────────────────────────────────────────
+async function loadSorting() {
+  const tbody = document.getElementById('sortingTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading…</td></tr>';
+  try {
+    const { data: tasks } = await sb.from('sort_tasks').select('id, status, sorter_id, completed_at, created_at, stream_id').eq('org_id', currentProfile.org_id).order('created_at', { ascending: true });
+    const allTasks = tasks || [];
+    const streamIds = [...new Set(allTasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
+    let streamMap = {};
+    if (streamIds.length) {
+      const { data: streams } = await sb.from('streams').select('id, stream_key, break_date, break_count').in('id', streamIds);
+      (streams||[]).forEach(function(s){ streamMap[s.id] = s; });
+    }
+    const sorterIds = [...new Set(allTasks.filter(function(t){ return t.sorter_id; }).map(function(t){ return t.sorter_id; }))];
+    let sorterMap = {};
+    if (sorterIds.length) {
+      const { data: sorters } = await sb.from('profiles').select('id, display_name').in('id', sorterIds);
+      (sorters||[]).forEach(function(s){ sorterMap[s.id] = s.display_name; });
+    }
+    const filtered = sortingFilter === 'all' ? allTasks : allTasks.filter(function(t){ return t.status === sortingFilter; });
+    tbody.innerHTML = '';
+    if (!filtered.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No sort tasks found.</td></tr>'; return; }
+    filtered.forEach(function(task){
+      const s = streamMap[task.stream_id] || {};
+      const statusBadge = task.status === 'completed' ? '<span class="badge badge-green">Completed</span>'
+        : task.status === 'in_progress' ? '<span class="badge badge-yellow">In Progress</span>'
+        : '<span class="badge badge-gray">Pending</span>';
+      const sorterName = task.sorter_id && sorterMap[task.sorter_id] ? escHtml(sorterMap[task.sorter_id]) : '<span style="color:var(--muted);">Unassigned</span>';
+      const completedAt = task.completed_at ? new Date(task.completed_at).toLocaleString() : '—';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td style="font-weight:600;">' + escHtml(s.stream_key||'—') + '</td>' +
+        '<td style="color:var(--muted);">' + (s.break_date||'—') + '</td>' +
+        '<td style="text-align:center;">' + (s.break_count||'—') + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td>' + sorterName + '</td>' +
+        '<td style="font-size:0.82rem;color:var(--muted);">' + completedAt + '</td>';
+      tbody.appendChild(tr);
+    });
+  } catch(err) {
+    document.getElementById('sortingTableBody').innerHTML = '<tr class="empty-row"><td colspan="6">Failed to load.</td></tr>';
+  }
+}
+
+// ── REPORTS ──────────────────────────────────────────────
+async function loadDashboard() {
+  const today = new Date().toISOString().slice(0,10);
+  const { data: todayBreaks } = await sb.from('breaks').select('revenue, net_profit').eq('org_id', currentProfile.org_id).eq('break_date', today);
+  const { data: allBreaks } = await sb.from('breaks').select('revenue, net_profit').eq('org_id', currentProfile.org_id);
+  const { data: allStreams } = await sb.from('streams').select('id').eq('org_id', currentProfile.org_id).eq('status', 'closed');
+
+  const todayRev = (todayBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.revenue)||0); },0);
+  const todayProfit = (todayBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.net_profit)||0); },0);
+  const totalRev = (allBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.revenue)||0); },0);
+  const totalProfit = (allBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.net_profit)||0); },0);
+
+  document.getElementById('dash-revenue').textContent = fmt(todayRev);
+  document.getElementById('dash-profit').textContent = fmt(todayProfit);
+  document.getElementById('dash-breaks').textContent = (todayBreaks||[]).length;
+  document.getElementById('dash-avg').textContent = (todayBreaks||[]).length ? fmt(todayRev/(todayBreaks||[]).length) : '—';
+  document.getElementById('dash-totalRevenue').textContent = fmt(totalRev);
+  document.getElementById('dash-totalProfit').textContent = fmt(totalProfit);
+  document.getElementById('dash-totalBreaks').textContent = (allBreaks||[]).length;
+  document.getElementById('dash-totalStreams').textContent = (allStreams||[]).length;
+
+  const { data: recent } = await sb.from('breaks').select('break_date, stream_id, break_number, breaker_id, revenue, net_profit').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(10);
+  const streamIds = [...new Set((recent||[]).map(function(b){ return b.stream_id; }).filter(Boolean))];
+  let streamMap = {};
+  if (streamIds.length) {
+    const { data: streams } = await sb.from('streams').select('id, stream_key').in('id', streamIds);
+    (streams||[]).forEach(function(s){ streamMap[s.id] = s.stream_key; });
+  }
+  const breakerIds = [...new Set((recent||[]).map(function(b){ return b.breaker_id; }).filter(Boolean))];
+  let breakerMap = {};
+  if (breakerIds.length) {
+    const { data: bp } = await sb.from('profiles').select('id, display_name').in('id', breakerIds);
+    (bp||[]).forEach(function(p){ breakerMap[p.id] = p.display_name; });
+  }
+  const tbody = document.getElementById('dashRecentBody');
+  tbody.innerHTML = '';
+  (recent||[]).forEach(function(b){
+    const profit = parseFloat(b.net_profit) || 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escHtml(b.break_date||'') + '</td>' +
+      '<td>' + escHtml(streamMap[b.stream_id]||'—') + '</td>' +
+      '<td style="text-align:center;">' + (b.break_number||'—') + '</td>' +
+      '<td>' + escHtml(breakerMap[b.breaker_id]||'—') + '</td>' +
+      '<td>' + fmt(b.revenue) + '</td>' +
+      '<td style="color:' + (profit>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>';
+    tbody.appendChild(tr);
+  });
+  if (!(recent||[]).length) tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No breaks yet.</td></tr>';
+}
+
+async function loadStreamSummaryStreams() {
+  const sel = document.getElementById('ssStreamSelect');
+  sel.innerHTML = '<option value="">— select a stream —</option>';
+  const { data: streams } = await sb.from('streams').select('id, stream_key, break_date').eq('org_id', currentProfile.org_id).eq('status', 'closed').order('break_date', { ascending: false });
+  (streams||[]).forEach(function(s){
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = escHtml(s.stream_key||s.id) + ' — ' + (s.break_date||'');
+    sel.appendChild(opt);
+  });
+  document.getElementById('ssSummaryWrap').style.display = 'none';
+}
+
+async function loadStreamSummaryDetail() {
+  const streamId = document.getElementById('ssStreamSelect').value;
+  const wrap = document.getElementById('ssSummaryWrap');
+  if (!streamId) { wrap.style.display = 'none'; return; }
+
+  const { data: stream } = await sb.from('streams').select('*').eq('id', streamId).single();
+  const { data: breaks } = await sb.from('breaks').select('*').eq('stream_id', streamId).order('break_number');
+
+  if (!stream) return;
+  const statsRow = document.getElementById('ssStatsRow');
+  statsRow.innerHTML =
+    '<div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-value blue">' + fmt(stream.total_submitted_revenue) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Final Sales</div><div class="stat-value green">' + fmt(stream.final_sales) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Box Cost</div><div class="stat-value">' + fmt(stream.total_product_cost) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value ' + ((parseFloat(stream.final_sales)||0)-(parseFloat(stream.total_product_cost)||0)-(parseFloat(stream.total_other_costs)||0) >= 0 ? 'green' : 'red') + '">' + fmt((parseFloat(stream.final_sales)||0)-(parseFloat(stream.total_product_cost)||0)-(parseFloat(stream.total_other_costs)||0)) + '</div></div>';
+
+  const tbody = document.getElementById('ssBreakBody');
+  tbody.innerHTML = '';
+  (breaks||[]).forEach(function(b){
+    const profit = (parseFloat(b.revenue)||0) - (parseFloat(b.total_product_cost)||0);
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + (b.break_number||'—') + '</td>' +
+      '<td>' + fmt(b.revenue) + '</td>' +
+      '<td>' + fmt(b.total_product_cost) + '</td>' +
+      '<td style="color:' + (profit>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>' +
+      '<td style="font-size:0.8rem;color:var(--muted);">' + ((b.products_used||[]).map(function(p){ return escHtml(p.name) + ' ×' + p.qty; }).join(', ') || '—') + '</td>';
+    tbody.appendChild(tr);
+  });
+  if (!(breaks||[]).length) tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No breaks found.</td></tr>';
+  wrap.style.display = '';
+}
+
+async function loadHistory() {
+  const from = document.getElementById('histFrom').value;
+  const to = document.getElementById('histTo').value;
+  if (!from || !to) { showGlobalError('Select both a from and to date.'); return; }
+
+  const { data: breaks } = await sb.from('breaks').select('*').eq('org_id', currentProfile.org_id).gte('break_date', from).lte('break_date', to).order('break_date', { ascending: false });
+  const streamIds = [...new Set((breaks||[]).map(function(b){ return b.stream_id; }).filter(Boolean))];
+  let streamMap = {};
+  if (streamIds.length) {
+    const { data: s } = await sb.from('streams').select('id, stream_key').in('id', streamIds);
+    (s||[]).forEach(function(x){ streamMap[x.id] = x.stream_key; });
+  }
+  const breakerIds = [...new Set((breaks||[]).map(function(b){ return b.breaker_id; }).filter(Boolean))];
+  let breakerMap = {};
+  if (breakerIds.length) {
+    const { data: bp } = await sb.from('profiles').select('id, display_name').in('id', breakerIds);
+    (bp||[]).forEach(function(p){ breakerMap[p.id] = p.display_name; });
+  }
+  const tbody = document.getElementById('histTableBody');
+  tbody.innerHTML = '';
+  if (!(breaks||[]).length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No breaks found for this period.</td></tr>'; return; }
+  (breaks||[]).forEach(function(b){
+    const profit = parseFloat(b.net_profit) || 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escHtml(b.break_date||'') + '</td>' +
+      '<td>' + escHtml(streamMap[b.stream_id]||'—') + '</td>' +
+      '<td style="text-align:center;">' + (b.break_number||'—') + '</td>' +
+      '<td>' + escHtml(breakerMap[b.breaker_id]||'—') + '</td>' +
+      '<td>' + fmt(b.revenue) + '</td>' +
+      '<td>' + fmt(b.total_product_cost) + '</td>' +
+      '<td style="color:' + (profit>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>' +
+      '<td style="text-align:center;">' + (b.total_units_used||0) + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadProductRoi() {
+  const { data: breaks } = await sb.from('breaks').select('products_used, revenue').eq('org_id', currentProfile.org_id);
+  const map = {};
+  (breaks||[]).forEach(function(b){
+    (b.products_used||[]).forEach(function(p){
+      if (!map[p.name]) map[p.name] = { name: p.name, count: 0, units: 0, cost: 0, revenue: 0 };
+      map[p.name].count++;
+      map[p.name].units += p.qty || 1;
+      map[p.name].cost += (p.unit_cost || p.cost || 0) * (p.qty || 1);
+    });
+  });
+  const products = Object.values(map);
+  const tbody = document.getElementById('roiTableBody');
+  tbody.innerHTML = '';
+  if (!products.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No break data yet.</td></tr>'; return; }
+  const maxRoi = Math.max(...products.map(function(p){ return p.cost > 0 ? ((p.revenue - p.cost) / p.cost * 100) : 0; }));
+  products.sort(function(a,b){ return b.revenue - a.revenue; }).forEach(function(p){
+    const profit = p.revenue - p.cost;
+    const roi = p.cost > 0 ? (profit / p.cost * 100) : 0;
+    const barPct = maxRoi > 0 ? Math.max(0, (roi / maxRoi) * 100) : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><strong>' + escHtml(p.name) + '</strong></td>' +
+      '<td style="text-align:center;">' + p.count + '</td>' +
+      '<td style="text-align:center;">' + p.units + '</td>' +
+      '<td>' + fmt(p.cost) + '</td>' +
+      '<td>' + fmt(p.revenue) + '</td>' +
+      '<td style="color:' + (profit>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>' +
+      '<td style="color:' + (roi>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + roi.toFixed(1) + '%</td>' +
+      '<td style="width:80px;"><div class="roi-bar-wrap"><div class="roi-bar" style="width:' + barPct.toFixed(0) + '%;background:' + (roi>=0?'var(--green)':'var(--red)') + ';"></div></div></td>';
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadLeaderboard() {
+  const { data: breaks } = await sb.from('breaks').select('breaker_id, revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id);
+  const breakerIds = [...new Set((breaks||[]).map(function(b){ return b.breaker_id; }).filter(Boolean))];
+  let nameMap = {};
+  if (breakerIds.length) {
+    const { data: bp } = await sb.from('profiles').select('id, display_name').in('id', breakerIds);
+    (bp||[]).forEach(function(p){ nameMap[p.id] = p.display_name; });
+  }
+  const map = {};
+  (breaks||[]).forEach(function(b){
+    if (!b.breaker_id) return;
+    if (!map[b.breaker_id]) map[b.breaker_id] = { id: b.breaker_id, name: nameMap[b.breaker_id]||'Unknown', breaks: 0, revenue: 0, profit: 0, streams: new Set() };
+    map[b.breaker_id].breaks++;
+    map[b.breaker_id].revenue += parseFloat(b.revenue)||0;
+    map[b.breaker_id].profit += parseFloat(b.net_profit)||0;
+    if (b.stream_id) map[b.breaker_id].streams.add(b.stream_id);
+  });
+  const list = Object.values(map).sort(function(a,b){ return b.revenue - a.revenue; });
+  const tbody = document.getElementById('lbTableBody');
+  tbody.innerHTML = '';
+  if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No data yet.</td></tr>'; return; }
+  list.forEach(function(p, i){
+    const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><div class="lb-rank ' + rankClass + '">' + (i+1) + '</div></td>' +
+      '<td><strong>' + escHtml(p.name) + '</strong></td>' +
+      '<td style="text-align:center;">' + p.breaks + '</td>' +
+      '<td>' + fmt(p.revenue) + '</td>' +
+      '<td style="color:' + (p.profit>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + fmt(p.profit) + '</td>' +
+      '<td>' + (p.breaks ? fmt(p.revenue/p.breaks) : '—') + '</td>' +
+      '<td style="text-align:center;">' + p.streams.size + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// ── TEAM ─────────────────────────────────────────────────
+async function loadTeam() {
+  const tbody = document.getElementById('teamTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Loading…</td></tr>';
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
+  const { data: shifts } = await sb.from('schedules').select('breaker_id, sorter_id').eq('org_id', currentProfile.org_id).gte('scheduled_date', cutoff.toISOString().slice(0,10));
+
+  const shiftCount = {};
+  (shifts||[]).forEach(function(s){
+    const id = s.breaker_id || s.sorter_id;
+    if (id) shiftCount[id] = (shiftCount[id]||0) + 1;
+  });
+
+  tbody.innerHTML = '';
+  if (!allProfiles.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No team members yet.</td></tr>'; return; }
+  allProfiles.forEach(function(p){
+    const roleBadge = p.role === 'breaker' ? '<span class="badge badge-green">breaker</span>'
+      : p.role === 'sorter' ? '<span class="badge badge-blue">sorter</span>'
+      : '<span class="badge badge-purple">manager</span>';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><strong>' + escHtml(p.display_name||'—') + '</strong></td>' +
+      '<td>' + roleBadge + '</td>' +
+      '<td style="color:var(--muted);font-size:0.82rem;">' + escHtml(p.email||'—') + '</td>' +
+      '<td style="text-align:center;">' + (shiftCount[p.id]||0) + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// ── SETTINGS ─────────────────────────────────────────────
+async function saveProfile() {
+  const name = document.getElementById('settDisplayName').value.trim();
+  const phone = document.getElementById('settPhone').value.trim();
+  if (!name) { showGlobalError('Name is required.'); return; }
+  const { error } = await sb.from('profiles').update({ display_name: name, phone: phone || null }).eq('id', currentUser.id);
+  if (error) { showGlobalError('Failed to save profile.'); return; }
+  currentProfile.display_name = name;
+  document.getElementById('mgrBadge').textContent = name;
+  showGlobalSuccess('Profile saved.');
+}
+
+async function saveEmail() {
+  const email = document.getElementById('settEmail').value.trim();
+  const confirm = document.getElementById('settEmailConfirm').value.trim();
+  if (!email) { showGlobalError('Enter a new email.'); return; }
+  if (email !== confirm) { showGlobalError('Emails do not match.'); return; }
+  const { error } = await sb.auth.updateUser({ email });
+  if (error) { showGlobalError(escHtml(error.message)); return; }
+  showGlobalSuccess('Confirmation sent to both addresses. Check your inbox.');
+}
+
+async function savePassword() {
+  const pw = document.getElementById('settPassword').value;
+  const confirm = document.getElementById('settPasswordConfirm').value;
+  if (!pw || pw.length < 8) { showGlobalError('Password must be at least 8 characters.'); return; }
+  if (pw !== confirm) { showGlobalError('Passwords do not match.'); return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) { showGlobalError(escHtml(error.message)); return; }
+  document.getElementById('settPassword').value = '';
+  document.getElementById('settPasswordConfirm').value = '';
+  showGlobalSuccess('Password updated.');
+}
+</script>
+</body>
+</html>

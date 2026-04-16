@@ -239,6 +239,7 @@
     .badge-blue { background: rgba(79,110,247,0.15); color: var(--primary); }
     .badge-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
     .badge-gray { background: rgba(100,116,139,0.15); color: var(--muted); }
+    .badge-purple { background: rgba(168,85,247,0.15); color: #a855f7; }
 
     /* ── STATS CARDS ── */
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
@@ -3367,7 +3368,7 @@ async function loadTeam() {
     const payLabel = isOwner ? '—' : formatPayStructureLabel(p);
     tr.innerHTML =
       '<td><strong>' + escHtml(p.display_name) + '</strong>' + (isMe ? ' <span style="color:var(--muted);font-size:0.75rem;">(you)</span>' : '') + '</td>' +
-      '<td><span class="badge ' + (isOwner ? 'badge-blue' : p.role === 'breaker' ? 'badge-green' : 'badge-gray') + '">' + escHtml(p.role) + '</span></td>' +
+      '<td><span class="badge ' + (isOwner ? 'badge-blue' : p.role === 'breaker' ? 'badge-green' : p.role === 'manager' ? 'badge-purple' : 'badge-gray') + '">' + escHtml(p.role) + '</span></td>' +
       '<td style="font-size:0.82rem;color:var(--muted);">' + payLabel + '</td>' +
       '<td>' + fmtDate(p.created_at) + '</td>' +
       '<td><div class="btn-row">' +
