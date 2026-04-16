@@ -123,6 +123,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-tab="queue">Sort Queue</button>
   <button class="tab-btn" data-tab="shifts">My Shifts</button>
+  <button class="tab-btn" data-tab="pay">My Pay</button>
 </div>
 
 <div class="main">
@@ -146,6 +147,68 @@
   <div class="tab-content" id="tab-shifts">
     <div id="shiftsContent">
       <div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading shifts…</div>
+    </div>
+  </div>
+
+  <!-- ── MY PAY TAB ── -->
+  <div class="tab-content" id="tab-pay">
+    <div class="panel">
+      <div class="panel-title">My Pay</div>
+      <div id="sorterPayTypeLabel" style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;"></div>
+
+      <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem;flex-wrap:wrap;">
+        <button class="pay-period-btn active" data-period="daily" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">Today</button>
+        <button class="pay-period-btn" data-period="weekly" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.8rem;font-weight:600;cursor:pointer;">This Week</button>
+        <button class="pay-period-btn" data-period="monthly" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.8rem;font-weight:600;cursor:pointer;">This Month</button>
+        <button class="pay-period-btn" data-period="all" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.8rem;font-weight:600;cursor:pointer;">All Time</button>
+      </div>
+
+      <div id="sorterPayStatsRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem;margin-bottom:1.25rem;"></div>
+
+      <!-- Hourly shift breakdown -->
+      <div id="sorterShiftSection" style="display:none;margin-bottom:1.25rem;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Shift Hours</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Date</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Clock In</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Clock Out</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Hours</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Pay</th>
+              </tr>
+            </thead>
+            <tbody id="sorterShiftBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Per break breakdown -->
+      <div id="sorterBreakSection" style="display:none;margin-bottom:1.25rem;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Breaks Sorted</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Date</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Stream</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Pay</th>
+              </tr>
+            </thead>
+            <tbody id="sorterBreakBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="padding:0.75rem;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:700;color:var(--muted);">Total Earnings This Period</span>
+        <span style="font-size:1.4rem;font-weight:800;color:#22c55e;" id="sorterPayTotal">—</span>
+      </div>
+
+      <div id="sorterPayNotConfigured" style="display:none;margin-top:1rem;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:0.85rem 1rem;font-size:0.85rem;color:#e2e8f0;">
+        ⚠ Your pay hasn't been configured yet. Ask your owner to set up your pay type in the Team tab.
+      </div>
     </div>
   </div>
 </div>
@@ -179,6 +242,7 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
     hideMessages();
     if (btn.dataset.tab === 'queue') loadSortQueue();
     if (btn.dataset.tab === 'shifts') loadShifts();
+    if (btn.dataset.tab === 'pay') loadSorterPay();
   });
 });
 
@@ -520,6 +584,138 @@ async function initAuth() {
 }
 
 initAuth();
+
+// ── My Pay ────────────────────────────────────────────────
+let sorterPayPeriod = 'daily';
+
+function fmt(n) { return '$' + (parseFloat(n) || 0).toFixed(2); }
+
+function getSorterPeriodFrom(period) {
+  const now = new Date();
+  if (period === 'daily') return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  if (period === 'weekly') { const d = now.getDay(); return new Date(now.getFullYear(), now.getMonth(), now.getDate() - d).toISOString(); }
+  if (period === 'monthly') return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  return new Date(2000, 0, 1).toISOString();
+}
+
+document.querySelectorAll('.pay-period-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    sorterPayPeriod = this.dataset.period;
+    document.querySelectorAll('.pay-period-btn').forEach(function (b) {
+      b.style.background = 'var(--bg)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
+    });
+    this.style.background = 'var(--primary)'; this.style.color = '#fff'; this.style.borderColor = 'var(--primary)';
+    loadSorterPay();
+  });
+});
+
+async function loadSorterPay() {
+  const from = getSorterPeriodFrom(sorterPayPeriod);
+  const type = currentProfile.pay_type;
+
+  document.getElementById('sorterShiftSection').style.display = 'none';
+  document.getElementById('sorterBreakSection').style.display = 'none';
+  document.getElementById('sorterPayNotConfigured').style.display = 'none';
+  document.getElementById('sorterPayStatsRow').innerHTML = '';
+
+  const typeLabels = {
+    hourly: 'Hourly — rate × hours clocked',
+    per_break: 'Per Break Sorted — flat rate per break',
+    hourly_per_break: 'Hourly + Per Break Sorted'
+  };
+  document.getElementById('sorterPayTypeLabel').textContent = type
+    ? 'Pay type: ' + (typeLabels[type] || type)
+    : 'Pay type not configured.';
+
+  if (!type) {
+    document.getElementById('sorterPayNotConfigured').style.display = 'block';
+    document.getElementById('sorterPayTotal').textContent = '—';
+    return;
+  }
+
+  let grandTotal = 0;
+  const statsHTML = [];
+
+  // ── Hourly component ───────────────────────────────────
+  if (type === 'hourly' || type === 'hourly_per_break') {
+    const rate = parseFloat(currentProfile.hourly_rate) || 0;
+    const { data: shifts } = await sb
+      .from('schedules')
+      .select('scheduled_date, clocked_in_at, clocked_out_at')
+      .eq('org_id', currentProfile.org_id)
+      .eq('sorter_id', currentUser.id)
+      .not('clocked_in_at', 'is', null)
+      .not('clocked_out_at', 'is', null)
+      .gte('clocked_in_at', from)
+      .order('clocked_in_at', { ascending: false });
+
+    let totalHours = 0, totalPay = 0;
+    const tbody = document.getElementById('sorterShiftBody');
+    tbody.innerHTML = '';
+    (shifts || []).forEach(function (s) {
+      const hrs = Math.max(0, (new Date(s.clocked_out_at) - new Date(s.clocked_in_at)) / 3600000);
+      const pay = hrs * rate;
+      totalHours += hrs; totalPay += pay;
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
+      tr.innerHTML =
+        '<td style="padding:0.4rem 0.5rem;">' + s.scheduled_date + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_in_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_out_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + hrs.toFixed(2) + ' hrs</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(pay) + '</td>';
+      tbody.appendChild(tr);
+    });
+    if (!(shifts||[]).length) tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No completed shifts this period.</td></tr>';
+    document.getElementById('sorterShiftSection').style.display = '';
+    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Hours Clocked</div><div style="font-size:1.4rem;font-weight:900;color:#e2e8f0;">' + totalHours.toFixed(2) + ' hrs</div></div>');
+    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Hourly Pay ($' + rate.toFixed(2) + '/hr)</div><div style="font-size:1.4rem;font-weight:900;color:#22c55e;">' + fmt(totalPay) + '</div></div>');
+    grandTotal += totalPay;
+  }
+
+  // ── Per break component ────────────────────────────────
+  if (type === 'per_break' || type === 'hourly_per_break') {
+    const rate = parseFloat(currentProfile.per_break_rate) || 0;
+    const { data: tasks } = await sb
+      .from('sort_tasks')
+      .select('id, completed_at, stream_id')
+      .eq('sorter_id', currentUser.id)
+      .eq('org_id', currentProfile.org_id)
+      .eq('status', 'completed')
+      .gte('completed_at', from)
+      .order('completed_at', { ascending: false });
+
+    // Get stream keys for display
+    const streamIds = [...new Set((tasks||[]).map(function(t){return t.stream_id;}).filter(Boolean))];
+    let streamMap = {};
+    if (streamIds.length) {
+      const { data: streams } = await sb.from('streams').select('id, stream_key').in('id', streamIds);
+      (streams||[]).forEach(function(s){ streamMap[s.id] = s.stream_key; });
+    }
+
+    const count = (tasks||[]).length;
+    const totalBreakPay = count * rate;
+    const tbody = document.getElementById('sorterBreakBody');
+    tbody.innerHTML = '';
+    (tasks||[]).forEach(function(t) {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
+      tr.innerHTML =
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + (t.completed_at ? new Date(t.completed_at).toLocaleDateString() : '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + escHtml(streamMap[t.stream_id] || '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(rate) + '</td>';
+      tbody.appendChild(tr);
+    });
+    if (!count) tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No breaks sorted this period.</td></tr>';
+    document.getElementById('sorterBreakSection').style.display = '';
+    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Breaks Sorted</div><div style="font-size:1.4rem;font-weight:900;color:#e2e8f0;">' + count + '</div></div>');
+    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Per Break Pay ($' + rate.toFixed(2) + ')</div><div style="font-size:1.4rem;font-weight:900;color:#22c55e;">' + fmt(totalBreakPay) + '</div></div>');
+    grandTotal += totalBreakPay;
+  }
+
+  document.getElementById('sorterPayStatsRow').innerHTML = statsHTML.join('');
+  document.getElementById('sorterPayTotal').textContent = fmt(grandTotal);
+}
 </script>
 </body>
 </html>

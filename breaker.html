@@ -372,7 +372,7 @@
 <div class="breaker-tabs">
   <button class="breaker-tab-btn active" data-tab="entry">Break Entry</button>
   <button class="breaker-tab-btn" data-tab="shifts">My Shifts</button>
-  <button class="breaker-tab-btn" data-tab="payouts" id="payoutsTabBtn" style="display:none;">My Payouts</button>
+  <button class="breaker-tab-btn" data-tab="payouts" id="payoutsTabBtn">My Pay</button>
 </div>
 
 <div class="main">
@@ -526,9 +526,10 @@
   <!-- PAYOUTS TAB -->
   <div class="breaker-tab-content" id="breaker-tab-payouts">
     <div class="panel">
-      <div class="panel-title">My Payouts</div>
+      <div class="panel-title">My Pay</div>
 
-      <div id="myCommissionRate" style="display:none;"></div>
+      <!-- Pay type label -->
+      <div id="myPayTypeLabel" style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;"></div>
 
       <!-- Period filter -->
       <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem;flex-wrap:wrap;">
@@ -538,24 +539,11 @@
         <button class="payout-period-btn" data-period="all" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.8rem;font-weight:600;cursor:pointer;">All Time</button>
       </div>
 
-      <!-- Payout summary -->
-      <div class="grid-3" style="margin-bottom:1.25rem;">
-        <div class="stat-card">
-          <div class="stat-label">Stream Profit (My Streams)</div>
-          <div class="stat-value" id="payoutProfit">$0.00</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Commission Earned</div>
-          <div class="stat-value green" id="payoutCommission">$0.00</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Tips Received</div>
-          <div class="stat-value green" id="payoutTips">$0.00</div>
-        </div>
-      </div>
+      <!-- Dynamic summary stats (rendered by JS based on pay type) -->
+      <div id="payoutStatsRow" class="grid-3" style="margin-bottom:1.25rem;"></div>
 
-      <!-- Per stream breakdown -->
-      <div style="margin-bottom:1.25rem;">
+      <!-- Commission stream breakdown (only shown for commission types) -->
+      <div id="payoutStreamSection" style="margin-bottom:1.25rem;display:none;">
         <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Stream Breakdown</div>
         <div style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
@@ -565,8 +553,8 @@
                 <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Date</th>
                 <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Final Sales</th>
                 <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Box Cost</th>
-                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Profit</th>
-                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Commission</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Net Profit</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Your Commission</th>
               </tr>
             </thead>
             <tbody id="payoutStreamBody">
@@ -576,9 +564,34 @@
         </div>
       </div>
 
+      <!-- Hourly shift breakdown (only shown for hourly types) -->
+      <div id="payoutShiftSection" style="margin-bottom:1.25rem;display:none;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Shift Hours Breakdown</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Date</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Clock In</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Clock Out</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Hours</th>
+                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Pay</th>
+              </tr>
+            </thead>
+            <tbody id="payoutShiftBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Total bar -->
       <div style="padding:0.75rem;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-        <span style="font-weight:700;color:var(--muted);">Total Payout (Commission + Tips)</span>
+        <span style="font-weight:700;color:var(--muted);" id="payoutTotalLabel">Total Earnings</span>
         <span style="font-size:1.4rem;font-weight:800;color:var(--green);" id="payoutTotal">$0.00</span>
+      </div>
+
+      <!-- Not configured notice -->
+      <div id="payoutNotConfigured" style="display:none;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:0.85rem 1rem;font-size:0.85rem;color:#e2e8f0;">
+        ⚠ Your pay hasn't been configured yet. Ask your owner to set up your pay type in the Team tab.
       </div>
 
       <!-- Log a tip -->
@@ -1671,27 +1684,10 @@ function showClockedInBanner(shift) {
   errorBox.parentNode.insertBefore(banner, errorBox);
 }
 
-// ── Commission / Payouts ──────────────────────────────────
+// ── My Pay ────────────────────────────────────────────────
 let currentPeriod = 'daily';
 
-async function checkCommissionEnabled() {
-  try {
-    const { data: org } = await sb
-      .from('organizations')
-      .select('commission_enabled')
-      .eq('id', currentProfile.org_id)
-      .single();
-
-    if (org && org.commission_enabled) {
-      document.getElementById('payoutsTabBtn').style.display = '';
-      const rate = parseFloat(currentProfile.commission_rate) || 0;
-      document.getElementById('myCommissionRate').textContent = rate + '%';
-      setupPayoutListeners();
-    }
-  } catch (err) {
-    console.error('Commission check error:', err);
-  }
-}
+function fmt(n) { return '$' + (parseFloat(n) || 0).toFixed(2); }
 
 function getPeriodRange(period) {
   const now = new Date();
@@ -1703,62 +1699,139 @@ function getPeriodRange(period) {
   return from.toISOString();
 }
 
+function checkCommissionEnabled() {
+  // No-op — payouts tab is always shown, pay type drives what's displayed
+  setupPayoutListeners();
+}
+
 async function loadPayouts() {
   const from = getPeriodRange(currentPeriod);
-  const rate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
+  const type = currentProfile.pay_type;
 
-  // Load CLOSED streams for this breaker in the period — commission is based on profit
-  const { data: streamsData } = await sb
-    .from('streams')
-    .select('id, stream_key, break_date, final_sales, total_product_cost, net_profit')
-    .eq('breaker_id', currentUser.id)
-    .eq('status', 'closed')
-    .gte('closed_at', from)
-    .order('break_date', { ascending: false });
+  // Hide all sections first
+  document.getElementById('payoutStreamSection').style.display = 'none';
+  document.getElementById('payoutShiftSection').style.display = 'none';
+  document.getElementById('payoutNotConfigured').style.display = 'none';
+  document.getElementById('payoutStatsRow').innerHTML = '';
 
-  const streams = streamsData || [];
-  let totalProfit = 0;
-  let totalCommission = 0;
-
-  const tbody = document.getElementById('payoutStreamBody');
-  tbody.innerHTML = '';
-
-  streams.forEach(function (s) {
-    const finalSales = parseFloat(s.final_sales) || 0;
-    const boxCost = parseFloat(s.total_product_cost) || 0;
-    const profit = finalSales - boxCost;
-    const commission = profit * rate;
-    totalProfit += profit;
-    totalCommission += commission;
-
-    const tr = document.createElement('tr');
-    tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
-    tr.innerHTML =
-      '<td style="padding:0.4rem 0.5rem;">' + escHtml(s.stream_key) + '</td>' +
-      '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + s.break_date + '</td>' +
-      '<td style="padding:0.4rem 0.5rem;">' + fmt(finalSales) + '</td>' +
-      '<td style="padding:0.4rem 0.5rem;">' + fmt(boxCost) + '</td>' +
-      '<td style="padding:0.4rem 0.5rem;color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(profit) + '</td>' +
-      '<td style="padding:0.4rem 0.5rem;font-weight:700;color:var(--green);">' + fmt(commission) + '</td>';
-    tbody.appendChild(tr);
-  });
-
-  if (streams.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No closed streams in this period.</td></tr>';
+  if (!type) {
+    document.getElementById('payoutNotConfigured').style.display = 'block';
+    document.getElementById('payoutTotal').textContent = '—';
+    document.getElementById('myPayTypeLabel').textContent = 'Pay type not configured — ask your owner.';
+    return;
   }
 
-  // Tips
-  const { data: tipsData } = await sb
-    .from('tips')
-    .select('amount')
-    .eq('breaker_id', currentUser.id)
-    .gte('created_at', from);
-  const totalTips = (tipsData || []).reduce(function (s, t) { return s + (parseFloat(t.amount) || 0); }, 0);
+  const typeLabels = {
+    commission: 'Commission — % of net profit per stream',
+    hourly: 'Hourly — rate × hours clocked',
+    salary: 'Salary — fixed per pay period',
+    hourly_commission: 'Hourly + Commission',
+    salary_commission: 'Salary + Commission'
+  };
+  document.getElementById('myPayTypeLabel').textContent = 'Pay type: ' + (typeLabels[type] || type);
 
-  document.getElementById('payoutProfit').textContent = fmt(totalProfit);
-  document.getElementById('payoutCommission').textContent = fmt(totalCommission);
-  document.getElementById('payoutTips').textContent = fmt(totalTips);
-  document.getElementById('payoutTotal').textContent = fmt(totalCommission + totalTips);
+  let grandTotal = 0;
+  const statsHTML = [];
+
+  // ── Commission component ───────────────────────────────
+  if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
+    const rate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
+    const { data: streamsData } = await sb
+      .from('streams')
+      .select('id, stream_key, break_date, final_sales, total_product_cost, total_fees, total_other_costs')
+      .eq('breaker_id', currentUser.id)
+      .eq('status', 'closed')
+      .gte('closed_at', from)
+      .order('break_date', { ascending: false });
+
+    const streams = streamsData || [];
+    let totalProfit = 0, totalCommission = 0;
+    const tbody = document.getElementById('payoutStreamBody');
+    tbody.innerHTML = '';
+
+    streams.forEach(function (s) {
+      const sales = parseFloat(s.final_sales) || 0;
+      const cost = parseFloat(s.total_product_cost) || 0;
+      const fees = parseFloat(s.total_fees) || 0;
+      const other = parseFloat(s.total_other_costs) || 0;
+      const profit = sales - cost - fees - other;
+      const commission = Math.max(0, profit) * rate;
+      totalProfit += profit;
+      totalCommission += commission;
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
+      tr.innerHTML =
+        '<td style="padding:0.4rem 0.5rem;">' + escHtml(s.stream_key) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + s.break_date + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + fmt(sales) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + fmt(cost) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(profit) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:var(--green);">' + fmt(commission) + '</td>';
+      tbody.appendChild(tr);
+    });
+    if (!streams.length) tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No closed streams this period.</td></tr>';
+    document.getElementById('payoutStreamSection').style.display = '';
+
+    statsHTML.push('<div class="stat-card"><div class="stat-label">Net Profit (My Streams)</div><div class="stat-value">' + fmt(totalProfit) + '</div></div>');
+    statsHTML.push('<div class="stat-card"><div class="stat-label">Commission (' + (parseFloat(currentProfile.commission_rate)||0) + '%)</div><div class="stat-value green">' + fmt(totalCommission) + '</div></div>');
+    grandTotal += totalCommission;
+  }
+
+  // ── Hourly component ───────────────────────────────────
+  if (type === 'hourly' || type === 'hourly_commission') {
+    const rate = parseFloat(currentProfile.hourly_rate) || 0;
+    const { data: shifts } = await sb
+      .from('schedules')
+      .select('scheduled_date, clocked_in_at, clocked_out_at')
+      .eq('org_id', currentProfile.org_id)
+      .eq('breaker_id', currentUser.id)
+      .not('clocked_in_at', 'is', null)
+      .not('clocked_out_at', 'is', null)
+      .gte('clocked_in_at', from)
+      .order('clocked_in_at', { ascending: false });
+
+    let totalHours = 0, totalHourlyPay = 0;
+    const shiftTbody = document.getElementById('payoutShiftBody');
+    shiftTbody.innerHTML = '';
+    (shifts || []).forEach(function (s) {
+      const hrs = Math.max(0, (new Date(s.clocked_out_at) - new Date(s.clocked_in_at)) / 3600000);
+      const pay = hrs * rate;
+      totalHours += hrs; totalHourlyPay += pay;
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
+      tr.innerHTML =
+        '<td style="padding:0.4rem 0.5rem;">' + s.scheduled_date + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_in_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_out_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + hrs.toFixed(2) + ' hrs</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:var(--green);">' + fmt(pay) + '</td>';
+      shiftTbody.appendChild(tr);
+    });
+    if (!(shifts||[]).length) shiftTbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No completed shifts this period.</td></tr>';
+    document.getElementById('payoutShiftSection').style.display = '';
+
+    statsHTML.push('<div class="stat-card"><div class="stat-label">Hours Clocked</div><div class="stat-value">' + totalHours.toFixed(2) + ' hrs</div></div>');
+    statsHTML.push('<div class="stat-card"><div class="stat-label">Hourly Pay ($' + rate.toFixed(2) + '/hr)</div><div class="stat-value green">' + fmt(totalHourlyPay) + '</div></div>');
+    grandTotal += totalHourlyPay;
+  }
+
+  // ── Salary component ───────────────────────────────────
+  if (type === 'salary' || type === 'salary_commission') {
+    const amount = parseFloat(currentProfile.salary_amount) || 0;
+    const period = currentProfile.salary_period || 'period';
+    statsHTML.push('<div class="stat-card"><div class="stat-label">Salary</div><div class="stat-value green">' + fmt(amount) + '<span style="font-size:0.7rem;color:var(--muted);font-weight:400;"> /' + period + '</span></div></div>');
+    grandTotal += amount;
+  }
+
+  // ── Tips ───────────────────────────────────────────────
+  const { data: tipsData } = await sb.from('tips').select('amount').eq('breaker_id', currentUser.id).gte('created_at', from);
+  const totalTips = (tipsData || []).reduce(function (s, t) { return s + (parseFloat(t.amount) || 0); }, 0);
+  statsHTML.push('<div class="stat-card"><div class="stat-label">Tips Received</div><div class="stat-value green">' + fmt(totalTips) + '</div></div>');
+  grandTotal += totalTips;
+
+  document.getElementById('payoutStatsRow').innerHTML = statsHTML.join('');
+  document.getElementById('payoutTotal').textContent = fmt(grandTotal);
+  document.getElementById('payoutTotalLabel').textContent = 'Total Earnings This Period';
 }
 
 function setupPayoutListeners() {
