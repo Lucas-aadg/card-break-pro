@@ -416,7 +416,7 @@
         <button class="nav-dd-item" data-tab="streamSummary">Stream Summary</button>
         <button class="nav-dd-item" data-tab="history">Break History</button>
         <button class="nav-dd-item" data-tab="productRoi">Product ROI</button>
-        <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
+        <button class="nav-dd-item" data-tab="performance">Performance</button>
       </div>
     </div>
 
@@ -881,26 +881,57 @@
   </div>
 
   <!-- ═══════════════════════════════════════════
-       TAB: LEADERBOARD
+       TAB: PERFORMANCE
   ════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-leaderboard">
+  <div class="tab-content" id="tab-performance">
     <div class="panel">
-      <div class="panel-title">Breaker Leaderboard (All Time)</div>
-      <div class="tbl-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width:50px;">#</th>
-              <th>Breaker</th>
-              <th>Breaks</th>
-              <th>Total Revenue</th>
-              <th>Total Profit</th>
-              <th>Avg Revenue/Break</th>
-              <th>Streams</th>
-            </tr>
-          </thead>
-          <tbody id="lbTableBody"></tbody>
-        </table>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
+        <div class="panel-title" style="margin:0;" id="perfPanelTitle">Performance</div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-primary btn-sm" id="perfBreakerBtn" style="font-size:0.8rem;padding:0.3rem 0.9rem;">Breakers</button>
+          <button class="btn btn-outline btn-sm" id="perfSorterBtn" style="font-size:0.8rem;padding:0.3rem 0.9rem;">Sorters</button>
+        </div>
+      </div>
+      <!-- Breaker table -->
+      <div id="perfBreakerWrap">
+        <div class="tbl-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:44px;">#</th>
+                <th>Breaker</th>
+                <th>Breaks</th>
+                <th>Streams</th>
+                <th>Total Revenue</th>
+                <th>Total Profit</th>
+                <th>Profit Margin</th>
+                <th>Avg Rev / Break</th>
+                <th>Avg Profit / Break</th>
+              </tr>
+            </thead>
+            <tbody id="perfBreakerBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Sorter table -->
+      <div id="perfSorterWrap" style="display:none;">
+        <div class="tbl-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:44px;">#</th>
+                <th>Sorter</th>
+                <th>Tasks Done</th>
+                <th>Streams Sorted</th>
+                <th>Shifts Worked</th>
+                <th>Hours Worked</th>
+                <th>Avg Tasks / Shift</th>
+                <th>Avg Hours / Shift</th>
+              </tr>
+            </thead>
+            <tbody id="perfSorterBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -1712,7 +1743,7 @@ async function initAuth() {
 // Maps each tab to its parent dropdown group
 const TAB_GROUP_MAP = {
   breakEntry: 'ng-live', schedule: 'ng-live',
-  dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', leaderboard: 'ng-reports',
+  dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', performance: 'ng-reports',
   inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
 };
 const GROUP_BTN_MAP = {
@@ -1755,7 +1786,7 @@ async function switchTab(tab) {
     else if (tab === 'streamSummary') await loadStreamSummary();
     else if (tab === 'dashboard') await loadDashboard();
     else if (tab === 'productRoi') await loadProductRoi();
-    else if (tab === 'leaderboard') await loadLeaderboard();
+    else if (tab === 'performance') await loadPerformance();
     else if (tab === 'team') await loadTeam();
     else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
     else if (tab === 'sorting') await loadSorting();
@@ -3202,47 +3233,76 @@ async function loadProductRoi() {
 // ══════════════════════════════════════════════════════════
 //  LEADERBOARD TAB
 // ══════════════════════════════════════════════════════════
-async function loadLeaderboard() {
-  const tbody = document.getElementById('lbTableBody');
-  tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
+let perfView = 'breaker';
 
+function setupPerformance() {
+  document.getElementById('perfBreakerBtn').addEventListener('click', function () {
+    if (perfView === 'breaker') return;
+    perfView = 'breaker';
+    document.getElementById('perfBreakerBtn').className = 'btn btn-primary btn-sm';
+    document.getElementById('perfSorterBtn').className = 'btn btn-outline btn-sm';
+    document.getElementById('perfBreakerWrap').style.display = '';
+    document.getElementById('perfSorterWrap').style.display = 'none';
+    document.getElementById('perfPanelTitle').textContent = 'Breaker Performance (All Time)';
+    loadBreakerPerformance();
+  });
+  document.getElementById('perfSorterBtn').addEventListener('click', function () {
+    if (perfView === 'sorter') return;
+    perfView = 'sorter';
+    document.getElementById('perfSorterBtn').className = 'btn btn-primary btn-sm';
+    document.getElementById('perfBreakerBtn').className = 'btn btn-outline btn-sm';
+    document.getElementById('perfSorterWrap').style.display = '';
+    document.getElementById('perfBreakerWrap').style.display = 'none';
+    document.getElementById('perfPanelTitle').textContent = 'Sorter Performance (All Time)';
+    loadSorterPerformance();
+  });
+}
+
+async function loadPerformance() {
+  setupPerformance();
+  perfView = 'breaker';
+  document.getElementById('perfBreakerBtn').className = 'btn btn-primary btn-sm';
+  document.getElementById('perfSorterBtn').className = 'btn btn-outline btn-sm';
+  document.getElementById('perfBreakerWrap').style.display = '';
+  document.getElementById('perfSorterWrap').style.display = 'none';
+  document.getElementById('perfPanelTitle').textContent = 'Breaker Performance (All Time)';
+  await loadBreakerPerformance();
+}
+
+async function loadBreakerPerformance() {
+  const tbody = document.getElementById('perfBreakerBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Loading…</td></tr>';
   try {
     const { data: breaks, error } = await sb
       .from('breaks').select('breaker_id, revenue, net_profit, stream_id')
       .eq('org_id', currentProfile.org_id);
     if (error) throw error;
 
-    const breakerMap = {};
+    const map = {};
     (breaks || []).forEach(function (b) {
-      if (!breakerMap[b.breaker_id]) {
-        breakerMap[b.breaker_id] = { totalRevenue: 0, totalProfit: 0, breakCount: 0, streams: new Set() };
-      }
-      breakerMap[b.breaker_id].totalRevenue += parseFloat(b.revenue) || 0;
-      breakerMap[b.breaker_id].totalProfit += parseFloat(b.net_profit) || 0;
-      breakerMap[b.breaker_id].breakCount += 1;
-      if (b.stream_id) breakerMap[b.breaker_id].streams.add(b.stream_id);
+      if (!b.breaker_id) return;
+      if (!map[b.breaker_id]) map[b.breaker_id] = { totalRevenue: 0, totalProfit: 0, breakCount: 0, streams: new Set() };
+      map[b.breaker_id].totalRevenue += parseFloat(b.revenue) || 0;
+      map[b.breaker_id].totalProfit += parseFloat(b.net_profit) || 0;
+      map[b.breaker_id].breakCount += 1;
+      if (b.stream_id) map[b.breaker_id].streams.add(b.stream_id);
     });
 
-    const rows = Object.entries(breakerMap).map(function (entry) {
+    const rows = Object.entries(map).map(function (e) {
       return {
-        breakerId: entry[0],
-        name: getProfileName(entry[0]),
-        totalRevenue: entry[1].totalRevenue,
-        totalProfit: entry[1].totalProfit,
-        breakCount: entry[1].breakCount,
-        streamCount: entry[1].streams.size,
-        avgRevenue: entry[1].breakCount > 0 ? entry[1].totalRevenue / entry[1].breakCount : 0
+        name: getProfileName(e[0]),
+        totalRevenue: e[1].totalRevenue,
+        totalProfit: e[1].totalProfit,
+        breakCount: e[1].breakCount,
+        streamCount: e[1].streams.size,
+        avgRevenue: e[1].breakCount > 0 ? e[1].totalRevenue / e[1].breakCount : 0,
+        avgProfit: e[1].breakCount > 0 ? e[1].totalProfit / e[1].breakCount : 0,
+        margin: e[1].totalRevenue > 0 ? (e[1].totalProfit / e[1].totalRevenue) * 100 : 0
       };
-    });
-
-    rows.sort(function (a, b) { return b.totalRevenue - a.totalRevenue; });
+    }).sort(function (a, b) { return b.totalRevenue - a.totalRevenue; });
 
     tbody.innerHTML = '';
-    if (rows.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No data yet.</td></tr>';
-      return;
-    }
-
+    if (rows.length === 0) { tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No break data yet.</td></tr>'; return; }
     rows.forEach(function (r, idx) {
       const rank = idx + 1;
       const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
@@ -3251,15 +3311,75 @@ async function loadLeaderboard() {
         '<td class="lb-rank ' + rankClass + '">' + rank + '</td>' +
         '<td><strong>' + escHtml(r.name) + '</strong></td>' +
         '<td style="text-align:center;">' + r.breakCount + '</td>' +
+        '<td style="text-align:center;">' + r.streamCount + '</td>' +
         '<td style="color:var(--primary);font-weight:700;">' + fmt(r.totalRevenue) + '</td>' +
         '<td style="color:' + (r.totalProfit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(r.totalProfit) + '</td>' +
+        '<td style="color:' + (r.margin >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + r.margin.toFixed(1) + '%</td>' +
         '<td>' + fmt(r.avgRevenue) + '</td>' +
-        '<td style="text-align:center;">' + r.streamCount + '</td>';
+        '<td style="color:' + (r.avgProfit >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(r.avgProfit) + '</td>';
       tbody.appendChild(tr);
     });
   } catch (err) {
-    showGlobalError('Leaderboard load error: ' + escHtml(err.message));
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Error loading data.</td></tr>';
+    showGlobalError('Performance load error: ' + escHtml(err.message));
+    document.getElementById('perfBreakerBody').innerHTML = '<tr class="empty-row"><td colspan="9">Error loading data.</td></tr>';
+  }
+}
+
+async function loadSorterPerformance() {
+  const tbody = document.getElementById('perfSorterBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Loading…</td></tr>';
+  try {
+    const sorters = allProfiles.filter(function (p) { return p.role === 'sorter'; });
+    if (!sorters.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No sorters on your team yet.</td></tr>'; return; }
+
+    const { data: tasks } = await sb.from('sort_tasks')
+      .select('sorter_id, status, stream_id, completed_at, created_at')
+      .eq('org_id', currentProfile.org_id);
+
+    const { data: shifts } = await sb.from('schedules')
+      .select('sorter_id, clocked_in_at, clocked_out_at')
+      .eq('org_id', currentProfile.org_id)
+      .not('sorter_id', 'is', null)
+      .not('clocked_in_at', 'is', null)
+      .not('clocked_out_at', 'is', null);
+
+    const rows = sorters.map(function (s) {
+      const myTasks = (tasks || []).filter(function (t) { return t.sorter_id === s.id && t.status === 'completed'; });
+      const myShifts = (shifts || []).filter(function (sh) { return sh.sorter_id === s.id; });
+      const totalHours = myShifts.reduce(function (sum, sh) {
+        return sum + (new Date(sh.clocked_out_at) - new Date(sh.clocked_in_at)) / 3600000;
+      }, 0);
+      const streams = new Set(myTasks.filter(function (t) { return t.stream_id; }).map(function (t) { return t.stream_id; }));
+      return {
+        name: s.display_name || '—',
+        tasksDone: myTasks.length,
+        streamsSorted: streams.size,
+        shiftsWorked: myShifts.length,
+        totalHours: totalHours,
+        avgTasksPerShift: myShifts.length > 0 ? myTasks.length / myShifts.length : 0,
+        avgHoursPerShift: myShifts.length > 0 ? totalHours / myShifts.length : 0
+      };
+    }).sort(function (a, b) { return b.tasksDone - a.tasksDone; });
+
+    tbody.innerHTML = '';
+    rows.forEach(function (r, idx) {
+      const rank = idx + 1;
+      const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="lb-rank ' + rankClass + '">' + rank + '</td>' +
+        '<td><strong>' + escHtml(r.name) + '</strong></td>' +
+        '<td style="text-align:center;font-weight:700;color:var(--primary);">' + r.tasksDone + '</td>' +
+        '<td style="text-align:center;">' + r.streamsSorted + '</td>' +
+        '<td style="text-align:center;">' + r.shiftsWorked + '</td>' +
+        '<td style="text-align:center;">' + r.totalHours.toFixed(1) + 'h</td>' +
+        '<td style="text-align:center;">' + r.avgTasksPerShift.toFixed(1) + '</td>' +
+        '<td style="text-align:center;">' + r.avgHoursPerShift.toFixed(1) + 'h</td>';
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    showGlobalError('Performance load error: ' + escHtml(err.message));
+    document.getElementById('perfSorterBody').innerHTML = '<tr class="empty-row"><td colspan="8">Error loading data.</td></tr>';
   }
 }
 

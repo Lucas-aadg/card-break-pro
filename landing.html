@@ -295,15 +295,16 @@
     .step-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; }
     .step-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
 
-    /* ── THREE ROLES ── */
-    .two-logins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
-    @media (max-width: 840px) { .two-logins { grid-template-columns: 1fr 1fr; } }
+    /* ── FOUR ROLES ── */
+    .two-logins { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; }
+    @media (max-width: 1000px) { .two-logins { grid-template-columns: 1fr 1fr; } }
     @media (max-width: 560px) { .two-logins { grid-template-columns: 1fr; } }
     .login-card {
       background: var(--card); border: 1px solid var(--border);
       border-radius: 14px; padding: 2rem;
     }
     .login-card.owner { border-color: rgba(79,110,247,0.3); }
+    .login-card.manager { border-color: rgba(245,158,11,0.3); }
     .login-card.breaker { border-color: rgba(34,197,94,0.3); }
     .login-card.sorter { border-color: rgba(168,85,247,0.3); }
     .login-chip {
@@ -312,6 +313,7 @@
       letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 1rem;
     }
     .login-chip.blue { background: rgba(79,110,247,0.12); color: var(--primary); }
+    .login-chip.yellow { background: rgba(245,158,11,0.12); color: #f59e0b; }
     .login-chip.green { background: rgba(34,197,94,0.12); color: var(--green); }
     .login-chip.purple { background: rgba(168,85,247,0.12); color: #a855f7; }
     .login-card h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.75rem; }
@@ -884,21 +886,31 @@
 <section data-page="features">
   <div class="section-inner">
     <div class="section-label">Built for the whole team</div>
-    <div class="section-title">One platform. <span>Three roles.</span></div>
+    <div class="section-title">One platform. <span>Four roles.</span></div>
     <p class="section-sub">Every person on your team gets their own login and sees exactly what they need — nothing more, nothing less.</p>
     <div class="two-logins">
       <div class="login-card owner">
-        <div class="login-chip blue">Owner / Manager</div>
+        <div class="login-chip blue">Owner</div>
         <h3>You run the business</h3>
         <ul>
-          <li>Full analytics dashboard and profit reports</li>
-          <li>Product ROI and break history across all streams</li>
-          <li>Team management with invite codes</li>
-          <li>Set and manage commission rates per breaker</li>
-          <li>Build and publish schedules for all roles</li>
-          <li>Clock in/out log for every team member</li>
-          <li>Sorting tab — live status of every stream order</li>
-          <li>Inventory management by category</li>
+          <li>Full analytics, profit reports, and payroll</li>
+          <li>Set pay rates — commission, hourly, salary, per-break</li>
+          <li>Billing, subscription, and business settings</li>
+          <li>Generate invite codes for your entire team</li>
+          <li>View and manage all roles from one place</li>
+          <li>Reset and archive data at any time</li>
+        </ul>
+      </div>
+      <div class="login-card manager">
+        <div class="login-chip yellow">Manager</div>
+        <h3>They run the floor</h3>
+        <ul>
+          <li>Schedule shifts for breakers and sorters</li>
+          <li>Manage inventory and restock products</li>
+          <li>Monitor the sort queue in real time</li>
+          <li>Full reports — revenue, ROI, break history</li>
+          <li>Performance view for breakers and sorters</li>
+          <li>No access to payroll or billing</li>
         </ul>
       </div>
       <div class="login-card breaker">

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>Card Break Pro — Manager Help Guide</title>
+  <style>
+    :root {
+      --bg: #0d0d14; --card: #13131e; --border: #2d2d3d;
+      --primary: #4f6ef7; --green: #22c55e; --red: #ef4444;
+      --yellow: #f59e0b; --text: #e2e8f0; --muted: #64748b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.7; }
+    nav {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 0 2rem; display: flex; align-items: center; justify-content: space-between;
+      min-height: 52px; position: sticky; top: 0; z-index: 100;
+    }
+    .brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 2px; color: var(--text); text-decoration: none; }
+    .brand span { color: var(--primary); }
+    .nav-back { color: var(--muted); font-size: 0.82rem; text-decoration: none; transition: color 0.2s; }
+    .nav-back:hover { color: var(--text); }
+    .wrap { max-width: 700px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+    h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.4rem; }
+    h1 span { color: var(--primary); }
+    .subtitle { color: var(--muted); margin-bottom: 3rem; }
+    .section { margin-bottom: 3rem; }
+    .section-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 1.25rem; padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; flex-shrink: 0;
+    }
+    .icon-blue { background: rgba(79,110,247,0.15); }
+    .icon-green { background: rgba(34,197,94,0.15); }
+    .icon-yellow { background: rgba(245,158,11,0.15); }
+    .icon-purple { background: rgba(168,85,247,0.15); }
+    h2 { font-size: 1.15rem; font-weight: 700; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+    .toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 3rem; }
+    .toc h3 { font-size: 0.75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.75rem; }
+    .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.1rem 2rem; }
+    @media (max-width: 480px) { .toc-grid { grid-template-columns: 1fr; } }
+    .toc a { display: block; color: var(--primary); text-decoration: none; font-size: 0.875rem; padding: 0.2rem 0; }
+    .toc a:hover { text-decoration: underline; }
+    .step-list { list-style: none; }
+    .step-list li {
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 0.75rem 0; border-bottom: 1px solid rgba(45,45,61,0.5);
+    }
+    .step-list li:last-child { border-bottom: none; }
+    .step-num {
+      background: var(--primary); color: #fff;
+      font-size: 0.75rem; font-weight: 800;
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .step-body strong { display: block; font-size: 0.92rem; margin-bottom: 0.2rem; }
+    .step-body p { font-size: 0.85rem; color: var(--muted); }
+    .tip { background: rgba(79,110,247,0.08); border: 1px solid rgba(79,110,247,0.2); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; }
+    .tip strong { color: var(--primary); }
+    .highlight { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; }
+    .highlight strong { color: var(--green); }
+    .warn { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; }
+    .warn strong { color: var(--yellow); }
+    .access-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem; }
+    @media (max-width: 480px) { .access-grid { grid-template-columns: 1fr; } }
+    .access-card { border-radius: 8px; padding: 0.75rem 1rem; }
+    .access-yes { background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.2); }
+    .access-no { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.2); }
+    .access-card h4 { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+    .access-yes h4 { color: var(--green); }
+    .access-no h4 { color: var(--red); }
+    .access-card ul { list-style: none; }
+    .access-card ul li { font-size: 0.82rem; color: var(--muted); padding: 0.2rem 0; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="manager.html" class="brand">CARD <span>BREAK</span> PRO</a>
+  <a href="manager.html" class="nav-back">← Back to Dashboard</a>
+</nav>
+
+<div class="wrap">
+  <h1>Manager <span>Help</span> Guide</h1>
+  <p class="subtitle">Everything you need to run the floor on Card Break Pro as a manager.</p>
+
+  <div class="toc">
+    <h3>Jump to</h3>
+    <div class="toc-grid">
+      <a href="#access">🔑 What You Can Access</a>
+      <a href="#schedule">📅 Schedule</a>
+      <a href="#inventory">📦 Inventory</a>
+      <a href="#sorting">📬 Sort Queue</a>
+      <a href="#reports">📊 Reports</a>
+      <a href="#performance">🏆 Performance</a>
+      <a href="#team">👥 Team</a>
+      <a href="#settings">⚙️ Settings</a>
+    </div>
+  </div>
+
+  <!-- GETTING STARTED / ACCESS -->
+  <div class="section" id="access">
+    <div class="section-header">
+      <div class="section-icon icon-blue">🔑</div>
+      <h2>What You Can Access</h2>
+    </div>
+    <div class="card">
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Your owner gave you a Manager invite code. You signed up through the Join page, selected Manager, and now have your own dashboard. Here's exactly what you have access to:</p>
+      <div class="access-grid">
+        <div class="access-card access-yes">
+          <h4>✓ You have access to</h4>
+          <ul>
+            <li>Schedule — create &amp; manage shifts</li>
+            <li>Inventory — add, edit, restock products</li>
+            <li>Inventory Log — full audit trail</li>
+            <li>Sort Queue — monitor &amp; update tasks</li>
+            <li>Reports — dashboard, stream summary, break history, product ROI</li>
+            <li>Performance — breaker &amp; sorter metrics</li>
+            <li>Team — view all members</li>
+            <li>Settings — your own profile, email, password</li>
+          </ul>
+        </div>
+        <div class="access-card access-no">
+          <h4>✗ Owner-only</h4>
+          <ul>
+            <li>Payroll &amp; pay rate settings</li>
+            <li>Billing &amp; subscription</li>
+            <li>Generating invite codes</li>
+            <li>Reset data</li>
+            <li>Break entry (live streaming)</li>
+            <li>Commission settings</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHEDULE -->
+  <div class="section" id="schedule">
+    <div class="section-header">
+      <div class="section-icon icon-yellow">📅</div>
+      <h2>Schedule</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Create a shift</strong>
+            <p>Use the form at the top of the Schedule tab. Select the date, choose a breaker or sorter from the dropdown, set a start and end time, and add an optional stream key. Hit Create Shift — it appears on the calendar and in the team member's Shifts tab immediately.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Calendar view</strong>
+            <p>The calendar highlights days that have shifts scheduled. Click any highlighted day to jump to that week's shifts in the upcoming table.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Edit or cancel a shift</strong>
+            <p>In the Upcoming Shifts table, click Edit to change the date, time, or stream key. Click Cancel to remove it — the team member will no longer see it in their dashboard.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Clock Log</strong>
+            <p>Scroll down past the upcoming shifts table to see a full log of every clock-in and clock-out across all team members. Filter by breaker or sorter. Use this to verify hours for the owner's payroll run.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div class="section" id="inventory">
+    <div class="section-header">
+      <div class="section-icon icon-green">📦</div>
+      <h2>Inventory</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Add a new product</strong>
+            <p>Fill in the product name, cost per box, category, and starting stock. If you want the system to track a weighted average cost when you restock at different prices, check "Track weighted avg cost on restock". Click Add Product.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Edit or restock</strong>
+            <p>Click Edit on any product. You can update the name, cost, category, or stock level. To restock, enter the quantity you're adding and the price you paid per box — the system recalculates the weighted average cost automatically.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Filter by category</strong>
+            <p>Use the category pills above the product table to filter by sport or product type. Helps when you have a large inventory.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Inventory Log</strong>
+            <p>Every stock change — initial adds, restocks, and usage from breaks — is recorded in the Inventory Log tab. Filter by time period, action type, or specific product. The summary strip at the top shows total units in, out, and net change for the selected period.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- SORT QUEUE -->
+  <div class="section" id="sorting">
+    <div class="section-header">
+      <div class="section-icon icon-purple">📬</div>
+      <h2>Sort Queue</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>What you see</strong>
+            <p>Every sort task for your organization, across all streams. Filter by status — All, Pending, In Progress, or Completed. Each row shows the stream, assigned sorter, break count, and current status.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Monitor progress</strong>
+            <p>Use this view to see what's backed up and what's done. If something has been sitting in Pending for too long, follow up with the assigned sorter or check the Schedule tab to see if they have a shift today.</p>
+          </div>
+        </li>
+      </ol>
+      <div class="tip"><strong>Note:</strong> Sort tasks are created automatically when a stream closes out. Sorters update their own status from their dashboard — you don't need to touch them unless you're monitoring or following up.</div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="section" id="reports">
+    <div class="section-header">
+      <div class="section-icon icon-blue">📊</div>
+      <h2>Reports</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Dashboard</strong>
+            <p>High-level stats — total revenue, profit, breaks, streams, average profit per break, and top breakers. Shows recent break activity at a glance.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Stream Summary</strong>
+            <p>Select a specific stream to see its full breakdown — total revenue, profit, box cost, platform fee, and each individual break in that stream.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Break History</strong>
+            <p>Filter by date range to see every individual break logged. Includes breaker name, product, revenue, profit, and time. Useful for reviewing specific sessions.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Product ROI</strong>
+            <p>Ranked table of all products showing total revenue, box cost, profit, and ROI percentage. Tells you exactly which boxes are worth breaking and which aren't.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- PERFORMANCE -->
+  <div class="section" id="performance">
+    <div class="section-header">
+      <div class="section-icon icon-yellow">🏆</div>
+      <h2>Performance</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Breaker Performance</strong>
+            <p>Default view when you open Performance. Shows all breakers ranked by total revenue. Columns include: Breaks, Streams, Total Revenue, Total Profit, Profit Margin, Avg Revenue per Break, and Avg Profit per Break. Top 3 get gold/silver/bronze rankings.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Sorter Performance</strong>
+            <p>Click the Sorters button at the top right to switch views. Shows all sorters ranked by tasks completed. Columns include: Tasks Done, Streams Sorted, Shifts Worked, Hours Worked, Avg Tasks per Shift, and Avg Hours per Shift.</p>
+          </div>
+        </li>
+      </ol>
+      <div class="highlight"><strong>Tip:</strong> Use Performance data when talking to your owner about scheduling decisions, recognizing strong performers, or identifying who might need support.</div>
+    </div>
+  </div>
+
+  <!-- TEAM -->
+  <div class="section" id="team">
+    <div class="section-header">
+      <div class="section-icon icon-green">👥</div>
+      <h2>Team</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>See the full team roster</strong>
+            <p>The Team tab lists every member of your organization — name, role (breaker, sorter, or manager), email, and how many shifts they've worked in the last 30 days.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>What you don't see</strong>
+            <p>Pay rates, commission settings, and payout history are owner-only. If you need to reference pay information, ask your owner directly.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="section" id="settings">
+    <div class="section-header">
+      <div class="section-icon icon-blue">⚙️</div>
+      <h2>Settings</h2>
+    </div>
+    <div class="card">
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Profile</strong>
+            <p>Update your display name and phone number. Your name shows on schedules and in the team list.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Change Email</strong>
+            <p>Update your account email. Confirmation links are sent to both addresses before the change takes effect.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Change Password</strong>
+            <p>Enter a new password to update your login credentials. You'll stay logged in after saving.</p>
+          </div>
+        </li>
+      </ol>
+      <div class="warn"><strong>Note:</strong> Billing and reset data are not available to managers. Contact your owner for subscription or data management needs.</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:var(--muted);font-size:0.8rem;margin-top:2rem;">
+    Questions? Ask your owner or email <a href="mailto:hello@cardbreakpro.com" style="color:var(--primary);">hello@cardbreakpro.com</a>
+  </div>
+</div>
+</body>
+</html>
