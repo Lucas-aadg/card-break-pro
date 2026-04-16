@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Card Break Pro — Flyer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #060608;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    }
+
+    .flyer {
+      width: 100vmin;
+      height: 100vmin;
+      background: #0d0d14;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5.5vmin;
+    }
+
+    /* Background glow effects */
+    .glow-top {
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse at center, rgba(79,110,247,0.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .glow-bottom {
+      position: absolute;
+      bottom: -200px;
+      right: -100px;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(ellipse at center, rgba(34,197,94,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Grid lines for texture */
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(79,110,247,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,110,247,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6vmin;
+      background: rgba(79,110,247,0.12);
+      border: 1px solid rgba(79,110,247,0.35);
+      color: #4f6ef7;
+      font-size: 1.2vmin;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 0.7vmin 1.8vmin;
+      border-radius: 100px;
+      margin-bottom: 2.5vmin;
+    }
+    .badge .dot { width: 0.55vmin; height: 0.55vmin; background: #4f6ef7; border-radius: 50%; }
+
+    .brand {
+      font-size: 1.8vmin;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: #e2e8f0;
+      text-transform: uppercase;
+      margin-bottom: 2.5vmin;
+    }
+    .brand span { color: #4f6ef7; }
+
+    .headline {
+      font-size: 7.2vmin;
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: -0.2vmin;
+      color: #e2e8f0;
+      margin-bottom: 2vmin;
+    }
+    .headline .accent { color: #4f6ef7; }
+
+    .sub {
+      font-size: 2vmin;
+      color: #64748b;
+      line-height: 1.6;
+      max-width: 72vmin;
+      margin-bottom: 3.5vmin;
+      font-weight: 400;
+    }
+    .sub strong { color: #94a3b8; font-weight: 600; }
+
+    .pills {
+      display: flex;
+      gap: 1vmin;
+      margin-bottom: 3.5vmin;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .pill {
+      display: flex;
+      align-items: center;
+      gap: 0.7vmin;
+      background: #13131e;
+      border: 1px solid #2d2d3d;
+      border-radius: 1vmin;
+      padding: 1vmin 1.6vmin;
+      font-size: 1.4vmin;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .pill .icon { font-size: 1.5vmin; }
+    .pill.green { border-color: rgba(34,197,94,0.25); }
+    .pill.blue { border-color: rgba(79,110,247,0.25); }
+    .pill.purple { border-color: rgba(168,85,247,0.25); }
+
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #2d2d3d, transparent);
+      margin-bottom: 3.5vmin;
+    }
+
+    .stats {
+      display: flex;
+      gap: 0;
+      margin-bottom: 3.5vmin;
+      width: 100%;
+      max-width: 80vmin;
+    }
+    .stat {
+      flex: 1;
+      text-align: center;
+      padding: 0 2vmin;
+      border-right: 1px solid #2d2d3d;
+    }
+    .stat:last-child { border-right: none; }
+    .stat-value {
+      font-size: 4.2vmin;
+      font-weight: 900;
+      color: #4f6ef7;
+      letter-spacing: -0.1vmin;
+      line-height: 1;
+      margin-bottom: 0.5vmin;
+    }
+    .stat-label {
+      font-size: 1.2vmin;
+      color: #64748b;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .cta-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2vmin;
+    }
+    .cta-btn {
+      background: #4f6ef7;
+      color: #fff;
+      font-size: 2vmin;
+      font-weight: 800;
+      padding: 1.8vmin 5vmin;
+      border-radius: 1.2vmin;
+      letter-spacing: 0.5px;
+      box-shadow: 0 0 6vmin rgba(79,110,247,0.4);
+    }
+    .cta-url {
+      font-size: 1.5vmin;
+      color: #64748b;
+      font-weight: 500;
+      letter-spacing: 1px;
+    }
+    .cta-trial {
+      font-size: 1.4vmin;
+      color: #22c55e;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .corner-tag {
+      position: absolute;
+      top: 3vmin;
+      right: 3vmin;
+      background: rgba(34,197,94,0.12);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: #22c55e;
+      font-size: 1.1vmin;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 0.7vmin 1.4vmin;
+      border-radius: 100px;
+    }
+  </style>
+</head>
+<body>
+  <div class="flyer">
+    <div class="glow-top"></div>
+    <div class="glow-bottom"></div>
+    <div class="grid-overlay"></div>
+    <div class="corner-tag">14-Day Free Trial</div>
+
+    <div class="content">
+
+      <div class="badge">
+        <div class="dot"></div>
+        For Live Card Breaking Businesses
+        <div class="dot"></div>
+      </div>
+
+      <div class="brand">CARD <span>BREAK</span> PRO</div>
+
+      <div class="headline">
+        Ditch the<br>
+        <span class="accent">spreadsheets.</span>
+      </div>
+
+      <p class="sub">
+        One platform that runs your entire breaking business —
+        <strong>break tracking, commissions, inventory, and shipping.</strong>
+        All automated. Works on Whatnot, Fanatics & TikTok Shop.
+      </p>
+
+      <div class="pills">
+        <div class="pill blue"><span class="icon">📡</span> Live Break Tracking</div>
+        <div class="pill green"><span class="icon">💰</span> Auto Commission Math</div>
+        <div class="pill blue"><span class="icon">🎯</span> Break Even Before You Go Live</div>
+        <div class="pill purple"><span class="icon">📦</span> Sort Queue & Fast Shipping</div>
+        <div class="pill green"><span class="icon">📊</span> Profit Reports & Analytics</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">0</div>
+          <div class="stat-label">Spreadsheets<br>Needed</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">1×</div>
+          <div class="stat-label">Add Inventory —<br>Rest Is Automatic</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">3</div>
+          <div class="stat-label">Roles — Owner,<br>Breaker, Sorter</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">Hidden Fees or<br>Per-Seat Charges</div>
+        </div>
+      </div>
+
+      <div class="cta-group">
+        <div class="cta-trial">14 days free — no credit card required</div>
+        <div class="cta-btn">Start Free Trial</div>
+        <div class="cta-url">cardbreakpro.com</div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

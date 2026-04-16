@@ -1409,6 +1409,17 @@
           </div>
         </div>
       </div>
+
+      <!-- Commission method — only shown for commission types -->
+      <div id="ps-commission-method-group" style="display:none;margin-top:1rem;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:0.85rem 1rem;">
+        <label style="display:flex;align-items:flex-start;gap:0.65rem;cursor:pointer;text-transform:none;font-size:0.85rem;font-weight:400;color:var(--text);">
+          <input type="checkbox" id="ps-commission-period-total" style="margin-top:3px;accent-color:var(--primary);width:15px;height:15px;flex-shrink:0;" />
+          <span>
+            <strong style="display:block;font-size:0.85rem;margin-bottom:0.15rem;">Enable period netting</strong>
+            <span style="color:var(--muted);font-size:0.8rem;">When checked, losing streams reduce commission earnings from other streams in the same pay period. By default, each stream floors at $0 — a bad stream never takes from a good one.</span>
+          </span>
+        </label>
+      </div>
     </div>
 
     <!-- Role: Sorter -->
@@ -3410,6 +3421,9 @@ function psBreakerType(type) {
     document.getElementById('ps-commission-rate-group').style.display = '';
     document.getElementById('ps-salary-group').style.display = '';
   }
+  // Show period-netting option only for commission types
+  const hasCommission = type === 'commission' || type === 'hourly_commission' || type === 'salary_commission';
+  document.getElementById('ps-commission-method-group').style.display = hasCommission ? '' : 'none';
 }
 
 function psSorterType(type) {
@@ -3450,6 +3464,7 @@ function openPaySettings(profile) {
   document.getElementById('ps-salary-period').value = profile.salary_period || 'weekly';
   document.getElementById('ps-sorter-hourly-rate').value = profile.hourly_rate != null ? profile.hourly_rate : '';
   document.getElementById('ps-sorter-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
+  document.getElementById('ps-commission-period-total').checked = profile.commission_method === 'period_total';
 
   // Select current pay type
   if (profile.pay_type) {
@@ -3479,6 +3494,7 @@ document.addEventListener('DOMContentLoaded', function () {
       payType = sel.value;
       if (payType === 'commission' || payType === 'hourly_commission' || payType === 'salary_commission') {
         updates.commission_rate = parseFloat(document.getElementById('ps-commission-rate').value) || 0;
+        updates.commission_method = document.getElementById('ps-commission-period-total').checked ? 'period_total' : 'per_stream';
       }
       if (payType === 'hourly' || payType === 'hourly_commission') {
         updates.hourly_rate = parseFloat(document.getElementById('ps-hourly-rate').value) || 0;
@@ -3716,6 +3732,7 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
   // Commission component
   if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
     const rate = (parseFloat(p.commission_rate) || 0) / 100;
+    const periodTotal = p.commission_method === 'period_total';
     const { data: streams } = await sb.from('streams')
       .select('final_sales, total_product_cost, total_other_costs')
       .eq('breaker_id', p.id)
@@ -3723,13 +3740,24 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
       .eq('status', 'closed')
       .gte('closed_at', fromTs)
       .lte('closed_at', toTs);
-    // net profit = final_sales (already after platform fee) − box cost − other costs
-    const netProfit = (streams || []).reduce(function (s, x) {
-      return s + (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
-    }, 0);
-    const commission = Math.max(0, netProfit) * rate;
+    const streamList = streams || [];
+    let commission;
+    if (periodTotal) {
+      // Sum all streams first, then floor at $0 — losses can reduce gains
+      const netProfit = streamList.reduce(function (s, x) {
+        return s + (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
+      }, 0);
+      commission = Math.max(0, netProfit) * rate;
+      parts.push(streamList.length + ' streams · net profit ' + fmt(netProfit) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission) + ' (period total)');
+    } else {
+      // Per-stream: each losing stream floors at $0, never drags down other streams
+      commission = streamList.reduce(function (s, x) {
+        const profit = (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
+        return s + Math.max(0, profit) * rate;
+      }, 0);
+      parts.push(streamList.length + ' streams × ' + (parseFloat(p.commission_rate) || 0) + '% per stream = ' + fmt(commission));
+    }
     total += commission;
-    parts.push((streams || []).length + ' streams · net profit ' + fmt(netProfit) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission));
   }
 
   // Hourly component
@@ -3748,11 +3776,29 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
     parts.push('Salary: ' + fmt(amount) + ' (' + (p.salary_period || 'period') + ')');
   }
 
+  // Tips — always included regardless of pay type
+  // Tips go into the owner/seller account on Whatnot; breaker must report them,
+  // and the owner owes that amount back to the breaker at payroll time.
+  const { data: tipsData } = await sb.from('tips')
+    .select('amount')
+    .eq('breaker_id', p.id)
+    .eq('org_id', currentProfile.org_id)
+    .gte('created_at', fromTs)
+    .lte('created_at', toTs);
+  const totalTips = (tipsData || []).reduce(function (s, t) { return s + (parseFloat(t.amount) || 0); }, 0);
+  if (totalTips > 0) {
+    total += totalTips;
+    parts.push('Tips: ' + fmt(totalTips));
+  }
+
   if (!type || type === 'not_set') {
-    result.breakdown = '⚠ Pay type not configured';
+    result.breakdown = totalTips > 0
+      ? '⚠ Pay type not configured · Tips: ' + fmt(totalTips)
+      : '⚠ Pay type not configured';
   } else {
     result.breakdown = parts.join(' + ') || '—';
   }
+  result.tips = totalTips;
   result.total = total;
 }
 
@@ -3834,7 +3880,7 @@ function renderPayrollResults() {
         '<td><span class="badge ' + (r.role === 'breaker' ? 'badge-green' : 'badge-gray') + '">' + r.role + '</span></td>' +
         '<td style="font-size:0.82rem;">' + escHtml(typeLabels[r.pay_type] || r.pay_type) + '</td>' +
         '<td style="font-size:0.8rem;color:var(--muted);">' + escHtml(r.breakdown) + '</td>' +
-        '<td style="text-align:right;font-weight:800;color:' + (notSet ? 'var(--muted)' : 'var(--text)') + ';">' + (notSet ? '—' : fmt(r.total)) + '</td>';
+        '<td style="text-align:right;font-weight:800;color:' + (notSet && !r.tips ? 'var(--muted)' : 'var(--text)') + ';">' + (notSet && !r.tips ? '—' : fmt(r.total)) + '</td>';
       tbody.appendChild(tr);
     });
   }
