@@ -1295,16 +1295,21 @@
           <td style="font-weight:700;color:var(--muted);">Totals</td>
           <td style="font-weight:800;color:var(--primary);" id="coTotalRev">$0.00</td>
           <td style="font-weight:800;color:var(--primary);" id="coTotalBox">$0.00</td>
-          <td style="font-weight:800;color:var(--primary);" id="coTotalFees">$0.00</td>
+          <td style="font-weight:800;color:var(--primary);font-size:0.82rem;color:var(--muted);" id="coTotalFees">$0.00 (est.)</td>
         </tr>
       </tfoot>
     </table>
     <div class="form-group">
-      <label for="coFinalSales">Final Sales (Actual Collected $)</label>
-      <input type="number" id="coFinalSales" placeholder="Enter actual money collected" min="0" step="0.01" style="font-size:1.05rem;" />
+      <label for="coFinalSales">Final Sales — Actual payout from platform ($)</label>
+      <input type="number" id="coFinalSales" placeholder="What the platform actually paid out" min="0" step="0.01" style="font-size:1.05rem;" />
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:0.35rem;">The real platform fee = Total Revenue − Final Sales. Net profit = Final Sales − Box Cost − Other Costs.</p>
+    </div>
+    <div id="coRealFeeRow" style="display:none;background:rgba(79,110,247,0.07);border:1px solid rgba(79,110,247,0.2);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:0.85rem;display:none;font-size:0.85rem;display:flex;justify-content:space-between;">
+      <span style="color:var(--muted);">Real Platform Fee (Revenue − Final Sales)</span>
+      <span style="font-weight:700;color:var(--text);" id="coRealFee">—</span>
     </div>
     <div class="net-preview">
-      <span class="net-label">Estimated Net Profit</span>
+      <span class="net-label">Net Profit</span>
       <span class="net-val" id="coNetPreview">—</span>
     </div>
     <div class="form-group">
@@ -2272,15 +2277,17 @@ async function beOpenCloseOut() {
 
   document.getElementById('coTotalRev').textContent = fmt(totalRev);
   document.getElementById('coTotalBox').textContent = fmt(totalBox);
-  document.getElementById('coTotalFees').textContent = fmt(totalFees);
+  document.getElementById('coTotalFees').textContent = fmt(totalFees) + ' (est.)';
   document.getElementById('coFinalSales').value = '';
   document.getElementById('coNotes').value = '';
   document.getElementById('coNetPreview').textContent = '—';
   document.getElementById('coNetPreview').className = 'net-val';
+  document.getElementById('coRealFeeRow').style.display = 'none';
 
   const modal = document.getElementById('closeOutModal');
   modal.dataset.totalBox = totalBox;
   modal.dataset.totalFees = totalFees;
+  modal.dataset.totalRev = totalRev;
   modal.dataset.totalOther = beCurrentStream ? (parseFloat(beCurrentStream.total_other_costs) || 0) : 0;
   modal.classList.add('active');
 }
@@ -2297,15 +2304,21 @@ function beResetEntry() {
 
 function setupCloseOutModal() {
   document.getElementById('coFinalSales').addEventListener('input', function () {
-    const val = parseFloat(this.value) || 0;
+    const finalSales = parseFloat(this.value) || 0;
     const modal = document.getElementById('closeOutModal');
     const totalBox = parseFloat(modal.dataset.totalBox) || 0;
-    const totalFees = parseFloat(modal.dataset.totalFees) || 0;
     const totalOther = parseFloat(modal.dataset.totalOther) || 0;
-    const net = val - totalBox - totalFees - totalOther;
+    const totalRev = parseFloat(modal.dataset.totalRev) || 0;
+    // Real fee = what the platform kept (total entered revenue minus actual payout)
+    const realFee = Math.max(0, totalRev - finalSales);
+    // Net profit = actual payout minus box cost minus other costs (fee already baked into final_sales)
+    const net = finalSales - totalBox - totalOther;
     const el = document.getElementById('coNetPreview');
     el.textContent = fmt(net);
     el.className = 'net-val ' + (net >= 0 ? 'positive' : 'negative');
+    const feeRow = document.getElementById('coRealFeeRow');
+    document.getElementById('coRealFee').textContent = fmt(realFee);
+    feeRow.style.display = finalSales > 0 ? 'flex' : 'none';
   });
 
   document.getElementById('coCancelBtn').addEventListener('click', function () {
@@ -2325,9 +2338,11 @@ function setupCloseOutModal() {
     const finalSales = parseFloat(finalSalesStr);
     const modal = document.getElementById('closeOutModal');
     const totalBox = parseFloat(modal.dataset.totalBox) || 0;
-    const totalFees = parseFloat(modal.dataset.totalFees) || 0;
     const totalOther = parseFloat(modal.dataset.totalOther) || 0;
-    const netProfit = finalSales - totalBox - totalFees - totalOther;
+    const totalRev = parseFloat(modal.dataset.totalRev) || 0;
+    const realFee = Math.max(0, totalRev - finalSales);
+    // Net profit = actual payout − box cost − other costs (real fee is already reflected in final_sales)
+    const netProfit = finalSales - totalBox - totalOther;
 
     const btn = document.getElementById('coConfirmBtn');
     btn.disabled = true;
@@ -2341,6 +2356,7 @@ function setupCloseOutModal() {
         status: 'closed',
         final_sales: finalSales,
         net_profit: netProfit,
+        total_fees: realFee,
         notes: notes || null,
         closed_at: new Date().toISOString()
       }).eq('id', beCurrentStream.id);
@@ -3701,14 +3717,15 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
   if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
     const rate = (parseFloat(p.commission_rate) || 0) / 100;
     const { data: streams } = await sb.from('streams')
-      .select('final_sales, total_product_cost, total_fees, total_other_costs')
+      .select('final_sales, total_product_cost, total_other_costs')
       .eq('breaker_id', p.id)
       .eq('org_id', currentProfile.org_id)
       .eq('status', 'closed')
       .gte('closed_at', fromTs)
       .lte('closed_at', toTs);
+    // net profit = final_sales (already after platform fee) − box cost − other costs
     const netProfit = (streams || []).reduce(function (s, x) {
-      return s + (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_fees) || 0) - (parseFloat(x.total_other_costs) || 0);
+      return s + (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
     }, 0);
     const commission = Math.max(0, netProfit) * rate;
     total += commission;

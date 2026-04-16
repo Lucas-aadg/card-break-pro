@@ -1738,7 +1738,7 @@ async function loadPayouts() {
     const rate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
     const { data: streamsData } = await sb
       .from('streams')
-      .select('id, stream_key, break_date, final_sales, total_product_cost, total_fees, total_other_costs')
+      .select('id, stream_key, break_date, final_sales, total_product_cost, total_other_costs')
       .eq('breaker_id', currentUser.id)
       .eq('status', 'closed')
       .gte('closed_at', from)
@@ -1752,9 +1752,9 @@ async function loadPayouts() {
     streams.forEach(function (s) {
       const sales = parseFloat(s.final_sales) || 0;
       const cost = parseFloat(s.total_product_cost) || 0;
-      const fees = parseFloat(s.total_fees) || 0;
       const other = parseFloat(s.total_other_costs) || 0;
-      const profit = sales - cost - fees - other;
+      // final_sales already reflects platform fee deduction — no double-subtract
+      const profit = sales - cost - other;
       const commission = Math.max(0, profit) * rate;
       totalProfit += profit;
       totalCommission += commission;
