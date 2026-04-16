@@ -475,10 +475,15 @@
 
         <!-- Products -->
         <div class="panel">
-          <div class="panel-header">
+          <div class="panel-header" style="flex-wrap:wrap;gap:0.5rem;">
             <div class="panel-title">Products Used This Break</div>
-            <button class="btn btn-outline btn-sm" id="be-refreshProducts" style="padding:0.3rem 0.7rem;font-size:0.75rem;">Refresh</button>
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+              <button id="be-repeatBreakBtn" style="display:none;padding:0.3rem 0.85rem;border-radius:100px;border:1px solid var(--primary);background:rgba(79,110,247,0.12);color:var(--primary);font-size:0.78rem;font-weight:700;cursor:pointer;" title="Re-select the same products from the last break">↩ Repeat Last Break</button>
+              <button id="be-toggleProductsBtn" style="padding:0.3rem 0.75rem;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">▼ Hide</button>
+              <button class="btn btn-outline btn-sm" id="be-refreshProducts" style="padding:0.3rem 0.7rem;font-size:0.75rem;">Refresh</button>
+            </div>
           </div>
+          <div id="be-productsSummaryBar" style="display:none;font-size:0.83rem;color:var(--muted);padding:0.35rem 0;"></div>
           <div id="be-productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
           <div id="be-productsWrap" style="display:none;overflow-x:auto;">
             <table class="product-table">
@@ -1546,6 +1551,7 @@ let orgProducts = [];
 let beCurrentStream = null;
 let beSubmittedBreaks = [];
 let beBreakNumber = 1;
+let beLastBreakProducts = [];
 let allProfiles = [];
 let confirmCallback = null;
 
@@ -1891,6 +1897,43 @@ function setupBreakEntry() {
     beRenderProductTable();
   });
 
+  // Repeat Last Break
+  document.getElementById('be-repeatBreakBtn').addEventListener('click', function () {
+    if (!beLastBreakProducts.length) return;
+    document.querySelectorAll('#be-productBody .qty-input').forEach(function (inp) { inp.value = 0; beUpdateProductRow(inp); });
+    beLastBreakProducts.forEach(function (used) {
+      const idx = orgProducts.findIndex(function (p) { return p.id === used.product_id; });
+      if (idx === -1) return;
+      const inp = document.querySelector('#be-productBody .qty-input[data-idx="' + idx + '"]');
+      if (inp) { inp.value = used.qty; beUpdateProductRow(inp); }
+    });
+    beRecalc();
+  });
+
+  // Toggle product list collapse
+  let beProductsCollapsed = false;
+  document.getElementById('be-toggleProductsBtn').addEventListener('click', function () {
+    beProductsCollapsed = !beProductsCollapsed;
+    const wrap = document.getElementById('be-productsWrap');
+    const noMsg = document.getElementById('be-noProductsMsg');
+    const summaryBar = document.getElementById('be-productsSummaryBar');
+
+    if (beProductsCollapsed) {
+      wrap.style.display = 'none';
+      if (noMsg) noMsg.style.display = 'none';
+      const boxCost = beGetBoxCost();
+      const totalUnits = beGetTotalUnits();
+      summaryBar.textContent = totalUnits + ' box' + (totalUnits !== 1 ? 'es' : '') + ' selected · ' + fmt(boxCost) + ' box cost';
+      summaryBar.style.display = '';
+      this.textContent = '▶ Show';
+    } else {
+      summaryBar.style.display = 'none';
+      wrap.style.display = '';
+      if (noMsg && orgProducts.length === 0) noMsg.style.display = '';
+      this.textContent = '▼ Hide';
+    }
+  });
+
   beRenderProductTable();
 }
 
@@ -2227,7 +2270,9 @@ async function beHandleSubmit() {
       break_count: newBreakCount
     }).eq('id', stream.id);
 
-    beSubmittedBreaks.push({ break_number: beBreakNumber, revenue, cumulativeTotal: currentWhatnotTotal });
+    beSubmittedBreaks.push({ break_number: beBreakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed });
+    beLastBreakProducts = productsUsed;
+    document.getElementById('be-repeatBreakBtn').style.display = '';
     beBreakNumber += 1;
     beCurrentStream = { ...stream, total_submitted_revenue: newRevTotal, break_count: newBreakCount };
 

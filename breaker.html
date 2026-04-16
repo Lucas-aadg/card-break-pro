@@ -402,7 +402,14 @@
 
   <!-- PRODUCTS -->
   <div class="panel">
-    <div class="panel-title">Products Used This Break</div>
+    <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+      <span>Products Used This Break</span>
+      <div style="display:flex;align-items:center;gap:0.6rem;">
+        <button id="repeatBreakBtn" style="display:none;padding:0.3rem 0.85rem;border-radius:100px;border:1px solid var(--primary);background:rgba(79,110,247,0.12);color:var(--primary);font-size:0.78rem;font-weight:700;cursor:pointer;transition:opacity 0.2s;" title="Re-select the same products from the last break">↩ Repeat Last Break</button>
+        <button id="toggleProductsBtn" style="padding:0.3rem 0.75rem;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;transition:color 0.2s,border-color 0.2s;">▼ Hide</button>
+      </div>
+    </div>
+    <div id="productsSummaryBar" style="display:none;font-size:0.83rem;color:var(--muted);padding:0.35rem 0;"></div>
     <div id="categoryFilter" style="display:none;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;"></div>
     <div id="productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
     <div id="productsWrap" style="display:none;overflow-x:auto;">
@@ -707,6 +714,7 @@ let products = [];
 let currentStream = null;
 let submittedBreaks = [];
 let breakNumber = 1;
+let lastBreakProducts = [];
 
 // ── Utility ──────────────────────────────────────────────
 function escHtml(str) {
@@ -1278,8 +1286,10 @@ async function handleSubmitBreak() {
 
     if (streamErr) console.warn('Stream update error:', streamErr);
 
-    // Update local state — store individual revenue AND the cumulative total that was typed
-    submittedBreaks.push({ break_number: breakNumber, revenue, cumulativeTotal: currentWhatnotTotal });
+    // Update local state — store individual revenue, cumulative total, and products used for repeat
+    submittedBreaks.push({ break_number: breakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed });
+    lastBreakProducts = productsUsed;
+    document.getElementById('repeatBreakBtn').style.display = '';
     breakNumber += 1;
     currentStream = { ...stream, total_submitted_revenue: newTotalRevenue, break_count: newBreakCount };
 
@@ -1487,6 +1497,54 @@ function setupEventListeners() {
   });
 
   document.getElementById('refreshProductsBtn').addEventListener('click', loadProducts);
+
+  // Repeat Last Break
+  document.getElementById('repeatBreakBtn').addEventListener('click', function () {
+    if (!lastBreakProducts.length) return;
+    // Clear all qty inputs first
+    document.querySelectorAll('.qty-input').forEach(function (inp) { inp.value = 0; updateProductRow(inp); });
+    // Re-apply quantities from last break
+    lastBreakProducts.forEach(function (used) {
+      const idx = products.findIndex(function (p) { return p.id === used.product_id; });
+      if (idx === -1) return;
+      const inp = document.querySelector('.qty-input[data-idx="' + idx + '"]');
+      if (inp) { inp.value = used.qty; updateProductRow(inp); }
+    });
+    recalcTotals();
+  });
+
+  // Toggle product list collapse
+  let productsCollapsed = false;
+  document.getElementById('toggleProductsBtn').addEventListener('click', function () {
+    productsCollapsed = !productsCollapsed;
+    const categoryFilter = document.getElementById('categoryFilter');
+    const productsWrap = document.getElementById('productsWrap');
+    const noProductsMsg = document.getElementById('noProductsMsg');
+    const summaryBar = document.getElementById('productsSummaryBar');
+
+    if (productsCollapsed) {
+      categoryFilter.style.display = 'none';
+      productsWrap.style.display = 'none';
+      noProductsMsg.style.display = 'none';
+      const boxCost = getTotalBoxCost();
+      const totalUnits = getTotalUnitsUsed();
+      summaryBar.textContent = totalUnits + ' box' + (totalUnits !== 1 ? 'es' : '') + ' selected · ' + fmt(boxCost) + ' box cost';
+      summaryBar.style.display = '';
+      this.textContent = '▶ Show';
+    } else {
+      summaryBar.style.display = 'none';
+      // Restore whichever sections were visible before
+      const hasProducts = products.length > 0;
+      if (hasProducts) {
+        productsWrap.style.display = '';
+        const hasCats = document.getElementById('categoryFilter').children.length > 0;
+        if (hasCats) categoryFilter.style.display = 'flex';
+      } else {
+        noProductsMsg.style.display = '';
+      }
+      this.textContent = '▼ Hide';
+    }
+  });
 
   document.getElementById('revenueInput').addEventListener('input', recalcTotals);
   document.getElementById('spotsInput').addEventListener('input', recalcTotals);
