@@ -425,6 +425,7 @@
       <div class="nav-dropdown">
         <div class="dd-section-label">Business</div>
         <button class="nav-dd-item" data-tab="inventory">Inventory</button>
+        <button class="nav-dd-item" data-tab="invLog">Inventory Log</button>
         <button class="nav-dd-item" data-tab="team">Team & Payouts</button>
         <button class="nav-dd-item" data-tab="sorting">Sorting</button>
         <button class="nav-dd-item" data-tab="settings">Settings</button>
@@ -606,6 +607,12 @@
           <label for="invNotes">Notes</label>
           <textarea id="invNotes" placeholder="Optional notes…"></textarea>
         </div>
+        <div class="form-group" style="grid-column:1/-1;padding-top:0.25rem;">
+          <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-weight:400;">
+            <input type="checkbox" id="invAvgCost" style="width:15px;height:15px;margin-top:2px;flex-shrink:0;" />
+            <span style="font-size:0.83rem;color:var(--text);">Average cost <span style="color:var(--muted);font-weight:400;">— when you restock this product, blend the new batch cost with existing stock cost</span></span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -659,6 +666,71 @@
             </tr>
           </thead>
           <tbody id="invTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: INVENTORY LOG
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-invLog">
+    <div class="panel">
+      <div class="panel-header" style="flex-wrap:wrap;gap:0.75rem;">
+        <div class="panel-title">Inventory Log</div>
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;">
+          <select id="invLogPeriod" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;">
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month" selected>This Month</option>
+            <option value="year">This Year</option>
+            <option value="all">All Time</option>
+          </select>
+          <select id="invLogAction" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;">
+            <option value="">All Actions</option>
+            <option value="restock">Restocks</option>
+            <option value="initial">Initial Stock</option>
+            <option value="used">Box Usage</option>
+          </select>
+          <select id="invLogProduct" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;max-width:180px;">
+            <option value="">All Products</option>
+          </select>
+          <button class="btn btn-outline btn-sm" id="invLogRefresh" style="padding:0.4rem 0.75rem;font-size:0.82rem;">Refresh</button>
+        </div>
+      </div>
+
+      <!-- Summary strip -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1rem;">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Boxes Received</div>
+          <div id="ilStatIn" style="font-size:1.5rem;font-weight:900;color:var(--green);letter-spacing:-0.5px;">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">this period</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Boxes Used</div>
+          <div id="ilStatOut" style="font-size:1.5rem;font-weight:900;color:var(--red);letter-spacing:-0.5px;">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">this period</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Net Change</div>
+          <div id="ilStatNet" style="font-size:1.5rem;font-weight:900;color:var(--text);letter-spacing:-0.5px;">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">boxes net this period</div>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date & Time</th>
+              <th>Product</th>
+              <th>Action</th>
+              <th>Qty</th>
+              <th>Unit Cost</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="invLogBody"></tbody>
         </table>
       </div>
     </div>
@@ -1237,6 +1309,26 @@
         <label for="pm-notes">Notes</label>
         <textarea id="pm-notes"></textarea>
       </div>
+      <!-- Restock section -->
+      <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:1.1rem;margin-top:0.1rem;">
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.85rem;">📦 New Shipment Received</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="pm-restock">Boxes Received</label>
+            <input type="number" id="pm-restock" min="0" placeholder="0" />
+            <p style="font-size:0.74rem;color:var(--muted);margin-top:0.3rem;">Leave 0 if no new stock today.</p>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="pm-restockCost">This Batch Cost / Box ($)</label>
+            <input type="number" id="pm-restockCost" min="0" step="0.01" placeholder="0.00" />
+            <p style="font-size:0.74rem;color:var(--muted);margin-top:0.3rem;">What you paid per box for this batch.</p>
+          </div>
+        </div>
+        <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;margin-top:0.9rem;">
+          <input type="checkbox" id="pm-avgCost" style="width:15px;height:15px;margin-top:2px;flex-shrink:0;" />
+          <span style="font-size:0.83rem;color:var(--text);">Average cost <span style="color:var(--muted);font-weight:400;">— blend this batch's cost with your existing stock cost (weighted average)</span></span>
+        </label>
+      </div>
     </div>
     <div class="modal-btn-row">
       <button class="btn btn-outline" id="pmCancelBtn">Cancel</button>
@@ -1418,7 +1510,7 @@ async function initAuth() {
 const TAB_GROUP_MAP = {
   breakEntry: 'ng-live', schedule: 'ng-live',
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', leaderboard: 'ng-reports',
-  inventory: 'ng-manage', team: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
+  inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
 };
 const GROUP_BTN_MAP = {
   'ng-live': 'ngb-live', 'ng-reports': 'ngb-reports', 'ng-manage': 'ngb-manage'
@@ -1454,6 +1546,7 @@ async function switchTab(tab) {
 
   try {
     if (tab === 'inventory') await loadInventoryTable();
+    else if (tab === 'invLog') await loadInvLog();
     else if (tab === 'history') await loadHistory();
     else if (tab === 'streamSummary') await loadStreamSummary();
     else if (tab === 'dashboard') await loadDashboard();
@@ -1903,13 +1996,23 @@ async function beHandleSubmit() {
     });
     if (breakErr) throw breakErr;
 
-    // Deduct stock
+    // Deduct stock + log usage
     for (const used of productsUsed) {
       const product = orgProducts.find(function (p) { return p.id === used.product_id; });
       if (!product) continue;
       const newStock = Math.max(0, product.current_stock - used.qty);
       await sb.from('products').update({ current_stock: newStock }).eq('id', used.product_id);
       product.current_stock = newStock;
+      // Log box usage
+      await sb.from('inventory_log').insert({
+        org_id: currentProfile.org_id,
+        product_id: used.product_id,
+        product_name: product.name,
+        action: 'used',
+        quantity: used.qty,
+        unit_cost: product.unit_cost,
+        notes: 'Break #' + (beBreakNumber - 1) + (beCurrentStream ? ' — stream ' + beCurrentStream.stream_key : '')
+      });
     }
 
     // Update stream
@@ -2107,6 +2210,104 @@ function setupInventory() {
   });
 }
 
+// ── Inventory Log ─────────────────────────────────────────
+async function loadInvLog() {
+  const tbody = document.getElementById('invLogBody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;">Loading…</td></tr>';
+
+  // Populate product filter
+  const prodSelect = document.getElementById('invLogProduct');
+  const currentProd = prodSelect.value;
+  prodSelect.innerHTML = '<option value="">All Products</option>' +
+    orgProducts.map(function (p) {
+      return '<option value="' + escHtml(p.id) + '"' + (currentProd === p.id ? ' selected' : '') + '>' + escHtml(p.name) + '</option>';
+    }).join('');
+
+  // Wire filters (once)
+  if (!invLogProduct._wired) {
+    invLogProduct._wired = true;
+    document.getElementById('invLogPeriod').addEventListener('change', loadInvLog);
+    document.getElementById('invLogAction').addEventListener('change', loadInvLog);
+    document.getElementById('invLogProduct').addEventListener('change', loadInvLog);
+    document.getElementById('invLogRefresh').addEventListener('click', loadInvLog);
+  }
+
+  // Build date range
+  const period = document.getElementById('invLogPeriod').value;
+  const now = new Date();
+  let fromDate = null;
+  if (period === 'today') {
+    fromDate = now.toISOString().slice(0, 10);
+  } else if (period === 'week') {
+    const d = new Date(now);
+    d.setDate(d.getDate() - d.getDay());
+    fromDate = d.toISOString().slice(0, 10);
+  } else if (period === 'month') {
+    fromDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+  } else if (period === 'year') {
+    fromDate = now.getFullYear() + '-01-01';
+  }
+
+  const actionFilter = document.getElementById('invLogAction').value;
+  const prodFilter = document.getElementById('invLogProduct').value;
+
+  try {
+    let query = sb
+      .from('inventory_log')
+      .select('*')
+      .eq('org_id', currentProfile.org_id)
+      .order('created_at', { ascending: false });
+
+    if (fromDate) query = query.gte('created_at', fromDate + 'T00:00:00');
+    if (actionFilter) query = query.eq('action', actionFilter);
+    if (prodFilter) query = query.eq('product_id', prodFilter);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const rows = data || [];
+
+    // Summary stats
+    const boxesIn = rows.filter(function (r) { return r.action !== 'used'; }).reduce(function (s, r) { return s + r.quantity; }, 0);
+    const boxesOut = rows.filter(function (r) { return r.action === 'used'; }).reduce(function (s, r) { return s + r.quantity; }, 0);
+    document.getElementById('ilStatIn').textContent = boxesIn.toLocaleString();
+    document.getElementById('ilStatOut').textContent = boxesOut.toLocaleString();
+    const net = boxesIn - boxesOut;
+    const netEl = document.getElementById('ilStatNet');
+    netEl.textContent = (net >= 0 ? '+' : '') + net.toLocaleString();
+    netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;font-style:italic;">No log entries for this period.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    rows.forEach(function (row) {
+      const tr = document.createElement('tr');
+      const actionLabel =
+        row.action === 'restock' ? '<span class="badge badge-green">Restock</span>' :
+        row.action === 'initial' ? '<span class="badge badge-gray">Initial</span>' :
+        '<span class="badge badge-red">Used</span>';
+      const qtyDisplay = row.action === 'used'
+        ? '<span style="color:var(--red);">−' + row.quantity + '</span>'
+        : '<span style="color:var(--green);">+' + row.quantity + '</span>';
+      const d = new Date(row.created_at);
+      tr.innerHTML =
+        '<td style="white-space:nowrap;">' + d.toLocaleDateString() + ' <span style="color:var(--muted);font-size:0.8rem;">' + fmtTime(d) + '</span></td>' +
+        '<td><strong>' + escHtml(row.product_name) + '</strong></td>' +
+        '<td>' + actionLabel + '</td>' +
+        '<td style="font-weight:700;">' + qtyDisplay + '</td>' +
+        '<td>' + (row.unit_cost != null ? fmt(row.unit_cost) : '—') + '</td>' +
+        '<td style="font-size:0.82rem;color:var(--muted);">' + escHtml(row.notes || '') + '</td>';
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:2rem;">Failed to load log: ' + escHtml(err.message) + '</td></tr>';
+    console.error(err);
+  }
+}
+
 async function loadInventoryTable() {
   await loadProducts();
 
@@ -2224,6 +2425,7 @@ function invClearForm() {
   document.getElementById('invMinAlert').value = '5';
   document.getElementById('invDisplayOrder').value = '0';
   document.getElementById('invNotes').value = '';
+  document.getElementById('invAvgCost').checked = false;
 }
 
 async function invHandleSave() {
@@ -2242,7 +2444,7 @@ async function invHandleSave() {
   btn.textContent = 'Saving…';
 
   try {
-    const { error } = await sb.from('products').insert({
+    const { data: newProd, error } = await sb.from('products').insert({
       org_id: currentProfile.org_id,
       name, category: category || null,
       unit_cost: unitCost,
@@ -2251,8 +2453,21 @@ async function invHandleSave() {
       display_order: displayOrder,
       notes: notes || null,
       active: true
-    });
+    }).select('id').single();
     if (error) throw error;
+
+    // Log initial stock
+    if (stock > 0 && newProd) {
+      await sb.from('inventory_log').insert({
+        org_id: currentProfile.org_id,
+        product_id: newProd.id,
+        product_name: name,
+        action: 'initial',
+        quantity: stock,
+        unit_cost: unitCost,
+        notes: 'Initial stock entry'
+      });
+    }
 
     invClearForm();
     await loadInventoryTable();
@@ -2278,6 +2493,9 @@ function invOpenEditModal(id) {
   document.getElementById('pm-minAlert').value = product.min_stock_alert;
   document.getElementById('pm-displayOrder').value = product.display_order || 0;
   document.getElementById('pm-notes').value = product.notes || '';
+  document.getElementById('pm-restock').value = '';
+  document.getElementById('pm-restockCost').value = '';
+  document.getElementById('pm-avgCost').checked = false;
   document.getElementById('productEditModal').classList.add('active');
 }
 
@@ -2285,13 +2503,41 @@ async function pmHandleSave() {
   const id = document.getElementById('pm-id').value;
   const name = document.getElementById('pm-name').value.trim();
   const category = document.getElementById('pm-category').value.trim();
-  const unitCost = parseFloat(document.getElementById('pm-unitCost').value) || 0;
-  const stock = parseInt(document.getElementById('pm-stock').value, 10) || 0;
+  const existingUnitCost = parseFloat(document.getElementById('pm-unitCost').value) || 0;
+  const existingStock = parseInt(document.getElementById('pm-stock').value, 10) || 0;
   const minAlert = parseInt(document.getElementById('pm-minAlert').value, 10) || 5;
   const displayOrder = parseInt(document.getElementById('pm-displayOrder').value, 10) || 0;
   const notes = document.getElementById('pm-notes').value.trim();
+  const restock = parseInt(document.getElementById('pm-restock').value, 10) || 0;
+  const restockCost = parseFloat(document.getElementById('pm-restockCost').value) || 0;
+  const avgCost = document.getElementById('pm-avgCost').checked;
 
   if (!name) { showGlobalError('Product name is required.'); return; }
+
+  // Compute final stock and unit cost
+  let finalStock = existingStock;
+  let finalUnitCost = existingUnitCost;
+  let logEntry = null;
+
+  if (restock > 0) {
+    finalStock = existingStock + restock;
+    if (avgCost && (existingStock + restock) > 0) {
+      // Weighted average: blend existing stock cost with new batch cost
+      finalUnitCost = ((existingStock * existingUnitCost) + (restock * restockCost)) / (existingStock + restock);
+      finalUnitCost = Math.round(finalUnitCost * 100) / 100; // round to cents
+    }
+    logEntry = {
+      org_id: currentProfile.org_id,
+      product_id: id,
+      product_name: name,
+      action: 'restock',
+      quantity: restock,
+      unit_cost: restockCost || existingUnitCost,
+      notes: avgCost
+        ? 'Avg cost applied — new unit cost: $' + finalUnitCost.toFixed(2)
+        : (restockCost ? 'Batch cost: $' + restockCost.toFixed(2) + '/box' : null)
+    };
+  }
 
   const btn = document.getElementById('pmSaveBtn');
   btn.disabled = true;
@@ -2300,19 +2546,28 @@ async function pmHandleSave() {
   try {
     const { error } = await sb.from('products').update({
       name, category: category || null,
-      unit_cost: unitCost,
-      current_stock: stock,
+      unit_cost: finalUnitCost,
+      current_stock: finalStock,
       min_stock_alert: minAlert,
       display_order: displayOrder,
       notes: notes || null
     }).eq('id', id);
     if (error) throw error;
 
+    // Log the restock
+    if (logEntry) {
+      await sb.from('inventory_log').insert(logEntry);
+    }
+
     document.getElementById('productEditModal').classList.remove('active');
     await loadProducts();
     await loadInventoryTable();
     beRenderProductTable();
-    showGlobalSuccess('Product updated!');
+
+    const msg = restock > 0
+      ? 'Product updated! +' + restock + ' boxes received. New stock: ' + finalStock + (avgCost ? '. Avg cost: $' + finalUnitCost.toFixed(2) : '') + '.'
+      : 'Product updated!';
+    showGlobalSuccess(msg);
   } catch (err) {
     showGlobalError('Save failed: ' + escHtml(err.message));
   } finally {
