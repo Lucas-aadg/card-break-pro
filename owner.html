@@ -426,7 +426,8 @@
         <div class="dd-section-label">Business</div>
         <button class="nav-dd-item" data-tab="inventory">Inventory</button>
         <button class="nav-dd-item" data-tab="invLog">Inventory Log</button>
-        <button class="nav-dd-item" data-tab="team">Team & Payouts</button>
+        <button class="nav-dd-item" data-tab="team">Team</button>
+        <button class="nav-dd-item" data-tab="payroll">Payroll</button>
         <button class="nav-dd-item" data-tab="sorting">Sorting</button>
         <button class="nav-dd-item" data-tab="settings">Settings</button>
       </div>
@@ -983,8 +984,8 @@
             <tr>
               <th>Name</th>
               <th>Role</th>
+              <th>Pay Structure</th>
               <th>Joined</th>
-              <th id="commissionRateHeader" style="display:none;">Commission %</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -994,6 +995,102 @@
     </div>
   </div>
 </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: PAYROLL
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-payroll">
+
+    <!-- Date range + filters -->
+    <div class="panel">
+      <div class="panel-header" style="flex-wrap:wrap;gap:0.75rem;margin-bottom:1.1rem;">
+        <div class="panel-title">Run Payroll</div>
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;">
+          <select id="prPeriodPreset" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;">
+            <option value="this_week">This Week</option>
+            <option value="last_two_weeks" selected>Last 2 Weeks</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="custom">Custom Range</option>
+          </select>
+          <div id="prCustomRange" style="display:none;gap:0.5rem;align-items:center;display:none;">
+            <input type="date" id="prFrom" style="padding:0.4rem 0.6rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;" />
+            <span style="color:var(--muted);font-size:0.82rem;">to</span>
+            <input type="date" id="prTo" style="padding:0.4rem 0.6rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;" />
+          </div>
+          <select id="prRoleFilter" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;">
+            <option value="all">All Staff</option>
+            <option value="breaker">Breakers Only</option>
+            <option value="sorter">Sorters Only</option>
+          </select>
+          <button class="btn btn-primary" id="prRunBtn" style="padding:0.4rem 1rem;font-size:0.82rem;">Calculate</button>
+        </div>
+      </div>
+
+      <!-- Summary strip -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.25rem;" id="prSummaryStrip" style="display:none;">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Total Payroll</div>
+          <div id="prTotalPayroll" style="font-size:1.5rem;font-weight:900;color:var(--red);letter-spacing:-0.5px;">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">owed this period</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Breaker Pay</div>
+          <div id="prBreakerTotal" style="font-size:1.5rem;font-weight:900;color:var(--text);letter-spacing:-0.5px;">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">commission + base</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Sorter Pay</div>
+          <div id="prSorterTotal" style="font-size:1.5rem;font-weight:900;color:var(--text);letter-spacing:-0.5px;">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">hourly + per break</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Net Profit After Payroll</div>
+          <div id="prNetAfterPayroll" style="font-size:1.5rem;font-weight:900;color:var(--green);letter-spacing:-0.5px;">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">break profit − payroll</div>
+        </div>
+      </div>
+
+      <!-- Results table -->
+      <div id="prResultsWrap" style="display:none;">
+        <div class="tbl-wrap">
+          <table class="data-table" id="prTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Pay Structure</th>
+                <th>Breakdown</th>
+                <th style="text-align:right;">Total Owed</th>
+              </tr>
+            </thead>
+            <tbody id="prTableBody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:0.75rem;" id="prMarkPaidRow">
+          <button class="btn btn-outline" id="prExportBtn">Export CSV</button>
+          <button class="btn btn-primary" id="prMarkPaidBtn">Mark as Paid</button>
+        </div>
+      </div>
+
+      <div id="prEmptyState" style="text-align:center;color:var(--muted);padding:2.5rem;font-style:italic;">
+        Pick a period and click Calculate to see payroll.
+      </div>
+    </div>
+
+    <!-- Past payroll runs -->
+    <div class="panel">
+      <div class="panel-title">Past Payroll Runs</div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Period</th><th>Paid On</th><th>Staff</th><th>Total Paid</th><th>Notes</th></tr>
+          </thead>
+          <tbody id="prHistoryBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══════════════════════════════════════════
        TAB: SCHEDULE
@@ -1275,6 +1372,131 @@
   </div>
 </div>
 
+<!-- PAY SETTINGS MODAL -->
+<div class="modal-overlay" id="paySettingsModal">
+  <div class="modal" style="max-width:520px;">
+    <h2 id="psModalTitle">Pay Settings</h2>
+    <input type="hidden" id="ps-profileId" />
+    <p id="ps-name" style="color:var(--muted);font-size:0.85rem;margin-bottom:1.25rem;"></p>
+
+    <!-- Role: Breaker -->
+    <div id="ps-breaker-fields">
+      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.75rem;">Pay Type</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem;margin-bottom:1.1rem;">
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-breaker-type" value="commission" id="psb-commission" style="display:none;" />
+          <div class="ps-type-card" id="psb-commission-card" onclick="psBreakerType('commission')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">💰</div>
+            <div style="font-weight:700;font-size:0.8rem;">Commission</div>
+            <div style="font-size:0.72rem;color:var(--muted);">% of net profit</div>
+          </div>
+        </label>
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-breaker-type" value="hourly" id="psb-hourly" style="display:none;" />
+          <div class="ps-type-card" id="psb-hourly-card" onclick="psBreakerType('hourly')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">⏱</div>
+            <div style="font-weight:700;font-size:0.8rem;">Hourly</div>
+            <div style="font-size:0.72rem;color:var(--muted);">rate × hrs clocked</div>
+          </div>
+        </label>
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-breaker-type" value="salary" id="psb-salary" style="display:none;" />
+          <div class="ps-type-card" id="psb-salary-card" onclick="psBreakerType('salary')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">📆</div>
+            <div style="font-weight:700;font-size:0.8rem;">Salary</div>
+            <div style="font-size:0.72rem;color:var(--muted);">fixed per period</div>
+          </div>
+        </label>
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-breaker-type" value="hourly_commission" id="psb-hourly-commission" style="display:none;" />
+          <div class="ps-type-card" id="psb-hourly-commission-card" onclick="psBreakerType('hourly_commission')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">⏱💰</div>
+            <div style="font-weight:700;font-size:0.8rem;">Hourly + Comm</div>
+            <div style="font-size:0.72rem;color:var(--muted);">both combined</div>
+          </div>
+        </label>
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-breaker-type" value="salary_commission" id="psb-salary-commission" style="display:none;" />
+          <div class="ps-type-card" id="psb-salary-commission-card" onclick="psBreakerType('salary_commission')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">📆💰</div>
+            <div style="font-weight:700;font-size:0.8rem;">Salary + Comm</div>
+            <div style="font-size:0.72rem;color:var(--muted);">fixed + % profit</div>
+          </div>
+        </label>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="form-group ps-field-commission ps-field-hourly-commission ps-field-salary-commission" id="ps-commission-rate-group">
+          <label for="ps-commission-rate">Commission Rate (%)</label>
+          <input type="number" id="ps-commission-rate" min="0" max="100" step="0.1" placeholder="e.g. 8" />
+        </div>
+        <div class="form-group ps-field-hourly ps-field-hourly-commission" id="ps-hourly-rate-group">
+          <label for="ps-hourly-rate">Hourly Rate ($/hr)</label>
+          <input type="number" id="ps-hourly-rate" min="0" step="0.01" placeholder="e.g. 15.00" />
+        </div>
+        <div class="form-group ps-field-salary ps-field-salary-commission" id="ps-salary-group" style="grid-column:1/-1;">
+          <label for="ps-salary-amount">Salary Amount ($)</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+            <input type="number" id="ps-salary-amount" min="0" step="0.01" placeholder="e.g. 500.00" />
+            <select id="ps-salary-period" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.65rem 1rem;font-size:0.9rem;outline:none;">
+              <option value="weekly">per week</option>
+              <option value="biweekly">per 2 weeks</option>
+              <option value="monthly">per month</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Role: Sorter -->
+    <div id="ps-sorter-fields" style="display:none;">
+      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.75rem;">Pay Type</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem;margin-bottom:1.1rem;">
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-sorter-type" value="hourly" id="pss-hourly" style="display:none;" />
+          <div class="ps-type-card" id="pss-hourly-card" onclick="psSorterType('hourly')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">⏱</div>
+            <div style="font-weight:700;font-size:0.8rem;">Hourly</div>
+            <div style="font-size:0.72rem;color:var(--muted);">rate × hrs clocked</div>
+          </div>
+        </label>
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-sorter-type" value="per_break" id="pss-per-break" style="display:none;" />
+          <div class="ps-type-card" id="pss-per-break-card" onclick="psSorterType('per_break')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">📦</div>
+            <div style="font-weight:700;font-size:0.8rem;">Per Break</div>
+            <div style="font-size:0.72rem;color:var(--muted);">$ per break sorted</div>
+          </div>
+        </label>
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-sorter-type" value="hourly_per_break" id="pss-hourly-per-break" style="display:none;" />
+          <div class="ps-type-card" id="pss-hourly-per-break-card" onclick="psSorterType('hourly_per_break')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">⏱📦</div>
+            <div style="font-weight:700;font-size:0.8rem;">Hourly + Per Break</div>
+            <div style="font-size:0.72rem;color:var(--muted);">both combined</div>
+          </div>
+        </label>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="form-group ps-sorter-field-hourly ps-sorter-field-hourly-per-break" id="pss-hourly-rate-group">
+          <label for="ps-sorter-hourly-rate">Hourly Rate ($/hr)</label>
+          <input type="number" id="ps-sorter-hourly-rate" min="0" step="0.01" placeholder="e.g. 15.00" />
+        </div>
+        <div class="form-group ps-sorter-field-per-break ps-sorter-field-hourly-per-break" id="pss-per-break-rate-group">
+          <label for="ps-sorter-per-break-rate">Rate per Break Sorted ($)</label>
+          <input type="number" id="ps-sorter-per-break-rate" min="0" step="0.01" placeholder="e.g. 4.00" />
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-btn-row" style="margin-top:1.5rem;">
+      <button class="btn btn-outline" id="psCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="psSaveBtn">Save Pay Settings</button>
+    </div>
+  </div>
+</div>
+
 <!-- PRODUCT EDIT MODAL -->
 <div class="modal-overlay" id="productEditModal">
   <div class="modal">
@@ -1510,7 +1732,7 @@ async function initAuth() {
 const TAB_GROUP_MAP = {
   breakEntry: 'ng-live', schedule: 'ng-live',
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', leaderboard: 'ng-reports',
-  inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
+  inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
 };
 const GROUP_BTN_MAP = {
   'ng-live': 'ngb-live', 'ng-reports': 'ngb-reports', 'ng-manage': 'ngb-manage'
@@ -1547,6 +1769,7 @@ async function switchTab(tab) {
   try {
     if (tab === 'inventory') await loadInventoryTable();
     else if (tab === 'invLog') await loadInvLog();
+    else if (tab === 'payroll') await loadPayroll();
     else if (tab === 'history') await loadHistory();
     else if (tab === 'streamSummary') await loadStreamSummary();
     else if (tab === 'dashboard') await loadDashboard();
@@ -3102,12 +3325,8 @@ async function loadTeam() {
   const tbody = document.getElementById('teamTableBody');
   tbody.innerHTML = '';
 
-  const commissionEnabled = await getCommissionEnabled();
-  const showCommission = commissionEnabled;
-  document.getElementById('commissionRateHeader').style.display = showCommission ? '' : 'none';
-
   if (allProfiles.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="' + (showCommission ? '5' : '4') + '">No team members yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No team members yet.</td></tr>';
     return;
   }
 
@@ -3115,33 +3334,24 @@ async function loadTeam() {
     const tr = document.createElement('tr');
     const isMe = p.id === currentUser.id;
     const isOwner = p.role === 'owner';
-    const commissionCell = showCommission
-      ? (isOwner
-          ? '<td>—</td>'
-          : '<td><div style="display:flex;align-items:center;gap:0.4rem;"><input type="number" class="commission-rate-input" data-id="' + p.id + '" value="' + (parseFloat(p.commission_rate) || 0) + '" min="0" max="100" step="0.1" style="width:70px;padding:0.25rem 0.5rem;font-size:0.85rem;text-align:center;" /><span style="color:var(--muted);font-size:0.8rem;">%</span></div></td>')
-        : '';
+    const payLabel = isOwner ? '—' : formatPayStructureLabel(p);
     tr.innerHTML =
       '<td><strong>' + escHtml(p.display_name) + '</strong>' + (isMe ? ' <span style="color:var(--muted);font-size:0.75rem;">(you)</span>' : '') + '</td>' +
-      '<td><span class="badge ' + (isOwner ? 'badge-blue' : 'badge-green') + '">' + escHtml(p.role) + '</span></td>' +
+      '<td><span class="badge ' + (isOwner ? 'badge-blue' : p.role === 'breaker' ? 'badge-green' : 'badge-gray') + '">' + escHtml(p.role) + '</span></td>' +
+      '<td style="font-size:0.82rem;color:var(--muted);">' + payLabel + '</td>' +
       '<td>' + fmtDate(p.created_at) + '</td>' +
-      commissionCell +
-      '<td>' +
-        (!isMe && !isOwner ?
-          '<button class="btn btn-sm" data-action="remove" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:rgba(239,68,68,0.15);color:var(--red);">Remove</button>'
-          : '—'
-        ) +
-      '</td>';
+      '<td><div class="btn-row">' +
+        (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="pay" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Pay Settings</button>' : '') +
+        (!isMe && !isOwner ? '<button class="btn btn-sm" data-action="remove" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:rgba(239,68,68,0.15);color:var(--red);">Remove</button>' : '') +
+        (isOwner ? '—' : '') +
+      '</div></td>';
     tbody.appendChild(tr);
   });
 
-  // Commission rate save on change
-  tbody.querySelectorAll('.commission-rate-input').forEach(function (input) {
-    input.addEventListener('change', async function () {
-      const id = this.dataset.id;
-      const rate = parseFloat(this.value) || 0;
-      const { error } = await sb.from('profiles').update({ commission_rate: rate }).eq('id', id);
-      if (error) showGlobalError('Failed to save rate.');
-      else showGlobalSuccess('Commission rate updated.');
+  tbody.querySelectorAll('[data-action="pay"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const p = allProfiles.find(function (x) { return x.id === btn.dataset.id; });
+      if (p) openPaySettings(p);
     });
   });
 
@@ -3150,7 +3360,7 @@ async function loadTeam() {
       const id = btn.dataset.id;
       const name = btn.dataset.name;
       openConfirm(
-        'Remove Breaker',
+        'Remove Team Member',
         'Remove "' + name + '" from your team? They will lose access to the platform.',
         async function () {
           try {
@@ -3165,8 +3375,6 @@ async function loadTeam() {
       );
     });
   });
-
-  if (commissionEnabled) await loadPayoutOverview('daily');
 }
 
 // ── Commission ────────────────────────────────────────────
@@ -3268,6 +3476,484 @@ async function loadPayoutOverview(period) {
 
   if (breakers.length === 0) tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No breakers on team yet.</td></tr>';
   document.getElementById('totalPayoutExpense').textContent = fmt(grandTotal);
+}
+
+// ── Pay Settings Modal ────────────────────────────────────
+
+function formatPayStructureLabel(p) {
+  const type = p.pay_type;
+  if (!type) return '<span style="color:var(--red);font-size:0.78rem;">Not set</span>';
+  const labels = {
+    commission: '% Commission',
+    hourly: 'Hourly',
+    salary: 'Salary',
+    hourly_commission: 'Hourly + Commission',
+    salary_commission: 'Salary + Commission',
+    per_break: 'Per Break Sorted',
+    hourly_per_break: 'Hourly + Per Break'
+  };
+  let label = labels[type] || type;
+  const parts = [];
+  if (p.commission_rate != null && (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission')) {
+    parts.push(p.commission_rate + '% net profit');
+  }
+  if (p.hourly_rate != null && (type === 'hourly' || type === 'hourly_commission' || type === 'hourly_per_break')) {
+    parts.push('$' + parseFloat(p.hourly_rate).toFixed(2) + '/hr');
+  }
+  if (p.salary_amount != null && (type === 'salary' || type === 'salary_commission')) {
+    parts.push('$' + parseFloat(p.salary_amount).toFixed(2) + '/' + (p.salary_period || 'period'));
+  }
+  if (p.per_break_rate != null && (type === 'per_break' || type === 'hourly_per_break')) {
+    parts.push('$' + parseFloat(p.per_break_rate).toFixed(2) + '/break');
+  }
+  return label + (parts.length ? ' <span style="color:var(--muted);">(' + parts.join(', ') + ')</span>' : '');
+}
+
+function psSelectCard(cardId, groupPrefix) {
+  document.querySelectorAll('[id^="' + groupPrefix + '"][id$="-card"]').forEach(function (c) {
+    c.style.borderColor = 'var(--border)';
+    c.style.background = 'transparent';
+  });
+  const card = document.getElementById(cardId);
+  if (card) { card.style.borderColor = 'var(--primary)'; card.style.background = 'rgba(79,110,247,0.08)'; }
+}
+
+function psBreakerType(type) {
+  document.getElementById('psb-' + type).checked = true;
+  psSelectCard('psb-' + type + '-card', 'psb-');
+  // Show/hide relevant fields
+  ['ps-commission-rate-group', 'ps-hourly-rate-group', 'ps-salary-group'].forEach(function (id) {
+    document.getElementById(id).style.display = 'none';
+  });
+  if (type === 'commission') document.getElementById('ps-commission-rate-group').style.display = '';
+  else if (type === 'hourly') document.getElementById('ps-hourly-rate-group').style.display = '';
+  else if (type === 'salary') document.getElementById('ps-salary-group').style.display = '';
+  else if (type === 'hourly_commission') {
+    document.getElementById('ps-commission-rate-group').style.display = '';
+    document.getElementById('ps-hourly-rate-group').style.display = '';
+  } else if (type === 'salary_commission') {
+    document.getElementById('ps-commission-rate-group').style.display = '';
+    document.getElementById('ps-salary-group').style.display = '';
+  }
+}
+
+function psSorterType(type) {
+  document.getElementById('pss-' + type.replace('_', '-')).checked = true;
+  psSelectCard('pss-' + type.replace('_', '-') + '-card', 'pss-');
+  ['pss-hourly-rate-group', 'pss-per-break-rate-group'].forEach(function (id) {
+    document.getElementById(id).style.display = 'none';
+  });
+  if (type === 'hourly') document.getElementById('pss-hourly-rate-group').style.display = '';
+  else if (type === 'per_break') document.getElementById('pss-per-break-rate-group').style.display = '';
+  else if (type === 'hourly_per_break') {
+    document.getElementById('pss-hourly-rate-group').style.display = '';
+    document.getElementById('pss-per-break-rate-group').style.display = '';
+  }
+}
+
+function openPaySettings(profile) {
+  document.getElementById('ps-profileId').value = profile.id;
+  document.getElementById('ps-name').textContent = profile.display_name + ' · ' + profile.role;
+  document.getElementById('ps-breaker-fields').style.display = profile.role === 'breaker' ? '' : 'none';
+  document.getElementById('ps-sorter-fields').style.display = profile.role === 'sorter' ? '' : 'none';
+
+  // Reset all field visibility
+  ['ps-commission-rate-group','ps-hourly-rate-group','ps-salary-group'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
+  ['pss-hourly-rate-group','pss-per-break-rate-group'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
+  // Reset card highlights
+  ['psb-commission-card','psb-hourly-card','psb-salary-card','psb-hourly-commission-card','psb-salary-commission-card'].forEach(function(id){
+    const c = document.getElementById(id); if(c){c.style.borderColor='var(--border)';c.style.background='transparent';}
+  });
+  ['pss-hourly-card','pss-per-break-card','pss-hourly-per-break-card'].forEach(function(id){
+    const c = document.getElementById(id); if(c){c.style.borderColor='var(--border)';c.style.background='transparent';}
+  });
+
+  // Pre-fill existing values
+  document.getElementById('ps-commission-rate').value = profile.commission_rate != null ? profile.commission_rate : '';
+  document.getElementById('ps-hourly-rate').value = profile.hourly_rate != null ? profile.hourly_rate : '';
+  document.getElementById('ps-salary-amount').value = profile.salary_amount != null ? profile.salary_amount : '';
+  document.getElementById('ps-salary-period').value = profile.salary_period || 'weekly';
+  document.getElementById('ps-sorter-hourly-rate').value = profile.hourly_rate != null ? profile.hourly_rate : '';
+  document.getElementById('ps-sorter-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
+
+  // Select current pay type
+  if (profile.pay_type) {
+    if (profile.role === 'breaker') psBreakerType(profile.pay_type);
+    else psSorterType(profile.pay_type);
+  }
+
+  document.getElementById('paySettingsModal').classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('psCancelBtn').addEventListener('click', function () {
+    document.getElementById('paySettingsModal').classList.remove('active');
+  });
+  document.getElementById('paySettingsModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+  document.getElementById('psSaveBtn').addEventListener('click', async function () {
+    const id = document.getElementById('ps-profileId').value;
+    const profile = allProfiles.find(function (p) { return p.id === id; });
+    if (!profile) return;
+
+    let payType, updates = {};
+    if (profile.role === 'breaker') {
+      const sel = document.querySelector('input[name="ps-breaker-type"]:checked');
+      if (!sel) { showGlobalError('Please select a pay type.'); return; }
+      payType = sel.value;
+      if (payType === 'commission' || payType === 'hourly_commission' || payType === 'salary_commission') {
+        updates.commission_rate = parseFloat(document.getElementById('ps-commission-rate').value) || 0;
+      }
+      if (payType === 'hourly' || payType === 'hourly_commission') {
+        updates.hourly_rate = parseFloat(document.getElementById('ps-hourly-rate').value) || 0;
+      }
+      if (payType === 'salary' || payType === 'salary_commission') {
+        updates.salary_amount = parseFloat(document.getElementById('ps-salary-amount').value) || 0;
+        updates.salary_period = document.getElementById('ps-salary-period').value;
+      }
+    } else {
+      const sel = document.querySelector('input[name="ps-sorter-type"]:checked');
+      if (!sel) { showGlobalError('Please select a pay type.'); return; }
+      payType = sel.value;
+      if (payType === 'hourly' || payType === 'hourly_per_break') {
+        updates.hourly_rate = parseFloat(document.getElementById('ps-sorter-hourly-rate').value) || 0;
+      }
+      if (payType === 'per_break' || payType === 'hourly_per_break') {
+        updates.per_break_rate = parseFloat(document.getElementById('ps-sorter-per-break-rate').value) || 0;
+      }
+    }
+    updates.pay_type = payType;
+
+    const btn = document.getElementById('psSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { error } = await sb.from('profiles').update(updates).eq('id', id);
+      if (error) throw error;
+      document.getElementById('paySettingsModal').classList.remove('active');
+      await loadAllProfiles();
+      await loadTeam();
+      showGlobalSuccess('Pay settings saved for ' + profile.display_name + '.');
+    } catch (err) {
+      showGlobalError('Failed to save: ' + escHtml(err.message));
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Pay Settings';
+    }
+  });
+});
+
+// ── Payroll ───────────────────────────────────────────────
+let prCurrentResults = [];
+let prCurrentRange = { from: null, to: null, label: '' };
+
+function getPayrollRange(preset) {
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  let from, to = todayStr, label;
+
+  if (preset === 'this_week') {
+    const d = new Date(now); d.setDate(d.getDate() - d.getDay());
+    from = d.toISOString().slice(0, 10);
+    label = 'This Week (' + from + ' – ' + to + ')';
+  } else if (preset === 'last_two_weeks') {
+    const d = new Date(now); d.setDate(d.getDate() - 13);
+    from = d.toISOString().slice(0, 10);
+    label = 'Last 2 Weeks (' + from + ' – ' + to + ')';
+  } else if (preset === 'this_month') {
+    from = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+    label = 'This Month (' + from + ' – ' + to + ')';
+  } else if (preset === 'last_month') {
+    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    from = lm.toISOString().slice(0, 10);
+    const lme = new Date(now.getFullYear(), now.getMonth(), 0);
+    to = lme.toISOString().slice(0, 10);
+    label = 'Last Month (' + from + ' – ' + to + ')';
+  } else {
+    from = document.getElementById('prFrom').value;
+    to = document.getElementById('prTo').value || todayStr;
+    label = 'Custom (' + from + ' – ' + to + ')';
+  }
+  return { from, to, label };
+}
+
+async function loadPayroll() {
+  // Wire up controls once
+  if (!document.getElementById('prRunBtn')._wired) {
+    document.getElementById('prRunBtn')._wired = true;
+
+    document.getElementById('prPeriodPreset').addEventListener('change', function () {
+      const isCustom = this.value === 'custom';
+      document.getElementById('prCustomRange').style.display = isCustom ? 'flex' : 'none';
+    });
+
+    document.getElementById('prRunBtn').addEventListener('click', runPayroll);
+
+    document.getElementById('prMarkPaidBtn').addEventListener('click', async function () {
+      if (!prCurrentResults.length) return;
+      const total = prCurrentResults.reduce(function (s, r) { return s + r.total; }, 0);
+      const staffCount = prCurrentResults.length;
+      openConfirm(
+        'Mark as Paid',
+        'Record a payroll payment of ' + fmt(total) + ' for ' + staffCount + ' staff member(s) for ' + prCurrentRange.label + '?',
+        async function () {
+          try {
+            const { error } = await sb.from('payroll_runs').insert({
+              org_id: currentProfile.org_id,
+              period_from: prCurrentRange.from,
+              period_to: prCurrentRange.to,
+              period_label: prCurrentRange.label,
+              total_paid: total,
+              staff_count: staffCount,
+              details: JSON.stringify(prCurrentResults.map(function (r) {
+                return { name: r.name, role: r.role, pay_type: r.pay_type, total: r.total, breakdown: r.breakdown };
+              }))
+            });
+            if (error) throw error;
+            showGlobalSuccess('Payroll of ' + fmt(total) + ' marked as paid!');
+            await loadPayrollHistory();
+          } catch (err) {
+            showGlobalError('Failed to record payroll: ' + escHtml(err.message));
+          }
+        }
+      );
+    });
+
+    document.getElementById('prExportBtn').addEventListener('click', function () {
+      if (!prCurrentResults.length) return;
+      let csv = 'Name,Role,Pay Type,Breakdown,Total Owed\n';
+      prCurrentResults.forEach(function (r) {
+        csv += '"' + r.name + '","' + r.role + '","' + r.pay_type + '","' + r.breakdown + '",' + r.total.toFixed(2) + '\n';
+      });
+      csv += '\n,,,Total,' + prCurrentResults.reduce(function(s,r){return s+r.total;},0).toFixed(2) + '\n';
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'payroll-' + prCurrentRange.from + '-to-' + prCurrentRange.to + '.csv';
+      a.click();
+    });
+
+    document.getElementById('prRoleFilter').addEventListener('change', renderPayrollResults);
+  }
+
+  await loadPayrollHistory();
+}
+
+async function runPayroll() {
+  const preset = document.getElementById('prPeriodPreset').value;
+  const range = getPayrollRange(preset);
+  if (!range.from) { showGlobalError('Please enter a start date.'); return; }
+  prCurrentRange = range;
+
+  const btn = document.getElementById('prRunBtn');
+  btn.disabled = true; btn.textContent = 'Calculating…';
+  document.getElementById('prEmptyState').style.display = 'none';
+  document.getElementById('prResultsWrap').style.display = 'none';
+
+  try {
+    await loadAllProfiles();
+    const staff = allProfiles.filter(function (p) { return p.role !== 'owner'; });
+    const fromTs = range.from + 'T00:00:00';
+    const toTs = range.to + 'T23:59:59';
+
+    prCurrentResults = [];
+
+    for (const p of staff) {
+      const result = { name: p.display_name, role: p.role, pay_type: p.pay_type || 'not_set', total: 0, breakdown: '' };
+
+      if (p.role === 'breaker') {
+        await calcBreakerPay(p, fromTs, toTs, result);
+      } else if (p.role === 'sorter') {
+        await calcSorterPay(p, fromTs, toTs, result);
+      }
+
+      prCurrentResults.push(result);
+    }
+
+    renderPayrollResults();
+  } catch (err) {
+    showGlobalError('Payroll calculation failed: ' + escHtml(err.message));
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Calculate';
+  }
+}
+
+async function calcBreakerPay(p, fromTs, toTs, result) {
+  const type = p.pay_type;
+  const parts = [];
+  let total = 0;
+
+  // Commission component
+  if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
+    const rate = (parseFloat(p.commission_rate) || 0) / 100;
+    const { data: streams } = await sb.from('streams')
+      .select('final_sales, total_product_cost, total_fees, total_other_costs')
+      .eq('breaker_id', p.id)
+      .eq('org_id', currentProfile.org_id)
+      .eq('status', 'closed')
+      .gte('closed_at', fromTs)
+      .lte('closed_at', toTs);
+    const netProfit = (streams || []).reduce(function (s, x) {
+      return s + (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_fees) || 0) - (parseFloat(x.total_other_costs) || 0);
+    }, 0);
+    const commission = Math.max(0, netProfit) * rate;
+    total += commission;
+    parts.push((streams || []).length + ' streams · net profit ' + fmt(netProfit) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission));
+  }
+
+  // Hourly component
+  if (type === 'hourly' || type === 'hourly_commission') {
+    const rate = parseFloat(p.hourly_rate) || 0;
+    const hours = await calcHours(p.id, fromTs, toTs);
+    const earned = hours * rate;
+    total += earned;
+    parts.push(hours.toFixed(2) + ' hrs × $' + rate.toFixed(2) + '/hr = ' + fmt(earned));
+  }
+
+  // Salary component
+  if (type === 'salary' || type === 'salary_commission') {
+    const amount = parseFloat(p.salary_amount) || 0;
+    total += amount;
+    parts.push('Salary: ' + fmt(amount) + ' (' + (p.salary_period || 'period') + ')');
+  }
+
+  if (!type || type === 'not_set') {
+    result.breakdown = '⚠ Pay type not configured';
+  } else {
+    result.breakdown = parts.join(' + ') || '—';
+  }
+  result.total = total;
+}
+
+async function calcSorterPay(p, fromTs, toTs, result) {
+  const type = p.pay_type;
+  const parts = [];
+  let total = 0;
+
+  // Hourly component
+  if (type === 'hourly' || type === 'hourly_per_break') {
+    const rate = parseFloat(p.hourly_rate) || 0;
+    const hours = await calcHours(p.id, fromTs, toTs);
+    const earned = hours * rate;
+    total += earned;
+    parts.push(hours.toFixed(2) + ' hrs × $' + rate.toFixed(2) + '/hr = ' + fmt(earned));
+  }
+
+  // Per break sorted component
+  if (type === 'per_break' || type === 'hourly_per_break') {
+    const rate = parseFloat(p.per_break_rate) || 0;
+    // Count sort tasks completed by this sorter in period
+    const { data: tasks } = await sb.from('sort_tasks')
+      .select('id')
+      .eq('sorter_id', p.id)
+      .eq('org_id', currentProfile.org_id)
+      .eq('status', 'completed')
+      .gte('completed_at', fromTs)
+      .lte('completed_at', toTs);
+    const breakCount = (tasks || []).length;
+    const earned = breakCount * rate;
+    total += earned;
+    parts.push(breakCount + ' breaks sorted × $' + rate.toFixed(2) + ' = ' + fmt(earned));
+  }
+
+  if (!type || type === 'not_set') {
+    result.breakdown = '⚠ Pay type not configured';
+  } else {
+    result.breakdown = parts.join(' + ') || '—';
+  }
+  result.total = total;
+}
+
+async function calcHours(profileId, fromTs, toTs) {
+  const { data: shifts } = await sb.from('schedules')
+    .select('clocked_in_at, clocked_out_at')
+    .eq('org_id', currentProfile.org_id)
+    .or('breaker_id.eq.' + profileId + ',sorter_id.eq.' + profileId)
+    .not('clocked_in_at', 'is', null)
+    .not('clocked_out_at', 'is', null)
+    .gte('clocked_in_at', fromTs)
+    .lte('clocked_out_at', toTs);
+  return (shifts || []).reduce(function (sum, s) {
+    const inT = new Date(s.clocked_in_at).getTime();
+    const outT = new Date(s.clocked_out_at).getTime();
+    return sum + Math.max(0, (outT - inT) / 3600000);
+  }, 0);
+}
+
+function renderPayrollResults() {
+  const roleFilter = document.getElementById('prRoleFilter').value;
+  const filtered = roleFilter === 'all' ? prCurrentResults : prCurrentResults.filter(function (r) { return r.role === roleFilter; });
+
+  const tbody = document.getElementById('prTableBody');
+  tbody.innerHTML = '';
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No staff match this filter.</td></tr>';
+  } else {
+    filtered.forEach(function (r) {
+      const tr = document.createElement('tr');
+      const notSet = !r.pay_type || r.pay_type === 'not_set';
+      const typeLabels = {
+        commission:'Commission', hourly:'Hourly', salary:'Salary',
+        hourly_commission:'Hourly + Commission', salary_commission:'Salary + Commission',
+        per_break:'Per Break', hourly_per_break:'Hourly + Per Break'
+      };
+      tr.innerHTML =
+        '<td><strong>' + escHtml(r.name) + '</strong></td>' +
+        '<td><span class="badge ' + (r.role === 'breaker' ? 'badge-green' : 'badge-gray') + '">' + r.role + '</span></td>' +
+        '<td style="font-size:0.82rem;">' + escHtml(typeLabels[r.pay_type] || r.pay_type) + '</td>' +
+        '<td style="font-size:0.8rem;color:var(--muted);">' + escHtml(r.breakdown) + '</td>' +
+        '<td style="text-align:right;font-weight:800;color:' + (notSet ? 'var(--muted)' : 'var(--text)') + ';">' + (notSet ? '—' : fmt(r.total)) + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Totals
+  const all = prCurrentResults;
+  const bTotal = all.filter(function(r){return r.role==='breaker';}).reduce(function(s,r){return s+r.total;},0);
+  const sTotal = all.filter(function(r){return r.role==='sorter';}).reduce(function(s,r){return s+r.total;},0);
+  const grandTotal = bTotal + sTotal;
+  document.getElementById('prTotalPayroll').textContent = fmt(grandTotal);
+  document.getElementById('prBreakerTotal').textContent = fmt(bTotal);
+  document.getElementById('prSorterTotal').textContent = fmt(sTotal);
+
+  // Net profit in period for context
+  document.getElementById('prNetAfterPayroll').textContent = '—';
+
+  document.getElementById('prResultsWrap').style.display = '';
+  document.getElementById('prEmptyState').style.display = 'none';
+  document.getElementById('prSummaryStrip').style.display = '';
+}
+
+async function loadPayrollHistory() {
+  const tbody = document.getElementById('prHistoryBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Loading…</td></tr>';
+  try {
+    const { data, error } = await sb.from('payroll_runs')
+      .select('*')
+      .eq('org_id', currentProfile.org_id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    const rows = data || [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No payroll runs recorded yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '';
+    rows.forEach(function (r) {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td style="font-size:0.82rem;">' + escHtml(r.period_label || (r.period_from + ' – ' + r.period_to)) + '</td>' +
+        '<td>' + fmtDate(r.created_at) + '</td>' +
+        '<td>' + (r.staff_count || '—') + ' people</td>' +
+        '<td style="font-weight:700;color:var(--red);">' + fmt(r.total_paid) + '</td>' +
+        '<td style="font-size:0.8rem;color:var(--muted);">' + escHtml(r.notes || '') + '</td>';
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Failed to load history.</td></tr>';
+  }
 }
 
 // ── Schedule ──────────────────────────────────────────────
