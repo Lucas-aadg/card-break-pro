@@ -446,7 +446,7 @@
 
   <!-- REVENUE + CALCULATOR -->
   <div class="panel">
-    <div class="panel-title">Current Whatnot Total
+    <div class="panel-title">Current Platform Total
       <span style="font-size:0.75rem;font-weight:400;color:var(--muted);margin-left:8px;">— type the running total shown on your platform, we calculate each break's revenue automatically</span>
     </div>
     <div class="revenue-input-wrap" style="margin-bottom:0.5rem;">
@@ -666,8 +666,8 @@
 
     <div class="form-group" style="background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.3);border-radius:8px;padding:14px;">
       <label for="finalSalesInput" style="color:var(--primary);font-size:0.85rem;font-weight:700;text-transform:none;letter-spacing:0;">
-        Final Whatnot Total <span style="color:var(--red);">*</span>
-        <span style="color:var(--muted);font-weight:400;font-size:0.75rem;margin-left:6px;">— the final number shown on Whatnot after all giveaways</span>
+        Final Platform Total <span style="color:var(--red);">*</span>
+        <span style="color:var(--muted);font-weight:400;font-size:0.75rem;margin-left:6px;">— the final payout number shown on your platform after all deductions</span>
       </label>
       <input type="number" id="finalSalesInput" placeholder="0.00" min="0" step="0.01" style="font-size:1.3rem;font-weight:700;font-family:'Consolas',monospace;margin-top:8px;border-color:var(--primary);" />
     </div>
@@ -1193,14 +1193,14 @@ async function handleSubmitBreak() {
 
   if (!streamKey) { showError('Please enter a Stream Key / ID.'); return; }
   if (!breakDate) { showError('Please select a date.'); return; }
-  if (!revenueStr || isNaN(parseFloat(revenueStr))) { showError('Please enter a valid Whatnot total.'); return; }
+  if (!revenueStr || isNaN(parseFloat(revenueStr))) { showError('Please enter a valid platform total.'); return; }
 
   const currentWhatnotTotal = parseFloat(revenueStr);
   const prevTotal = getPreviousCumulativeTotal();
 
   // Validate: typed total must be >= previous total
   if (currentWhatnotTotal < prevTotal) {
-    showError('The Whatnot total you entered ($' + currentWhatnotTotal.toFixed(2) + ') is less than the previous stream total ($' + prevTotal.toFixed(2) + '). Enter the current running total shown on your platform.');
+    showError('The platform total you entered ($' + currentWhatnotTotal.toFixed(2) + ') is less than the previous total ($' + prevTotal.toFixed(2) + '). Enter the current running total shown on your platform.');
     return;
   }
 

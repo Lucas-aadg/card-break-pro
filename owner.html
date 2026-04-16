@@ -506,7 +506,7 @@
 
         <!-- Revenue -->
         <div class="panel">
-          <div class="panel-title">Current Whatnot Total
+          <div class="panel-title">Current Platform Total
             <span style="font-size:0.75rem;font-weight:400;color:var(--muted);margin-left:8px;">— type the running total shown on your platform</span>
           </div>
           <div class="revenue-input-wrap">
@@ -2146,13 +2146,13 @@ async function beHandleSubmit() {
 
   if (!streamKey) { showGlobalError('Please enter a Stream Key.'); return; }
   if (!breakDate) { showGlobalError('Please select a date.'); return; }
-  if (!revenueStr || isNaN(parseFloat(revenueStr))) { showGlobalError('Please enter a valid Whatnot total.'); return; }
+  if (!revenueStr || isNaN(parseFloat(revenueStr))) { showGlobalError('Please enter a valid platform total.'); return; }
 
   const currentWhatnotTotal = parseFloat(revenueStr);
   const prevTotal = beGetPrevCumulativeTotal();
 
   if (currentWhatnotTotal < prevTotal) {
-    showGlobalError('The Whatnot total entered ($' + currentWhatnotTotal.toFixed(2) + ') is less than the previous total ($' + prevTotal.toFixed(2) + '). Enter the current running total shown on your platform.');
+    showGlobalError('The platform total entered ($' + currentWhatnotTotal.toFixed(2) + ') is less than the previous total ($' + prevTotal.toFixed(2) + '). Enter the current running total shown on your platform.');
     return;
   }
 
