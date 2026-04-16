@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Webhook signature verification failed: ' + err.message });
   }
 
-  const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+  const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   const getMetadata = (obj) => ({
     userId: obj.metadata?.user_id,

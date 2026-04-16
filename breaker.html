@@ -1824,7 +1824,7 @@ async function loadPayouts() {
   }
 
   // ── Tips ───────────────────────────────────────────────
-  const { data: tipsData } = await sb.from('tips').select('amount').eq('breaker_id', currentUser.id).gte('created_at', from);
+  const { data: tipsData } = await sb.from('tips').select('amount').eq('breaker_id', currentUser.id).eq('org_id', currentProfile.org_id).gte('created_at', from);
   const totalTips = (tipsData || []).reduce(function (s, t) { return s + (parseFloat(t.amount) || 0); }, 0);
   statsHTML.push('<div class="stat-card"><div class="stat-label">Tips Received</div><div class="stat-value green">' + fmt(totalTips) + '</div></div>');
   grandTotal += totalTips;
