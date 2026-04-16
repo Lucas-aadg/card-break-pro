@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Card Break Pro — Flyer</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -28,261 +28,253 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 5.5vmin;
+      padding: 5vmin 6vmin;
     }
 
-    /* Background glow effects */
-    .glow-top {
-      position: absolute;
-      top: -200px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 800px;
-      height: 600px;
-      background: radial-gradient(ellipse at center, rgba(79,110,247,0.18) 0%, transparent 70%);
+    /* Background */
+    .glow-tl {
+      position: absolute; top: -15vmin; left: -10vmin;
+      width: 70vmin; height: 70vmin;
+      background: radial-gradient(ellipse at center, rgba(79,110,247,0.14) 0%, transparent 65%);
       pointer-events: none;
     }
-    .glow-bottom {
-      position: absolute;
-      bottom: -200px;
-      right: -100px;
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(ellipse at center, rgba(34,197,94,0.08) 0%, transparent 70%);
+    .glow-br {
+      position: absolute; bottom: -10vmin; right: -10vmin;
+      width: 60vmin; height: 60vmin;
+      background: radial-gradient(ellipse at center, rgba(34,197,94,0.07) 0%, transparent 65%);
       pointer-events: none;
     }
-
-    /* Grid lines for texture */
     .grid-overlay {
-      position: absolute;
-      inset: 0;
+      position: absolute; inset: 0;
       background-image:
-        linear-gradient(rgba(79,110,247,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(79,110,247,0.04) 1px, transparent 1px);
-      background-size: 60px 60px;
+        linear-gradient(rgba(79,110,247,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,110,247,0.035) 1px, transparent 1px);
+      background-size: 55px 55px;
       pointer-events: none;
+    }
+    /* Top edge accent line */
+    .top-line {
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #4f6ef7 30%, #4f6ef7 70%, transparent);
+    }
+
+    .corner-tag {
+      position: absolute; top: 3.2vmin; right: 3.5vmin;
+      background: rgba(34,197,94,0.12);
+      border: 1px solid rgba(34,197,94,0.35);
+      color: #22c55e;
+      font-size: 1.05vmin; font-weight: 800;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 0.65vmin 1.4vmin; border-radius: 100px;
     }
 
     .content {
-      position: relative;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      width: 100%;
+      position: relative; z-index: 10;
+      display: flex; flex-direction: column;
+      align-items: center; text-align: center; width: 100%;
     }
 
-    /* Badge */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6vmin;
-      background: rgba(79,110,247,0.12);
-      border: 1px solid rgba(79,110,247,0.35);
-      color: #4f6ef7;
-      font-size: 1.2vmin;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      padding: 0.7vmin 1.8vmin;
-      border-radius: 100px;
-      margin-bottom: 2.5vmin;
-    }
-    .badge .dot { width: 0.55vmin; height: 0.55vmin; background: #4f6ef7; border-radius: 50%; }
-
+    /* Brand */
     .brand {
-      font-size: 1.8vmin;
-      font-weight: 900;
-      letter-spacing: 4px;
-      color: #e2e8f0;
-      text-transform: uppercase;
-      margin-bottom: 2.5vmin;
+      font-size: 1.5vmin; font-weight: 900;
+      letter-spacing: 5px; color: #94a3b8;
+      text-transform: uppercase; margin-bottom: 2.8vmin;
     }
     .brand span { color: #4f6ef7; }
 
+    /* Headline */
     .headline {
-      font-size: 7.2vmin;
-      font-weight: 900;
-      line-height: 1.05;
-      letter-spacing: -0.2vmin;
-      color: #e2e8f0;
-      margin-bottom: 2vmin;
+      font-size: 8.2vmin; font-weight: 900;
+      line-height: 1.0; letter-spacing: -0.3vmin;
+      color: #e2e8f0; margin-bottom: 0.8vmin;
     }
     .headline .accent { color: #4f6ef7; }
+    .headline .white { color: #fff; }
 
-    .sub {
-      font-size: 2vmin;
-      color: #64748b;
-      line-height: 1.6;
-      max-width: 72vmin;
-      margin-bottom: 3.5vmin;
-      font-weight: 400;
+    .headline-sub {
+      font-size: 2.1vmin; font-weight: 500;
+      color: #64748b; margin-bottom: 3vmin; line-height: 1.5;
     }
-    .sub strong { color: #94a3b8; font-weight: 600; }
+    .headline-sub strong { color: #94a3b8; font-weight: 600; }
 
-    .pills {
-      display: flex;
-      gap: 1vmin;
-      margin-bottom: 3.5vmin;
-      flex-wrap: wrap;
-      justify-content: center;
+    /* Flow strip */
+    .flow {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 3vmin;
+      background: #13131e; border: 1px solid #2d2d3d;
+      border-radius: 1.2vmin; overflow: hidden;
+      width: 100%; max-width: 84vmin;
     }
-    .pill {
-      display: flex;
-      align-items: center;
-      gap: 0.7vmin;
-      background: #13131e;
-      border: 1px solid #2d2d3d;
-      border-radius: 1vmin;
-      padding: 1vmin 1.6vmin;
-      font-size: 1.4vmin;
-      font-weight: 600;
-      color: #e2e8f0;
+    .flow-step {
+      flex: 1; padding: 1.1vmin 0.5vmin;
+      text-align: center; font-size: 1.25vmin;
+      font-weight: 600; color: #94a3b8;
+      border-right: 1px solid #2d2d3d;
+      line-height: 1.4;
     }
-    .pill .icon { font-size: 1.5vmin; }
-    .pill.green { border-color: rgba(34,197,94,0.25); }
-    .pill.blue { border-color: rgba(79,110,247,0.25); }
-    .pill.purple { border-color: rgba(168,85,247,0.25); }
+    .flow-step:last-child { border-right: none; }
+    .flow-step .emoji { font-size: 1.8vmin; display: block; margin-bottom: 0.3vmin; }
+    .flow-step .dim { color: #4f6ef7; font-size: 1.05vmin; font-weight: 700; }
+    .flow-arrow {
+      color: #2d2d3d; font-size: 1.6vmin; padding: 0 0.2vmin;
+      flex-shrink: 0;
+    }
 
+    /* Divider */
     .divider {
-      width: 100%;
-      height: 1px;
+      width: 100%; height: 1px;
       background: linear-gradient(90deg, transparent, #2d2d3d, transparent);
-      margin-bottom: 3.5vmin;
+      margin-bottom: 2.8vmin;
     }
 
+    /* Stats */
     .stats {
-      display: flex;
-      gap: 0;
-      margin-bottom: 3.5vmin;
-      width: 100%;
-      max-width: 80vmin;
+      display: flex; gap: 0;
+      margin-bottom: 2.8vmin;
+      width: 100%; max-width: 84vmin;
     }
     .stat {
-      flex: 1;
-      text-align: center;
-      padding: 0 2vmin;
+      flex: 1; text-align: center;
+      padding: 0 1.5vmin;
       border-right: 1px solid #2d2d3d;
     }
     .stat:last-child { border-right: none; }
     .stat-value {
-      font-size: 4.2vmin;
-      font-weight: 900;
-      color: #4f6ef7;
-      letter-spacing: -0.1vmin;
-      line-height: 1;
-      margin-bottom: 0.5vmin;
+      font-size: 4.8vmin; font-weight: 900;
+      color: #4f6ef7; letter-spacing: -0.1vmin;
+      line-height: 1; margin-bottom: 0.5vmin;
     }
+    .stat-value.green { color: #22c55e; }
     .stat-label {
-      font-size: 1.2vmin;
-      color: #64748b;
-      font-weight: 500;
-      line-height: 1.4;
+      font-size: 1.1vmin; color: #64748b;
+      font-weight: 500; line-height: 1.4;
     }
 
+    /* CTA */
     .cta-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.2vmin;
-    }
-    .cta-btn {
-      background: #4f6ef7;
-      color: #fff;
-      font-size: 2vmin;
-      font-weight: 800;
-      padding: 1.8vmin 5vmin;
-      border-radius: 1.2vmin;
-      letter-spacing: 0.5px;
-      box-shadow: 0 0 6vmin rgba(79,110,247,0.4);
-    }
-    .cta-url {
-      font-size: 1.5vmin;
-      color: #64748b;
-      font-weight: 500;
-      letter-spacing: 1px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 1.1vmin;
     }
     .cta-trial {
-      font-size: 1.4vmin;
-      color: #22c55e;
-      font-weight: 700;
-      letter-spacing: 0.5px;
+      font-size: 1.35vmin; color: #22c55e;
+      font-weight: 700; letter-spacing: 0.5px;
+    }
+    .cta-btn {
+      background: #4f6ef7; color: #fff;
+      font-size: 2vmin; font-weight: 800;
+      padding: 1.7vmin 6vmin; border-radius: 1vmin;
+      letter-spacing: 0.3px;
+      box-shadow: 0 0 5vmin rgba(79,110,247,0.45);
+    }
+    .cta-url {
+      font-size: 1.4vmin; color: #475569;
+      font-weight: 500; letter-spacing: 1px;
     }
 
-    .corner-tag {
-      position: absolute;
-      top: 3vmin;
-      right: 3vmin;
-      background: rgba(34,197,94,0.12);
-      border: 1px solid rgba(34,197,94,0.3);
-      color: #22c55e;
-      font-size: 1.1vmin;
-      font-weight: 800;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 0.7vmin 1.4vmin;
-      border-radius: 100px;
+    /* Roles row */
+    .roles {
+      display: flex; gap: 1vmin;
+      margin-bottom: 2.8vmin;
+      justify-content: center;
     }
+    .role-chip {
+      font-size: 1.15vmin; font-weight: 700;
+      padding: 0.55vmin 1.3vmin; border-radius: 100px;
+      letter-spacing: 0.3px;
+    }
+    .rc-blue  { background: rgba(79,110,247,0.12);  border: 1px solid rgba(79,110,247,0.3);  color: #4f6ef7; }
+    .rc-amber { background: rgba(245,158,11,0.12);  border: 1px solid rgba(245,158,11,0.3);  color: #f59e0b; }
+    .rc-green { background: rgba(34,197,94,0.12);   border: 1px solid rgba(34,197,94,0.3);   color: #22c55e; }
+    .rc-purple{ background: rgba(168,85,247,0.12);  border: 1px solid rgba(168,85,247,0.3);  color: #a855f7; }
   </style>
 </head>
 <body>
   <div class="flyer">
-    <div class="glow-top"></div>
-    <div class="glow-bottom"></div>
+    <div class="glow-tl"></div>
+    <div class="glow-br"></div>
     <div class="grid-overlay"></div>
+    <div class="top-line"></div>
     <div class="corner-tag">14-Day Free Trial</div>
 
     <div class="content">
 
-      <div class="badge">
-        <div class="dot"></div>
-        For Live Card Breaking Businesses
-        <div class="dot"></div>
-      </div>
-
       <div class="brand">CARD <span>BREAK</span> PRO</div>
 
       <div class="headline">
-        Ditch the<br>
-        <span class="accent">spreadsheets.</span>
+        Your breaking business<br>
+        <span class="accent">runs itself.</span>
       </div>
-
-      <p class="sub">
-        One platform that runs your entire breaking business —
-        <strong>break tracking, commissions, inventory, and shipping.</strong>
-        All automated. Works on Whatnot, Fanatics & TikTok Shop.
+      <p class="headline-sub">
+        Breaker clocks in. Breaks are tracked. Payroll calculates.<br>
+        <strong>You just watch the money come in.</strong>
       </p>
 
-      <div class="pills">
-        <div class="pill blue"><span class="icon">📡</span> Live Break Tracking</div>
-        <div class="pill green"><span class="icon">💰</span> Auto Commission Math</div>
-        <div class="pill blue"><span class="icon">🎯</span> Break Even Before You Go Live</div>
-        <div class="pill purple"><span class="icon">📦</span> Sort Queue & Fast Shipping</div>
-        <div class="pill green"><span class="icon">📊</span> Profit Reports & Analytics</div>
+      <!-- Automated flow -->
+      <div class="flow">
+        <div class="flow-step">
+          <span class="emoji">🕐</span>
+          Clock In
+          <span class="dim">auto</span>
+        </div>
+        <div class="flow-step">
+          <span class="emoji">📡</span>
+          Live Tracking
+          <span class="dim">real-time</span>
+        </div>
+        <div class="flow-step">
+          <span class="emoji">💰</span>
+          Break Even
+          <span class="dim">pre-stream</span>
+        </div>
+        <div class="flow-step">
+          <span class="emoji">📦</span>
+          Sort Queue
+          <span class="dim">auto-created</span>
+        </div>
+        <div class="flow-step">
+          <span class="emoji">🧾</span>
+          Payroll
+          <span class="dim">calculated</span>
+        </div>
+        <div class="flow-step">
+          <span class="emoji">📊</span>
+          Reports
+          <span class="dim">always live</span>
+        </div>
+      </div>
+
+      <!-- Roles -->
+      <div class="roles">
+        <span class="role-chip rc-blue">Owner</span>
+        <span class="role-chip rc-amber">Manager</span>
+        <span class="role-chip rc-green">Breaker</span>
+        <span class="role-chip rc-purple">Sorter</span>
       </div>
 
       <div class="divider"></div>
 
+      <!-- Stats -->
       <div class="stats">
         <div class="stat">
           <div class="stat-value">0</div>
-          <div class="stat-label">Spreadsheets<br>Needed</div>
+          <div class="stat-label">Spreadsheets<br>needed</div>
         </div>
         <div class="stat">
-          <div class="stat-value">1×</div>
-          <div class="stat-label">Add Inventory —<br>Rest Is Automatic</div>
+          <div class="stat-value green">4</div>
+          <div class="stat-label">Roles, one<br>platform</div>
         </div>
         <div class="stat">
-          <div class="stat-value">3</div>
-          <div class="stat-label">Roles — Owner,<br>Breaker, Sorter</div>
+          <div class="stat-value">∞</div>
+          <div class="stat-label">Streams tracked,<br>no limits</div>
         </div>
         <div class="stat">
-          <div class="stat-value">$0</div>
-          <div class="stat-label">Hidden Fees or<br>Per-Seat Charges</div>
+          <div class="stat-value green">$0</div>
+          <div class="stat-label">Hidden fees or<br>per-seat charges</div>
         </div>
       </div>
 
+      <!-- CTA -->
       <div class="cta-group">
         <div class="cta-trial">14 days free — no credit card required</div>
         <div class="cta-btn">Start Free Trial</div>
