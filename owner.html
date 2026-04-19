@@ -1437,6 +1437,14 @@
             <div style="font-size:0.72rem;color:var(--muted);">fixed + % profit</div>
           </div>
         </label>
+        <label style="all:unset;cursor:pointer;">
+          <input type="radio" name="ps-breaker-type" value="per_break" id="psb-per-break" style="display:none;" />
+          <div class="ps-type-card" id="psb-per-break-card" onclick="psBreakerType('per_break')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.2rem;">📦</div>
+            <div style="font-weight:700;font-size:0.8rem;">Per Break</div>
+            <div style="font-size:0.72rem;color:var(--muted);">$ per break run</div>
+          </div>
+        </label>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
@@ -1459,6 +1467,16 @@
             </select>
           </div>
         </div>
+        <div class="form-group" id="ps-per-break-rate-group" style="display:none;">
+          <label for="ps-per-break-rate">Default Rate per Break ($) — fallback if category has no rate</label>
+          <input type="number" id="ps-per-break-rate" min="0" step="0.01" placeholder="e.g. 7.00" />
+        </div>
+      </div>
+
+      <!-- Breaker Category Rates — only shown for per_break type -->
+      <div id="psb-category-rates-group" style="display:none;margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--border);">
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.75rem;">Rate per Break by Category</div>
+        <div id="psb-category-rates-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem 1rem;"></div>
       </div>
 
       <!-- Commission method — only shown for commission types -->
@@ -3591,10 +3609,10 @@ function psSelectCard(cardId, groupPrefix) {
 }
 
 function psBreakerType(type) {
-  document.getElementById('psb-' + type).checked = true;
-  psSelectCard('psb-' + type + '-card', 'psb-');
+  document.getElementById('psb-' + type.replace('_', '-')).checked = true;
+  psSelectCard('psb-' + type.replace('_', '-') + '-card', 'psb-');
   // Show/hide relevant fields
-  ['ps-commission-rate-group', 'ps-hourly-rate-group', 'ps-salary-group'].forEach(function (id) {
+  ['ps-commission-rate-group', 'ps-hourly-rate-group', 'ps-salary-group', 'ps-per-break-rate-group'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });
   if (type === 'commission') document.getElementById('ps-commission-rate-group').style.display = '';
@@ -3606,7 +3624,13 @@ function psBreakerType(type) {
   } else if (type === 'salary_commission') {
     document.getElementById('ps-commission-rate-group').style.display = '';
     document.getElementById('ps-salary-group').style.display = '';
+  } else if (type === 'per_break') {
+    document.getElementById('ps-per-break-rate-group').style.display = '';
+    document.getElementById('psb-category-rates-group').style.display = '';
+    loadCategoryRateInputs(psCurrentProfile ? (psCurrentProfile.category_rates || {}) : {}, 'psb-category-rates-body');
   }
+  // Hide category rates group unless per_break
+  if (type !== 'per_break') document.getElementById('psb-category-rates-group').style.display = 'none';
   // Show period-netting option only for commission types
   const hasCommission = type === 'commission' || type === 'hourly_commission' || type === 'salary_commission';
   document.getElementById('ps-commission-method-group').style.display = hasCommission ? '' : 'none';
@@ -3635,8 +3659,8 @@ function psSorterType(type) {
 
 let psCurrentProfile = null;
 
-async function loadCategoryRateInputs(existingRates) {
-  const body = document.getElementById('pss-category-rates-body');
+async function loadCategoryRateInputs(existingRates, bodyId) {
+  const body = document.getElementById(bodyId || 'pss-category-rates-body');
   body.innerHTML = '<span style="color:var(--muted);font-size:0.82rem;">Loading…</span>';
   try {
     const { data: prods } = await sb.from('products').select('category')
@@ -3669,12 +3693,13 @@ async function openPaySettings(profile) {
   document.getElementById('ps-breaker-fields').style.display = profile.role === 'breaker' ? '' : 'none';
   document.getElementById('ps-sorter-fields').style.display = profile.role === 'sorter' ? '' : 'none';
   document.getElementById('pss-category-rates-group').style.display = 'none';
+  document.getElementById('psb-category-rates-group').style.display = 'none';
 
   // Reset all field visibility
-  ['ps-commission-rate-group','ps-hourly-rate-group','ps-salary-group'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
+  ['ps-commission-rate-group','ps-hourly-rate-group','ps-salary-group','ps-per-break-rate-group'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
   ['pss-hourly-rate-group','pss-per-break-rate-group'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
   // Reset card highlights
-  ['psb-commission-card','psb-hourly-card','psb-salary-card','psb-hourly-commission-card','psb-salary-commission-card'].forEach(function(id){
+  ['psb-commission-card','psb-hourly-card','psb-salary-card','psb-hourly-commission-card','psb-salary-commission-card','psb-per-break-card'].forEach(function(id){
     const c = document.getElementById(id); if(c){c.style.borderColor='var(--border)';c.style.background='transparent';}
   });
   ['pss-hourly-card','pss-per-break-card','pss-hourly-per-break-card'].forEach(function(id){
@@ -3688,6 +3713,7 @@ async function openPaySettings(profile) {
   document.getElementById('ps-salary-period').value = profile.salary_period || 'weekly';
   document.getElementById('ps-sorter-hourly-rate').value = profile.hourly_rate != null ? profile.hourly_rate : '';
   document.getElementById('ps-sorter-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
+  document.getElementById('ps-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
   document.getElementById('ps-commission-period-total').checked = profile.commission_method === 'period_total';
 
   // Select current pay type
@@ -3726,6 +3752,15 @@ document.addEventListener('DOMContentLoaded', function () {
       if (payType === 'salary' || payType === 'salary_commission') {
         updates.salary_amount = parseFloat(document.getElementById('ps-salary-amount').value) || 0;
         updates.salary_period = document.getElementById('ps-salary-period').value;
+      }
+      if (payType === 'per_break') {
+        updates.per_break_rate = parseFloat(document.getElementById('ps-per-break-rate').value) || 0;
+        const catRates = {};
+        document.querySelectorAll('.cat-rate-input').forEach(function(inp) {
+          const val = parseFloat(inp.value);
+          if (!isNaN(val) && val >= 0) catRates[inp.dataset.category] = val;
+        });
+        updates.category_rates = catRates;
       }
     } else {
       const sel = document.querySelector('input[name="ps-sorter-type"]:checked');
@@ -4004,6 +4039,73 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
     const amount = parseFloat(p.salary_amount) || 0;
     total += amount;
     parts.push('Salary: ' + fmt(amount) + ' (' + (p.salary_period || 'period') + ')');
+  }
+
+  // Per Break — each stream = one break run, rate by product category
+  if (type === 'per_break') {
+    const categoryRates = p.category_rates || {};
+    const hasCategoryRates = Object.keys(categoryRates).length > 0;
+    const defaultRate = parseFloat(p.per_break_rate) || 0;
+
+    const { data: streams } = await sb.from('streams')
+      .select('id')
+      .eq('breaker_id', p.id)
+      .eq('org_id', currentProfile.org_id)
+      .eq('status', 'closed')
+      .gte('closed_at', fromTs)
+      .lte('closed_at', toTs);
+
+    const streamIds = (streams || []).map(function(s){ return s.id; });
+
+    if (hasCategoryRates && streamIds.length) {
+      // Map each stream → category via first product_used on any break in that stream
+      const { data: bks } = await sb.from('breaks')
+        .select('stream_id, products_used')
+        .in('stream_id', streamIds)
+        .not('products_used', 'is', null);
+
+      const streamProdMap = {};
+      const productIds = [];
+      (bks || []).forEach(function(b) {
+        if (!streamProdMap[b.stream_id] && b.products_used && b.products_used.length) {
+          const pid = b.products_used[0].product_id;
+          if (pid) { streamProdMap[b.stream_id] = pid; productIds.push(pid); }
+        }
+      });
+
+      const streamCatMap = {};
+      if (productIds.length) {
+        const { data: prods } = await sb.from('products').select('id, category').in('id', [...new Set(productIds)]);
+        const prodCatMap = {};
+        (prods || []).forEach(function(prod){ prodCatMap[prod.id] = prod.category; });
+        Object.entries(streamProdMap).forEach(function(entry){
+          streamCatMap[entry[0]] = prodCatMap[entry[1]];
+        });
+      }
+
+      const catTally = {};
+      streamIds.forEach(function(sid) {
+        const cat = streamCatMap[sid] ? streamCatMap[sid] : '__default__';
+        if (!catTally[cat]) catTally[cat] = 0;
+        catTally[cat]++;
+      });
+
+      const catParts = [];
+      Object.entries(catTally).forEach(function(entry) {
+        const cat = entry[0]; const count = entry[1];
+        const rate = cat !== '__default__' && categoryRates[cat] != null ? parseFloat(categoryRates[cat]) : defaultRate;
+        const earned = count * rate;
+        total += earned;
+        catParts.push(count + ' ' + (cat === '__default__' ? 'uncategorized' : cat) + ' × $' + rate.toFixed(2) + ' = ' + fmt(earned));
+      });
+      parts.push(catParts.join(' + '));
+    } else {
+      // Flat rate — no category rates configured
+      const breakCount = streamIds.length;
+      const earned = breakCount * defaultRate;
+      total += earned;
+      parts.push(breakCount + ' breaks × $' + defaultRate.toFixed(2) + '/break = ' + fmt(earned));
+    }
   }
 
   // Tips — always included regardless of pay type
