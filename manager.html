@@ -268,7 +268,10 @@
   <div class="tab-content" id="tab-streamSummary">
     <div class="panel">
       <div class="panel-header">
-        <div class="panel-title">Stream Summary</div>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <div class="panel-title" style="margin:0;">Stream Summary</div>
+          <button onclick="printTable('Stream Summary', 'Card Break Pro — Stream Summary — ' + new Date().toLocaleDateString(), 'ssBreakTable')" title="Print / Save as PDF" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:0.2rem 0.45rem;font-size:0.9rem;line-height:1;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--primary)';" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';">🖨</button>
+        </div>
       </div>
       <div class="filter-row">
         <div><label for="ssStreamSelect">Select Stream</label><select id="ssStreamSelect"><option value="">— select a stream —</option></select></div>
@@ -279,7 +282,7 @@
       <div class="panel">
         <div class="panel-title">Break Breakdown</div>
         <div class="tbl-wrap">
-          <table class="data-table">
+          <table class="data-table" id="ssBreakTable">
             <thead><tr><th>Break #</th><th>Revenue</th><th>Box Cost</th><th>Est. Profit</th><th>Products Used</th></tr></thead>
             <tbody id="ssBreakBody"></tbody>
           </table>
@@ -295,9 +298,10 @@
         <div><label for="histFrom">From</label><input type="date" id="histFrom" /></div>
         <div><label for="histTo">To</label><input type="date" id="histTo" /></div>
         <button class="btn btn-primary" id="histFilterBtn">Filter</button>
+        <button onclick="printTable('Break History', 'Card Break Pro — Break History — ' + new Date().toLocaleDateString(), 'histTable')" title="Print / Save as PDF" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:0.35rem 0.55rem;font-size:0.9rem;line-height:1;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--primary)';" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';">🖨</button>
       </div>
       <div class="tbl-wrap">
-        <table class="data-table">
+        <table class="data-table" id="histTable">
           <thead><tr><th>Date</th><th>Stream</th><th>Break #</th><th>Breaker</th><th>Revenue</th><th>Box Cost</th><th>Est. Profit</th><th>Units</th></tr></thead>
           <tbody id="histTableBody"><tr class="empty-row"><td colspan="8">Select a date range and click Filter.</td></tr></tbody>
         </table>
@@ -308,9 +312,12 @@
   <!-- ═══════════════════ TAB: PRODUCT ROI ═══════════════════ -->
   <div class="tab-content" id="tab-productRoi">
     <div class="panel">
-      <div class="panel-title">Product ROI Summary</div>
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
+        <div class="panel-title" style="margin:0;">Product ROI Summary</div>
+        <button onclick="printTable('Product ROI', 'Card Break Pro — Product ROI — ' + new Date().toLocaleDateString(), 'roiTable')" title="Print / Save as PDF" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:0.2rem 0.45rem;font-size:0.9rem;line-height:1;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--primary)';" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';">🖨</button>
+      </div>
       <div class="tbl-wrap">
-        <table class="data-table">
+        <table class="data-table" id="roiTable">
           <thead><tr><th>Product</th><th>Times Used</th><th>Total Units</th><th>Total Cost</th><th>Total Revenue</th><th>Est. Profit</th><th>ROI %</th><th>Bar</th></tr></thead>
           <tbody id="roiTableBody"></tbody>
         </table>
@@ -401,7 +408,10 @@
   <div class="tab-content" id="tab-invLog">
     <div class="panel">
       <div class="panel-header">
-        <div class="panel-title">Inventory Log</div>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <div class="panel-title" style="margin:0;">Inventory Log</div>
+          <button onclick="printTable('Inventory Log', 'Card Break Pro — Inventory Log — ' + new Date().toLocaleDateString(), 'ilTable')" title="Print / Save as PDF" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:0.2rem 0.45rem;font-size:0.9rem;line-height:1;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--primary)';" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';">🖨</button>
+        </div>
       </div>
       <div class="filter-row">
         <div><label for="ilPeriod">Period</label>
@@ -430,7 +440,7 @@
         <div class="stat-card"><div class="stat-label">Net Change</div><div class="stat-value" id="ilStatNet">—</div></div>
       </div>
       <div class="tbl-wrap">
-        <table class="data-table">
+        <table class="data-table" id="ilTable">
           <thead><tr><th>Date</th><th>Product</th><th>Action</th><th>Qty</th><th>Cost/Unit</th><th>Notes</th></tr></thead>
           <tbody id="ilTableBody"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
         </table>
@@ -1584,6 +1594,30 @@ async function savePassword() {
   document.getElementById('settPassword').value = '';
   document.getElementById('settPasswordConfirm').value = '';
   showGlobalSuccess('Password updated.');
+}
+
+// ── Print / PDF ───────────────────────────────────────────
+function printTable(title, subtitle, tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + title + '</title><style>' +
+    'body{font-family:system-ui,sans-serif;color:#111;background:#fff;padding:2rem;}' +
+    'h1{font-size:1.4rem;font-weight:800;margin-bottom:0.25rem;}' +
+    'p.sub{font-size:0.85rem;color:#666;margin-bottom:1.5rem;}' +
+    'table{width:100%;border-collapse:collapse;font-size:0.82rem;}' +
+    'th{background:#f4f4f7;font-weight:700;text-align:left;padding:0.5rem 0.75rem;border-bottom:2px solid #ddd;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;}' +
+    'td{padding:0.45rem 0.75rem;border-bottom:1px solid #eee;}' +
+    'tr:last-child td{border-bottom:none;}' +
+    '@media print{@page{margin:1.5cm;}}' +
+    '</style></head><body>' +
+    '<h1>' + title + '</h1>' +
+    '<p class="sub">' + (subtitle || ('Printed ' + new Date().toLocaleDateString())) + '</p>' +
+    table.outerHTML +
+    '</body></html>');
+  win.document.close();
+  win.focus();
+  setTimeout(function(){ win.print(); }, 400);
 }
 </script>
 </body>
