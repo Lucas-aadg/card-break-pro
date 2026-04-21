@@ -566,8 +566,8 @@ async function initAuth() {
 
     if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
     if (profile.role !== 'sorter') {
-      window.location.href = profile.role === 'owner' ? 'owner.html' : profile.role === 'breaker' ? 'breaker.html' : 'index.html';
-      return;
+      const roleMap = { owner: 'owner.html', breaker: 'breaker.html', manager: 'manager.html' };
+      window.location.href = roleMap[profile.role] || 'index.html'; return;
     }
 
     currentProfile = profile;

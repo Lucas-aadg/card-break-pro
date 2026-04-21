@@ -1729,7 +1729,10 @@ async function initAuth() {
       .from('profiles').select('*').eq('id', currentUser.id).single();
 
     if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
-    if (profile.role !== 'owner') { window.location.href = profile.role === 'breaker' ? 'breaker.html' : 'index.html'; return; }
+    if (profile.role !== 'owner') {
+      const roleMap = { breaker: 'breaker.html', sorter: 'sorter.html', manager: 'manager.html' };
+      window.location.href = roleMap[profile.role] || 'index.html'; return;
+    }
 
     // Check subscription status — retry if returning from Stripe checkout (webhook may be slow)
     const justPaid = new URLSearchParams(window.location.search).get('subscribed') === 'true';
