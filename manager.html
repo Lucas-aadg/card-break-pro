@@ -231,9 +231,9 @@
       <div class="tbl-wrap">
         <table class="data-table">
           <thead>
-            <tr><th>Date</th><th>Team Member</th><th>Role</th><th>Stream Key</th><th>Clock In</th><th>Clock Out</th><th>Duration</th><th>Status</th></tr>
+            <tr><th>Date</th><th>Team Member</th><th>Role</th><th>Stream Key</th><th>Clock In</th><th>Clock Out</th><th>Duration</th><th>Status</th><th></th></tr>
           </thead>
-          <tbody id="clockLogTableBody"><tr class="empty-row"><td colspan="8">Loading…</td></tr></tbody>
+          <tbody id="clockLogTableBody"><tr class="empty-row"><td colspan="9">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -556,6 +556,29 @@
     <div class="modal-btn-row">
       <button class="btn btn-outline" id="esCancelBtn">Cancel</button>
       <button class="btn btn-primary" id="esSaveBtn">Save Shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT CLOCK TIMES MODAL -->
+<div class="modal-overlay" id="editClockModal">
+  <div class="modal" style="max-width:420px;">
+    <h2>Edit Clock Times</h2>
+    <p id="editClockName" style="color:var(--muted);font-size:0.85rem;margin-bottom:1.25rem;"></p>
+    <input type="hidden" id="editClockId" />
+    <div style="display:grid;gap:1rem;">
+      <div class="form-group">
+        <label for="editClockIn">Clock In</label>
+        <input type="datetime-local" id="editClockIn" style="padding:0.65rem 0.75rem;font-size:0.9rem;" />
+      </div>
+      <div class="form-group">
+        <label for="editClockOut">Clock Out <span style="color:var(--muted);font-weight:400;">(leave blank if still clocked in)</span></label>
+        <input type="datetime-local" id="editClockOut" style="padding:0.65rem 0.75rem;font-size:0.9rem;" />
+      </div>
+    </div>
+    <div class="modal-btn-row" style="margin-top:1.5rem;">
+      <button class="btn btn-outline" id="editClockCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="editClockSaveBtn">Save</button>
     </div>
   </div>
 </div>
@@ -942,16 +965,16 @@ function loadCalendar() {
 
 async function loadClockLog() {
   const tbody = document.getElementById('clockLogTableBody');
-  tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Loading…</td></tr>';
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Loading…</td></tr>';
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
   const { data: shifts } = await sb.from('schedules')
-    .select('*')
+    .select('id, scheduled_date, start_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id, sorter_id')
     .eq('org_id', currentProfile.org_id)
     .not('clocked_in_at', 'is', null)
     .gte('scheduled_date', cutoff.toISOString().slice(0,10))
     .order('clocked_in_at', { ascending: false });
 
-  if (!shifts || !shifts.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No clock-in records found.</td></tr>'; return; }
+  if (!shifts || !shifts.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No clock-in records found.</td></tr>'; return; }
   tbody.innerHTML = '';
   shifts.forEach(function(s){
     const profile = allProfiles.find(function(p){ return p.id === s.breaker_id || p.id === s.sorter_id; });
@@ -970,10 +993,66 @@ async function loadClockLog() {
       '<td style="font-size:0.82rem;">' + (inT ? inT.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—') + '</td>' +
       '<td style="font-size:0.82rem;">' + (outT ? outT.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—') + '</td>' +
       '<td>' + hrs + '</td>' +
-      '<td>' + statusBadge + '</td>';
+      '<td>' + statusBadge + '</td>' +
+      '<td><button class="btn-sm" data-editclockid="' + s.id + '" data-name="' + name + '" data-cin="' + (s.clocked_in_at||'') + '" data-cout="' + (s.clocked_out_at||'') + '" style="font-size:0.72rem;padding:0.2rem 0.55rem;">Edit</button></td>';
     tbody.appendChild(tr);
   });
+
+  tbody.querySelectorAll('[data-editclockid]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      openEditClock(this.dataset.editclockid, this.dataset.name, this.dataset.cin, this.dataset.cout);
+    });
+  });
 }
+
+// ── EDIT CLOCK TIMES ─────────────────────────────────────
+function toLocalDatetimeValue(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  const pad = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function openEditClock(id, name, cinIso, coutIso) {
+  document.getElementById('editClockId').value = id;
+  document.getElementById('editClockName').textContent = name;
+  document.getElementById('editClockIn').value = toLocalDatetimeValue(cinIso);
+  document.getElementById('editClockOut').value = toLocalDatetimeValue(coutIso);
+  document.getElementById('editClockModal').classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('editClockCancelBtn').addEventListener('click', function() {
+    document.getElementById('editClockModal').classList.remove('active');
+  });
+  document.getElementById('editClockModal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+  document.getElementById('editClockSaveBtn').addEventListener('click', async function() {
+    const id = document.getElementById('editClockId').value;
+    const cinVal = document.getElementById('editClockIn').value;
+    const coutVal = document.getElementById('editClockOut').value;
+    if (!cinVal) { showGlobalError('Clock In time is required.'); return; }
+    const cinIso = new Date(cinVal).toISOString();
+    const coutIso = coutVal ? new Date(coutVal).toISOString() : null;
+    if (coutIso && coutIso <= cinIso) { showGlobalError('Clock Out must be after Clock In.'); return; }
+    const updates = { clocked_in_at: cinIso, clocked_out_at: coutIso };
+    if (coutIso) updates.status = 'completed';
+    const btn = document.getElementById('editClockSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { error } = await sb.from('schedules').update(updates).eq('id', id);
+      if (error) throw error;
+      document.getElementById('editClockModal').classList.remove('active');
+      await loadClockLog();
+      showGlobalSuccess('Clock times updated.');
+    } catch (err) {
+      showGlobalError('Failed to save: ' + escHtml(err.message));
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
+    }
+  });
+});
 
 // ── INVENTORY ────────────────────────────────────────────
 async function loadInventory() {

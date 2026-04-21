@@ -1200,10 +1200,11 @@
               <th>Clock Out</th>
               <th>Duration</th>
               <th>Status</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="clockLogTableBody">
-            <tr class="empty-row"><td colspan="8">Loading…</td></tr>
+            <tr class="empty-row"><td colspan="9">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1542,6 +1543,29 @@
     <div class="modal-btn-row" style="margin-top:1.5rem;">
       <button class="btn btn-outline" id="psCancelBtn">Cancel</button>
       <button class="btn btn-primary" id="psSaveBtn">Save Pay Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT SHIFT MODAL -->
+<div class="modal-overlay" id="editShiftModal">
+  <div class="modal" style="max-width:420px;">
+    <h2>Edit Shift Hours</h2>
+    <p id="editShiftName" style="color:var(--muted);font-size:0.85rem;margin-bottom:1.25rem;"></p>
+    <input type="hidden" id="editShiftId" />
+    <div style="display:grid;gap:1rem;">
+      <div class="form-group">
+        <label for="editShiftIn">Clock In</label>
+        <input type="datetime-local" id="editShiftIn" style="padding:0.65rem 0.75rem;font-size:0.9rem;" />
+      </div>
+      <div class="form-group">
+        <label for="editShiftOut">Clock Out <span style="color:var(--muted);font-weight:400;">(leave blank if still clocked in)</span></label>
+        <input type="datetime-local" id="editShiftOut" style="padding:0.65rem 0.75rem;font-size:0.9rem;" />
+      </div>
+    </div>
+    <div class="modal-btn-row" style="margin-top:1.5rem;">
+      <button class="btn btn-outline" id="editShiftCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="editShiftSaveBtn">Save</button>
     </div>
   </div>
 </div>
@@ -4341,7 +4365,7 @@ async function loadClockLog() {
     // Load all schedules that have been clocked in at some point, newest first
     const { data, error } = await sb
       .from('schedules')
-      .select('scheduled_date, start_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id')
+      .select('id, scheduled_date, start_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id')
       .eq('org_id', currentProfile.org_id)
       .not('clocked_in_at', 'is', null)
       .order('clocked_in_at', { ascending: false })
@@ -4351,7 +4375,7 @@ async function loadClockLog() {
 
     const rows = data || [];
     if (!rows.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No clock in/out records yet.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No clock in/out records yet.</td></tr>';
       return;
     }
 
@@ -4392,14 +4416,73 @@ async function loadClockLog() {
         '<td style="color:var(--green);font-weight:600;">' + cinStr + '</td>' +
         '<td>' + coutStr + '</td>' +
         '<td style="color:var(--muted);">' + duration + '</td>' +
-        '<td>' + statusBadge + '</td>';
+        '<td>' + statusBadge + '</td>' +
+        '<td><button class="btn-sm" data-editshiftid="' + r.id + '" data-name="' + escHtml(profile.display_name || '—') + '" data-cin="' + (r.clocked_in_at || '') + '" data-cout="' + (r.clocked_out_at || '') + '" style="font-size:0.72rem;padding:0.2rem 0.55rem;">Edit</button></td>';
       tbody.appendChild(tr);
     });
+
+    tbody.querySelectorAll('[data-editshiftid]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openEditShift(this.dataset.editshiftid, this.dataset.name, this.dataset.cin, this.dataset.cout);
+      });
+    });
   } catch (err) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Failed to load clock history.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Failed to load clock history.</td></tr>';
     console.error(err);
   }
 }
+
+function toLocalDatetimeValue(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  // Format as YYYY-MM-DDTHH:MM for datetime-local input
+  const pad = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function openEditShift(id, name, cinIso, coutIso) {
+  document.getElementById('editShiftId').value = id;
+  document.getElementById('editShiftName').textContent = name;
+  document.getElementById('editShiftIn').value = toLocalDatetimeValue(cinIso);
+  document.getElementById('editShiftOut').value = toLocalDatetimeValue(coutIso);
+  document.getElementById('editShiftModal').classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('editShiftCancelBtn').addEventListener('click', function() {
+    document.getElementById('editShiftModal').classList.remove('active');
+  });
+  document.getElementById('editShiftModal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+  document.getElementById('editShiftSaveBtn').addEventListener('click', async function() {
+    const id = document.getElementById('editShiftId').value;
+    const cinVal = document.getElementById('editShiftIn').value;
+    const coutVal = document.getElementById('editShiftOut').value;
+    if (!cinVal) { showGlobalError('Clock In time is required.'); return; }
+    const cinIso = new Date(cinVal).toISOString();
+    const coutIso = coutVal ? new Date(coutVal).toISOString() : null;
+    if (coutIso && coutIso <= cinIso) { showGlobalError('Clock Out must be after Clock In.'); return; }
+
+    const updates = { clocked_in_at: cinIso, clocked_out_at: coutIso };
+    if (coutIso) updates.status = 'completed';
+
+    const btn = document.getElementById('editShiftSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { error } = await sb.from('schedules').update(updates).eq('id', id);
+      if (error) throw error;
+      document.getElementById('editShiftModal').classList.remove('active');
+      await loadClockLog();
+      showGlobalSuccess('Shift hours updated.');
+    } catch (err) {
+      showGlobalError('Failed to save: ' + escHtml(err.message));
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
+    }
+  });
+});
+
 
 async function loadScheduleBreakers() {
   const sel = document.getElementById('schedBreaker');
