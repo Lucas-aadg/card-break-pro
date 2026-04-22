@@ -3247,6 +3247,13 @@ function setupCloseOutModal() {
 
       if (error) throw error;
 
+      // Create sort task for sorters
+      await sb.from('sort_tasks').insert({
+        org_id: currentProfile.org_id,
+        stream_id: beCurrentStream.id,
+        status: 'pending'
+      });
+
       document.getElementById('closeOutModal').classList.remove('active');
       document.getElementById('be-streamKey').value = '';
       beSubmittedBreaks = [];
