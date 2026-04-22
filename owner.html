@@ -384,6 +384,68 @@
     .section-divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
     .break-entry-col-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; }
     @media (max-width: 860px) { .break-entry-col-layout { grid-template-columns: 1fr; } }
+
+    /* ── HOME / EMPIRE DASHBOARD ── */
+    .nav-btn { background:none;border:none;color:var(--muted);font-size:0.8rem;font-weight:600;padding:0 1rem;height:52px;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:color 0.2s,border-color 0.2s;letter-spacing:0.3px; }
+    .nav-btn:hover { color:var(--text); }
+    .nav-btn.active { color:var(--primary);border-bottom-color:var(--primary); }
+
+    .context-bar { display:none;align-items:center;gap:0.75rem;background:var(--card);border-bottom:2px solid var(--border);padding:0 1.5rem;height:38px;position:sticky;top:52px;z-index:150; }
+    .context-bar.active { display:flex; }
+    .context-bar-accent { width:3px;height:20px;border-radius:2px;flex-shrink:0; }
+    .context-bar-label { font-size:0.78rem;color:var(--muted); }
+    .context-bar-name { font-weight:800;font-size:0.88rem;color:var(--text); }
+    .context-bar-back { margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted);font-size:0.72rem;font-weight:600;padding:0.25rem 0.65rem;border-radius:6px;cursor:pointer;transition:color 0.15s,border-color 0.15s; }
+    .context-bar-back:hover { color:var(--text);border-color:var(--text); }
+
+    .home-greeting { margin-bottom:2rem; }
+    .greeting-eyebrow { font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:0.4rem; }
+    .greeting-headline { font-size:2rem;font-weight:900;color:var(--text);letter-spacing:-0.5px;line-height:1.15;margin-bottom:0.35rem; }
+    .greeting-sub { font-size:0.85rem;color:var(--muted); }
+
+    .empire-kpis { display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem; }
+    @media(max-width:720px){ .empire-kpis { grid-template-columns:repeat(2,1fr); } }
+    .empire-kpi { background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1.3rem;position:relative;overflow:hidden; }
+    .empire-kpi::before { content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kpi-color,var(--primary)); }
+    .empire-kpi-label { font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.5rem; }
+    .empire-kpi-value { font-size:1.65rem;font-weight:900;color:var(--kpi-color,var(--text));letter-spacing:-0.5px;line-height:1; }
+    .empire-kpi-sub { font-size:0.72rem;color:var(--muted);margin-top:0.3rem; }
+
+    .section-heading { display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem; }
+    .section-heading-label { font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted); }
+
+    .channel-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem; }
+    @media(max-width:900px){ .channel-grid { grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:560px){ .channel-grid { grid-template-columns:1fr; } }
+    .channel-card { background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.3rem;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;position:relative;overflow:hidden;border-left:4px solid var(--ch-color,var(--primary)); }
+    .channel-card:hover { transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,0.35); }
+    .channel-card-top { display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.1rem; }
+    .channel-icon-wrap { font-size:1.75rem;line-height:1;margin-bottom:0.3rem; }
+    .channel-card-name { font-size:0.98rem;font-weight:800;color:var(--text); }
+    .channel-live-badge { display:flex;align-items:center;gap:0.35rem;font-size:0.7rem;font-weight:700;color:var(--green);margin-top:0.22rem;min-height:1em; }
+    .channel-live-badge.dim { color:transparent; }
+    .live-dot { width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;animation:livePulse 1.6s ease-in-out infinite; }
+    @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.45;transform:scale(0.65)} }
+    .channel-enter-btn { background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:var(--text);font-size:0.72rem;font-weight:700;padding:0.32rem 0.7rem;border-radius:6px;cursor:pointer;white-space:nowrap;transition:background 0.15s;flex-shrink:0; }
+    .channel-enter-btn:hover { background:rgba(255,255,255,0.12); }
+    .channel-stats { display:grid;grid-template-columns:1fr 1fr;gap:0.65rem; }
+    .channel-stat-label { font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:0.12rem; }
+    .channel-stat-value { font-size:1rem;font-weight:800;color:var(--text); }
+
+    .live-activity-item { display:flex;align-items:center;gap:0.85rem;padding:0.65rem 0;border-bottom:1px solid rgba(45,45,61,0.5); }
+    .live-activity-item:last-child { border-bottom:none; }
+    .live-activity-dot { width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;animation:livePulse 1.6s ease-in-out infinite; }
+    .live-activity-ch { font-size:0.72rem;font-weight:700;padding:0.18rem 0.55rem;border-radius:100px;margin-left:auto;flex-shrink:0; }
+
+    .ch-empty { text-align:center;padding:3.5rem 1rem;grid-column:1/-1; }
+    .ch-empty-icon { font-size:3rem;margin-bottom:0.75rem; }
+    .ch-empty-title { font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:0.4rem; }
+    .ch-empty-sub { font-size:0.83rem;color:var(--muted);margin-bottom:1.25rem; }
+
+    /* Channel management in settings */
+    .ch-list-item { display:flex;align-items:center;gap:0.85rem;padding:0.75rem 0;border-bottom:1px solid rgba(45,45,61,0.5); }
+    .ch-list-item:last-child { border-bottom:none; }
+    .ch-swatch { width:14px;height:14px;border-radius:50%;flex-shrink:0; }
   </style>
 </head>
 <body>
@@ -396,6 +458,9 @@
 <nav>
   <div class="brand">CARD <span>BREAK</span> PRO</div>
   <div class="nav-menu" id="navMenu">
+
+    <!-- Home -->
+    <button class="nav-btn active" id="ngb-home" onclick="switchTab('home')">Home</button>
 
     <!-- Live Operations -->
     <div class="nav-group" id="ng-live">
@@ -444,20 +509,76 @@
   </div>
 </nav>
 
+<!-- Channel Context Bar -->
+<div class="context-bar" id="contextBar">
+  <div class="context-bar-accent" id="contextBarAccent"></div>
+  <span id="contextBarIcon" style="font-size:1rem;"></span>
+  <span class="context-bar-label">Viewing</span>
+  <span class="context-bar-name" id="contextBarName"></span>
+  <button class="context-bar-back" onclick="exitChannel()">← All Accounts</button>
+</div>
+
 <div class="main">
   <div id="globalError" class="error-box"></div>
   <div id="globalSuccess" class="success-box"></div>
 
   <!-- ═══════════════════════════════════════════
+       TAB: HOME (EMPIRE DASHBOARD)
+  ════════════════════════════════════════════ -->
+  <div class="tab-content active" id="tab-home">
+
+    <!-- Greeting -->
+    <div class="home-greeting">
+      <div class="greeting-eyebrow" id="homeEyebrow">Card Break Pro</div>
+      <div class="greeting-headline" id="homeGreeting">Loading…</div>
+      <div class="greeting-sub" id="homeDate"></div>
+    </div>
+
+    <!-- Empire KPIs -->
+    <div class="empire-kpis" id="empireKpis">
+      <div class="empire-kpi" style="--kpi-color:var(--primary)"><div class="empire-kpi-label">Today's Revenue</div><div class="empire-kpi-value">—</div></div>
+      <div class="empire-kpi" style="--kpi-color:var(--green)"><div class="empire-kpi-label">Today's Profit</div><div class="empire-kpi-value">—</div></div>
+      <div class="empire-kpi" style="--kpi-color:var(--primary)"><div class="empire-kpi-label">Month Revenue</div><div class="empire-kpi-value">—</div></div>
+      <div class="empire-kpi" style="--kpi-color:var(--green)"><div class="empire-kpi-label">Live Streams</div><div class="empire-kpi-value">—</div></div>
+    </div>
+
+    <!-- Account Cards -->
+    <div style="margin-bottom:2rem;">
+      <div class="section-heading">
+        <div class="section-heading-label">Your Accounts</div>
+        <button class="btn-sm" style="background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);color:var(--primary);font-size:0.72rem;" onclick="openChannelModal(null)">+ New Account</button>
+      </div>
+      <div class="channel-grid" id="channelGrid">
+        <div style="grid-column:1/-1;color:var(--muted);font-size:0.85rem;">Loading accounts…</div>
+      </div>
+    </div>
+
+    <!-- Live Activity -->
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+        <div class="panel-title" style="margin:0;">Live Right Now</div>
+        <button class="btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:0.72rem;" onclick="loadHome()">Refresh</button>
+      </div>
+      <div id="liveActivityBody"><div style="color:var(--muted);font-size:0.85rem;">Loading…</div></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════
        TAB: BREAK ENTRY
   ════════════════════════════════════════════ -->
-  <div class="tab-content active" id="tab-breakEntry">
+  <div class="tab-content" id="tab-breakEntry">
     <div class="break-entry-col-layout">
       <!-- Left column -->
       <div>
         <!-- Session -->
         <div class="panel">
           <div class="panel-title">Session Info</div>
+          <div id="be-channel-banner" style="display:none;align-items:center;gap:0.6rem;margin-bottom:0.85rem;padding:0.55rem 0.85rem;border-radius:8px;background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.2);">
+            <span id="be-channel-icon" style="font-size:1rem;"></span>
+            <span id="be-channel-name" style="font-weight:700;font-size:0.85rem;color:var(--text);"></span>
+            <span style="font-size:0.75rem;color:var(--muted);margin-left:0.25rem;">· products filtered to this account</span>
+          </div>
           <div class="session-grid">
             <div>
               <label for="be-date">Date</label>
@@ -586,6 +707,12 @@
       </div>
       <input type="hidden" id="invEditId" />
       <div class="inv-form">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label for="invChannel">Account (Channel)</label>
+          <select id="invChannel">
+            <option value="">— No specific account —</option>
+          </select>
+        </div>
         <div class="form-group">
           <label for="invName">Product Name</label>
           <input type="text" id="invName" placeholder="e.g. 2024 Topps Chrome Blaster" />
@@ -1304,6 +1431,15 @@
       </div>
     </div>
 
+    <!-- Channels / Accounts -->
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <div class="panel-title" style="margin:0;">Accounts (Channels)</div>
+        <button class="btn-sm" style="background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);color:var(--primary);" onclick="openChannelModal(null)">+ New Account</button>
+      </div>
+      <div id="settChannelList"><div style="color:var(--muted);font-size:0.85rem;">Loading…</div></div>
+    </div>
+
     <!-- Preferences -->
     <div class="panel">
       <div class="panel-title">Preferences</div>
@@ -1371,6 +1507,34 @@
     <div class="modal-btn-row">
       <button class="btn btn-outline" id="coCancelBtn">Cancel</button>
       <button class="btn btn-red" id="coConfirmBtn">Close Out Stream</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHANNEL MODAL -->
+<div class="modal-overlay" id="channelModal">
+  <div class="modal" style="max-width:440px;">
+    <h2 id="channelModalTitle">New Account</h2>
+    <input type="hidden" id="chModalId" />
+    <div style="display:grid;gap:1rem;">
+      <div class="form-group">
+        <label for="chModalName">Account Name</label>
+        <input type="text" id="chModalName" placeholder="e.g. Baseball Cards, Disney TCG" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="form-group">
+          <label for="chModalIcon">Icon (emoji)</label>
+          <input type="text" id="chModalIcon" placeholder="⚾" maxlength="4" style="font-size:1.4rem;text-align:center;" />
+        </div>
+        <div class="form-group">
+          <label for="chModalColor">Color</label>
+          <input type="color" id="chModalColor" value="#4f6ef7" style="height:42px;padding:0.2rem;cursor:pointer;" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-btn-row" style="margin-top:1.5rem;">
+      <button class="btn btn-outline" id="chModalCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="chModalSaveBtn">Save Account</button>
     </div>
   </div>
 </div>
@@ -1717,6 +1881,285 @@ function openConfirm(title, text, callback) {
   document.getElementById('confirmModal').classList.add('active');
 }
 
+// ── Channels ──────────────────────────────────────────────
+let orgChannels = [];
+let activeChannel = null;
+
+async function loadChannels() {
+  const { data, error } = await sb.from('channels').select('*').eq('org_id', currentProfile.org_id).order('sort_order', { ascending: true });
+  if (error) throw error;
+  orgChannels = data || [];
+}
+
+function enterChannel(channelId) {
+  const ch = orgChannels.find(function(c){ return c.id === channelId; });
+  if (!ch) return;
+  activeChannel = ch;
+  updateContextBar();
+  loadProducts().then(function() { beRenderProductTable(); });
+  switchTab('breakEntry');
+  updateBreakEntryChannelBanner();
+}
+
+function exitChannel() {
+  activeChannel = null;
+  updateContextBar();
+  loadProducts().then(function() { beRenderProductTable(); });
+  switchTab('home');
+  updateBreakEntryChannelBanner();
+}
+
+function updateContextBar() {
+  const bar = document.getElementById('contextBar');
+  if (!bar) return;
+  if (activeChannel) {
+    bar.classList.add('active');
+    document.getElementById('contextBarAccent').style.background = activeChannel.color;
+    document.getElementById('contextBarIcon').textContent = activeChannel.icon;
+    document.getElementById('contextBarName').textContent = activeChannel.name;
+  } else {
+    bar.classList.remove('active');
+  }
+}
+
+function updateBreakEntryChannelBanner() {
+  const banner = document.getElementById('be-channel-banner');
+  if (!banner) return;
+  if (activeChannel) {
+    banner.style.display = 'flex';
+    banner.style.borderColor = activeChannel.color + '55';
+    banner.style.background = activeChannel.color + '15';
+    document.getElementById('be-channel-icon').textContent = activeChannel.icon;
+    document.getElementById('be-channel-name').textContent = activeChannel.name;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function populateChannelDropdowns() {
+  // Inventory channel select
+  const sel = document.getElementById('invChannel');
+  if (sel) {
+    sel.innerHTML = '<option value="">— No specific account —</option>';
+    orgChannels.forEach(function(ch) {
+      const opt = document.createElement('option');
+      opt.value = ch.id;
+      opt.textContent = ch.icon + ' ' + ch.name;
+      if (activeChannel && activeChannel.id === ch.id) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+// ── Home Tab ──────────────────────────────────────────────
+function setupHome() {
+  updateGreeting();
+  setInterval(updateGreeting, 60000);
+}
+
+function updateGreeting() {
+  const hour = new Date().getHours();
+  let greeting, emoji;
+  if (hour < 12) { greeting = 'Good morning'; emoji = '☀️'; }
+  else if (hour < 17) { greeting = 'Good afternoon'; emoji = '⚡'; }
+  else { greeting = 'Good evening'; emoji = '🌙'; }
+  const name = currentProfile ? (currentProfile.display_name || 'Boss') : 'Boss';
+  const greetEl = document.getElementById('homeGreeting');
+  if (greetEl) greetEl.textContent = greeting + ', ' + name + '. ' + emoji;
+  const dateEl = document.getElementById('homeDate');
+  if (dateEl) {
+    const now = new Date();
+    dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  }
+}
+
+async function loadHome() {
+  updateGreeting();
+  await loadChannels();
+  populateChannelDropdowns();
+  await Promise.all([loadEmpireKpis(), renderChannelGrid()]);
+  await loadLiveActivity();
+}
+
+async function loadEmpireKpis() {
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 7) + '-01';
+  const [todayR, monthR, activeR] = await Promise.all([
+    sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', today),
+    sb.from('streams').select('final_sales').eq('org_id', currentProfile.org_id).eq('status', 'closed').gte('break_date', monthStart),
+    sb.from('streams').select('id').eq('org_id', currentProfile.org_id).eq('status', 'active')
+  ]);
+  const todayRev = (todayR.data || []).reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
+  const todayProfit = (todayR.data || []).reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0)-(parseFloat(x.total_product_cost)||0)-(parseFloat(x.total_other_costs)||0); }, 0);
+  const monthRev = (monthR.data || []).reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
+  const liveCount = (activeR.data || []).length;
+  const el = document.getElementById('empireKpis');
+  if (!el) return;
+  const profitColor = todayProfit >= 0 ? 'var(--green)' : 'var(--red)';
+  el.innerHTML = [
+    { label:"Today's Revenue", value: fmt(todayRev), sub:'closed streams today', color:'var(--primary)' },
+    { label:"Today's Profit", value: fmt(todayProfit), sub:'after all costs', color: profitColor },
+    { label:'Month Revenue', value: fmt(monthRev), sub: new Date().toLocaleString('default',{month:'long'}), color:'var(--primary)' },
+    { label:'Live Streams', value: liveCount, sub: liveCount === 1 ? '1 stream in progress' : liveCount + ' streams in progress', color:'var(--green)' }
+  ].map(function(k) {
+    return '<div class="empire-kpi" style="--kpi-color:' + k.color + '"><div class="empire-kpi-label">' + escHtml(k.label) + '</div><div class="empire-kpi-value">' + k.value + '</div><div class="empire-kpi-sub">' + escHtml(k.sub) + '</div></div>';
+  }).join('');
+}
+
+async function renderChannelGrid() {
+  const grid = document.getElementById('channelGrid');
+  if (!grid) return;
+  if (!orgChannels.length) {
+    grid.innerHTML = '<div class="ch-empty"><div class="ch-empty-icon">🏦</div><div class="ch-empty-title">No accounts yet</div><div class="ch-empty-sub">Create your first account to start organizing your channels.</div><button class="btn btn-primary" onclick="openChannelModal(null)" style="padding:0.65rem 1.5rem;">Create Account</button></div>';
+    return;
+  }
+  grid.innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">Loading accounts…</div>';
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 7) + '-01';
+  const profileMap = {};
+  allProfiles.forEach(function(p){ profileMap[p.id] = p; });
+
+  const channelData = await Promise.all(orgChannels.map(async function(ch) {
+    const [tdR, moR, acR] = await Promise.all([
+      sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).eq('channel_id', ch.id).eq('break_date', today).eq('status','closed'),
+      sb.from('streams').select('final_sales').eq('org_id', currentProfile.org_id).eq('channel_id', ch.id).gte('break_date', monthStart).eq('status','closed'),
+      sb.from('streams').select('id,breaker_id').eq('org_id', currentProfile.org_id).eq('channel_id', ch.id).eq('status','active')
+    ]);
+    return { ch, td: tdR.data||[], mo: moR.data||[], ac: acR.data||[] };
+  }));
+
+  grid.innerHTML = channelData.map(function(d) {
+    const { ch, td, mo, ac } = d;
+    const todayRev = td.reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
+    const todayProfit = td.reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0)-(parseFloat(x.total_product_cost)||0)-(parseFloat(x.total_other_costs)||0); }, 0);
+    const monthRev = mo.reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
+    const isLive = ac.length > 0;
+    const liveBreaker = isLive && ac[0].breaker_id ? ((profileMap[ac[0].breaker_id]||{}).display_name||'Someone') : '';
+    const profitColor = todayProfit >= 0 ? 'var(--green)' : 'var(--red)';
+    return '<div class="channel-card" style="--ch-color:' + ch.color + ';border-left-color:' + ch.color + ';" onclick="enterChannel(\'' + ch.id + '\')">' +
+      '<div class="channel-card-top">' +
+        '<div>' +
+          '<div class="channel-icon-wrap">' + ch.icon + '</div>' +
+          '<div class="channel-card-name">' + escHtml(ch.name) + '</div>' +
+          '<div class="channel-live-badge' + (isLive ? '' : ' dim') + '">' + (isLive ? '<span class="live-dot"></span>' + escHtml(liveBreaker) + ' is live' : '&nbsp;') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:0.4rem;align-items:flex-end;">' +
+          '<button class="channel-enter-btn" onclick="event.stopPropagation();enterChannel(\'' + ch.id + '\')">Enter →</button>' +
+          '<button class="btn-sm" style="font-size:0.65rem;padding:0.2rem 0.5rem;background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--muted);" onclick="event.stopPropagation();openChannelModal(\'' + ch.id + '\')">Edit</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="channel-stats">' +
+        '<div><div class="channel-stat-label">Today Revenue</div><div class="channel-stat-value" style="color:var(--primary);">' + fmt(todayRev) + '</div></div>' +
+        '<div><div class="channel-stat-label">Today Profit</div><div class="channel-stat-value" style="color:' + profitColor + ';">' + fmt(todayProfit) + '</div></div>' +
+        '<div><div class="channel-stat-label">Month Revenue</div><div class="channel-stat-value">' + fmt(monthRev) + '</div></div>' +
+        '<div><div class="channel-stat-label">Live</div><div class="channel-stat-value' + (isLive ? ' green' : '') + '">' + ac.length + '</div></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function loadLiveActivity() {
+  const el = document.getElementById('liveActivityBody');
+  if (!el) return;
+  const { data: activeStreams } = await sb.from('streams').select('id,breaker_id,channel_id,stream_key,break_count').eq('org_id', currentProfile.org_id).eq('status','active');
+  if (!activeStreams || !activeStreams.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">No active streams right now. Everything is quiet.</div>';
+    return;
+  }
+  const profileMap = {};
+  allProfiles.forEach(function(p){ profileMap[p.id] = p; });
+  const channelMap = {};
+  orgChannels.forEach(function(c){ channelMap[c.id] = c; });
+  el.innerHTML = activeStreams.map(function(s) {
+    const breaker = profileMap[s.breaker_id] || {};
+    const ch = s.channel_id && channelMap[s.channel_id] ? channelMap[s.channel_id] : null;
+    const chBadge = ch ? '<span class="live-activity-ch" style="background:' + ch.color + '22;color:' + ch.color + ';">' + ch.icon + ' ' + escHtml(ch.name) + '</span>' : '';
+    return '<div class="live-activity-item">' +
+      '<span class="live-activity-dot"></span>' +
+      '<div style="flex:1;">' +
+        '<div style="font-weight:700;font-size:0.88rem;color:var(--text);">' + escHtml(breaker.display_name || '—') + '</div>' +
+        '<div style="font-size:0.78rem;color:var(--muted);">' + escHtml(s.stream_key || '—') + ' · ' + (s.break_count || 0) + ' breaks</div>' +
+      '</div>' + chBadge + '</div>';
+  }).join('');
+}
+
+// ── Channel CRUD ──────────────────────────────────────────
+function openChannelModal(channelId) {
+  const ch = channelId ? orgChannels.find(function(c){ return c.id === channelId; }) : null;
+  document.getElementById('chModalId').value = channelId || '';
+  document.getElementById('channelModalTitle').textContent = ch ? 'Edit Account' : 'New Account';
+  document.getElementById('chModalName').value = ch ? ch.name : '';
+  document.getElementById('chModalIcon').value = ch ? ch.icon : '📦';
+  document.getElementById('chModalColor').value = ch ? ch.color : '#4f6ef7';
+  document.getElementById('channelModal').classList.add('active');
+}
+
+async function renderSettingsChannelList() {
+  const el = document.getElementById('settChannelList');
+  if (!el) return;
+  await loadChannels();
+  if (!orgChannels.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">No accounts yet. Click "New Account" to create one.</div>';
+    return;
+  }
+  el.innerHTML = orgChannels.map(function(ch) {
+    return '<div class="ch-list-item">' +
+      '<div class="ch-swatch" style="background:' + ch.color + ';"></div>' +
+      '<span style="font-size:1.1rem;">' + ch.icon + '</span>' +
+      '<span style="font-weight:700;font-size:0.9rem;flex:1;">' + escHtml(ch.name) + '</span>' +
+      '<button class="btn-sm" style="font-size:0.72rem;padding:0.25rem 0.6rem;background:rgba(79,110,247,0.1);border:1px solid rgba(79,110,247,0.3);color:var(--primary);" onclick="openChannelModal(\'' + ch.id + '\')">Edit</button>' +
+      '<button class="btn-sm btn-danger-sm" style="font-size:0.72rem;padding:0.25rem 0.6rem;" onclick="deleteChannel(\'' + ch.id + '\',\'' + escHtml(ch.name) + '\')">Delete</button>' +
+    '</div>';
+  }).join('');
+}
+
+function deleteChannel(channelId, name) {
+  openConfirm('Delete Account', 'Delete "' + name + '"? This will NOT delete existing streams or products — they just won\'t be linked to this account anymore.', async function() {
+    await sb.from('channels').delete().eq('id', channelId);
+    await loadChannels();
+    populateChannelDropdowns();
+    renderSettingsChannelList();
+    showGlobalSuccess('"' + name + '" deleted.');
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('chModalCancelBtn').addEventListener('click', function() {
+    document.getElementById('channelModal').classList.remove('active');
+  });
+  document.getElementById('channelModal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+  document.getElementById('chModalSaveBtn').addEventListener('click', async function() {
+    const name = document.getElementById('chModalName').value.trim();
+    const icon = document.getElementById('chModalIcon').value.trim() || '📦';
+    const color = document.getElementById('chModalColor').value || '#4f6ef7';
+    const id = document.getElementById('chModalId').value;
+    if (!name) { showGlobalError('Account name is required.'); return; }
+    const btn = document.getElementById('chModalSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      if (id) {
+        const { error } = await sb.from('channels').update({ name, icon, color }).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await sb.from('channels').insert({ org_id: currentProfile.org_id, name, icon, color, sort_order: orgChannels.length });
+        if (error) throw error;
+      }
+      document.getElementById('channelModal').classList.remove('active');
+      await loadChannels();
+      populateChannelDropdowns();
+      renderSettingsChannelList();
+      if (document.getElementById('tab-home').classList.contains('active')) await renderChannelGrid();
+      showGlobalSuccess('Account saved.');
+    } catch (err) {
+      showGlobalError('Failed to save: ' + escHtml(err.message));
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Account';
+    }
+  });
+});
+
 // ── Auth ──────────────────────────────────────────────────
 async function initAuth() {
   showLoading('Checking session…');
@@ -1781,8 +2224,11 @@ async function initAuth() {
     currentProfile = profile;
     document.getElementById('ownerBadge').textContent = escHtml(profile.display_name);
 
-    await Promise.all([loadProducts(), loadAllProfiles()]);
+    await Promise.all([loadChannels(), loadAllProfiles()]);
+    await loadProducts();
+    populateChannelDropdowns();
     setupTabNav();
+    setupHome();
     setupBreakEntry();
     setupInventory();
     setupHistory();
@@ -1794,7 +2240,7 @@ async function initAuth() {
     setupCloseOutModal();
 
     // Load initial tab data
-    await loadDashboard();
+    await loadHome();
 
     hideLoading();
   } catch (err) {
@@ -1807,6 +2253,7 @@ async function initAuth() {
 // ── Tab Navigation (Dropdown) ─────────────────────────────
 // Maps each tab to its parent dropdown group
 const TAB_GROUP_MAP = {
+  home: 'ng-home',
   breakEntry: 'ng-live', schedule: 'ng-live',
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', performance: 'ng-reports',
   inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
@@ -1816,6 +2263,9 @@ const GROUP_BTN_MAP = {
 };
 
 function updateNavActiveState(activeTab) {
+  // Home button
+  const homeBtn = document.getElementById('ngb-home');
+  if (homeBtn) homeBtn.classList.toggle('active', activeTab === 'home');
   // Clear all dropdown item active states
   document.querySelectorAll('.nav-dd-item').forEach(function (el) { el.classList.remove('active'); });
   // Clear all group button active states
@@ -1825,7 +2275,7 @@ function updateNavActiveState(activeTab) {
   if (activeItem) activeItem.classList.add('active');
   // Set active group
   const groupId = TAB_GROUP_MAP[activeTab];
-  if (groupId) {
+  if (groupId && groupId !== 'ng-home') {
     const groupBtnId = GROUP_BTN_MAP[groupId];
     if (groupBtnId) document.getElementById(groupBtnId).classList.add('has-active');
   }
@@ -1844,7 +2294,9 @@ async function switchTab(tab) {
   closeAllDropdowns();
 
   try {
-    if (tab === 'inventory') await loadInventoryTable();
+    if (tab === 'home') await loadHome();
+    else if (tab === 'breakEntry') { await loadProducts(); beRenderProductTable(); updateBreakEntryChannelBanner(); }
+    else if (tab === 'inventory') await loadInventoryTable();
     else if (tab === 'invLog') await loadInvLog();
     else if (tab === 'payroll') await loadPayroll();
     else if (tab === 'history') await loadHistory();
@@ -1855,7 +2307,7 @@ async function switchTab(tab) {
     else if (tab === 'team') await loadTeam();
     else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
     else if (tab === 'sorting') await loadSorting();
-    else if (tab === 'settings') await loadSettings();
+    else if (tab === 'settings') { await loadSettings(); await renderSettingsChannelList(); }
   } catch (err) {
     showGlobalError('Failed to load tab: ' + escHtml(err.message));
     console.error(err);
@@ -1942,12 +2394,10 @@ function setupConfirmModal() {
 
 // ── Products (shared) ─────────────────────────────────────
 async function loadProducts() {
-  const { data, error } = await sb
-    .from('products')
-    .select('*')
-    .eq('org_id', currentProfile.org_id)
-    .order('display_order', { ascending: true });
-
+  let q = sb.from('products').select('*').eq('org_id', currentProfile.org_id);
+  if (activeChannel) q = q.eq('channel_id', activeChannel.id);
+  q = q.order('display_order', { ascending: true });
+  const { data, error } = await q;
   if (error) throw error;
   orgProducts = data || [];
   return orgProducts;
@@ -2261,17 +2711,20 @@ async function beGetOrCreateStream() {
   if (fetchErr) throw fetchErr;
   if (existing) return existing;
 
+  const streamInsert = {
+    org_id: currentProfile.org_id,
+    breaker_id: currentUser.id,
+    stream_key: streamKey,
+    break_date: breakDate,
+    status: 'active',
+    total_submitted_revenue: 0,
+    break_count: 0
+  };
+  if (activeChannel) streamInsert.channel_id = activeChannel.id;
+
   const { data: newStream, error: createErr } = await sb
     .from('streams')
-    .insert({
-      org_id: currentProfile.org_id,
-      breaker_id: currentUser.id,
-      stream_key: streamKey,
-      break_date: breakDate,
-      status: 'active',
-      total_submitted_revenue: 0,
-      break_count: 0
-    })
+    .insert(streamInsert)
     .select().single();
 
   if (createErr) throw createErr;
@@ -2776,6 +3229,8 @@ function invClearForm() {
   document.getElementById('invDisplayOrder').value = '0';
   document.getElementById('invNotes').value = '';
   document.getElementById('invAvgCost').checked = false;
+  const chSel = document.getElementById('invChannel');
+  if (chSel) chSel.value = activeChannel ? activeChannel.id : '';
 }
 
 async function invHandleSave() {
@@ -2786,6 +3241,7 @@ async function invHandleSave() {
   const minAlert = parseInt(document.getElementById('invMinAlert').value, 10) || 5;
   const displayOrder = parseInt(document.getElementById('invDisplayOrder').value, 10) || 0;
   const notes = document.getElementById('invNotes').value.trim();
+  const channelSelVal = document.getElementById('invChannel').value || null;
 
   if (!name) { showGlobalError('Product name is required.'); return; }
 
@@ -2802,7 +3258,8 @@ async function invHandleSave() {
       min_stock_alert: minAlert,
       display_order: displayOrder,
       notes: notes || null,
-      active: true
+      active: true,
+      channel_id: channelSelVal
     }).select('id').single();
     if (error) throw error;
 
