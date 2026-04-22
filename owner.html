@@ -1219,6 +1219,7 @@
               <th>Name</th>
               <th>Role</th>
               <th>Pay Structure</th>
+              <th>Accounts</th>
               <th>Joined</th>
               <th>Actions</th>
             </tr>
@@ -1681,6 +1682,20 @@
     <div class="modal-btn-row">
       <button class="btn btn-outline" id="confirmCancelBtn">Cancel</button>
       <button class="btn btn-red" id="confirmOkBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHANNEL ASSIGN MODAL -->
+<div class="modal-overlay" id="assignChannelModal">
+  <div class="modal" style="max-width:440px;">
+    <h2>Assign Accounts</h2>
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.25rem;">Select which accounts <strong id="assignMemberName" style="color:var(--text);"></strong> can work.</p>
+    <input type="hidden" id="assignProfileId" />
+    <div id="assignChannelList" style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1.5rem;max-height:320px;overflow-y:auto;"></div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="document.getElementById('assignChannelModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" id="assignChannelSaveBtn">Save Assignments</button>
     </div>
   </div>
 </div>
@@ -4326,6 +4341,7 @@ async function generateInviteCode() {
 
 async function loadTeam() {
   await loadAllProfiles();
+  await loadChannels();
 
   // Unused codes
   try {
@@ -4355,12 +4371,29 @@ async function loadTeam() {
     showGlobalError('Failed to load codes: ' + escHtml(err.message));
   }
 
+  // Load channel assignments for the whole org
+  let assignMap = {}; // profile_id -> [channel, ...]
+  try {
+    const { data: assigns, error: aErr } = await sb
+      .from('channel_assignments').select('profile_id, channel_id')
+      .eq('org_id', currentProfile.org_id);
+    if (aErr) throw aErr;
+    const chMap = {};
+    orgChannels.forEach(function(c){ chMap[c.id] = c; });
+    (assigns || []).forEach(function(a) {
+      if (!assignMap[a.profile_id]) assignMap[a.profile_id] = [];
+      if (chMap[a.channel_id]) assignMap[a.profile_id].push(chMap[a.channel_id]);
+    });
+  } catch(err) {
+    // non-fatal, show empty chips
+  }
+
   // Team members
   const tbody = document.getElementById('teamTableBody');
   tbody.innerHTML = '';
 
   if (allProfiles.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No team members yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No team members yet.</td></tr>';
     return;
   }
 
@@ -4369,10 +4402,26 @@ async function loadTeam() {
     const isMe = p.id === currentUser.id;
     const isOwner = p.role === 'owner';
     const payLabel = isOwner ? '—' : formatPayStructureLabel(p);
+
+    // Build channel chips
+    const assignedChannels = assignMap[p.id] || [];
+    let chipsHtml = '';
+    if (isOwner) {
+      chipsHtml = '<span style="color:var(--muted);font-size:0.78rem;">All</span>';
+    } else if (assignedChannels.length === 0) {
+      chipsHtml = '<span style="color:var(--muted);font-size:0.78rem;">None</span>';
+    } else {
+      chipsHtml = assignedChannels.map(function(ch) {
+        return '<span style="display:inline-block;padding:0.18rem 0.55rem;border-radius:100px;font-size:0.72rem;font-weight:700;background:' + ch.color + '22;border:1px solid ' + ch.color + '55;color:' + ch.color + ';margin:0.1rem;">' +
+          escHtml(ch.icon || '') + ' ' + escHtml(ch.name) + '</span>';
+      }).join('');
+    }
+
     tr.innerHTML =
       '<td><strong>' + escHtml(p.display_name) + '</strong>' + (isMe ? ' <span style="color:var(--muted);font-size:0.75rem;">(you)</span>' : '') + '</td>' +
       '<td><span class="badge ' + (isOwner ? 'badge-blue' : p.role === 'breaker' ? 'badge-green' : p.role === 'manager' ? 'badge-purple' : 'badge-gray') + '">' + escHtml(p.role) + '</span></td>' +
       '<td style="font-size:0.82rem;color:var(--muted);">' + payLabel + '</td>' +
+      '<td><div style="display:flex;flex-wrap:wrap;gap:0.15rem;align-items:center;">' + chipsHtml + (!isOwner ? ' <button class="btn btn-outline btn-sm" data-action="assign" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.15rem 0.5rem;font-size:0.7rem;margin-left:0.25rem;">Assign</button>' : '') + '</div></td>' +
       '<td>' + fmtDate(p.created_at) + '</td>' +
       '<td><div class="btn-row">' +
         (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="pay" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Pay Settings</button>' : '') +
@@ -4386,6 +4435,12 @@ async function loadTeam() {
     btn.addEventListener('click', function () {
       const p = allProfiles.find(function (x) { return x.id === btn.dataset.id; });
       if (p) openPaySettings(p);
+    });
+  });
+
+  tbody.querySelectorAll('[data-action="assign"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openAssignChannels(btn.dataset.id, btn.dataset.name);
     });
   });
 
@@ -4410,6 +4465,76 @@ async function loadTeam() {
     });
   });
 }
+
+// ── Channel Assignments ────────────────────────────────────
+async function openAssignChannels(profileId, displayName) {
+  document.getElementById('assignProfileId').value = profileId;
+  document.getElementById('assignMemberName').textContent = displayName;
+
+  // Fetch existing assignments for this profile
+  const { data: existing } = await sb.from('channel_assignments')
+    .select('channel_id').eq('profile_id', profileId);
+  const assigned = new Set((existing || []).map(function(a){ return a.channel_id; }));
+
+  const list = document.getElementById('assignChannelList');
+  if (!orgChannels.length) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;">No accounts created yet.</p>';
+  } else {
+    list.innerHTML = orgChannels.map(function(ch) {
+      const checked = assigned.has(ch.id) ? 'checked' : '';
+      return '<label style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0.9rem;border-radius:10px;border:1px solid ' + (assigned.has(ch.id) ? ch.color + '55' : 'var(--border)') + ';background:' + (assigned.has(ch.id) ? ch.color + '11' : 'rgba(255,255,255,0.02)') + ';cursor:pointer;transition:all 0.2s;" class="assign-ch-row" data-channel-id="' + ch.id + '">' +
+        '<input type="checkbox" value="' + ch.id + '" ' + checked + ' style="width:16px;height:16px;accent-color:' + ch.color + ';cursor:pointer;" />' +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' + ch.color + ';flex-shrink:0;"></span>' +
+        '<span style="font-weight:700;font-size:0.9rem;">' + escHtml(ch.icon || '') + ' ' + escHtml(ch.name) + '</span>' +
+        '</label>';
+    }).join('');
+
+    // Live highlight on check
+    list.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        const row = cb.closest('.assign-ch-row');
+        const ch = orgChannels.find(function(c){ return c.id === cb.value; });
+        if (!ch) return;
+        if (cb.checked) {
+          row.style.borderColor = ch.color + '55';
+          row.style.background = ch.color + '11';
+        } else {
+          row.style.borderColor = 'var(--border)';
+          row.style.background = 'rgba(255,255,255,0.02)';
+        }
+      });
+    });
+  }
+
+  document.getElementById('assignChannelModal').classList.add('active');
+}
+
+document.getElementById('assignChannelSaveBtn').addEventListener('click', async function() {
+  const profileId = document.getElementById('assignProfileId').value;
+  const checkboxes = document.getElementById('assignChannelList').querySelectorAll('input[type="checkbox"]');
+  const selectedIds = Array.from(checkboxes).filter(function(cb){ return cb.checked; }).map(function(cb){ return cb.value; });
+
+  try {
+    // Delete existing, then insert new
+    const { error: delErr } = await sb.from('channel_assignments')
+      .delete().eq('profile_id', profileId).eq('org_id', currentProfile.org_id);
+    if (delErr) throw delErr;
+
+    if (selectedIds.length > 0) {
+      const rows = selectedIds.map(function(cid) {
+        return { org_id: currentProfile.org_id, profile_id: profileId, channel_id: cid };
+      });
+      const { error: insErr } = await sb.from('channel_assignments').insert(rows);
+      if (insErr) throw insErr;
+    }
+
+    document.getElementById('assignChannelModal').classList.remove('active');
+    await loadTeam();
+    showGlobalSuccess('Account assignments saved.');
+  } catch(err) {
+    showGlobalError('Failed to save assignments: ' + escHtml(err.message));
+  }
+});
 
 // ── Commission ────────────────────────────────────────────
 
