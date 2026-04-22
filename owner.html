@@ -464,10 +464,9 @@
 
     <!-- Live Operations -->
     <div class="nav-group" id="ng-live">
-      <button class="nav-group-btn has-active" id="ngb-live">Live ▾</button>
+      <button class="nav-group-btn" id="ngb-live">Live ▾</button>
       <div class="nav-dropdown">
         <div class="dd-section-label">Stream</div>
-        <button class="nav-dd-item active" data-tab="breakEntry">Break Entry</button>
         <button class="nav-dd-item" data-tab="schedule">Schedule</button>
       </div>
     </div>
@@ -1896,17 +1895,15 @@ function enterChannel(channelId) {
   if (!ch) return;
   activeChannel = ch;
   updateContextBar();
-  loadProducts().then(function() { beRenderProductTable(); });
-  switchTab('breakEntry');
-  updateBreakEntryChannelBanner();
+  loadProducts();
+  switchTab('dashboard');
 }
 
 function exitChannel() {
   activeChannel = null;
   updateContextBar();
-  loadProducts().then(function() { beRenderProductTable(); });
+  loadProducts();
   switchTab('home');
-  updateBreakEntryChannelBanner();
 }
 
 function updateContextBar() {
@@ -2010,7 +2007,7 @@ async function renderChannelGrid() {
   const grid = document.getElementById('channelGrid');
   if (!grid) return;
   if (!orgChannels.length) {
-    grid.innerHTML = '<div class="ch-empty"><div class="ch-empty-icon">🏦</div><div class="ch-empty-title">No accounts yet</div><div class="ch-empty-sub">Create your first account to start organizing your channels.</div><button class="btn btn-primary" onclick="openChannelModal(null)" style="padding:0.65rem 1.5rem;">Create Account</button></div>';
+    grid.innerHTML = '<div class="ch-empty"><div class="ch-empty-icon" style="font-size:2.5rem;width:56px;height:56px;border-radius:50%;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;color:var(--muted);">+</div><div class="ch-empty-title">No accounts yet</div><div class="ch-empty-sub">Create your first account to start organizing your channels.</div><button class="btn btn-primary" onclick="openChannelModal(null)" style="padding:0.65rem 1.5rem;">Create Account</button></div>';
     return;
   }
   grid.innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">Loading accounts…</div>';
@@ -2254,7 +2251,7 @@ async function initAuth() {
 // Maps each tab to its parent dropdown group
 const TAB_GROUP_MAP = {
   home: 'ng-home',
-  breakEntry: 'ng-live', schedule: 'ng-live',
+  schedule: 'ng-live',
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', performance: 'ng-reports',
   inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
 };
@@ -2295,7 +2292,6 @@ async function switchTab(tab) {
 
   try {
     if (tab === 'home') await loadHome();
-    else if (tab === 'breakEntry') { await loadProducts(); beRenderProductTable(); updateBreakEntryChannelBanner(); }
     else if (tab === 'inventory') await loadInventoryTable();
     else if (tab === 'invLog') await loadInvLog();
     else if (tab === 'payroll') await loadPayroll();
@@ -2338,7 +2334,7 @@ function setupTabNav() {
   document.addEventListener('click', function () { closeAllDropdowns(); });
 
   // Initial active state
-  updateNavActiveState('breakEntry');
+  updateNavActiveState('home');
 }
 
 // ── Global Buttons ────────────────────────────────────────
