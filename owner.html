@@ -5166,6 +5166,7 @@ async function loadPayrollHistory() {
 // ── Schedule ──────────────────────────────────────────────
 let calYear, calMonth, allSchedules = [];
 
+let _schedSetupDone = false;
 async function setupSchedule() {
   const now = new Date();
   calYear = now.getFullYear();
@@ -5174,8 +5175,11 @@ async function setupSchedule() {
   await loadSchedules();
   await loadClockLog();
   setupCalControls();
-  setupSchedSave();
-  document.getElementById('refreshClockLogBtn').addEventListener('click', loadClockLog);
+  if (!_schedSetupDone) {
+    _schedSetupDone = true;
+    setupSchedSave();
+    document.getElementById('refreshClockLogBtn').addEventListener('click', loadClockLog);
+  }
 }
 
 async function loadClockLog() {
