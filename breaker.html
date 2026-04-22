@@ -1427,6 +1427,9 @@ async function handleConfirmClose() {
 
     if (error) throw error;
 
+    // Save stream id before clearing state
+    const closedStreamId = currentStream.id;
+
     // Reset everything
     document.getElementById('closeOutModal').classList.remove('active');
     document.getElementById('streamKey').value = '';
@@ -1446,7 +1449,7 @@ async function handleConfirmClose() {
     // Create sort task for this stream
     await sb.from('sort_tasks').insert({
       org_id: currentProfile.org_id,
-      stream_id: currentStream.id,
+      stream_id: closedStreamId,
       status: 'pending'
     });
 
@@ -1639,7 +1642,7 @@ async function loadShifts() {
       const statusColor = s.status === 'completed' ? 'var(--green)' : s.status === 'cancelled' ? 'var(--red)' : 'var(--muted)';
       tr.innerHTML =
         '<td style="padding:0.4rem 0.5rem;">' + s.scheduled_date + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;">' + (s.start_time ? s.start_time.slice(0,5) : '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + (s.scheduled_time ? s.scheduled_time.slice(0,5) : '—') + '</td>' +
         '<td style="padding:0.4rem 0.5rem;">' + escHtml(s.stream_key || '—') + '</td>' +
         '<td style="padding:0.4rem 0.5rem;font-weight:700;color:' + statusColor + ';">' + s.status.toUpperCase() + '</td>';
       pastBody.appendChild(tr);
@@ -1659,7 +1662,7 @@ async function loadShifts() {
       '<div>' +
         '<div style="font-weight:800;font-size:1rem;color:var(--text);">' + s.scheduled_date + (isToday ? ' <span style="background:var(--primary);color:#fff;font-size:0.65rem;padding:2px 7px;border-radius:100px;vertical-align:middle;">TODAY</span>' : '') + '</div>' +
         '<div style="color:var(--muted);font-size:0.83rem;margin-top:0.25rem;">' +
-          (s.start_time ? '&#128336; ' + s.start_time.slice(0,5) + '&nbsp;&nbsp;' : '') +
+          (s.scheduled_time ? '&#128336; ' + s.scheduled_time.slice(0,5) + '&nbsp;&nbsp;' : '') +
           (s.stream_key ? '&#128273; ' + escHtml(s.stream_key) + '&nbsp;&nbsp;' : '') +
           (s.notes ? '&#128203; ' + escHtml(s.notes) : '') +
         '</div>' +
@@ -1699,7 +1702,7 @@ async function checkTodayShiftAndNotify() {
     '<div>' +
       '<div style="font-weight:700;color:var(--primary);margin-bottom:0.2rem;">&#128336; You have a shift today!</div>' +
       '<div style="font-size:0.83rem;color:var(--muted);">' +
-        (shift.start_time ? 'Start time: ' + shift.start_time.slice(0,5) + '&nbsp;&nbsp;' : '') +
+        (shift.scheduled_time ? 'Start time: ' + shift.scheduled_time.slice(0,5) + '&nbsp;&nbsp;' : '') +
         (shift.stream_key ? '&#128273; ' + escHtml(shift.stream_key) + '&nbsp;&nbsp;' : '') +
         (shift.notes ? escHtml(shift.notes) : '') +
       '</div>' +
@@ -1744,8 +1747,6 @@ function showClockedInBanner(shift) {
 
 // ── My Pay ────────────────────────────────────────────────
 let currentPeriod = 'daily';
-
-function fmt(n) { return '$' + (parseFloat(n) || 0).toFixed(2); }
 
 function getPeriodRange(period) {
   const now = new Date();

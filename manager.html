@@ -968,7 +968,7 @@ async function loadClockLog() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Loading…</td></tr>';
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
   const { data: shifts } = await sb.from('schedules')
-    .select('id, scheduled_date, start_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id, sorter_id')
+    .select('id, scheduled_date, scheduled_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id, sorter_id')
     .eq('org_id', currentProfile.org_id)
     .not('clocked_in_at', 'is', null)
     .gte('scheduled_date', cutoff.toISOString().slice(0,10))

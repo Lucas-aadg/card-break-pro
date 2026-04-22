@@ -392,7 +392,7 @@ async function loadShifts() {
             '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">' +
               '<span style="font-weight:700;">' + escHtml(sh.scheduled_date) + '</span>' +
               (isToday ? '<span class="today-badge">Today</span>' : '') +
-              (sh.start_time ? '<span style="color:var(--muted);font-size:0.82rem;">· ' + sh.start_time.slice(0,5) + '</span>' : '') +
+              (sh.scheduled_time ? '<span style="color:var(--muted);font-size:0.82rem;">· ' + sh.scheduled_time.slice(0,5) + '</span>' : '') +
             '</div>' +
             '<div style="font-size:0.82rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap;">' +
               (sh.stream_key ? '<span>🔑 ' + escHtml(sh.stream_key) + '</span>' : '') +
@@ -463,7 +463,7 @@ async function checkTodayShift() {
     .eq('sorter_id', currentUser.id)
     .eq('scheduled_date', today)
     .in('status', ['scheduled', 'in_progress'])
-    .order('start_time', { ascending: true })
+    .order('scheduled_time', { ascending: true })
     .limit(1);
 
   if (!shifts || !shifts.length) return;
@@ -483,7 +483,7 @@ async function checkTodayShift() {
     '<div>' +
       '<div style="font-weight:700;color:var(--primary);margin-bottom:0.2rem;">📅 You have a sorting shift today!</div>' +
       '<div style="font-size:0.82rem;color:var(--muted);">' +
-        (shift.start_time ? 'Start time: ' + shift.start_time.slice(0,5) : 'Check your schedule') +
+        (shift.scheduled_time ? 'Start time: ' + shift.scheduled_time.slice(0,5) : 'Check your schedule') +
       '</div>' +
     '</div>' +
     '<button id="sorterClockInBtn" class="btn btn-green" style="padding:0.5rem 1.1rem;font-size:0.875rem;">⏱ Clock In</button>';
