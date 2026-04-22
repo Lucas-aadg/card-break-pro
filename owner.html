@@ -1889,6 +1889,12 @@
     <h2 id="prodModalTitle">Edit Product</h2>
     <div class="inv-form" id="prodModalForm">
       <input type="hidden" id="pm-id" />
+      <div class="form-group" style="grid-column:1/-1;">
+        <label for="pm-channel">Account (Channel)</label>
+        <select id="pm-channel">
+          <option value="">— No specific account —</option>
+        </select>
+      </div>
       <div class="form-group">
         <label for="pm-name">Product Name</label>
         <input type="text" id="pm-name" />
@@ -3575,6 +3581,14 @@ function invOpenEditModal(id) {
   document.getElementById('pm-restock').value = '';
   document.getElementById('pm-restockCost').value = '';
   document.getElementById('pm-avgCost').checked = false;
+
+  // Populate channel dropdown
+  const pmCh = document.getElementById('pm-channel');
+  pmCh.innerHTML = '<option value="">— No specific account —</option>' +
+    orgChannels.map(function(ch) {
+      return '<option value="' + ch.id + '"' + (product.channel_id === ch.id ? ' selected' : '') + '>' + escHtml((ch.icon || '') + ' ' + ch.name) + '</option>';
+    }).join('');
+
   document.getElementById('productEditModal').classList.add('active');
 }
 
@@ -3618,6 +3632,8 @@ async function pmHandleSave() {
     };
   }
 
+  const channelId = document.getElementById('pm-channel').value || null;
+
   const btn = document.getElementById('pmSaveBtn');
   btn.disabled = true;
   btn.textContent = 'Saving…';
@@ -3629,7 +3645,8 @@ async function pmHandleSave() {
       current_stock: finalStock,
       min_stock_alert: minAlert,
       display_order: displayOrder,
-      notes: notes || null
+      notes: notes || null,
+      channel_id: channelId
     }).eq('id', id);
     if (error) throw error;
 
