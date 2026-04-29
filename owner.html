@@ -3423,6 +3423,16 @@ async function loadInvLog() {
       .eq('org_id', currentProfile.org_id)
       .order('created_at', { ascending: false });
 
+    // When a channel is active, scope to products belonging to that channel
+    if (activeChannel) {
+      const chProductIds = orgProducts.map(function(p){ return p.id; });
+      if (chProductIds.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No inventory log entries for this channel.</td></tr>';
+        return;
+      }
+      query = query.in('product_id', chProductIds);
+    }
+
     if (fromDate) query = query.gte('created_at', fromDate + 'T00:00:00');
     if (actionFilter) query = query.eq('action', actionFilter);
     if (prodFilter) query = query.eq('product_id', prodFilter);
@@ -3860,6 +3870,17 @@ async function loadHistory() {
     .order('break_date', { ascending: false })
     .order('created_at', { ascending: false });
 
+  // Filter breaks by channel via stream IDs
+  if (activeChannel) {
+    const chStreamIds = await getActiveChannelStreamIds();
+    if (chStreamIds && chStreamIds.length === 0) {
+      historyData = [];
+      renderHistoryTable([]);
+      return;
+    }
+    if (chStreamIds) query = query.in('stream_id', chStreamIds);
+  }
+
   if (from) query = query.gte('break_date', from);
   if (to) query = query.lte('break_date', to);
   if (breakerId) query = query.eq('breaker_id', breakerId);
@@ -3957,11 +3978,12 @@ async function loadStreamSummary() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Loading…</td></tr>';
 
   try {
-    const { data, error } = await sb
-      .from('streams').select('*')
+    let ssQ = sb.from('streams').select('*')
       .eq('org_id', currentProfile.org_id)
       .order('break_date', { ascending: false })
       .order('created_at', { ascending: false });
+    if (activeChannel) ssQ = ssQ.eq('channel_id', activeChannel.id);
+    const { data, error } = await ssQ;
 
     if (error) throw error;
 
@@ -4449,16 +4471,28 @@ async function loadSorterPerformance() {
     const sorters = allProfiles.filter(function (p) { return p.role === 'sorter'; });
     if (!sorters.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No sorters on your team yet.</td></tr>'; return; }
 
-    const { data: tasks } = await sb.from('sort_tasks')
+    let sorterTasksQ = sb.from('sort_tasks')
       .select('sorter_id, status, stream_id, completed_at, created_at')
       .eq('org_id', currentProfile.org_id);
-
-    const { data: shifts } = await sb.from('schedules')
+    let sorterShiftsQ = sb.from('schedules')
       .select('sorter_id, clocked_in_at, clocked_out_at')
       .eq('org_id', currentProfile.org_id)
       .not('sorter_id', 'is', null)
       .not('clocked_in_at', 'is', null)
       .not('clocked_out_at', 'is', null);
+    if (activeChannel) {
+      const chStreamIds = await getActiveChannelStreamIds();
+      if (chStreamIds) {
+        if (chStreamIds.length === 0) {
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No sorter data for this channel.</td></tr>';
+          return;
+        }
+        sorterTasksQ = sorterTasksQ.in('stream_id', chStreamIds);
+      }
+      sorterShiftsQ = sorterShiftsQ.eq('channel_id', activeChannel.id);
+    }
+    const { data: tasks } = await sorterTasksQ;
+    const { data: shifts } = await sorterShiftsQ;
 
     const rows = sorters.map(function (s) {
       const myTasks = (tasks || []).filter(function (t) { return t.sorter_id === s.id && t.status === 'completed'; });
@@ -5149,7 +5183,13 @@ async function runPayroll() {
 
   try {
     await loadAllProfiles();
-    const staff = allProfiles.filter(function (p) { return p.role !== 'owner'; });
+    let staff = allProfiles.filter(function (p) { return p.role !== 'owner'; });
+    // When viewing a channel, only calculate pay for staff assigned to it
+    if (activeChannel) {
+      const { data: chAssigns } = await sb.from('channel_assignments').select('profile_id').eq('channel_id', activeChannel.id);
+      const assignedIds = new Set((chAssigns || []).map(function(a){ return a.profile_id; }));
+      staff = staff.filter(function(p){ return assignedIds.has(p.id); });
+    }
     const fromTs = range.from + 'T00:00:00';
     const toTs = range.to + 'T23:59:59';
 
@@ -5240,13 +5280,15 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
   if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
     const rate = (parseFloat(p.commission_rate) || 0) / 100;
     const periodTotal = ((p.category_rates || {}).__commission_method || p.commission_method || 'per_stream') === 'period_total';
-    const { data: streams } = await sb.from('streams')
+    let commStreamsQ = sb.from('streams')
       .select('final_sales, total_product_cost, total_other_costs')
       .eq('breaker_id', p.id)
       .eq('org_id', currentProfile.org_id)
       .eq('status', 'closed')
       .gte('closed_at', fromTs)
       .lte('closed_at', toTs);
+    if (activeChannel) commStreamsQ = commStreamsQ.eq('channel_id', activeChannel.id);
+    const { data: streams } = await commStreamsQ;
     const streamList = streams || [];
     let commission;
     if (periodTotal) {
@@ -5289,13 +5331,15 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
     const hasCategoryRates = Object.keys(categoryRates).length > 0;
     const defaultRate = parseFloat(p.per_break_rate) || 0;
 
-    const { data: streams } = await sb.from('streams')
+    let perBreakStreamsQ = sb.from('streams')
       .select('id')
       .eq('breaker_id', p.id)
       .eq('org_id', currentProfile.org_id)
       .eq('status', 'closed')
       .gte('closed_at', fromTs)
       .lte('closed_at', toTs);
+    if (activeChannel) perBreakStreamsQ = perBreakStreamsQ.eq('channel_id', activeChannel.id);
+    const { data: streams } = await perBreakStreamsQ;
 
     const streamIds = (streams || []).map(function(s){ return s.id; });
 
@@ -5396,13 +5440,19 @@ async function calcSorterPay(p, fromTs, toTs, result) {
     const hasCategoryRates = Object.keys(categoryRates).length > 0;
     const defaultRate = parseFloat(p.per_break_rate) || 0;
 
-    const { data: tasks } = await sb.from('sort_tasks')
+    let sorterTasksPayQ = sb.from('sort_tasks')
       .select('id, stream_id')
       .eq('sorter_id', p.id)
       .eq('org_id', currentProfile.org_id)
       .eq('status', 'completed')
       .gte('completed_at', fromTs)
       .lte('completed_at', toTs);
+    if (activeChannel) {
+      const chStreamIds = await getActiveChannelStreamIds();
+      if (chStreamIds && chStreamIds.length > 0) sorterTasksPayQ = sorterTasksPayQ.in('stream_id', chStreamIds);
+      else if (chStreamIds && chStreamIds.length === 0) { result.breakdown = 'No tasks for this channel'; result.total = 0; return; }
+    }
+    const { data: tasks } = await sorterTasksPayQ;
 
     if (hasCategoryRates && tasks && tasks.length) {
       // Build stream → category map
@@ -5469,7 +5519,7 @@ async function calcSorterPay(p, fromTs, toTs, result) {
 }
 
 async function calcHours(profileId, fromTs, toTs) {
-  const { data: shifts } = await sb.from('schedules')
+  let hoursQ = sb.from('schedules')
     .select('clocked_in_at, clocked_out_at')
     .eq('org_id', currentProfile.org_id)
     .or('breaker_id.eq.' + profileId + ',sorter_id.eq.' + profileId)
@@ -5477,6 +5527,8 @@ async function calcHours(profileId, fromTs, toTs) {
     .not('clocked_out_at', 'is', null)
     .gte('clocked_in_at', fromTs)
     .lte('clocked_out_at', toTs);
+  if (activeChannel) hoursQ = hoursQ.eq('channel_id', activeChannel.id);
+  const { data: shifts } = await hoursQ;
   return (shifts || []).reduce(function (sum, s) {
     const inT = new Date(s.clocked_in_at).getTime();
     const outT = new Date(s.clocked_out_at).getTime();
@@ -5641,13 +5693,14 @@ async function loadClockLog() {
 
   try {
     // Load all schedules that have been clocked in at some point, newest first
-    const { data, error } = await sb
-      .from('schedules')
+    let clkQ = sb.from('schedules')
       .select('id, scheduled_date, scheduled_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id')
       .eq('org_id', currentProfile.org_id)
       .not('clocked_in_at', 'is', null)
       .order('clocked_in_at', { ascending: false })
       .limit(100);
+    if (activeChannel) clkQ = clkQ.eq('channel_id', activeChannel.id);
+    const { data, error } = await clkQ;
 
     if (error) throw error;
 
@@ -6058,12 +6111,20 @@ async function loadSorting() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading…</td></tr>';
 
   try {
-    // Step 1: load sort tasks
-    const { data: tasks, error } = await sb
-      .from('sort_tasks')
+    // Step 1: load sort tasks (scoped to active channel via stream_ids)
+    let sortTasksQ = sb.from('sort_tasks')
       .select('id, status, sorter_id, completed_at, created_at, stream_id')
       .eq('org_id', currentProfile.org_id)
       .order('created_at', { ascending: true });
+    if (activeChannel) {
+      const chStreamIds = await getActiveChannelStreamIds();
+      if (chStreamIds && chStreamIds.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No sort tasks for this channel.</td></tr>';
+        return;
+      }
+      if (chStreamIds) sortTasksQ = sortTasksQ.in('stream_id', chStreamIds);
+    }
+    const { data: tasks, error } = await sortTasksQ;
 
     if (error) throw error;
     const allTasks = tasks || [];
