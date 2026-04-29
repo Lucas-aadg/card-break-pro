@@ -1708,6 +1708,27 @@
   </div>
 </div>
 
+<!-- CHANGE ROLE MODAL -->
+<div class="modal-overlay" id="changeRoleModal">
+  <div class="modal" style="max-width:360px;">
+    <h2>Change Role</h2>
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.25rem;">Select a new role for <strong id="changeRoleName" style="color:var(--text);"></strong>.</p>
+    <input type="hidden" id="changeRoleProfileId" />
+    <div style="margin-bottom:1.5rem;">
+      <label style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);display:block;margin-bottom:0.5rem;">New Role</label>
+      <select id="changeRoleSelect" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:0.65rem 0.85rem;font-size:0.9rem;font-family:inherit;">
+        <option value="breaker">Breaker</option>
+        <option value="sorter">Sorter</option>
+        <option value="manager">Manager</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="document.getElementById('changeRoleModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" id="changeRoleSaveBtn">Save Role</button>
+    </div>
+  </div>
+</div>
+
 <!-- PAY SETTINGS MODAL -->
 <div class="modal-overlay" id="paySettingsModal">
   <div class="modal" style="max-width:520px;">
@@ -4530,6 +4551,7 @@ async function loadTeam() {
       '<td>' + fmtDate(p.created_at) + '</td>' +
       '<td><div class="btn-row">' +
         (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="pay" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Pay Settings</button>' : '') +
+        (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="role" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" data-role="' + escHtml(p.role) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Change Role</button>' : '') +
         (!isMe && !isOwner ? '<button class="btn btn-sm" data-action="remove" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:rgba(239,68,68,0.15);color:var(--red);">Remove</button>' : '') +
         (isOwner ? '—' : '') +
       '</div></td>';
@@ -4546,6 +4568,12 @@ async function loadTeam() {
   tbody.querySelectorAll('[data-action="assign"]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       openAssignChannels(btn.dataset.id, btn.dataset.name);
+    });
+  });
+
+  tbody.querySelectorAll('[data-action="role"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openChangeRole(btn.dataset.id, btn.dataset.name, btn.dataset.role);
     });
   });
 
@@ -4570,6 +4598,37 @@ async function loadTeam() {
     });
   });
 }
+
+// ── Change Role ────────────────────────────────────────────
+function openChangeRole(profileId, displayName, currentRole) {
+  document.getElementById('changeRoleProfileId').value = profileId;
+  document.getElementById('changeRoleName').textContent = displayName;
+  document.getElementById('changeRoleSelect').value = currentRole;
+  document.getElementById('changeRoleModal').classList.add('active');
+}
+
+document.getElementById('changeRoleSaveBtn').addEventListener('click', async function () {
+  const profileId = document.getElementById('changeRoleProfileId').value;
+  const newRole = document.getElementById('changeRoleSelect').value;
+  const name = document.getElementById('changeRoleName').textContent;
+  if (!profileId || !newRole) return;
+  showLoading('Updating role…');
+  try {
+    const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', profileId);
+    if (error) throw error;
+    document.getElementById('changeRoleModal').classList.remove('active');
+    hideLoading();
+    showGlobalSuccess(name + ' is now a ' + newRole + '.');
+    await loadTeam();
+  } catch (err) {
+    hideLoading();
+    showGlobalError('Failed to update role: ' + escHtml(err.message));
+  }
+});
+
+document.getElementById('changeRoleModal').addEventListener('click', function (e) {
+  if (e.target === this) this.classList.remove('active');
+});
 
 // ── Channel Assignments ────────────────────────────────────
 async function openAssignChannels(profileId, displayName) {
