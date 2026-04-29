@@ -196,9 +196,13 @@
           <input type="text" id="schedNotes" placeholder="e.g. Baseball boxes only" />
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.1rem;">
-        <input type="checkbox" id="schedRepeat" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);" />
-        <label for="schedRepeat" style="text-transform:none;letter-spacing:0;font-size:0.875rem;color:var(--muted);cursor:pointer;margin:0;">Repeat for next 7 days (same time, same person)</label>
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.1rem;flex-wrap:wrap;">
+        <input type="checkbox" id="schedRepeat" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);" onchange="document.getElementById('schedRepeatDaysWrap').style.display=this.checked?'flex':'none'" />
+        <label for="schedRepeat" style="text-transform:none;letter-spacing:0;font-size:0.875rem;color:var(--muted);cursor:pointer;margin:0;">Repeat</label>
+        <div id="schedRepeatDaysWrap" style="display:none;align-items:center;gap:0.5rem;">
+          <input type="number" id="schedRepeatDays" min="1" max="365" value="7" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.875rem;padding:0.3rem 0.6rem;outline:none;text-align:center;" />
+          <span style="font-size:0.875rem;color:var(--muted);">consecutive days</span>
+        </div>
       </div>
       <button class="btn btn-primary" id="schedSaveBtn">Add Shift</button>
     </div>
@@ -964,6 +968,7 @@ async function createShift() {
   const streamKey = document.getElementById('schedStreamKey').value.trim();
   const notes = document.getElementById('schedNotes').value.trim();
   const repeat = document.getElementById('schedRepeat').checked;
+  const repeatDays = repeat ? Math.min(365, Math.max(1, parseInt(document.getElementById('schedRepeatDays').value) || 7)) : 1;
 
   if (!personId || !date || !time) { showGlobalError('Please select a team member, date, and time.'); return; }
 
@@ -971,12 +976,12 @@ async function createShift() {
   if (!profile) { showGlobalError('Invalid team member.'); return; }
 
   const btn = document.getElementById('schedSaveBtn');
-  btn.disabled = true; btn.textContent = 'Saving…';
+  btn.disabled = true; btn.textContent = repeat ? 'Saving ' + repeatDays + ' shifts…' : 'Saving…';
 
   try {
     const shifts = [];
     const baseDate = new Date(date + 'T12:00:00');
-    const days = repeat ? 8 : 1;
+    const days = repeatDays;
     for (let i = 0; i < days; i++) {
       const d = new Date(baseDate);
       d.setDate(d.getDate() + i);
@@ -995,10 +1000,11 @@ async function createShift() {
     }
     const { error } = await sb.from('schedules').insert(shifts);
     if (error) throw error;
-    showGlobalSuccess('Shift' + (repeat ? 's' : '') + ' scheduled.');
+    showGlobalSuccess(repeat ? repeatDays + ' shifts scheduled.' : 'Shift scheduled.');
     document.getElementById('schedStreamKey').value = '';
     document.getElementById('schedNotes').value = '';
     document.getElementById('schedRepeat').checked = false;
+    document.getElementById('schedRepeatDaysWrap').style.display = 'none';
     await loadSchedule();
     loadCalendar();
   } catch(err) {

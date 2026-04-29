@@ -1379,9 +1379,13 @@
           <input type="text" id="schedNotes" placeholder="e.g. Baseball boxes only" />
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.1rem;">
-        <input type="checkbox" id="schedRepeat" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);" />
-        <label for="schedRepeat" style="text-transform:none;letter-spacing:0;font-size:0.875rem;color:var(--muted);cursor:pointer;margin:0;">Repeat for next 7 days (same time, same person)</label>
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.1rem;flex-wrap:wrap;">
+        <input type="checkbox" id="schedRepeat" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);" onchange="document.getElementById('ownerSchedRepeatDaysWrap').style.display=this.checked?'flex':'none'" />
+        <label for="schedRepeat" style="text-transform:none;letter-spacing:0;font-size:0.875rem;color:var(--muted);cursor:pointer;margin:0;">Repeat</label>
+        <div id="ownerSchedRepeatDaysWrap" style="display:none;align-items:center;gap:0.5rem;">
+          <input type="number" id="schedRepeatDays" min="1" max="365" value="7" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.875rem;padding:0.3rem 0.6rem;outline:none;text-align:center;" />
+          <span style="font-size:0.875rem;color:var(--muted);">consecutive days</span>
+        </div>
       </div>
       <button class="btn btn-primary" id="schedSaveBtn" style="min-width:160px;">Add Shift</button>
     </div>
@@ -5990,23 +5994,22 @@ function setupSchedSave() {
     const streamKey = document.getElementById('schedStreamKey').value.trim();
     const notes = document.getElementById('schedNotes').value.trim();
     const repeat = document.getElementById('schedRepeat').checked;
+    const repeatDays = repeat ? Math.min(365, Math.max(1, parseInt(document.getElementById('schedRepeatDays').value) || 7)) : 1;
 
     if (!breakerId) { showGlobalError('Please select a team member.'); return; }
     if (!date) { showGlobalError('Please select a date.'); return; }
 
     this.disabled = true;
-    this.textContent = repeat ? 'Saving 7 shifts…' : 'Saving…';
+    this.textContent = repeat ? 'Saving ' + repeatDays + ' shifts…' : 'Saving…';
 
     try {
       // Build list of dates to insert
-      const dates = [date];
-      if (repeat) {
-        const base = new Date(date + 'T12:00:00'); // noon to avoid DST issues
-        for (let i = 1; i <= 6; i++) {
-          const d = new Date(base);
-          d.setDate(d.getDate() + i);
-          dates.push(d.toISOString().split('T')[0]);
-        }
+      const base = new Date(date + 'T12:00:00');
+      const dates = [];
+      for (let i = 0; i < repeatDays; i++) {
+        const d = new Date(base);
+        d.setDate(d.getDate() + i);
+        dates.push(d.toISOString().split('T')[0]);
       }
 
       const selectedProfile = allProfiles.find(function(p){ return p.id === breakerId; });
@@ -6036,7 +6039,9 @@ function setupSchedSave() {
       document.getElementById('schedRepeat').checked = false;
 
       await loadSchedules();
-      showGlobalSuccess(repeat ? '7 shifts scheduled!' : 'Shift scheduled!');
+      document.getElementById('schedRepeat').checked = false;
+      document.getElementById('ownerSchedRepeatDaysWrap').style.display = 'none';
+      showGlobalSuccess(repeat ? repeatDays + ' shifts scheduled!' : 'Shift scheduled!');
     } catch (err) {
       showGlobalError('Failed to schedule shift: ' + escHtml(err.message));
     } finally {
