@@ -364,6 +364,7 @@
   <div class="brand">CARD <span>BREAK</span> PRO</div>
   <div class="nav-right">
     <a href="help-breaker.html" target="_blank" style="color:var(--muted);font-size:0.8rem;font-weight:600;text-decoration:none;padding:0.35rem 0.7rem;border:1px solid var(--border);border-radius:6px;transition:color 0.2s,border-color 0.2s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--border)'" onmouseout="this.style.color='var(--muted)'">Help</a>
+    <a href="manager.html" id="mgrViewLink" style="display:none;color:var(--primary);font-size:0.8rem;font-weight:700;text-decoration:none;padding:0.35rem 0.8rem;border:1px solid rgba(79,110,247,0.4);border-radius:6px;background:rgba(79,110,247,0.08);">Manager View</a>
     <span class="breaker-badge" id="breakerBadge">Breaker</span>
     <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
   </div>
@@ -782,6 +783,9 @@ async function initAuth() {
 
     currentProfile = profile;
     document.getElementById('breakerBadge').textContent = escHtml(profile.display_name);
+    if (profile.role === 'breaker/manager') {
+      document.getElementById('mgrViewLink').style.display = '';
+    }
 
     await loadProducts();
     setupBreakerTabs();

@@ -149,6 +149,7 @@
 
   <div class="nav-actions">
     <a href="help-manager.html" class="nav-help-link">? Help</a>
+    <a href="breaker.html" id="brkViewLink" style="display:none;color:var(--primary);font-size:0.8rem;font-weight:700;text-decoration:none;padding:0.35rem 0.8rem;border:1px solid rgba(79,110,247,0.4);border-radius:6px;background:rgba(79,110,247,0.08);">Breaker View</a>
     <span id="mgrBadge" style="color:var(--muted);font-size:0.8rem;"></span>
     <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
   </div>
@@ -749,9 +750,12 @@ async function init() {
     currentUser = session.user;
 
     const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-    if (!profile || profile.role !== 'manager') { window.location.href = 'index.html'; return; }
+    if (!profile || (profile.role !== 'manager' && profile.role !== 'breaker/manager')) { window.location.href = 'index.html'; return; }
     currentProfile = profile;
     document.getElementById('mgrBadge').textContent = profile.display_name || '';
+    if (profile.role === 'breaker/manager') {
+      document.getElementById('brkViewLink').style.display = '';
+    }
 
     // Prefill settings
     document.getElementById('settDisplayName').value = profile.display_name || '';
@@ -861,7 +865,7 @@ async function createShift() {
         status: 'scheduled'
       };
       if (profile.role === 'sorter') entry.sorter_id = personId;
-      else entry.breaker_id = personId;
+      else entry.breaker_id = personId; // covers 'breaker', 'breaker/manager', 'manager'
       shifts.push(entry);
     }
     const { error } = await sb.from('schedules').insert(shifts);
