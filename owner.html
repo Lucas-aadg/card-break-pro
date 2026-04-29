@@ -1046,6 +1046,7 @@
               <th>Fees</th>
               <th>Net Profit</th>
               <th>Status</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="ssTableBody"></tbody>
@@ -1470,6 +1471,7 @@
               <th>Status</th>
               <th>Assigned To</th>
               <th>Completed At</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="sortingTableBody">
@@ -3845,7 +3847,7 @@ function setupStreamSummary() {
 
 async function loadStreamSummary() {
   const tbody = document.getElementById('ssTableBody');
-  tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Loading…</td></tr>';
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Loading…</td></tr>';
 
   try {
     const { data, error } = await sb
@@ -3858,7 +3860,7 @@ async function loadStreamSummary() {
 
     tbody.innerHTML = '';
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No streams recorded yet.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="11">No streams recorded yet.</td></tr>';
       return;
     }
 
@@ -3876,12 +3878,53 @@ async function loadStreamSummary() {
         '<td>' + fmt(s.total_product_cost) + '</td>' +
         '<td>' + fmt(s.total_fees) + '</td>' +
         '<td>' + profitDisplay + '</td>' +
-        '<td><span class="badge ' + (s.status === 'active' ? 'badge-green' : 'badge-gray') + '">' + escHtml(s.status) + '</span></td>';
+        '<td><span class="badge ' + (s.status === 'active' ? 'badge-green' : 'badge-gray') + '">' + escHtml(s.status) + '</span></td>' +
+        '<td style="text-align:center;"><button onclick="deleteStream(\'' + s.id + '\',\'' + escHtml(s.stream_key) + '\')" title="Delete stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
       tbody.appendChild(tr);
     });
   } catch (err) {
     showGlobalError('Failed to load streams: ' + escHtml(err.message));
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Error loading data.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Error loading data.</td></tr>';
+  }
+}
+
+async function deleteStream(streamId, streamKey) {
+  if (!confirm('Delete stream "' + streamKey + '"?\n\nThis will permanently erase all breaks, revenue, profit, fees, and commission for this stream, and remove it from the sort queue. This cannot be undone.')) return;
+  showLoading('Deleting stream…');
+  try {
+    // Fetch all breaks so we can restore stock
+    const { data: streamBreaks } = await sb.from('breaks').select('products_used').eq('stream_id', streamId);
+
+    // Restore product stock for every box used in these breaks
+    const stockDeltas = {};
+    (streamBreaks || []).forEach(function(b) {
+      (b.products_used || []).forEach(function(p) {
+        if (p.product_id) {
+          stockDeltas[p.product_id] = (stockDeltas[p.product_id] || 0) + (p.qty || 0);
+        }
+      });
+    });
+    for (const [productId, qty] of Object.entries(stockDeltas)) {
+      const { data: prod } = await sb.from('products').select('current_stock').eq('id', productId).single();
+      if (prod) {
+        await sb.from('products').update({ current_stock: (prod.current_stock || 0) + qty }).eq('id', productId);
+      }
+    }
+
+    // Delete breaks, sort task, then the stream record itself
+    await sb.from('breaks').delete().eq('stream_id', streamId);
+    await sb.from('sort_tasks').delete().eq('stream_id', streamId);
+    await sb.from('streams').delete().eq('id', streamId);
+
+    hideLoading();
+    await loadStreamSummary();
+    // Also refresh sort queue if it's the active tab
+    if (document.getElementById('tab-sorting') && document.getElementById('tab-sorting').style.display !== 'none') {
+      await loadSorting();
+    }
+  } catch (err) {
+    hideLoading();
+    showGlobalError('Failed to delete stream: ' + escHtml(err.message));
   }
 }
 
@@ -5731,7 +5774,7 @@ async function loadSorting() {
 
     tbody.innerHTML = '';
     if (!filtered.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No sort tasks found.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No sort tasks found.</td></tr>';
       return;
     }
 
@@ -5754,12 +5797,26 @@ async function loadSorting() {
         '<td style="text-align:center;">' + breakCount + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td>' + sorterName + '</td>' +
-        '<td style="font-size:0.82rem;color:var(--muted);">' + completedAt + '</td>';
+        '<td style="font-size:0.82rem;color:var(--muted);">' + completedAt + '</td>' +
+        '<td style="text-align:center;"><button onclick="deleteSortTask(\'' + task.id + '\',\'' + escHtml(s.stream_key || task.id) + '\')" title="Remove sort task" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
       tbody.appendChild(tr);
     });
   } catch (err) {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Failed to load sort tasks.</td></tr>';
     console.error(err);
+  }
+}
+
+async function deleteSortTask(taskId, streamKey) {
+  if (!confirm('Remove sort task for "' + streamKey + '" from the queue?\n\nThis only removes the sort task — the stream and breaks are kept.')) return;
+  showLoading('Removing…');
+  try {
+    await sb.from('sort_tasks').delete().eq('id', taskId);
+    hideLoading();
+    await loadSorting();
+  } catch (err) {
+    hideLoading();
+    showGlobalError('Failed to remove sort task: ' + escHtml(err.message));
   }
 }
 
