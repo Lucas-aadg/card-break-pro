@@ -1890,6 +1890,38 @@
   </div>
 </div>
 
+<!-- EDIT SCHEDULE SHIFT MODAL -->
+<div class="modal-overlay" id="editSchedModal">
+  <div class="modal" style="max-width:420px;">
+    <h2>Edit Shift</h2>
+    <input type="hidden" id="editSchedId" />
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+      <div class="form-group">
+        <label for="editSchedDate">Date</label>
+        <input type="date" id="editSchedDate" />
+      </div>
+      <div class="form-group">
+        <label for="editSchedTime">Start Time</label>
+        <input type="time" id="editSchedTime" />
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+      <div class="form-group">
+        <label for="editSchedStreamKey">Stream Key</label>
+        <input type="text" id="editSchedStreamKey" placeholder="e.g. STREAM-001" />
+      </div>
+      <div class="form-group">
+        <label for="editSchedNotes">Notes</label>
+        <input type="text" id="editSchedNotes" placeholder="Optional" />
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="document.getElementById('editSchedModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" id="editSchedSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT SHIFT MODAL -->
 <div class="modal-overlay" id="editShiftModal">
   <div class="modal" style="max-width:420px;">
@@ -5517,7 +5549,7 @@ async function loadClockLog() {
     // Load all schedules that have been clocked in at some point, newest first
     const { data, error } = await sb
       .from('schedules')
-      .select('id, scheduled_date, start_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id')
+      .select('id, scheduled_date, scheduled_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id')
       .eq('org_id', currentProfile.org_id)
       .not('clocked_in_at', 'is', null)
       .order('clocked_in_at', { ascending: false })
@@ -5737,7 +5769,7 @@ function renderCalendar() {
       chip.style.cssText = 'font-size:0.65rem;font-weight:600;border-radius:4px;padding:2px 4px;margin-bottom:2px;background:' +
         (isDone ? 'rgba(34,197,94,0.2)' : 'rgba(79,110,247,0.2)') + ';color:' +
         (isDone ? 'var(--green)' : 'var(--primary)') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-      chip.textContent = (s.start_time ? s.start_time.slice(0,5) + ' ' : '') + (s.profiles ? s.profiles.display_name : '');
+      chip.textContent = (s.scheduled_time ? s.scheduled_time.slice(0,5) + ' ' : '') + (s.profiles ? s.profiles.display_name : '');
       chip.title = (s.profiles ? s.profiles.display_name : '') + (s.stream_key ? ' — ' + s.stream_key : '');
       cell.appendChild(chip);
     });
@@ -5765,28 +5797,74 @@ function renderSchedTable() {
     const clockOut = fmtTime(s.clocked_out_at);
     tr.innerHTML =
       '<td>' + s.scheduled_date + '</td>' +
-      '<td>' + (s.start_time ? s.start_time.slice(0,5) : '—') + '</td>' +
+      '<td>' + (s.scheduled_time ? s.scheduled_time.slice(0,5) : '—') + '</td>' +
       '<td><strong>' + escHtml(s.profiles ? s.profiles.display_name : '—') + '</strong></td>' +
       '<td>' + escHtml(s.stream_key || '—') + '</td>' +
       '<td style="color:var(--muted);">' + escHtml(s.notes || '—') + '</td>' +
       '<td><span style="font-size:0.75rem;font-weight:700;color:' + statusColor + ';">' + statusLabel + '</span></td>' +
       '<td style="color:var(--green);font-size:0.83rem;">' + clockIn + '</td>' +
       '<td style="color:var(--muted);font-size:0.83rem;">' + clockOut + '</td>' +
-      '<td><button class="btn-sm btn-danger-sm" data-schedid="' + s.id + '" style="font-size:0.72rem;padding:0.2rem 0.5rem;">Cancel</button></td>';
+      '<td><div style="display:flex;gap:0.35rem;">' +
+        '<button class="sched-edit-btn" data-schedid="' + s.id + '" style="background:rgba(79,110,247,0.1);border:1px solid rgba(79,110,247,0.25);color:var(--primary);border-radius:6px;padding:0.2rem 0.55rem;font-size:0.72rem;font-weight:600;cursor:pointer;">Edit</button>' +
+        '<button class="sched-del-btn" data-schedid="' + s.id + '" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:var(--red);border-radius:6px;padding:0.2rem 0.55rem;font-size:0.72rem;font-weight:600;cursor:pointer;">Delete</button>' +
+      '</div></td>';
     tbody.appendChild(tr);
   });
 
-  tbody.querySelectorAll('[data-schedid]').forEach(function (btn) {
-    btn.addEventListener('click', async function () {
-      const id = this.dataset.schedid;
-      openConfirm('Cancel Shift', 'Cancel this scheduled shift?', async function () {
-        await sb.from('schedules').update({ status: 'cancelled' }).eq('id', id);
+  tbody.querySelectorAll('.sched-edit-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const s = allSchedules.find(function (x) { return x.id === btn.dataset.schedid; });
+      if (!s) return;
+      document.getElementById('editSchedId').value = s.id;
+      document.getElementById('editSchedDate').value = s.scheduled_date || '';
+      document.getElementById('editSchedTime').value = s.scheduled_time || '';
+      document.getElementById('editSchedStreamKey').value = s.stream_key || '';
+      document.getElementById('editSchedNotes').value = s.notes || '';
+      document.getElementById('editSchedModal').classList.add('active');
+    });
+  });
+
+  tbody.querySelectorAll('.sched-del-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openConfirm('Delete Shift', 'Permanently delete this scheduled shift?', async function () {
+        await sb.from('schedules').delete().eq('id', btn.dataset.schedid);
         await loadSchedules();
-        showGlobalSuccess('Shift cancelled.');
+        showGlobalSuccess('Shift deleted.');
       });
     });
   });
 }
+
+// Wire edit sched save (once)
+document.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('editSchedSaveBtn').addEventListener('click', async function () {
+    const id = document.getElementById('editSchedId').value;
+    const date = document.getElementById('editSchedDate').value;
+    const time = document.getElementById('editSchedTime').value;
+    const streamKey = document.getElementById('editSchedStreamKey').value.trim();
+    const notes = document.getElementById('editSchedNotes').value.trim();
+    if (!date) { showGlobalError('Date is required.'); return; }
+    showLoading('Saving…');
+    try {
+      await sb.from('schedules').update({
+        scheduled_date: date,
+        scheduled_time: time || null,
+        stream_key: streamKey || null,
+        notes: notes || null
+      }).eq('id', id);
+      hideLoading();
+      document.getElementById('editSchedModal').classList.remove('active');
+      await loadSchedules();
+      showGlobalSuccess('Shift updated.');
+    } catch (err) {
+      hideLoading();
+      showGlobalError('Failed to save: ' + escHtml(err.message));
+    }
+  });
+  document.getElementById('editSchedModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+});
 
 function setupSchedSave() {
   document.getElementById('schedSaveBtn').addEventListener('click', async function () {
