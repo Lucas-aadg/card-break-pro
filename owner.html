@@ -3417,9 +3417,31 @@ async function loadInvLog() {
         '<td style="font-weight:700;">' + qtyDisplay + '</td>' +
         '<td>' + (row.unit_cost != null ? fmt(row.unit_cost) : '—') + '</td>' +
         '<td style="font-size:0.82rem;color:var(--muted);">' + escHtml(row.notes || '') + '</td>' +
-        '<td style="text-align:center;"><button onclick="deleteInvLogEntry(\'' + row.id + '\',\'' + escHtml(row.product_name) + '\',\'' + row.action + '\',' + row.quantity + ',\'' + (row.product_id || '') + '\')" title="Delete entry" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
+        '<td style="text-align:center;"><button class="inv-log-del-btn" data-log-id="' + row.id + '" data-product-name="' + escHtml(row.product_name) + '" data-action="' + escHtml(row.action) + '" data-qty="' + row.quantity + '" title="Delete entry" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
       tbody.appendChild(tr);
     });
+
+    // Wire delete buttons after all rows are in DOM
+    tbody.querySelectorAll('.inv-log-del-btn').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        const logId = btn.dataset.logId;
+        const productName = btn.dataset.productName;
+        const action = btn.dataset.action;
+        const qty = btn.dataset.qty;
+        const actionLabel = action === 'used' ? 'used' : action === 'restock' ? 'restock' : 'initial';
+        if (!confirm('Delete this ' + actionLabel + ' entry for "' + productName + '" (' + (action === 'used' ? '−' : '+') + qty + ' boxes)?\n\nThis removes the log record only — inventory stock will not be adjusted.')) return;
+        showLoading('Deleting entry…');
+        try {
+          await sb.from('inventory_log').delete().eq('id', logId);
+          hideLoading();
+          await loadInvLog();
+        } catch (err) {
+          hideLoading();
+          showGlobalError('Failed to delete entry: ' + escHtml(err.message));
+        }
+      });
+    });
+
   } catch (err) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:2rem;">Failed to load log: ' + escHtml(err.message) + '</td></tr>';
     console.error(err);
