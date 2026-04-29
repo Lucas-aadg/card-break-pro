@@ -787,7 +787,7 @@ async function initAuth() {
       return;
     }
 
-    if (profile.role !== 'breaker') {
+    if (profile.role !== 'breaker' && profile.role !== 'breaker/manager') {
       const roleMap = { owner: 'owner.html', sorter: 'sorter.html', manager: 'manager.html' };
       window.location.href = roleMap[profile.role] || 'index.html'; return;
     }

@@ -1720,6 +1720,7 @@
         <option value="breaker">Breaker</option>
         <option value="sorter">Sorter</option>
         <option value="manager">Manager</option>
+        <option value="breaker/manager">Breaker / Manager</option>
       </select>
     </div>
     <div class="btn-row">
@@ -2482,7 +2483,7 @@ async function initAuth() {
 
     if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
     if (profile.role !== 'owner') {
-      const roleMap = { breaker: 'breaker.html', sorter: 'sorter.html', manager: 'manager.html' };
+      const roleMap = { breaker: 'breaker.html', sorter: 'sorter.html', manager: 'manager.html', 'breaker/manager': 'breaker.html' };
       window.location.href = roleMap[profile.role] || 'index.html'; return;
     }
 
@@ -4567,7 +4568,7 @@ async function loadTeam() {
 
     tr.innerHTML =
       '<td><strong>' + escHtml(p.display_name) + '</strong>' + (isMe ? ' <span style="color:var(--muted);font-size:0.75rem;">(you)</span>' : '') + '</td>' +
-      '<td><span class="badge ' + (isOwner ? 'badge-blue' : p.role === 'breaker' ? 'badge-green' : p.role === 'manager' ? 'badge-purple' : 'badge-gray') + '">' + escHtml(p.role) + '</span></td>' +
+      '<td><span class="badge ' + (isOwner ? 'badge-blue' : (p.role === 'breaker' || p.role === 'breaker/manager') ? 'badge-green' : p.role === 'manager' ? 'badge-purple' : 'badge-gray') + '">' + escHtml(p.role) + '</span></td>' +
       '<td style="font-size:0.82rem;color:var(--muted);">' + payLabel + '</td>' +
       '<td><div style="display:flex;flex-wrap:wrap;gap:0.15rem;align-items:center;">' + chipsHtml + (!isOwner ? ' <button class="btn btn-outline btn-sm" data-action="assign" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.15rem 0.5rem;font-size:0.7rem;margin-left:0.25rem;">Assign</button>' : '') + '</div></td>' +
       '<td>' + fmtDate(p.created_at) + '</td>' +
@@ -4846,7 +4847,8 @@ async function openPaySettings(profile) {
   psCurrentProfile = profile;
   document.getElementById('ps-profileId').value = profile.id;
   document.getElementById('ps-name').textContent = profile.display_name + ' · ' + profile.role;
-  document.getElementById('ps-breaker-fields').style.display = profile.role === 'breaker' ? '' : 'none';
+  const isBreakerRole = profile.role === 'breaker' || profile.role === 'breaker/manager';
+  document.getElementById('ps-breaker-fields').style.display = isBreakerRole ? '' : 'none';
   document.getElementById('ps-sorter-fields').style.display = profile.role === 'sorter' ? '' : 'none';
   document.getElementById('pss-category-rates-group').style.display = 'none';
   document.getElementById('psb-category-rates-group').style.display = 'none';
@@ -4872,10 +4874,17 @@ async function openPaySettings(profile) {
   document.getElementById('ps-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
   document.getElementById('ps-commission-period-total').checked = profile.commission_method === 'period_total';
 
-  // Select current pay type
+  // Select current pay type — guard against mismatched pay_type after a role change
+  const breakerPayTypes = ['commission', 'hourly', 'salary', 'hourly_commission', 'salary_commission', 'per_break'];
+  const sorterPayTypes = ['hourly', 'per_break', 'hourly_per_break'];
+  const isBreakerRolePay = profile.role === 'breaker' || profile.role === 'breaker/manager';
   if (profile.pay_type) {
-    if (profile.role === 'breaker') psBreakerType(profile.pay_type);
-    else psSorterType(profile.pay_type);
+    if (isBreakerRolePay && breakerPayTypes.includes(profile.pay_type)) {
+      psBreakerType(profile.pay_type);
+    } else if (profile.role === 'sorter' && sorterPayTypes.includes(profile.pay_type)) {
+      psSorterType(profile.pay_type);
+    }
+    // If pay_type doesn't match role (e.g. sorter promoted to breaker), leave blank so owner sets new pay settings
   }
 
   document.getElementById('paySettingsModal').classList.add('active');
@@ -5072,7 +5081,7 @@ async function runPayroll() {
     for (const p of staff) {
       const result = { name: p.display_name, role: p.role, pay_type: p.pay_type || 'not_set', total: 0, breakdown: '' };
 
-      if (p.role === 'breaker') {
+      if (p.role === 'breaker' || p.role === 'breaker/manager') {
         await calcBreakerPay(p, fromTs, toTs, result);
       } else if (p.role === 'sorter') {
         await calcSorterPay(p, fromTs, toTs, result);
