@@ -3845,15 +3845,6 @@ function setupHistory() {
   document.getElementById('histDateFrom').value = monthAgo;
   document.getElementById('histDateTo').value = today;
 
-  // Populate breaker filter
-  const sel = document.getElementById('histBreaker');
-  allProfiles.forEach(function (p) {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.display_name + ' (' + p.role + ')';
-    sel.appendChild(opt);
-  });
-
   document.getElementById('histFilterBtn').addEventListener('click', loadHistory);
   document.getElementById('histExportBtn').addEventListener('click', exportHistoryCsv);
 }
@@ -3861,6 +3852,26 @@ function setupHistory() {
 let historyData = [];
 
 async function loadHistory() {
+  // Repopulate breaker dropdown scoped to active channel (breakers only)
+  const sel = document.getElementById('histBreaker');
+  const prevVal = sel.value;
+  sel.innerHTML = '<option value="">All Breakers</option>';
+  let breakerPool = allProfiles.filter(function(p) {
+    return p.role === 'breaker' || p.role === 'breaker/manager';
+  });
+  if (activeChannel) {
+    const { data: assigns } = await sb.from('channel_assignments').select('profile_id').eq('channel_id', activeChannel.id);
+    const assignedIds = new Set((assigns || []).map(function(a){ return a.profile_id; }));
+    breakerPool = breakerPool.filter(function(p){ return assignedIds.has(p.id); });
+  }
+  breakerPool.forEach(function(p) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.display_name;
+    if (p.id === prevVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
   const from = document.getElementById('histDateFrom').value;
   const to = document.getElementById('histDateTo').value;
   const breakerId = document.getElementById('histBreaker').value;
