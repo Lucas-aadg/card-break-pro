@@ -4872,7 +4872,8 @@ async function openPaySettings(profile) {
   document.getElementById('ps-sorter-hourly-rate').value = profile.hourly_rate != null ? profile.hourly_rate : '';
   document.getElementById('ps-sorter-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
   document.getElementById('ps-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
-  document.getElementById('ps-commission-period-total').checked = profile.commission_method === 'period_total';
+  const storedCommMethod = (profile.category_rates || {}).__commission_method || profile.commission_method || 'per_stream';
+  document.getElementById('ps-commission-period-total').checked = storedCommMethod === 'period_total';
 
   // Select current pay type — guard against mismatched pay_type after a role change
   const breakerPayTypes = ['commission', 'hourly', 'salary', 'hourly_commission', 'salary_commission', 'per_break'];
@@ -4903,13 +4904,16 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!profile) return;
 
     let payType, updates = {};
-    if (profile.role === 'breaker') {
+    if (profile.role === 'breaker' || profile.role === 'breaker/manager') {
       const sel = document.querySelector('input[name="ps-breaker-type"]:checked');
       if (!sel) { showGlobalError('Please select a pay type.'); return; }
       payType = sel.value;
       if (payType === 'commission' || payType === 'hourly_commission' || payType === 'salary_commission') {
         updates.commission_rate = parseFloat(document.getElementById('ps-commission-rate').value) || 0;
-        updates.commission_method = document.getElementById('ps-commission-period-total').checked ? 'period_total' : 'per_stream';
+        const commMethod = document.getElementById('ps-commission-period-total').checked ? 'period_total' : 'per_stream';
+        const existingCatRates = Object.assign({}, profile.category_rates || {});
+        existingCatRates.__commission_method = commMethod;
+        updates.category_rates = existingCatRates;
       }
       if (payType === 'hourly' || payType === 'hourly_commission') {
         updates.hourly_rate = parseFloat(document.getElementById('ps-hourly-rate').value) || 0;
@@ -4921,10 +4925,13 @@ document.addEventListener('DOMContentLoaded', function () {
       if (payType === 'per_break') {
         updates.per_break_rate = parseFloat(document.getElementById('ps-per-break-rate').value) || 0;
         const catRates = {};
-        document.querySelectorAll('.cat-rate-input').forEach(function(inp) {
+        document.querySelectorAll('#psb-category-rates-body .cat-rate-input').forEach(function(inp) {
           const val = parseFloat(inp.value);
           if (!isNaN(val) && val >= 0) catRates[inp.dataset.category] = val;
         });
+        // Preserve stored commission_method
+        const prevMethod = (profile.category_rates || {}).__commission_method;
+        if (prevMethod) catRates.__commission_method = prevMethod;
         updates.category_rates = catRates;
       }
     } else {
@@ -5162,7 +5169,7 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
   // Commission component
   if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
     const rate = (parseFloat(p.commission_rate) || 0) / 100;
-    const periodTotal = p.commission_method === 'period_total';
+    const periodTotal = ((p.category_rates || {}).__commission_method || p.commission_method || 'per_stream') === 'period_total';
     const { data: streams } = await sb.from('streams')
       .select('final_sales, total_product_cost, total_other_costs')
       .eq('breaker_id', p.id)
