@@ -4051,10 +4051,25 @@ async function loadDashboard() {
   try {
     // If channel is active, get stream IDs for that channel
     const chStreamIds = await getActiveChannelStreamIds();
+    // Channel has no streams yet — show all zeros
+    if (chStreamIds && chStreamIds.length === 0) {
+      document.getElementById('dash-revenue').textContent = fmt(0);
+      const profitEl = document.getElementById('dash-profit');
+      profitEl.textContent = fmt(0); profitEl.className = 'stat-value green';
+      document.getElementById('dash-breaks').textContent = 0;
+      document.getElementById('dash-avg').textContent = '—';
+      document.getElementById('dash-totalRevenue').textContent = fmt(0);
+      const tpe = document.getElementById('dash-totalProfit');
+      tpe.textContent = fmt(0); tpe.className = 'stat-value green';
+      document.getElementById('dash-totalBreaks').textContent = 0;
+      document.getElementById('dash-totalStreams').textContent = 0;
+      document.getElementById('dashRecentBody').innerHTML = '<tr class="empty-row"><td colspan="6">No breaks yet for this channel.</td></tr>';
+      return;
+    }
 
     // Today's breaks
     let todayBreaksQ = sb.from('breaks').select('*').eq('org_id', currentProfile.org_id).eq('break_date', todayStr);
-    if (chStreamIds) todayBreaksQ = chStreamIds.length ? todayBreaksQ.in('stream_id', chStreamIds) : todayBreaksQ.eq('stream_id', 'no-match');
+    if (chStreamIds) todayBreaksQ = todayBreaksQ.in('stream_id', chStreamIds);
     const { data: todayBreaks, error: tbErr } = await todayBreaksQ;
     if (tbErr) throw tbErr;
 
@@ -4079,7 +4094,7 @@ async function loadDashboard() {
 
     // All-time breaks
     let allBreaksQ = sb.from('breaks').select('revenue, net_profit').eq('org_id', currentProfile.org_id);
-    if (chStreamIds) allBreaksQ = chStreamIds.length ? allBreaksQ.in('stream_id', chStreamIds) : allBreaksQ.eq('stream_id', 'no-match');
+    if (chStreamIds) allBreaksQ = allBreaksQ.in('stream_id', chStreamIds);
     const { data: allBreaks, error: abErr } = await allBreaksQ;
     if (abErr) throw abErr;
 
@@ -4107,7 +4122,7 @@ async function loadDashboard() {
 
     // Recent breaks
     let recentBreaksQ = sb.from('breaks').select('*').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(10);
-    if (chStreamIds) recentBreaksQ = chStreamIds.length ? recentBreaksQ.in('stream_id', chStreamIds) : recentBreaksQ.eq('stream_id', 'no-match');
+    if (chStreamIds) recentBreaksQ = recentBreaksQ.in('stream_id', chStreamIds);
     const { data: recentBreaks, error: rbErr } = await recentBreaksQ;
     if (rbErr) throw rbErr;
 
@@ -4147,8 +4162,12 @@ async function loadProductRoi() {
 
   try {
     const chStreamIds = await getActiveChannelStreamIds();
+    if (chStreamIds && chStreamIds.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No breaks yet for this channel.</td></tr>';
+      return;
+    }
     let roiQ = sb.from('breaks').select('revenue, products_used').eq('org_id', currentProfile.org_id);
-    if (chStreamIds) roiQ = chStreamIds.length ? roiQ.in('stream_id', chStreamIds) : roiQ.eq('stream_id', 'no-match');
+    if (chStreamIds) roiQ = roiQ.in('stream_id', chStreamIds);
     const { data: breaks, error } = await roiQ;
     if (error) throw error;
 
@@ -4352,8 +4371,12 @@ async function loadBreakerPerformance() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Loading…</td></tr>';
   try {
     const chStreamIds = await getActiveChannelStreamIds();
+    if (chStreamIds && chStreamIds.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No breaks yet for this channel.</td></tr>';
+      return;
+    }
     let perfQ = sb.from('breaks').select('breaker_id, revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id);
-    if (chStreamIds) perfQ = chStreamIds.length ? perfQ.in('stream_id', chStreamIds) : perfQ.eq('stream_id', 'no-match');
+    if (chStreamIds) perfQ = perfQ.in('stream_id', chStreamIds);
     const { data: breaks, error } = await perfQ;
     if (error) throw error;
 
