@@ -1058,6 +1058,11 @@
        TAB: DASHBOARD
   ════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-dashboard">
+    <div id="dashChannelBadge" style="display:none;margin-bottom:1rem;padding:0.5rem 0.9rem;border-radius:8px;background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.2);font-size:0.82rem;font-weight:600;color:var(--text);display:none;align-items:center;gap:0.5rem;">
+      <span id="dashChannelBadgeIcon"></span>
+      <span id="dashChannelBadgeName"></span>
+      <span style="color:var(--muted);">· numbers filtered to this account</span>
+    </div>
     <div class="stats-grid" id="dashStats">
       <div class="stat-card"><div class="stat-label">Today's Revenue</div><div class="stat-value blue" id="dash-revenue">—</div></div>
       <div class="stat-card"><div class="stat-label">Today's Profit</div><div class="stat-value green" id="dash-profit">—</div></div>
@@ -3887,15 +3892,35 @@ function setupDashboard() {
   // no additional setup needed — loaded on tab switch
 }
 
+async function getActiveChannelStreamIds() {
+  if (!activeChannel) return null;
+  const { data } = await sb.from('streams').select('id').eq('org_id', currentProfile.org_id).eq('channel_id', activeChannel.id);
+  return (data || []).map(function(s){ return s.id; });
+}
+
 async function loadDashboard() {
   const todayStr = today();
 
+  // Update channel badge
+  const badge = document.getElementById('dashChannelBadge');
+  if (badge) {
+    if (activeChannel) {
+      document.getElementById('dashChannelBadgeIcon').textContent = activeChannel.icon;
+      document.getElementById('dashChannelBadgeName').textContent = activeChannel.name;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
   try {
+    // If channel is active, get stream IDs for that channel
+    const chStreamIds = await getActiveChannelStreamIds();
+
     // Today's breaks
-    const { data: todayBreaks, error: tbErr } = await sb
-      .from('breaks').select('*')
-      .eq('org_id', currentProfile.org_id)
-      .eq('break_date', todayStr);
+    let todayBreaksQ = sb.from('breaks').select('*').eq('org_id', currentProfile.org_id).eq('break_date', todayStr);
+    if (chStreamIds) todayBreaksQ = chStreamIds.length ? todayBreaksQ.in('stream_id', chStreamIds) : todayBreaksQ.eq('stream_id', 'no-match');
+    const { data: todayBreaks, error: tbErr } = await todayBreaksQ;
     if (tbErr) throw tbErr;
 
     const todayRev = (todayBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
@@ -3904,11 +3929,9 @@ async function loadDashboard() {
     const todayAvg = todayCount > 0 ? todayRev / todayCount : 0;
 
     // Deduct commission payouts from today's closed streams
-    const { data: todayStreams } = await sb
-      .from('streams').select('commission_payout')
-      .eq('org_id', currentProfile.org_id)
-      .eq('status', 'closed')
-      .eq('break_date', todayStr);
+    let todayStreamsQ = sb.from('streams').select('commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', todayStr);
+    if (activeChannel) todayStreamsQ = todayStreamsQ.eq('channel_id', activeChannel.id);
+    const { data: todayStreams } = await todayStreamsQ;
     const todayCommission = (todayStreams || []).reduce(function (s, x) { return s + (parseFloat(x.commission_payout) || 0); }, 0);
     const todayProfitAfterCommission = todayProfit - todayCommission;
 
@@ -3920,19 +3943,18 @@ async function loadDashboard() {
     document.getElementById('dash-avg').textContent = todayCount > 0 ? fmt(todayAvg) : '—';
 
     // All-time breaks
-    const { data: allBreaks, error: abErr } = await sb
-      .from('breaks').select('revenue, net_profit')
-      .eq('org_id', currentProfile.org_id);
+    let allBreaksQ = sb.from('breaks').select('revenue, net_profit').eq('org_id', currentProfile.org_id);
+    if (chStreamIds) allBreaksQ = chStreamIds.length ? allBreaksQ.in('stream_id', chStreamIds) : allBreaksQ.eq('stream_id', 'no-match');
+    const { data: allBreaks, error: abErr } = await allBreaksQ;
     if (abErr) throw abErr;
 
     const totalRev = (allBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
     const totalProfit = (allBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
 
     // Deduct all-time commission payouts
-    const { data: allStreams } = await sb
-      .from('streams').select('commission_payout')
-      .eq('org_id', currentProfile.org_id)
-      .eq('status', 'closed');
+    let allStreamsQ = sb.from('streams').select('commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed');
+    if (activeChannel) allStreamsQ = allStreamsQ.eq('channel_id', activeChannel.id);
+    const { data: allStreams } = await allStreamsQ;
     const totalCommission = (allStreams || []).reduce(function (s, x) { return s + (parseFloat(x.commission_payout) || 0); }, 0);
     const totalProfitAfterCommission = totalProfit - totalCommission;
 
@@ -3943,17 +3965,15 @@ async function loadDashboard() {
     document.getElementById('dash-totalBreaks').textContent = (allBreaks || []).length;
 
     // Streams count
-    const { count: streamsCount } = await sb
-      .from('streams').select('id', { count: 'exact', head: true })
-      .eq('org_id', currentProfile.org_id);
+    let streamsCountQ = sb.from('streams').select('id', { count: 'exact', head: true }).eq('org_id', currentProfile.org_id);
+    if (activeChannel) streamsCountQ = streamsCountQ.eq('channel_id', activeChannel.id);
+    const { count: streamsCount } = await streamsCountQ;
     document.getElementById('dash-totalStreams').textContent = streamsCount || 0;
 
     // Recent breaks
-    const { data: recentBreaks, error: rbErr } = await sb
-      .from('breaks').select('*')
-      .eq('org_id', currentProfile.org_id)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    let recentBreaksQ = sb.from('breaks').select('*').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(10);
+    if (chStreamIds) recentBreaksQ = chStreamIds.length ? recentBreaksQ.in('stream_id', chStreamIds) : recentBreaksQ.eq('stream_id', 'no-match');
+    const { data: recentBreaks, error: rbErr } = await recentBreaksQ;
     if (rbErr) throw rbErr;
 
     // Load streams map for recent breaks
@@ -3991,9 +4011,10 @@ async function loadProductRoi() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Loading…</td></tr>';
 
   try {
-    const { data: breaks, error } = await sb
-      .from('breaks').select('revenue, products_used')
-      .eq('org_id', currentProfile.org_id);
+    const chStreamIds = await getActiveChannelStreamIds();
+    let roiQ = sb.from('breaks').select('revenue, products_used').eq('org_id', currentProfile.org_id);
+    if (chStreamIds) roiQ = chStreamIds.length ? roiQ.in('stream_id', chStreamIds) : roiQ.eq('stream_id', 'no-match');
+    const { data: breaks, error } = await roiQ;
     if (error) throw error;
 
     const productMap = {};
@@ -4195,9 +4216,10 @@ async function loadBreakerPerformance() {
   const tbody = document.getElementById('perfBreakerBody');
   tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Loading…</td></tr>';
   try {
-    const { data: breaks, error } = await sb
-      .from('breaks').select('breaker_id, revenue, net_profit, stream_id')
-      .eq('org_id', currentProfile.org_id);
+    const chStreamIds = await getActiveChannelStreamIds();
+    let perfQ = sb.from('breaks').select('breaker_id, revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id);
+    if (chStreamIds) perfQ = chStreamIds.length ? perfQ.in('stream_id', chStreamIds) : perfQ.eq('stream_id', 'no-match');
+    const { data: breaks, error } = await perfQ;
     if (error) throw error;
 
     const map = {};
