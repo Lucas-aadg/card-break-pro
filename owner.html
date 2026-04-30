@@ -6040,10 +6040,26 @@ async function loadScheduleBreakers() {
 }
 
 async function loadSchedules() {
-  let q = sb.from('schedules').select('*, profiles(display_name)').eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
+  // Try with channel filter first; fall back to unfiltered if column doesn't exist yet
+  let q = sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at, profiles(display_name)').eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
   if (ownerSchedChannel) q = q.eq('channel_id', ownerSchedChannel.id);
-  const { data, error } = await q;
-  if (error) { showGlobalError('Failed to load schedules.'); return; }
+  let { data, error } = await q;
+
+  // If channel_id column missing, retry without it
+  if (error && error.message && error.message.includes('channel_id')) {
+    const fallback = await sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at, profiles(display_name)').eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  // If scheduled_time column missing, retry with minimal select
+  if (error && error.message && (error.message.includes('scheduled_time') || error.message.includes('stream_key') || error.message.includes('schema cache'))) {
+    const fallback2 = await sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, status, clocked_in_at, clocked_out_at, profiles(display_name)').eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
+    data = fallback2.data;
+    error = fallback2.error;
+  }
+
+  if (error) { showGlobalError('Failed to load schedules: ' + error.message); return; }
   allSchedules = data || [];
   renderCalendar();
   renderSchedTable();
@@ -6261,19 +6277,30 @@ function setupSchedSave() {
         const row = {
           org_id: currentProfile.org_id,
           scheduled_date: d,
-          scheduled_time: time || null,
-          stream_key: streamKey || null,
-          notes: notes || null,
           status: 'scheduled'
         };
         if (selectedProfile && selectedProfile.role === 'sorter') row.sorter_id = breakerId;
         else row.breaker_id = breakerId;
-        if (ownerSchedChannel) row.channel_id = ownerSchedChannel.id;
         return row;
       });
 
-      const { error } = await sb.from('schedules').insert(rows);
-      if (error) throw error;
+      // Try inserting with optional columns; fall back without them if schema hasn't been migrated yet
+      let { error } = await sb.from('schedules').insert(rows.map(function(r) {
+        const full = Object.assign({}, r);
+        if (time) full.scheduled_time = time;
+        if (streamKey) full.stream_key = streamKey;
+        if (notes) full.notes = notes;
+        if (ownerSchedChannel) full.channel_id = ownerSchedChannel.id;
+        return full;
+      }));
+
+      if (error && error.message && (error.message.includes('scheduled_time') || error.message.includes('channel_id') || error.message.includes('stream_key') || error.message.includes('notes'))) {
+        // Schema not migrated yet — insert with only core columns
+        const fallback = await sb.from('schedules').insert(rows);
+        if (fallback.error) throw fallback.error;
+      } else if (error) {
+        throw error;
+      }
 
       document.getElementById('schedDate').value = '';
       document.getElementById('schedTime').value = '';

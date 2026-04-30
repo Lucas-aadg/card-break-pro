@@ -985,9 +985,24 @@ function populateScheduleDropdown() {
 async function loadSchedule() {
   const tbody = document.getElementById('schedTableBody');
   tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Loading…</td></tr>';
-  let q = sb.from('schedules').select('*').eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
+  let q = sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at').eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
   if (scheduleChannel) q = q.eq('channel_id', scheduleChannel.id);
-  const { data: shifts } = await q;
+  let { data: shifts, error } = await q;
+
+  // If channel_id column missing, retry without channel filter
+  if (error && error.message && error.message.includes('channel_id')) {
+    const fallback = await sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at').eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
+    shifts = fallback.data;
+    error = fallback.error;
+  }
+
+  // If other columns missing, retry minimal
+  if (error && error.message && (error.message.includes('scheduled_time') || error.message.includes('stream_key') || error.message.includes('schema cache'))) {
+    const fallback2 = await sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, status, clocked_in_at, clocked_out_at').eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
+    shifts = fallback2.data;
+    error = fallback2.error;
+  }
+
   allSchedules = shifts || [];
   renderScheduleTable(allSchedules);
 }
@@ -1060,27 +1075,32 @@ async function createShift() {
   btn.disabled = true; btn.textContent = repeat ? 'Saving ' + repeatDays + ' shifts…' : 'Saving…';
 
   try {
-    const shifts = [];
+    const coreShifts = [];
     const baseDate = new Date(date + 'T12:00:00');
-    const days = repeatDays;
-    for (let i = 0; i < days; i++) {
+    for (let i = 0; i < repeatDays; i++) {
       const d = new Date(baseDate);
       d.setDate(d.getDate() + i);
-      const entry = {
-        org_id: currentProfile.org_id,
-        scheduled_date: d.toISOString().slice(0,10),
-        scheduled_time: time,
-        stream_key: streamKey || null,
-        notes: notes || null,
-        status: 'scheduled'
-      };
+      const entry = { org_id: currentProfile.org_id, scheduled_date: d.toISOString().slice(0,10), status: 'scheduled' };
       if (profile.role === 'sorter') entry.sorter_id = personId;
-      else entry.breaker_id = personId; // covers 'breaker', 'breaker/manager', 'manager'
-      if (scheduleChannel) entry.channel_id = scheduleChannel.id;
-      shifts.push(entry);
+      else entry.breaker_id = personId;
+      coreShifts.push(entry);
     }
-    const { error } = await sb.from('schedules').insert(shifts);
-    if (error) throw error;
+
+    // Try inserting with optional columns; if schema not migrated fall back to core only
+    let { error } = await sb.from('schedules').insert(coreShifts.map(function(r) {
+      const full = Object.assign({}, r);
+      if (time) full.scheduled_time = time;
+      if (streamKey) full.stream_key = streamKey;
+      if (notes) full.notes = notes;
+      if (scheduleChannel) full.channel_id = scheduleChannel.id;
+      return full;
+    }));
+    if (error && error.message && (error.message.includes('scheduled_time') || error.message.includes('channel_id') || error.message.includes('stream_key') || error.message.includes('notes'))) {
+      const fallback = await sb.from('schedules').insert(coreShifts);
+      if (fallback.error) throw fallback.error;
+    } else if (error) {
+      throw error;
+    }
     showGlobalSuccess(repeat ? repeatDays + ' shifts scheduled.' : 'Shift scheduled.');
     document.getElementById('schedStreamKey').value = '';
     document.getElementById('schedNotes').value = '';
