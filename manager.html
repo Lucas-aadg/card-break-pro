@@ -151,6 +151,23 @@
     <a href="help-manager.html" class="nav-help-link">? Help</a>
     <a href="breaker.html" id="brkViewLink" style="display:none;color:var(--primary);font-size:0.8rem;font-weight:700;text-decoration:none;padding:0.35rem 0.8rem;border:1px solid rgba(79,110,247,0.4);border-radius:6px;background:rgba(79,110,247,0.08);">Breaker View</a>
     <span id="mgrBadge" style="color:var(--muted);font-size:0.8rem;"></span>
+    <!-- Notification Bell -->
+    <div style="position:relative;" id="notifBellWrap">
+      <button id="notifBellBtn" onclick="toggleNotifPanel()" style="background:none;border:none;cursor:pointer;padding:0.3rem;display:flex;align-items:center;justify-content:center;color:var(--muted);border-radius:8px;transition:color 0.2s,background 0.2s;" title="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span id="notifBadge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;font-size:0.6rem;font-weight:800;border-radius:100px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;"></span>
+      </button>
+      <div id="notifPanel" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:320px;background:#10101e;border:1px solid rgba(79,110,247,0.25);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:500;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1rem 0.6rem;border-bottom:1px solid rgba(79,110,247,0.12);">
+          <span style="font-size:0.8rem;font-weight:700;color:var(--text);">Notifications</span>
+          <button onclick="markAllNotifsRead()" style="background:none;border:none;color:var(--muted);font-size:0.72rem;cursor:pointer;font-weight:600;">Mark all read</button>
+        </div>
+        <div id="notifList" style="max-height:320px;overflow-y:auto;"></div>
+        <div style="padding:0.6rem 1rem;border-top:1px solid rgba(79,110,247,0.1);text-align:center;">
+          <button onclick="closeNotifPanel()" style="background:none;border:none;color:var(--muted);font-size:0.78rem;cursor:pointer;">Close</button>
+        </div>
+      </div>
+    </div>
     <button class="btn-sm btn-signout" id="signOutBtn">Sign Out</button>
   </div>
 </nav>
@@ -632,7 +649,9 @@ let currentProfile = null;
 let orgProducts = [];
 let allProfiles = [];
 let confirmCallback = null;
-let calCurrentDate = new Date();
+const CAL_MIN_YEAR = 2026;
+const CAL_MIN_MONTH = 4; // May (0-indexed)
+let calCurrentDate = new Date(2026, 4, 1); // Start at May 2026
 let allSchedules = [];
 let orgChannels = [];
 let scheduleChannel = null;
@@ -738,7 +757,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Schedule
   document.getElementById('schedSaveBtn').addEventListener('click', createShift);
-  document.getElementById('calPrevBtn').addEventListener('click', function(){ calCurrentDate.setMonth(calCurrentDate.getMonth()-1); loadCalendar(); });
+  document.getElementById('calPrevBtn').addEventListener('click', function(){
+    if (calCurrentDate.getFullYear() === CAL_MIN_YEAR && calCurrentDate.getMonth() === CAL_MIN_MONTH) return;
+    calCurrentDate.setMonth(calCurrentDate.getMonth()-1);
+    // Clamp to minimum
+    if (calCurrentDate.getFullYear() < CAL_MIN_YEAR || (calCurrentDate.getFullYear() === CAL_MIN_YEAR && calCurrentDate.getMonth() < CAL_MIN_MONTH)) {
+      calCurrentDate = new Date(CAL_MIN_YEAR, CAL_MIN_MONTH, 1);
+    }
+    loadCalendar();
+  });
   document.getElementById('calNextBtn').addEventListener('click', function(){ calCurrentDate.setMonth(calCurrentDate.getMonth()+1); loadCalendar(); });
   document.getElementById('refreshClockLogBtn').addEventListener('click', loadClockLog);
   document.getElementById('schedFilterInput').addEventListener('input', function(){ renderScheduleTable(allSchedules); });
@@ -800,6 +827,10 @@ async function init() {
     await loadAllProfiles();
     await loadChannelsForSchedule();
     switchTab('schedule');
+
+    // Notifications
+    loadNotifCount();
+    setInterval(loadNotifCount, 60000);
   } catch (err) {
     console.error(err);
     showGlobalError('Failed to load. Please refresh.');
@@ -807,6 +838,56 @@ async function init() {
     hideLoading();
   }
 }
+
+// ── Notifications ──────────────────────────────────────────
+let notifPanelOpen = false;
+function toggleNotifPanel() {
+  notifPanelOpen = !notifPanelOpen;
+  document.getElementById('notifPanel').style.display = notifPanelOpen ? 'block' : 'none';
+  if (notifPanelOpen) renderNotifPanel();
+}
+function closeNotifPanel() {
+  notifPanelOpen = false;
+  document.getElementById('notifPanel').style.display = 'none';
+}
+async function loadNotifCount() {
+  try {
+    const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('profile_id', currentUser.id).eq('read', false);
+    const badge = document.getElementById('notifBadge');
+    if (count && count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'block'; }
+    else { badge.style.display = 'none'; }
+  } catch (e) {}
+}
+async function renderNotifPanel() {
+  const list = document.getElementById('notifList');
+  list.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading…</div>';
+  try {
+    const { data } = await sb.from('notifications').select('*').eq('profile_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
+    if (!data || data.length === 0) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">No notifications yet.</div>'; return; }
+    list.innerHTML = data.map(function(n) {
+      const diff = Math.floor((Date.now() - new Date(n.created_at)) / 1000);
+      const age = diff < 60 ? 'Just now' : diff < 3600 ? Math.floor(diff/60)+'m ago' : diff < 86400 ? Math.floor(diff/3600)+'h ago' : Math.floor(diff/86400)+'d ago';
+      return '<div style="padding:0.75rem 1rem;border-bottom:1px solid rgba(79,110,247,0.08);cursor:pointer;display:flex;gap:0.65rem;align-items:flex-start;background:' + (n.read ? 'transparent' : 'rgba(79,110,247,0.04)') + ';" onclick="markNotifRead(\'' + n.id + '\',this)">' +
+        '<div style="width:7px;height:7px;border-radius:50%;background:' + (n.read ? 'transparent' : '#4f6ef7') + ';flex-shrink:0;margin-top:5px;"></div>' +
+        '<div><div style="font-size:0.82rem;font-weight:700;color:#e8eaf6;margin-bottom:0.15rem;">' + (n.title||'').replace(/</g,'&lt;') + '</div>' +
+        '<div style="font-size:0.78rem;color:#5a6a8a;line-height:1.4;">' + (n.message||'').replace(/</g,'&lt;') + '</div>' +
+        '<div style="font-size:0.68rem;color:#5a6a8a;margin-top:0.2rem;">' + age + '</div></div></div>';
+    }).join('');
+  } catch(e) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">Could not load.</div>'; }
+}
+async function markNotifRead(id, el) {
+  try {
+    await sb.from('notifications').update({ read: true }).eq('id', id);
+    if (el) { el.style.background = 'transparent'; const dot = el.querySelector('div'); if(dot) dot.style.background = 'transparent'; }
+    loadNotifCount();
+  } catch(e) {}
+}
+async function markAllNotifsRead() {
+  try { await sb.from('notifications').update({ read: true }).eq('profile_id', currentUser.id).eq('read', false); renderNotifPanel(); loadNotifCount(); } catch(e) {}
+}
+document.addEventListener('click', function(e) {
+  if (notifPanelOpen && !document.getElementById('notifBellWrap').contains(e.target)) closeNotifPanel();
+});
 
 async function loadAllProfiles() {
   const { data } = await sb.from('profiles').select('id, display_name, role, email').eq('org_id', currentProfile.org_id).neq('role', 'owner');
@@ -1065,6 +1146,13 @@ function loadCalendar() {
   const month = calCurrentDate.getMonth();
   label.textContent = calCurrentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
+  // Disable prev button at the minimum month
+  const prevBtn = document.getElementById('calPrevBtn');
+  const atMin = (year === CAL_MIN_YEAR && month === CAL_MIN_MONTH);
+  prevBtn.disabled = atMin;
+  prevBtn.style.opacity = atMin ? '0.3' : '';
+  prevBtn.style.cursor = atMin ? 'not-allowed' : '';
+
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   grid.innerHTML = '';
@@ -1080,12 +1168,14 @@ function loadCalendar() {
     grid.appendChild(document.createElement('div'));
   }
 
+  const todayStr = new Date().toISOString().slice(0, 10);
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
     const dayShifts = allSchedules.filter(function(s){ return s.scheduled_date === dateStr && s.status !== 'cancelled'; });
+    const isToday = dateStr === todayStr;
     const cell = document.createElement('div');
-    cell.style.cssText = 'min-height:52px;border:1px solid var(--border);border-radius:5px;padding:3px 4px;font-size:0.72rem;background:var(--bg);';
-    let html = '<div style="font-weight:700;color:var(--muted);margin-bottom:2px;">' + day + '</div>';
+    cell.style.cssText = 'min-height:52px;border:1px solid ' + (isToday ? 'var(--primary)' : 'var(--border)') + ';border-radius:5px;padding:3px 4px;font-size:0.72rem;background:' + (isToday ? 'rgba(79,110,247,0.06)' : 'var(--bg)') + ';';
+    let html = '<div style="font-weight:' + (isToday ? '800' : '700') + ';color:' + (isToday ? 'var(--primary)' : 'var(--muted)') + ';margin-bottom:2px;">' + day + '</div>';
     dayShifts.slice(0,3).forEach(function(s){
       const profile = allProfiles.find(function(p){ return p.id === s.breaker_id || p.id === s.sorter_id; });
       const name = profile ? profile.display_name.split(' ')[0] : '?';
