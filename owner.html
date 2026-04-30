@@ -6039,24 +6039,26 @@ async function loadScheduleBreakers() {
   }
 }
 
+const SCHED_SELECT = 'id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at, breaker:profiles!breaker_id(display_name), sorter:profiles!sorter_id(display_name)';
+const SCHED_SELECT_MINIMAL = 'id, org_id, breaker_id, sorter_id, scheduled_date, status, clocked_in_at, clocked_out_at, breaker:profiles!breaker_id(display_name), sorter:profiles!sorter_id(display_name)';
+
+function schedDisplayName(s) {
+  return (s.breaker && s.breaker.display_name) || (s.sorter && s.sorter.display_name) || null;
+}
+
 async function loadSchedules() {
-  // Try with channel filter first; fall back to unfiltered if column doesn't exist yet
-  let q = sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at, profiles(display_name)').eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
+  let q = sb.from('schedules').select(SCHED_SELECT).eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
   if (ownerSchedChannel) q = q.eq('channel_id', ownerSchedChannel.id);
   let { data, error } = await q;
 
-  // If channel_id column missing, retry without it
   if (error && error.message && error.message.includes('channel_id')) {
-    const fallback = await sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at, profiles(display_name)').eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
-    data = fallback.data;
-    error = fallback.error;
+    const fallback = await sb.from('schedules').select(SCHED_SELECT).eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
+    data = fallback.data; error = fallback.error;
   }
 
-  // If scheduled_time column missing, retry with minimal select
-  if (error && error.message && (error.message.includes('scheduled_time') || error.message.includes('stream_key') || error.message.includes('schema cache'))) {
-    const fallback2 = await sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, status, clocked_in_at, clocked_out_at, profiles(display_name)').eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
-    data = fallback2.data;
-    error = fallback2.error;
+  if (error && error.message && (error.message.includes('stream_key') || error.message.includes('schema cache') || error.message.includes('scheduled_time'))) {
+    const fallback2 = await sb.from('schedules').select(SCHED_SELECT_MINIMAL).eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
+    data = fallback2.data; error = fallback2.error;
   }
 
   if (error) { showGlobalError('Failed to load schedules: ' + error.message); return; }
@@ -6139,8 +6141,8 @@ function renderCalendar() {
       chip.style.cssText = 'font-size:0.65rem;font-weight:600;border-radius:4px;padding:2px 4px;margin-bottom:2px;background:' +
         (isDone ? 'rgba(34,197,94,0.2)' : 'rgba(79,110,247,0.2)') + ';color:' +
         (isDone ? 'var(--green)' : 'var(--primary)') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-      chip.textContent = (s.scheduled_time ? s.scheduled_time.slice(0,5) + ' ' : '') + (s.profiles ? s.profiles.display_name : '');
-      chip.title = (s.profiles ? s.profiles.display_name : '') + (s.stream_key ? ' — ' + s.stream_key : '');
+      chip.textContent = (s.scheduled_time ? s.scheduled_time.slice(0,5) + ' ' : '') + (schedDisplayName(s) || '');
+      chip.title = (schedDisplayName(s) || '') + (s.stream_key ? ' — ' + s.stream_key : '');
       cell.appendChild(chip);
     });
 
@@ -6156,7 +6158,7 @@ function renderSchedTable() {
   let upcoming = allSchedules.filter(function (s) { return s.scheduled_date >= today; });
   if (filterVal) {
     upcoming = upcoming.filter(function(s) {
-      const name = s.profiles ? s.profiles.display_name.toLowerCase() : '';
+      const name = (schedDisplayName(s) || '').toLowerCase();
       return name.includes(filterVal);
     });
   }
@@ -6178,7 +6180,7 @@ function renderSchedTable() {
     tr.innerHTML =
       '<td>' + s.scheduled_date + '</td>' +
       '<td>' + (s.scheduled_time ? s.scheduled_time.slice(0,5) : '—') + '</td>' +
-      '<td><strong>' + escHtml(s.profiles ? s.profiles.display_name : '—') + '</strong></td>' +
+      '<td><strong>' + escHtml(schedDisplayName(s) || '—') + '</strong></td>' +
       '<td>' + escHtml(s.stream_key || '—') + '</td>' +
       '<td style="color:var(--muted);font-size:0.82rem;">' + escHtml(s.notes || '—') + '</td>' +
       '<td>' + statusBadge + '</td>' +

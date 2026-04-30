@@ -982,25 +982,27 @@ function populateScheduleDropdown() {
 }
 
 // ── SCHEDULE ─────────────────────────────────────────────
+const SCHED_SELECT = 'id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at, breaker:profiles!breaker_id(display_name), sorter:profiles!sorter_id(display_name)';
+const SCHED_SELECT_MINIMAL = 'id, org_id, breaker_id, sorter_id, scheduled_date, status, clocked_in_at, clocked_out_at, breaker:profiles!breaker_id(display_name), sorter:profiles!sorter_id(display_name)';
+
+function schedDisplayName(s) {
+  return (s.breaker && s.breaker.display_name) || (s.sorter && s.sorter.display_name) || null;
+}
+
 async function loadSchedule() {
   const tbody = document.getElementById('schedTableBody');
   tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Loading…</td></tr>';
-  let q = sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at').eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
+  let q = sb.from('schedules').select(SCHED_SELECT).eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
   if (scheduleChannel) q = q.eq('channel_id', scheduleChannel.id);
   let { data: shifts, error } = await q;
 
-  // If channel_id column missing, retry without channel filter
   if (error && error.message && error.message.includes('channel_id')) {
-    const fallback = await sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at').eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
-    shifts = fallback.data;
-    error = fallback.error;
+    const fallback = await sb.from('schedules').select(SCHED_SELECT).eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
+    shifts = fallback.data; error = fallback.error;
   }
-
-  // If other columns missing, retry minimal
-  if (error && error.message && (error.message.includes('scheduled_time') || error.message.includes('stream_key') || error.message.includes('schema cache'))) {
-    const fallback2 = await sb.from('schedules').select('id, org_id, breaker_id, sorter_id, scheduled_date, status, clocked_in_at, clocked_out_at').eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
-    shifts = fallback2.data;
-    error = fallback2.error;
+  if (error && error.message && (error.message.includes('stream_key') || error.message.includes('schema cache') || error.message.includes('scheduled_time'))) {
+    const fallback2 = await sb.from('schedules').select(SCHED_SELECT_MINIMAL).eq('org_id', currentProfile.org_id).neq('status', 'cancelled').order('scheduled_date', { ascending: true });
+    shifts = fallback2.data; error = fallback2.error;
   }
 
   allSchedules = shifts || [];
