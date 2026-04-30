@@ -1327,10 +1327,10 @@
           <div id="prSorterTotal" style="font-size:1.5rem;font-weight:900;color:var(--text);letter-spacing:-0.5px;">—</div>
           <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">hourly + per break</div>
         </div>
-        <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:0.9rem 1.1rem;">
-          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);margin-bottom:0.35rem;">Tips to Remit</div>
-          <div id="prTipsTotal" style="font-size:1.5rem;font-weight:900;color:var(--yellow);letter-spacing:-0.5px;">—</div>
-          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">100% owed to breakers</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
+          <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Net Profit After Payroll</div>
+          <div id="prNetAfterPayroll" style="font-size:1.5rem;font-weight:900;color:var(--green);letter-spacing:-0.5px;">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">break profit − payroll</div>
         </div>
       </div>
 
@@ -1343,8 +1343,7 @@
                 <th>Name</th>
                 <th>Role</th>
                 <th>Pay Structure</th>
-                <th>Earned Pay</th>
-                <th style="text-align:right;color:var(--yellow);">Tips Due</th>
+                <th>Breakdown</th>
                 <th style="text-align:right;">Total Owed</th>
               </tr>
             </thead>
@@ -5719,7 +5718,7 @@ function renderPayrollResults() {
   tbody.innerHTML = '';
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No staff match this filter.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No staff match this filter.</td></tr>';
   } else {
     filtered.forEach(function (r) {
       const tr = document.createElement('tr');
@@ -5730,15 +5729,11 @@ function renderPayrollResults() {
         per_break:'Per Break', hourly_per_break:'Hourly + Per Break'
       };
       const tips = r.tips || 0;
-      const earnedOnly = r.total - tips;
-      // Build the earned pay breakdown string (strip "Tips: $x.xx" from it since we show it separately)
-      const breakdownClean = (r.breakdown || '').replace(/\s*\+?\s*Tips:\s*\$[\d.]+/g, '').replace(/Tips:\s*\$[\d.]+(?: \+ )?/g, '').replace(/ \+ $/, '').trim() || '—';
       tr.innerHTML =
         '<td><strong>' + escHtml(r.name) + '</strong></td>' +
         '<td><span class="badge ' + (r.role === 'breaker' || r.role === 'breaker/manager' ? 'badge-green' : 'badge-gray') + '">' + r.role + '</span></td>' +
         '<td style="font-size:0.82rem;">' + escHtml(typeLabels[r.pay_type] || (notSet ? 'Not set' : r.pay_type)) + '</td>' +
-        '<td style="font-size:0.8rem;color:var(--muted);">' + escHtml(breakdownClean) + '</td>' +
-        '<td style="text-align:right;font-weight:700;color:' + (tips > 0 ? 'var(--yellow)' : 'var(--muted)') + ';">' + (tips > 0 ? fmt(tips) : '—') + '</td>' +
+        '<td style="font-size:0.8rem;color:var(--muted);">' + escHtml(r.breakdown || '—') + '</td>' +
         '<td style="text-align:right;font-weight:800;color:' + (notSet && !tips ? 'var(--muted)' : 'var(--text)') + ';">' + (notSet && !tips ? '—' : fmt(r.total)) + '</td>';
       tbody.appendChild(tr);
     });
@@ -5748,12 +5743,11 @@ function renderPayrollResults() {
   const all = prCurrentResults;
   const bTotal = all.filter(function(r){return r.role==='breaker'||r.role==='breaker/manager';}).reduce(function(s,r){return s+r.total;},0);
   const sTotal = all.filter(function(r){return r.role==='sorter';}).reduce(function(s,r){return s+r.total;},0);
-  const tipsTotal = all.reduce(function(s,r){return s+(r.tips||0);},0);
   const grandTotal = bTotal + sTotal;
   document.getElementById('prTotalPayroll').textContent = fmt(grandTotal);
   document.getElementById('prBreakerTotal').textContent = fmt(bTotal);
   document.getElementById('prSorterTotal').textContent = fmt(sTotal);
-  document.getElementById('prTipsTotal').textContent = tipsTotal > 0 ? fmt(tipsTotal) : '$0.00';
+  document.getElementById('prNetAfterPayroll').textContent = '—';
 
   document.getElementById('prResultsWrap').style.display = '';
   document.getElementById('prEmptyState').style.display = 'none';
