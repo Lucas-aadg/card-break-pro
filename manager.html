@@ -982,7 +982,7 @@ function populateScheduleDropdown() {
 }
 
 // ── SCHEDULE ─────────────────────────────────────────────
-const SCHED_SELECT = 'id, org_id, breaker_id, sorter_id, scheduled_date, stream_key, notes, status, clocked_in_at, clocked_out_at, breaker:profiles!breaker_id(display_name), sorter:profiles!sorter_id(display_name)';
+const SCHED_SELECT = 'id, org_id, breaker_id, sorter_id, scheduled_date, scheduled_time, stream_key, notes, status, clocked_in_at, clocked_out_at, breaker:profiles!breaker_id(display_name), sorter:profiles!sorter_id(display_name)';
 const SCHED_SELECT_MINIMAL = 'id, org_id, breaker_id, sorter_id, scheduled_date, status, clocked_in_at, clocked_out_at, breaker:profiles!breaker_id(display_name), sorter:profiles!sorter_id(display_name)';
 
 function schedDisplayName(s) {
