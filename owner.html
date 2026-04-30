@@ -2543,11 +2543,11 @@ async function initAuth() {
       for (let attempt = 0; attempt < 10; attempt++) {
         const { data } = await sb
           .from('subscriptions')
-          .select('status')
+          .select('status, comped')
           .eq('org_id', profile.org_id)
           .maybeSingle();
         sub = data;
-        if (sub && sub.status === 'active') break;
+        if (sub && (sub.status === 'active' || sub.comped)) break;
         await new Promise(function(r) { setTimeout(r, 2000); });
       }
       // Remove ?subscribed=true from URL without reloading
@@ -2555,13 +2555,13 @@ async function initAuth() {
     } else {
       const { data } = await sb
         .from('subscriptions')
-        .select('status')
+        .select('status, comped')
         .eq('org_id', profile.org_id)
         .maybeSingle();
       sub = data;
     }
 
-    if (!sub || sub.status !== 'active') {
+    if (!sub || (sub.status !== 'active' && !sub.comped)) {
       // Show a full-page paywall overlay instead of the dashboard
       document.body.innerHTML = `
         <div style="min-height:100vh;background:#0d0d14;display:flex;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;">

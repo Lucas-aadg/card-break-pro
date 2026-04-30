@@ -319,12 +319,22 @@
 
         const { data: sub, error: subError } = await sb
           .from('subscriptions')
-          .select('status, stripe_customer_id')
+          .select('status, stripe_customer_id, comped')
           .eq('org_id', profile.org_id)
           .maybeSingle();
 
         if (subError) {
           showError('Failed to load subscription info: ' + subError.message);
+        }
+
+        // Comped accounts bypass normal billing entirely
+        if (sub && sub.comped) {
+          loadingState.style.display = 'none';
+          billingContent.style.display = 'block';
+          statusBadge.textContent = 'Complimentary';
+          statusBadge.className = 'status-badge status-active';
+          document.querySelector('.page-sub').textContent = 'This account has been provided complimentary access.';
+          return;
         }
 
         const status = sub ? sub.status : 'inactive';
