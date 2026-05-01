@@ -749,6 +749,9 @@
             </div>
           </div>
           <div id="be-productsSummaryBar" style="display:none;font-size:0.83rem;color:var(--muted);padding:0.35rem 0;"></div>
+          <div style="margin-bottom:0.6rem;">
+            <input type="text" id="be-productFilter" placeholder="Filter products…" style="width:100%;padding:0.45rem 0.75rem;font-size:0.85rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;" />
+          </div>
           <div id="be-productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
           <div id="be-productsWrap" style="display:none;overflow-x:auto;">
             <table class="product-table">
@@ -2963,6 +2966,15 @@ function setupBreakEntry() {
     beRenderProductTable();
   });
 
+  document.getElementById('be-productFilter').addEventListener('input', function () {
+    const val = this.value.toLowerCase().trim();
+    document.querySelectorAll('#be-productBody tr').forEach(function (tr) {
+      const name = (tr.querySelector('td:first-child') || {}).textContent || '';
+      const cat = (tr.querySelector('td:nth-child(2)') || {}).textContent || '';
+      tr.style.display = (!val || name.toLowerCase().includes(val) || cat.toLowerCase().includes(val)) ? '' : 'none';
+    });
+  });
+
   // Repeat Last Break
   document.getElementById('be-repeatBreakBtn').addEventListener('click', function () {
     if (!beLastBreakProducts.length) return;
@@ -3004,6 +3016,8 @@ function setupBreakEntry() {
 }
 
 function beRenderProductTable() {
+  const filterEl = document.getElementById('be-productFilter');
+  if (filterEl) filterEl.value = '';
   const activeProducts = orgProducts.filter(function (p) { return p.active; });
   const loadingEl = document.getElementById('be-productsLoading');
   const wrapEl = document.getElementById('be-productsWrap');
