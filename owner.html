@@ -4316,7 +4316,9 @@ async function confirmEditStream() {
       final_sales: finalSales,
       net_profit: netProfit,
       commission_payout: commissionPayout,
-      notes: notes || null
+      notes: notes || null,
+      status: 'closed',
+      closed_at: new Date().toISOString()
     }).eq('id', editingStreamId);
 
     if (error) throw error;
