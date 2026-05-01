@@ -807,7 +807,7 @@ async function initAuth() {
     await loadProducts();
     setupBreakerTabs();
     setupEventListeners();
-    initSession();
+    await initSession();
     await checkCommissionEnabled();
     await checkTodayShiftAndNotify();
     loadNotifCount();
@@ -820,11 +820,38 @@ async function initAuth() {
   }
 }
 
+// ── Session persistence ───────────────────────────────────
+function sessionKey() {
+  return 'cbp_session_' + (currentUser ? currentUser.id : 'anon');
+}
+
+function saveSessionState() {
+  const key = document.getElementById('streamKey').value.trim();
+  const date = document.getElementById('breakDate').value;
+  if (key) {
+    localStorage.setItem(sessionKey(), JSON.stringify({ streamKey: key, breakDate: date }));
+  }
+}
+
+function clearSessionState() {
+  localStorage.removeItem(sessionKey());
+}
+
 // ── Session ───────────────────────────────────────────────
-function initSession() {
+async function initSession() {
   const dateEl = document.getElementById('breakDate');
   dateEl.value = today();
   updateBreakDisplay();
+
+  // Restore any in-progress session from before a refresh
+  try {
+    const saved = JSON.parse(localStorage.getItem(sessionKey()) || 'null');
+    if (saved && saved.streamKey) {
+      document.getElementById('streamKey').value = saved.streamKey;
+      if (saved.breakDate) dateEl.value = saved.breakDate;
+      await onStreamKeyChange();
+    }
+  } catch (e) { /* ignore */ }
 }
 
 function updateBreakDisplay() {
@@ -1303,6 +1330,7 @@ async function handleSubmitBreak() {
     document.getElementById('repeatBreakBtn').style.display = '';
     breakNumber += 1;
     currentStream = { ...stream, total_submitted_revenue: newTotalRevenue, break_count: newBreakCount };
+    saveSessionState();
 
     // Clear inputs
     document.getElementById('revenueInput').value = '';
@@ -1450,6 +1478,7 @@ async function handleConfirmClose() {
     const closedStreamId = currentStream.id;
 
     // Reset everything
+    clearSessionState();
     document.getElementById('closeOutModal').classList.remove('active');
     document.getElementById('streamKey').value = '';
     submittedBreaks = [];
@@ -1576,10 +1605,16 @@ function setupEventListeners() {
   let streamKeyTimer = null;
   document.getElementById('streamKey').addEventListener('input', function () {
     clearTimeout(streamKeyTimer);
-    streamKeyTimer = setTimeout(onStreamKeyChange, 600);
+    streamKeyTimer = setTimeout(function () {
+      saveSessionState();
+      onStreamKeyChange();
+    }, 600);
   });
 
-  document.getElementById('breakDate').addEventListener('change', onStreamKeyChange);
+  document.getElementById('breakDate').addEventListener('change', function () {
+    saveSessionState();
+    onStreamKeyChange();
+  });
 
   document.getElementById('finalSalesInput').addEventListener('input', function () {
     const finalSales = parseFloat(this.value) || 0;

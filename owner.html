@@ -1709,6 +1709,28 @@
   </div>
 </div>
 
+<!-- EDIT STREAM MODAL -->
+<div class="modal-overlay" id="editStreamModal">
+  <div class="modal" style="max-width:440px;">
+    <h2>Edit Stream Summary</h2>
+    <div style="margin-bottom:1.25rem;">
+      <label style="display:block;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.5rem;">Final Sales (platform payout)</label>
+      <input type="number" id="editStreamFinalSales" placeholder="0.00" min="0" step="0.01" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.6rem 0.75rem;font-size:1rem;font-weight:700;font-family:'Consolas',monospace;" />
+    </div>
+    <div style="margin-bottom:1.25rem;">
+      <label style="display:block;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.5rem;">Notes (optional)</label>
+      <textarea id="editStreamNotes" rows="3" placeholder="Any notes…" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.6rem 0.75rem;font-size:0.875rem;resize:vertical;"></textarea>
+    </div>
+    <div id="editStreamNetPreview" style="background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.875rem;margin-bottom:1.25rem;display:none;">
+      Net Profit: <strong id="editStreamNetVal" style="color:var(--primary);">—</strong>
+    </div>
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="document.getElementById('editStreamModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" id="editStreamSaveBtn" onclick="confirmEditStream()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- PRODUCT CHART MODAL -->
 <div class="modal-overlay" id="productChartModal">
   <div class="modal" style="max-width:780px;width:100%;">
@@ -4180,6 +4202,10 @@ function exportHistoryCsv() {
 // ══════════════════════════════════════════════════════════
 function setupStreamSummary() {
   document.getElementById('ssRefreshBtn').addEventListener('click', loadStreamSummary);
+  document.getElementById('editStreamFinalSales').addEventListener('input', updateEditNetPreview);
+  document.getElementById('editStreamModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('active');
+  });
 }
 
 async function loadStreamSummary() {
@@ -4217,12 +4243,77 @@ async function loadStreamSummary() {
         '<td>' + fmt(s.total_fees) + '</td>' +
         '<td>' + profitDisplay + '</td>' +
         '<td><span class="badge ' + (s.status === 'active' ? 'badge-green' : 'badge-gray') + '">' + escHtml(s.status) + '</span></td>' +
-        '<td style="text-align:center;"><button onclick="deleteStream(\'' + s.id + '\',\'' + escHtml(s.stream_key) + '\')" title="Delete stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
+        '<td style="text-align:center;display:flex;gap:0.25rem;justify-content:center;align-items:center;">' +
+          '<button onclick="openEditStream(\'' + s.id + '\',' + (s.final_sales != null ? s.final_sales : 0) + ',' + (parseFloat(s.total_product_cost)||0) + ',' + (parseFloat(s.total_other_costs)||0) + ',\'' + escHtml((s.notes||'').replace(/'/g,"\\'")) + '\')" title="Edit stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:0.9rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--primary)\'" onmouseout="this.style.color=\'var(--muted)\'">✏️</button>' +
+          '<button onclick="deleteStream(\'' + s.id + '\',\'' + escHtml(s.stream_key) + '\')" title="Delete stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button>' +
+        '</td>';
       tbody.appendChild(tr);
     });
   } catch (err) {
     showGlobalError('Failed to load streams: ' + escHtml(err.message));
     tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Error loading data.</td></tr>';
+  }
+}
+
+let editingStreamId = null;
+let editingStreamBoxCost = 0;
+let editingStreamOtherCosts = 0;
+
+function openEditStream(streamId, currentFinalSales, boxCost, otherCosts, currentNotes) {
+  editingStreamId = streamId;
+  editingStreamBoxCost = boxCost;
+  editingStreamOtherCosts = otherCosts;
+
+  document.getElementById('editStreamFinalSales').value = currentFinalSales || '';
+  document.getElementById('editStreamNotes').value = currentNotes || '';
+  updateEditNetPreview();
+  document.getElementById('editStreamModal').classList.add('active');
+}
+
+function updateEditNetPreview() {
+  const finalSales = parseFloat(document.getElementById('editStreamFinalSales').value) || 0;
+  const net = finalSales - editingStreamBoxCost - editingStreamOtherCosts;
+  const preview = document.getElementById('editStreamNetPreview');
+  const val = document.getElementById('editStreamNetVal');
+  preview.style.display = 'block';
+  val.textContent = fmt(net);
+  val.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+}
+
+async function confirmEditStream() {
+  const finalSalesStr = document.getElementById('editStreamFinalSales').value.trim();
+  if (!finalSalesStr || isNaN(parseFloat(finalSalesStr))) {
+    alert('Please enter a valid Final Sales amount.');
+    return;
+  }
+  const finalSales = parseFloat(finalSalesStr);
+  const notes = document.getElementById('editStreamNotes').value.trim();
+  const netProfit = finalSales - editingStreamBoxCost - editingStreamOtherCosts;
+  const commissionRate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
+  const streamProfit = finalSales - editingStreamBoxCost;
+  const commissionPayout = streamProfit > 0 ? streamProfit * commissionRate : 0;
+
+  const btn = document.getElementById('editStreamSaveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const { error } = await sb.from('streams').update({
+      final_sales: finalSales,
+      net_profit: netProfit,
+      commission_payout: commissionPayout,
+      notes: notes || null
+    }).eq('id', editingStreamId);
+
+    if (error) throw error;
+
+    document.getElementById('editStreamModal').classList.remove('active');
+    await loadStreamSummary();
+  } catch (err) {
+    showGlobalError('Failed to update stream: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
   }
 }
 
