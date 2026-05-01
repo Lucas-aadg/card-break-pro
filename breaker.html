@@ -1187,7 +1187,17 @@ async function onStreamKeyChange() {
       submittedBreaks = breaks;
       breakNumber = breaks.length + 1;
     } else {
-      currentStream = null;
+      // Create stream immediately so breaker shows as live right away
+      const { data: created, error: createErr } = await sb.from('streams').insert({
+        org_id: currentProfile.org_id,
+        breaker_id: currentUser.id,
+        stream_key: streamKey,
+        break_date: breakDate,
+        status: 'active',
+        total_submitted_revenue: 0,
+        break_count: 0
+      }).select().single();
+      if (!createErr && created) currentStream = created;
       submittedBreaks = [];
       breakNumber = 1;
     }
