@@ -4258,7 +4258,7 @@ async function loadStreamSummary() {
         '<td>' + profitDisplay + '</td>' +
         '<td><span class="badge ' + (s.status === 'active' ? 'badge-green' : 'badge-gray') + '">' + escHtml(s.status) + '</span></td>' +
         '<td style="text-align:center;display:flex;gap:0.25rem;justify-content:center;align-items:center;">' +
-          '<button onclick="openEditStream(\'' + s.id + '\',' + (s.final_sales != null ? s.final_sales : 0) + ',' + (parseFloat(s.total_product_cost)||0) + ',' + (parseFloat(s.total_other_costs)||0) + ',\'' + escHtml((s.notes||'').replace(/'/g,"\\'")) + '\')" title="Edit stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:0.9rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--primary)\'" onmouseout="this.style.color=\'var(--muted)\'">✏️</button>' +
+          '<button onclick="openEditStream(\'' + s.id + '\',' + (s.final_sales != null ? s.final_sales : 0) + ',' + (parseFloat(s.total_product_cost)||0) + ',' + (parseFloat(s.total_other_costs)||0) + ',\'' + escHtml((s.notes||'').replace(/'/g,"\\'")) + '\',\'' + (s.breaker_id || '') + '\')" title="Edit stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:0.9rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--primary)\'" onmouseout="this.style.color=\'var(--muted)\'">✏️</button>' +
           '<button onclick="deleteStream(\'' + s.id + '\',\'' + escHtml(s.stream_key) + '\')" title="Delete stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button>' +
         '</td>';
       tbody.appendChild(tr);
@@ -4272,11 +4272,13 @@ async function loadStreamSummary() {
 let editingStreamId = null;
 let editingStreamBoxCost = 0;
 let editingStreamOtherCosts = 0;
+let editingStreamBreakerId = null;
 
-function openEditStream(streamId, currentFinalSales, boxCost, otherCosts, currentNotes) {
+function openEditStream(streamId, currentFinalSales, boxCost, otherCosts, currentNotes, breakerId) {
   editingStreamId = streamId;
   editingStreamBoxCost = boxCost;
   editingStreamOtherCosts = otherCosts;
+  editingStreamBreakerId = breakerId || null;
 
   document.getElementById('editStreamFinalSales').value = currentFinalSales || '';
   document.getElementById('editStreamNotes').value = currentNotes || '';
@@ -4303,7 +4305,9 @@ async function confirmEditStream() {
   const finalSales = parseFloat(finalSalesStr);
   const notes = document.getElementById('editStreamNotes').value.trim();
   const netProfit = finalSales - editingStreamBoxCost - editingStreamOtherCosts;
-  const commissionRate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
+  // Use the breaker's commission rate, not the owner's
+  const breaker = editingStreamBreakerId ? allProfiles.find(function(p){ return p.id === editingStreamBreakerId; }) : null;
+  const commissionRate = (parseFloat((breaker || currentProfile).commission_rate) || 0) / 100;
   const streamProfit = finalSales - editingStreamBoxCost;
   const commissionPayout = streamProfit > 0 ? streamProfit * commissionRate : 0;
 
