@@ -2453,24 +2453,36 @@ async function renderChannelGrid() {
 async function loadLiveActivity() {
   const el = document.getElementById('liveActivityBody');
   if (!el) return;
-  const { data: activeStreams } = await sb.from('streams').select('id,breaker_id,channel_id,stream_key,break_count').eq('org_id', currentProfile.org_id).eq('status','active');
-  if (!activeStreams || !activeStreams.length) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">No active streams right now. Everything is quiet.</div>';
+
+  // Live = anyone currently clocked in (schedule status = in_progress)
+  const { data: liveShifts } = await sb.from('schedules')
+    .select('breaker_id, sorter_id, stream_key, channel_id, clocked_in_at')
+    .eq('org_id', currentProfile.org_id)
+    .eq('status', 'in_progress');
+
+  if (!liveShifts || !liveShifts.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">No one is clocked in right now. Everything is quiet.</div>';
     return;
   }
+
   const profileMap = {};
   allProfiles.forEach(function(p){ profileMap[p.id] = p; });
+  // Include owner in profileMap
+  if (currentProfile) profileMap[currentProfile.id] = currentProfile;
   const channelMap = {};
   orgChannels.forEach(function(c){ channelMap[c.id] = c; });
-  el.innerHTML = activeStreams.map(function(s) {
-    const breaker = profileMap[s.breaker_id] || {};
+
+  el.innerHTML = liveShifts.map(function(s) {
+    const profileId = s.breaker_id || s.sorter_id;
+    const person = profileMap[profileId] || {};
     const ch = s.channel_id && channelMap[s.channel_id] ? channelMap[s.channel_id] : null;
     const chBadge = ch ? '<span class="live-activity-ch" style="background:' + ch.color + '22;color:' + ch.color + ';">' + ch.icon + ' ' + escHtml(ch.name) + '</span>' : '';
+    const since = s.clocked_in_at ? 'Since ' + fmtTime(s.clocked_in_at) : '';
     return '<div class="live-activity-item">' +
       '<span class="live-activity-dot"></span>' +
       '<div style="flex:1;">' +
-        '<div style="font-weight:700;font-size:0.88rem;color:var(--text);">' + escHtml(breaker.display_name || '—') + '</div>' +
-        '<div style="font-size:0.78rem;color:var(--muted);">' + escHtml(s.stream_key || '—') + ' · ' + (s.break_count || 0) + ' breaks</div>' +
+        '<div style="font-weight:700;font-size:0.88rem;color:var(--text);">' + escHtml(person.display_name || '—') + '</div>' +
+        '<div style="font-size:0.78rem;color:var(--muted);">' + (s.stream_key ? escHtml(s.stream_key) + ' · ' : '') + since + '</div>' +
       '</div>' + chBadge + '</div>';
   }).join('');
 }
@@ -2954,13 +2966,7 @@ function setupBreakEntry() {
   let streamKeyTimer = null;
   document.getElementById('be-streamKey').addEventListener('input', function () {
     clearTimeout(streamKeyTimer);
-    // On input: just look up existing stream, don't create
     streamKeyTimer = setTimeout(beOnStreamKeyChange, 600);
-  });
-  // Create stream only when user commits the stream key (blur or Enter)
-  document.getElementById('be-streamKey').addEventListener('blur', beCommitStreamKey);
-  document.getElementById('be-streamKey').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); beCommitStreamKey(); }
   });
   document.getElementById('be-date').addEventListener('change', beOnStreamKeyChange);
 
@@ -3231,28 +3237,6 @@ async function beOnStreamKeyChange() {
     document.getElementById('be-breakNum').textContent = beBreakNumber;
   } catch (err) {
     console.error('Stream key change error:', err);
-  }
-}
-
-async function beCommitStreamKey() {
-  const streamKey = document.getElementById('be-streamKey').value.trim();
-  const breakDate = document.getElementById('be-date').value;
-  if (!streamKey || !breakDate || beCurrentStream) return; // already have a stream
-  try {
-    const newStream = {
-      org_id: currentProfile.org_id,
-      breaker_id: currentUser.id,
-      stream_key: streamKey,
-      break_date: breakDate,
-      status: 'active',
-      total_submitted_revenue: 0,
-      break_count: 0
-    };
-    if (activeChannel) newStream.channel_id = activeChannel.id;
-    const { data: created, error } = await sb.from('streams').insert(newStream).select().single();
-    if (!error && created) beCurrentStream = created;
-  } catch (err) {
-    console.error('Stream create error:', err);
   }
 }
 
@@ -3529,6 +3513,13 @@ function setupCloseOutModal() {
       }).eq('id', beCurrentStream.id);
 
       if (error) throw error;
+
+      // Clock out the owner's active shift (if any)
+      await sb.from('schedules')
+        .update({ status: 'completed', clocked_out_at: new Date().toISOString() })
+        .eq('org_id', currentProfile.org_id)
+        .eq('breaker_id', currentUser.id)
+        .eq('status', 'in_progress');
 
       // Create sort task for sorters
       await sb.from('sort_tasks').insert({
