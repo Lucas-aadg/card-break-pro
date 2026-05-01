@@ -2954,7 +2954,13 @@ function setupBreakEntry() {
   let streamKeyTimer = null;
   document.getElementById('be-streamKey').addEventListener('input', function () {
     clearTimeout(streamKeyTimer);
+    // On input: just look up existing stream, don't create
     streamKeyTimer = setTimeout(beOnStreamKeyChange, 600);
+  });
+  // Create stream only when user commits the stream key (blur or Enter)
+  document.getElementById('be-streamKey').addEventListener('blur', beCommitStreamKey);
+  document.getElementById('be-streamKey').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); beCommitStreamKey(); }
   });
   document.getElementById('be-date').addEventListener('change', beOnStreamKeyChange);
 
@@ -3216,21 +3222,7 @@ async function beOnStreamKeyChange() {
       beSubmittedBreaks = breaks || [];
       beBreakNumber = beSubmittedBreaks.length + 1;
     } else {
-      // Create the stream immediately so the breaker shows up as live right away
-      const newStream = {
-        org_id: currentProfile.org_id,
-        breaker_id: currentUser.id,
-        stream_key: streamKey,
-        break_date: breakDate,
-        status: 'active',
-        total_submitted_revenue: 0,
-        break_count: 0
-      };
-      if (activeChannel) newStream.channel_id = activeChannel.id;
-      const { data: created, error: createErr } = await sb.from('streams').insert(newStream).select().single();
-      if (!createErr && created) {
-        beCurrentStream = created;
-      }
+      beCurrentStream = null;
       beSubmittedBreaks = [];
       beBreakNumber = 1;
     }
@@ -3239,6 +3231,28 @@ async function beOnStreamKeyChange() {
     document.getElementById('be-breakNum').textContent = beBreakNumber;
   } catch (err) {
     console.error('Stream key change error:', err);
+  }
+}
+
+async function beCommitStreamKey() {
+  const streamKey = document.getElementById('be-streamKey').value.trim();
+  const breakDate = document.getElementById('be-date').value;
+  if (!streamKey || !breakDate || beCurrentStream) return; // already have a stream
+  try {
+    const newStream = {
+      org_id: currentProfile.org_id,
+      breaker_id: currentUser.id,
+      stream_key: streamKey,
+      break_date: breakDate,
+      status: 'active',
+      total_submitted_revenue: 0,
+      break_count: 0
+    };
+    if (activeChannel) newStream.channel_id = activeChannel.id;
+    const { data: created, error } = await sb.from('streams').insert(newStream).select().single();
+    if (!error && created) beCurrentStream = created;
+  } catch (err) {
+    console.error('Stream create error:', err);
   }
 }
 

@@ -1187,17 +1187,7 @@ async function onStreamKeyChange() {
       submittedBreaks = breaks;
       breakNumber = breaks.length + 1;
     } else {
-      // Create stream immediately so breaker shows as live right away
-      const { data: created, error: createErr } = await sb.from('streams').insert({
-        org_id: currentProfile.org_id,
-        breaker_id: currentUser.id,
-        stream_key: streamKey,
-        break_date: breakDate,
-        status: 'active',
-        total_submitted_revenue: 0,
-        break_count: 0
-      }).select().single();
-      if (!createErr && created) currentStream = created;
+      currentStream = null;
       submittedBreaks = [];
       breakNumber = 1;
     }
@@ -1206,6 +1196,26 @@ async function onStreamKeyChange() {
     updateBreakDisplay();
   } catch (err) {
     console.error('Stream key change error:', err);
+  }
+}
+
+async function commitStreamKey() {
+  const streamKey = document.getElementById('streamKey').value.trim();
+  const breakDate = document.getElementById('breakDate').value;
+  if (!streamKey || !breakDate || currentStream) return;
+  try {
+    const { data: created, error } = await sb.from('streams').insert({
+      org_id: currentProfile.org_id,
+      breaker_id: currentUser.id,
+      stream_key: streamKey,
+      break_date: breakDate,
+      status: 'active',
+      total_submitted_revenue: 0,
+      break_count: 0
+    }).select().single();
+    if (!error && created) currentStream = created;
+  } catch (err) {
+    console.error('Stream create error:', err);
   }
 }
 
@@ -1579,6 +1589,10 @@ function setupEventListeners() {
   document.getElementById('streamKey').addEventListener('input', function () {
     clearTimeout(streamKeyTimer);
     streamKeyTimer = setTimeout(onStreamKeyChange, 600);
+  });
+  document.getElementById('streamKey').addEventListener('blur', commitStreamKey);
+  document.getElementById('streamKey').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); commitStreamKey(); }
   });
 
   document.getElementById('breakDate').addEventListener('change', onStreamKeyChange);
