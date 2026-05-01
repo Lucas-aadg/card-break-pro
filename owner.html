@@ -1317,7 +1317,7 @@
       </div>
 
       <!-- Summary strip -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.25rem;" id="prSummaryStrip" style="display:none;">
+      <div style="display:none;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.25rem;" id="prSummaryStrip">
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1.1rem;">
           <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.35rem;">Total Payroll</div>
           <div id="prTotalPayroll" style="font-size:1.5rem;font-weight:900;color:var(--red);letter-spacing:-0.5px;">—</div>
@@ -5488,6 +5488,8 @@ async function loadPayroll() {
   }
 
   await loadPayrollHistory();
+  // Auto-run with the default period on first load
+  await runPayroll();
 }
 
 async function runPayroll() {
@@ -5613,18 +5615,20 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
     let commission;
     if (periodTotal) {
       // Sum all streams first, then floor at $0 — losses can reduce gains
-      const netProfit = streamList.reduce(function (s, x) {
-        return s + (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
-      }, 0);
+      const totalSales = streamList.reduce(function (s, x) { return s + (parseFloat(x.final_sales) || 0); }, 0);
+      const totalCosts = streamList.reduce(function (s, x) { return s + (parseFloat(x.total_product_cost) || 0) + (parseFloat(x.total_other_costs) || 0); }, 0);
+      const netProfit = totalSales - totalCosts;
       commission = Math.max(0, netProfit) * rate;
-      parts.push(streamList.length + ' streams · net profit ' + fmt(netProfit) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission) + ' (period total)');
+      parts.push(streamList.length + ' streams · sales ' + fmt(totalSales) + ' − costs ' + fmt(totalCosts) + ' = profit ' + fmt(netProfit) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission));
     } else {
       // Per-stream: each losing stream floors at $0, never drags down other streams
+      let commissionBase = 0;
       commission = streamList.reduce(function (s, x) {
         const profit = (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
+        commissionBase += Math.max(0, profit);
         return s + Math.max(0, profit) * rate;
       }, 0);
-      parts.push(streamList.length + ' streams × ' + (parseFloat(p.commission_rate) || 0) + '% per stream = ' + fmt(commission));
+      parts.push(streamList.length + ' streams · profit base ' + fmt(commissionBase) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission));
     }
     total += commission;
   }
@@ -5897,7 +5901,7 @@ function renderPayrollResults() {
 
   document.getElementById('prResultsWrap').style.display = '';
   document.getElementById('prEmptyState').style.display = 'none';
-  document.getElementById('prSummaryStrip').style.display = '';
+  document.getElementById('prSummaryStrip').style.display = 'grid';
 }
 
 async function loadPayrollHistory() {
