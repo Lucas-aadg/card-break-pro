@@ -566,6 +566,9 @@
     <!-- Home -->
     <button class="nav-btn active" id="ngb-home" onclick="switchTab('home')">Home</button>
 
+    <!-- Break Entry -->
+    <button class="nav-btn" id="ngb-breakEntry" onclick="switchTab('breakEntry')">Break Entry</button>
+
     <!-- Reports -->
     <div class="nav-group" id="ng-reports">
       <button class="nav-group-btn" id="ngb-reports">Reports ▾</button>
@@ -2774,6 +2777,7 @@ async function initAuth() {
 // Maps each tab to its parent dropdown group
 const TAB_GROUP_MAP = {
   home: 'ng-home',
+  breakEntry: 'ng-breakEntry',
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', performance: 'ng-reports',
   schedule: 'ng-manage', inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage'
 };
@@ -2782,19 +2786,16 @@ const GROUP_BTN_MAP = {
 };
 
 function updateNavActiveState(activeTab) {
-  // Home button
   const homeBtn = document.getElementById('ngb-home');
   if (homeBtn) homeBtn.classList.toggle('active', activeTab === 'home');
-  // Clear all dropdown item active states
+  const beBtn = document.getElementById('ngb-breakEntry');
+  if (beBtn) beBtn.classList.toggle('active', activeTab === 'breakEntry');
   document.querySelectorAll('.nav-dd-item').forEach(function (el) { el.classList.remove('active'); });
-  // Clear all group button active states
   document.querySelectorAll('.nav-group-btn').forEach(function (el) { el.classList.remove('has-active'); });
-  // Set active item
   const activeItem = document.querySelector('.nav-dd-item[data-tab="' + activeTab + '"]');
   if (activeItem) activeItem.classList.add('active');
-  // Set active group
   const groupId = TAB_GROUP_MAP[activeTab];
-  if (groupId && groupId !== 'ng-home') {
+  if (groupId && groupId !== 'ng-home' && groupId !== 'ng-breakEntry') {
     const groupBtnId = GROUP_BTN_MAP[groupId];
     if (groupBtnId) document.getElementById(groupBtnId).classList.add('has-active');
   }
@@ -4019,9 +4020,10 @@ async function loadHistory() {
   const sel = document.getElementById('histBreaker');
   const prevVal = sel.value;
   sel.innerHTML = '<option value="">All Breakers</option>';
-  let breakerPool = allProfiles.filter(function(p) {
+  // Include the owner themselves — they can run breaks too
+  let breakerPool = [currentProfile].concat(allProfiles.filter(function(p) {
     return p.role === 'breaker' || p.role === 'breaker/manager';
-  });
+  }));
   if (activeChannel) {
     const { data: assigns } = await sb.from('channel_assignments').select('profile_id').eq('channel_id', activeChannel.id);
     const assignedIds = new Set((assigns || []).map(function(a){ return a.profile_id; }));
