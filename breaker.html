@@ -1408,7 +1408,8 @@ async function handleConfirmClose() {
   const totalFees = parseFloat(modal.dataset.totalFees) || 0;
   const totalOther = parseFloat(modal.dataset.totalOther) || 0;
   const finalFee = Math.max(0, totalSubmitted - finalSales);
-  const netProfit = finalSales - totalBox - totalFees - totalOther;
+  // finalSales is already post-platform-fee — don't subtract totalFees again
+  const netProfit = finalSales - totalBox - totalOther;
 
   // Commission payout: (final_sales - box_cost) * rate
   const commissionRate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
@@ -1599,7 +1600,8 @@ function setupEventListeners() {
       finalFeeRow.style.display = 'none';
     }
 
-    const net = finalSales - totalBox - totalFees - totalOther;
+    // finalSales is already post-platform-fee — don't subtract totalFees again
+    const net = finalSales - totalBox - totalOther;
     const el = document.getElementById('netProfitPreview');
     el.textContent = fmt(net);
     el.className = 'net-val ' + (net >= 0 ? 'positive' : 'negative');
