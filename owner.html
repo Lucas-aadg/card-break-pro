@@ -4248,11 +4248,12 @@ async function loadStreamSummary() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Loading…</td></tr>';
 
   try {
+    const ssStreamIds = await getActiveChannelStreamIds();
     let ssQ = sb.from('streams').select('*')
       .eq('org_id', currentProfile.org_id)
       .order('break_date', { ascending: false })
       .order('created_at', { ascending: false });
-    if (activeChannel) ssQ = ssQ.eq('channel_id', activeChannel.id);
+    if (ssStreamIds) ssQ = ssQ.in('id', ssStreamIds);
     const { data, error } = await ssQ;
 
     if (error) throw error;
@@ -4407,8 +4408,26 @@ function setupDashboard() {
 
 async function getActiveChannelStreamIds() {
   if (!activeChannel) return null;
-  const { data } = await sb.from('streams').select('id').eq('org_id', currentProfile.org_id).eq('channel_id', activeChannel.id);
-  return (data || []).map(function(s){ return s.id; });
+
+  // Streams explicitly tagged with this channel_id
+  const { data: byChannel } = await sb.from('streams').select('id')
+    .eq('org_id', currentProfile.org_id).eq('channel_id', activeChannel.id);
+
+  // Streams by breakers assigned to this channel that lack channel_id
+  const { data: assigns } = await sb.from('channel_assignments').select('profile_id')
+    .eq('org_id', currentProfile.org_id).eq('channel_id', activeChannel.id);
+  const breakerIds = (assigns || []).map(function(a){ return a.profile_id; });
+  let byBreaker = [];
+  if (breakerIds.length) {
+    const { data } = await sb.from('streams').select('id')
+      .eq('org_id', currentProfile.org_id)
+      .is('channel_id', null)
+      .in('breaker_id', breakerIds);
+    byBreaker = data || [];
+  }
+
+  const ids = [...new Set([...(byChannel||[]), ...byBreaker].map(function(s){ return s.id; }))];
+  return ids;
 }
 
 async function loadDashboard() {
@@ -4458,7 +4477,7 @@ async function loadDashboard() {
 
     // Deduct commission payouts from today's closed streams
     let todayStreamsQ = sb.from('streams').select('commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', todayStr);
-    if (activeChannel) todayStreamsQ = todayStreamsQ.eq('channel_id', activeChannel.id);
+    if (chStreamIds) todayStreamsQ = todayStreamsQ.in('id', chStreamIds);
     const { data: todayStreams } = await todayStreamsQ;
     const todayCommission = (todayStreams || []).reduce(function (s, x) { return s + (parseFloat(x.commission_payout) || 0); }, 0);
     const todayProfitAfterCommission = todayProfit - todayCommission;
@@ -4481,7 +4500,7 @@ async function loadDashboard() {
 
     // Deduct all-time commission payouts
     let allStreamsQ = sb.from('streams').select('commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed');
-    if (activeChannel) allStreamsQ = allStreamsQ.eq('channel_id', activeChannel.id);
+    if (chStreamIds) allStreamsQ = allStreamsQ.in('id', chStreamIds);
     const { data: allStreams } = await allStreamsQ;
     const totalCommission = (allStreams || []).reduce(function (s, x) { return s + (parseFloat(x.commission_payout) || 0); }, 0);
     const totalProfitAfterCommission = totalProfit - totalCommission;
@@ -4493,10 +4512,7 @@ async function loadDashboard() {
     document.getElementById('dash-totalBreaks').textContent = (allBreaks || []).length;
 
     // Streams count
-    let streamsCountQ = sb.from('streams').select('id', { count: 'exact', head: true }).eq('org_id', currentProfile.org_id);
-    if (activeChannel) streamsCountQ = streamsCountQ.eq('channel_id', activeChannel.id);
-    const { count: streamsCount } = await streamsCountQ;
-    document.getElementById('dash-totalStreams').textContent = streamsCount || 0;
+    document.getElementById('dash-totalStreams').textContent = chStreamIds ? chStreamIds.length : ((await sb.from('streams').select('id', { count: 'exact', head: true }).eq('org_id', currentProfile.org_id)).count || 0);
 
     // Recent breaks
     let recentBreaksQ = sb.from('breaks').select('*').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(10);
