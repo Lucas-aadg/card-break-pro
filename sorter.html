@@ -294,6 +294,7 @@ async function loadSortQueue() {
       const { data: streams } = await sb
         .from('streams')
         .select('id, stream_key, break_date, break_count')
+        .eq('org_id', currentProfile.org_id)
         .in('id', streamIds);
       if (streams) streams.forEach(s => { streamMap[s.id] = s; });
     }
@@ -800,7 +801,7 @@ async function loadSorterPay() {
     const streamIds = [...new Set((tasks||[]).map(function(t){return t.stream_id;}).filter(Boolean))];
     let streamMap = {};
     if (streamIds.length) {
-      const { data: streams } = await sb.from('streams').select('id, stream_key').in('id', streamIds);
+      const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', streamIds);
       (streams||[]).forEach(function(s){ streamMap[s.id] = s.stream_key; });
     }
 

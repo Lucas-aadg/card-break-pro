@@ -661,6 +661,7 @@ let sortingFilter = 'all';
 let invLogWired = false;
 
 function fmt(n) { return '$' + (parseFloat(n) || 0).toFixed(2); }
+function localDate(d) { const dt = d || new Date(); return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0'); }
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
@@ -706,7 +707,7 @@ function switchTab(tab) {
   if (tab === 'schedule') { loadSchedule(); loadCalendar(); loadClockLog(); }
   else if (tab === 'dashboard') loadDashboard();
   else if (tab === 'streamSummary') loadStreamSummaryStreams();
-  else if (tab === 'history') { const t = new Date(); document.getElementById('histTo').value = t.toISOString().slice(0,10); t.setDate(t.getDate()-30); document.getElementById('histFrom').value = t.toISOString().slice(0,10); }
+  else if (tab === 'history') { const t = new Date(); document.getElementById('histTo').value = localDate(t); t.setDate(t.getDate()-30); document.getElementById('histFrom').value = localDate(t); }
   else if (tab === 'productRoi') loadProductRoi();
   else if (tab === 'performance') loadPerformance();
   else if (tab === 'inventory') loadInventory();
@@ -1011,7 +1012,7 @@ async function loadSchedule() {
 
 function renderScheduleTable(shifts) {
   const tbody = document.getElementById('schedTableBody');
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDate();
   const filterVal = (document.getElementById('schedFilterInput') ? document.getElementById('schedFilterInput').value : '').toLowerCase().trim();
   let upcoming = shifts.filter(function(s) { return s.scheduled_date >= today; });
   if (filterVal) {
@@ -1082,7 +1083,7 @@ async function createShift() {
     for (let i = 0; i < repeatDays; i++) {
       const d = new Date(baseDate);
       d.setDate(d.getDate() + i);
-      const entry = { org_id: currentProfile.org_id, scheduled_date: d.toISOString().slice(0,10), status: 'scheduled' };
+      const entry = { org_id: currentProfile.org_id, scheduled_date: localDate(d), status: 'scheduled' };
       if (profile.role === 'sorter') entry.sorter_id = personId;
       else entry.breaker_id = personId;
       coreShifts.push(entry);
@@ -1190,7 +1191,7 @@ function loadCalendar() {
     grid.appendChild(document.createElement('div'));
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDate();
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
     const dayShifts = allSchedules.filter(function(s){ return s.scheduled_date === dateStr && s.status !== 'cancelled'; });
@@ -1218,7 +1219,7 @@ async function loadClockLog() {
     .select('id, scheduled_date, scheduled_time, stream_key, status, clocked_in_at, clocked_out_at, breaker_id, sorter_id')
     .eq('org_id', currentProfile.org_id)
     .not('clocked_in_at', 'is', null)
-    .gte('scheduled_date', cutoff.toISOString().slice(0,10))
+    .gte('scheduled_date', localDate(cutoff))
     .order('clocked_in_at', { ascending: false });
 
   if (!shifts || !shifts.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No clock-in records found.</td></tr>'; return; }
@@ -1586,7 +1587,7 @@ async function loadSorting() {
 
 // ── REPORTS ──────────────────────────────────────────────
 async function loadDashboard() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDate();
   const { data: todayBreaks } = await sb.from('breaks').select('revenue, net_profit').eq('org_id', currentProfile.org_id).eq('break_date', today);
   const { data: allBreaks } = await sb.from('breaks').select('revenue, net_profit').eq('org_id', currentProfile.org_id);
   const { data: allStreams } = await sb.from('streams').select('id').eq('org_id', currentProfile.org_id).eq('status', 'closed');
@@ -1864,7 +1865,7 @@ async function loadTeam() {
   const tbody = document.getElementById('teamTableBody');
   tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Loading…</td></tr>';
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
-  const { data: shifts } = await sb.from('schedules').select('breaker_id, sorter_id').eq('org_id', currentProfile.org_id).gte('scheduled_date', cutoff.toISOString().slice(0,10));
+  const { data: shifts } = await sb.from('schedules').select('breaker_id, sorter_id').eq('org_id', currentProfile.org_id).gte('scheduled_date', localDate(cutoff));
 
   const shiftCount = {};
   (shifts||[]).forEach(function(s){

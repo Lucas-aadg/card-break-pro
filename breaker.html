@@ -1456,6 +1456,11 @@ async function handleConfirmClose() {
   const finalSales = parseFloat(finalSalesStr);
   const modal = document.getElementById('closeOutModal');
   const totalSubmitted = parseFloat(modal.dataset.totalRevenue) || 0;
+
+  if (totalSubmitted > 0 && finalSales > totalSubmitted * 1.05) {
+    showError('Final Sales ($' + finalSales.toFixed(2) + ') is more than 5% above submitted revenue ($' + totalSubmitted.toFixed(2) + '). Please double-check the number.');
+    return;
+  }
   const totalBox = parseFloat(modal.dataset.totalBox) || 0;
   const totalFees = parseFloat(modal.dataset.totalFees) || 0;
   const totalOther = parseFloat(modal.dataset.totalOther) || 0;
@@ -1463,9 +1468,9 @@ async function handleConfirmClose() {
   // finalSales is already post-platform-fee — don't subtract totalFees again
   const netProfit = finalSales - totalBox - totalOther;
 
-  // Commission payout: (final_sales - box_cost) * rate
+  // Commission payout: (final_sales - box_cost - other_costs) * rate — matches owner payroll formula
   const commissionRate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
-  const streamProfit = finalSales - totalBox;
+  const streamProfit = finalSales - totalBox - totalOther;
   const commissionPayout = streamProfit > 0 ? streamProfit * commissionRate : 0;
 
   const confirmBtn = document.getElementById('confirmCloseBtn');
