@@ -1306,7 +1306,7 @@ async function handleSubmitBreak() {
 
     if (breakErr) throw breakErr;
 
-    // Deduct stock from products
+    // Deduct stock from products and log usage
     for (const used of productsUsed) {
       const product = products.find(function (p) { return p.id === used.product_id; });
       if (!product) continue;
@@ -1317,6 +1317,15 @@ async function handleSubmitBreak() {
         .eq('id', used.product_id);
       if (stockErr) console.warn('Stock update error:', stockErr);
       product.current_stock = newStock;
+      await sb.from('inventory_log').insert({
+        org_id: currentProfile.org_id,
+        product_id: used.product_id,
+        product_name: product.name,
+        action: 'used',
+        quantity: used.qty,
+        unit_cost: product.unit_cost,
+        notes: 'Break #' + (breakNumber - 1) + (currentStream ? ' — stream ' + currentStream.stream_key : '')
+      });
     }
 
     // Update stream totals
