@@ -1153,6 +1153,19 @@ async function getOrCreateStream() {
     return existing;
   }
 
+  // Try to find the channel_id from an active schedule with this stream key
+  let channelId = null;
+  const { data: schedMatch } = await sb
+    .from('schedules')
+    .select('channel_id')
+    .eq('org_id', currentProfile.org_id)
+    .eq('breaker_id', currentUser.id)
+    .eq('stream_key', streamKey)
+    .not('channel_id', 'is', null)
+    .limit(1)
+    .maybeSingle();
+  if (schedMatch) channelId = schedMatch.channel_id;
+
   // Create new stream
   const { data: newStream, error: createErr } = await sb
     .from('streams')
@@ -1163,7 +1176,8 @@ async function getOrCreateStream() {
       break_date: breakDate,
       status: 'active',
       total_submitted_revenue: 0,
-      break_count: 0
+      break_count: 0,
+      ...(channelId ? { channel_id: channelId } : {})
     })
     .select()
     .single();
