@@ -1782,7 +1782,7 @@ function formatShiftDate(dateStr) {
 let activeShiftId = null;
 
 async function checkTodayShiftAndNotify() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const { data } = await sb
     .from('schedules')
     .select('*')
@@ -1801,6 +1801,21 @@ async function checkTodayShiftAndNotify() {
     return;
   }
 
+  // Check 45-minute window if shift has a scheduled_time
+  let tooEarly = false;
+  let availableAt = '';
+  if (shift.scheduled_time) {
+    const [h, m] = shift.scheduled_time.slice(0, 5).split(':').map(Number);
+    const now = new Date();
+    const shiftMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime();
+    const windowMs = shiftMs - 45 * 60 * 1000;
+    if (Date.now() < windowMs) {
+      tooEarly = true;
+      const av = new Date(windowMs);
+      availableAt = String(av.getHours()).padStart(2,'0') + ':' + String(av.getMinutes()).padStart(2,'0');
+    }
+  }
+
   // Show clock-in banner
   const banner = document.createElement('div');
   banner.id = 'shiftBanner';
@@ -1813,13 +1828,24 @@ async function checkTodayShiftAndNotify() {
         (shift.stream_key ? '&#128273; ' + escHtml(shift.stream_key) + '&nbsp;&nbsp;' : '') +
         (shift.notes ? escHtml(shift.notes) : '') +
       '</div>' +
+      (tooEarly ? '<div style="font-size:0.78rem;color:var(--yellow);margin-top:0.3rem;">&#9201; Clock-in opens at ' + availableAt + ' (45 min before shift)</div>' : '') +
     '</div>' +
-    '<button id="clockInBtn" class="btn btn-green" style="padding:0.55rem 1.25rem;font-size:0.875rem;white-space:nowrap;">&#9200; Clock In</button>';
+    '<button id="clockInBtn" class="btn btn-green" style="padding:0.55rem 1.25rem;font-size:0.875rem;white-space:nowrap;"' + (tooEarly ? ' disabled title="Too early to clock in"' : '') + '>&#9200; Clock In</button>';
 
   const errorBox = document.getElementById('errorBox');
   errorBox.parentNode.insertBefore(banner, errorBox);
 
   document.getElementById('clockInBtn').addEventListener('click', async function () {
+    // Re-check window at click time in case page has been open a while
+    if (shift.scheduled_time) {
+      const [h, m] = shift.scheduled_time.slice(0, 5).split(':').map(Number);
+      const now = new Date();
+      const windowMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime() - 45 * 60 * 1000;
+      if (Date.now() < windowMs) {
+        showError('You can only clock in within 45 minutes of your scheduled start time.');
+        return;
+      }
+    }
     this.disabled = true;
     this.textContent = 'Clocking in…';
     await sb.from('schedules').update({
