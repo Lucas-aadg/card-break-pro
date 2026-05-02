@@ -2453,8 +2453,8 @@ async function renderChannelGrid() {
       sb.from('streams').select('final_sales').eq('org_id', currentProfile.org_id).eq('channel_id', ch.id).gte('break_date', monthStart).eq('status','closed'),
       breakerIds.length ? sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).is('channel_id', null).in('breaker_id', breakerIds).eq('break_date', today).eq('status','closed') : Promise.resolve({ data: [] }),
       breakerIds.length ? sb.from('streams').select('final_sales').eq('org_id', currentProfile.org_id).is('channel_id', null).in('breaker_id', breakerIds).gte('break_date', monthStart).eq('status','closed') : Promise.resolve({ data: [] }),
-      // Live = clocked-in schedules for this channel's assigned breakers
-      breakerIds.length ? sb.from('schedules').select('id,breaker_id').eq('org_id', currentProfile.org_id).eq('status','in_progress').in('breaker_id', breakerIds) : sb.from('schedules').select('id,breaker_id').eq('org_id', currentProfile.org_id).eq('status','in_progress').eq('channel_id', ch.id)
+      // Live = clocked-in schedules for THIS channel specifically
+      sb.from('schedules').select('id,breaker_id').eq('org_id', currentProfile.org_id).eq('status','in_progress').eq('channel_id', ch.id)
     ]);
     return {
       ch,
