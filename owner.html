@@ -2434,29 +2434,33 @@ async function renderChannelGrid() {
   const profileMap = {};
   allProfiles.forEach(function(p){ profileMap[p.id] = p; });
 
-  // Get stream keys associated with each channel via schedules (catches streams without channel_id set)
-  const { data: allSchedsForChannels } = await sb.from('schedules')
-    .select('channel_id, stream_key')
-    .eq('org_id', currentProfile.org_id)
-    .not('channel_id', 'is', null)
-    .not('stream_key', 'is', null);
-  const channelStreamKeys = {};
-  (allSchedsForChannels || []).forEach(function(s) {
-    if (!channelStreamKeys[s.channel_id]) channelStreamKeys[s.channel_id] = new Set();
-    channelStreamKeys[s.channel_id].add(s.stream_key);
+  // Map channel_id -> [breaker_ids] via channel_assignments
+  const { data: allAssigns } = await sb.from('channel_assignments')
+    .select('channel_id, profile_id').eq('org_id', currentProfile.org_id);
+  const channelBreakerIds = {};
+  (allAssigns || []).forEach(function(a) {
+    if (!channelBreakerIds[a.channel_id]) channelBreakerIds[a.channel_id] = [];
+    channelBreakerIds[a.channel_id].push(a.profile_id);
   });
 
   const channelData = await Promise.all(orgChannels.map(async function(ch) {
-    const keys = channelStreamKeys[ch.id] ? Array.from(channelStreamKeys[ch.id]) : [];
-    const [tdR, moR, acR, tdR2, moR2] = await Promise.all([
+    const breakerIds = channelBreakerIds[ch.id] || [];
+    // Query 1: streams with channel_id set (owner break entry, new breaker streams)
+    // Query 2: streams by assigned breaker_ids without channel_id (older streams)
+    const [tdR, moR, acR, tdR2, moR2, acR2] = await Promise.all([
       sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).eq('channel_id', ch.id).eq('break_date', today).eq('status','closed'),
       sb.from('streams').select('final_sales').eq('org_id', currentProfile.org_id).eq('channel_id', ch.id).gte('break_date', monthStart).eq('status','closed'),
       sb.from('streams').select('id,breaker_id').eq('org_id', currentProfile.org_id).eq('channel_id', ch.id).eq('status','active'),
-      // Also catch streams linked by stream_key but missing channel_id
-      keys.length ? sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).is('channel_id', null).in('stream_key', keys).eq('break_date', today).eq('status','closed') : Promise.resolve({ data: [] }),
-      keys.length ? sb.from('streams').select('final_sales').eq('org_id', currentProfile.org_id).is('channel_id', null).in('stream_key', keys).gte('break_date', monthStart).eq('status','closed') : Promise.resolve({ data: [] })
+      breakerIds.length ? sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).is('channel_id', null).in('breaker_id', breakerIds).eq('break_date', today).eq('status','closed') : Promise.resolve({ data: [] }),
+      breakerIds.length ? sb.from('streams').select('final_sales').eq('org_id', currentProfile.org_id).is('channel_id', null).in('breaker_id', breakerIds).gte('break_date', monthStart).eq('status','closed') : Promise.resolve({ data: [] }),
+      breakerIds.length ? sb.from('streams').select('id,breaker_id').eq('org_id', currentProfile.org_id).is('channel_id', null).in('breaker_id', breakerIds).eq('status','active') : Promise.resolve({ data: [] })
     ]);
-    return { ch, td: [...(tdR.data||[]), ...(tdR2.data||[])], mo: [...(moR.data||[]), ...(moR2.data||[])], ac: acR.data||[] };
+    return {
+      ch,
+      td: [...(tdR.data||[]), ...(tdR2.data||[])],
+      mo: [...(moR.data||[]), ...(moR2.data||[])],
+      ac: [...(acR.data||[]), ...(acR2.data||[])]
+    };
   }));
 
   grid.innerHTML = channelData.map(function(d) {
