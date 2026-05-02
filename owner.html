@@ -2257,7 +2257,8 @@ function fmtDate(d) {
 }
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
 function showLoading(text) {
@@ -2396,7 +2397,7 @@ async function loadHome() {
 }
 
 async function loadEmpireKpis() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const monthStart = today.slice(0, 7) + '-01';
   const [todayR, monthR, activeR] = await Promise.all([
     sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', today),
@@ -2428,7 +2429,7 @@ async function renderChannelGrid() {
     return;
   }
   grid.innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">Loading accounts…</div>';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const monthStart = today.slice(0, 7) + '-01';
   const profileMap = {};
   allProfiles.forEach(function(p){ profileMap[p.id] = p; });
