@@ -1715,6 +1715,7 @@
   <div class="modal" style="max-width:440px;">
     <h2>Edit Break</h2>
     <input type="hidden" id="editBreakId">
+    <input type="hidden" id="editBreakStreamId">
     <div style="display:grid;gap:1rem;margin-bottom:1.25rem;">
       <div>
         <label class="form-label">Revenue</label>
@@ -4242,6 +4243,7 @@ function openEditBreak(breakId) {
   const b = historyData.find(function(x){ return x.id === breakId; });
   if (!b) return;
   document.getElementById('editBreakId').value = b.id;
+  document.getElementById('editBreakStreamId').value = b.stream_id || '';
   document.getElementById('editBreakRevenue').value = parseFloat(b.revenue) || 0;
   document.getElementById('editBreakBoxCost').value = parseFloat(b.total_product_cost) || 0;
   document.getElementById('editBreakFees').value = parseFloat(b.estimated_fees) || 0;
@@ -4252,6 +4254,7 @@ function openEditBreak(breakId) {
 
 async function confirmEditBreak() {
   const id = document.getElementById('editBreakId').value;
+  const streamId = document.getElementById('editBreakStreamId').value;
   const revenue = parseFloat(document.getElementById('editBreakRevenue').value) || 0;
   const boxCost = parseFloat(document.getElementById('editBreakBoxCost').value) || 0;
   const fees = parseFloat(document.getElementById('editBreakFees').value) || 0;
@@ -4262,6 +4265,7 @@ async function confirmEditBreak() {
   const btn = document.getElementById('editBreakSaveBtn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
+    // 1. Update the break record
     const { error } = await sb.from('breaks').update({
       revenue,
       total_product_cost: boxCost,
@@ -4271,9 +4275,34 @@ async function confirmEditBreak() {
       net_profit: netProfit
     }).eq('id', id).eq('org_id', currentProfile.org_id);
     if (error) throw error;
+
+    // 2. Re-aggregate ALL breaks for this stream and push totals back up
+    if (streamId) {
+      const { data: allBreaks } = await sb.from('breaks')
+        .select('revenue, total_product_cost, estimated_fees, other_costs')
+        .eq('stream_id', streamId)
+        .eq('org_id', currentProfile.org_id);
+      const agg = (allBreaks || []).reduce(function(acc, b) {
+        acc.revenue += parseFloat(b.revenue) || 0;
+        acc.box    += parseFloat(b.total_product_cost) || 0;
+        acc.fees   += parseFloat(b.estimated_fees) || 0;
+        acc.other  += parseFloat(b.other_costs) || 0;
+        return acc;
+      }, { revenue: 0, box: 0, fees: 0, other: 0 });
+
+      await sb.from('streams').update({
+        total_submitted_revenue: agg.revenue,
+        total_product_cost: agg.box,
+        total_fees: agg.fees,
+        total_other_costs: agg.other
+      }).eq('id', streamId).eq('org_id', currentProfile.org_id);
+    }
+
     document.getElementById('editBreakModal').classList.remove('active');
     showGlobalSuccess('Break updated.');
-    await loadHistory();
+
+    // 3. Refresh all relevant views
+    await Promise.all([loadHistory(), loadStreamSummary(), loadHome()]);
   } catch(err) {
     showGlobalError('Failed to update break: ' + escHtml(err.message));
   } finally {
