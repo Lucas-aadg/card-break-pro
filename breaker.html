@@ -829,7 +829,7 @@ function sessionKey() {
 function saveSessionState() {
   const key = document.getElementById('streamKey').value.trim();
   const date = document.getElementById('breakDate').value;
-  if (key) {
+  if (key && date) {
     localStorage.setItem(sessionKey(), JSON.stringify({ streamKey: key, breakDate: date }));
   }
 }
@@ -1192,6 +1192,7 @@ async function loadStreamBreaks(streamId) {
     .from('breaks')
     .select('*')
     .eq('stream_id', streamId)
+    .eq('org_id', currentProfile.org_id)
     .order('break_number', { ascending: true });
 
   if (error) throw error;
@@ -1236,6 +1237,11 @@ async function onStreamKeyChange() {
 
     renderRunningTotal();
     updateBreakDisplay();
+
+    // Write stream key back to the active schedule so clock log shows it
+    if (activeShiftId && streamKey) {
+      try { await sb.from('schedules').update({ stream_key: streamKey }).eq('id', activeShiftId); } catch(e) { console.warn('stream_key sync failed:', e); }
+    }
   } catch (err) {
     console.error('Stream key change error:', err);
   }
@@ -1314,18 +1320,23 @@ async function handleSubmitBreak() {
       const { error: stockErr } = await sb
         .from('products')
         .update({ current_stock: newStock })
-        .eq('id', used.product_id);
+        .eq('id', used.product_id)
+        .eq('org_id', currentProfile.org_id);
       if (stockErr) console.warn('Stock update error:', stockErr);
       product.current_stock = newStock;
-      await sb.from('inventory_log').insert({
-        org_id: currentProfile.org_id,
-        product_id: used.product_id,
-        product_name: product.name,
-        action: 'used',
-        quantity: used.qty,
-        unit_cost: product.unit_cost,
-        notes: 'Break #' + (breakNumber - 1) + (currentStream ? ' — stream ' + currentStream.stream_key : '')
-      });
+      try {
+        await sb.from('inventory_log').insert({
+          org_id: currentProfile.org_id,
+          product_id: used.product_id,
+          product_name: product.name,
+          action: 'used',
+          quantity: used.qty,
+          unit_cost: product.unit_cost,
+          notes: 'Break #' + breakNumber + (currentStream ? ' — stream ' + currentStream.stream_key : '')
+        });
+      } catch (logErr) {
+        console.warn('Inventory log insert failed:', logErr);
+      }
     }
 
     // Update stream totals
@@ -1454,6 +1465,7 @@ async function handleConfirmClose() {
   }
 
   const finalSales = parseFloat(finalSalesStr);
+  if (finalSales < 0) { showError('Final Sales cannot be negative.'); return; }
   const modal = document.getElementById('closeOutModal');
   const totalSubmitted = parseFloat(modal.dataset.totalRevenue) || 0;
 
@@ -1496,17 +1508,27 @@ async function handleConfirmClose() {
 
     if (error) throw error;
 
-    // Clock out the active shift for this breaker
-    await sb.from('schedules')
-      .update({ status: 'completed', clocked_out_at: new Date().toISOString() })
-      .eq('org_id', currentProfile.org_id)
-      .eq('breaker_id', currentUser.id)
-      .eq('status', 'in_progress');
-
     // Save stream id before clearing state
     const closedStreamId = currentStream.id;
 
-    // Reset everything
+    // Clock out active shift — prefer specific ID, fall back to broad query
+    const clockOutTime = new Date().toISOString();
+    if (activeShiftId) {
+      await sb.from('schedules').update({ status: 'completed', clocked_out_at: clockOutTime }).eq('id', activeShiftId);
+      activeShiftId = null;
+      const clockedInBanner = document.getElementById('clockedInBanner');
+      if (clockedInBanner) clockedInBanner.remove();
+    } else {
+      await sb.from('schedules')
+        .update({ status: 'completed', clocked_out_at: clockOutTime })
+        .eq('org_id', currentProfile.org_id)
+        .eq('breaker_id', currentUser.id)
+        .eq('status', 'in_progress');
+      const clockedInBanner = document.getElementById('clockedInBanner');
+      if (clockedInBanner) clockedInBanner.remove();
+    }
+
+    // Reset UI state
     clearSessionState();
     document.getElementById('closeOutModal').classList.remove('active');
     document.getElementById('streamKey').value = '';
@@ -1523,25 +1545,17 @@ async function handleConfirmClose() {
 
     await loadProducts();
 
-    // Create sort task for this stream
-    await sb.from('sort_tasks').insert({
-      org_id: currentProfile.org_id,
-      stream_id: closedStreamId,
-      status: 'pending'
-    });
-
-    // Clock out if shift is active
-    if (activeShiftId) {
-      await sb.from('schedules').update({
-        status: 'completed',
-        clocked_out_at: new Date().toISOString()
-      }).eq('id', activeShiftId);
-      activeShiftId = null;
-      const clockedInBanner = document.getElementById('clockedInBanner');
-      if (clockedInBanner) clockedInBanner.remove();
-    }
-
     showSuccess('Stream closed out! Final Fee: ' + fmt(finalFee) + ' | Net Profit: ' + fmt(netProfit));
+
+    // Create sort task — in its own block so a failure here doesn't hide the success
+    try {
+      const { data: existingTask } = await sb.from('sort_tasks').select('id').eq('stream_id', closedStreamId).maybeSingle();
+      if (!existingTask) {
+        await sb.from('sort_tasks').insert({ org_id: currentProfile.org_id, stream_id: closedStreamId, status: 'pending' });
+      }
+    } catch (taskErr) {
+      console.warn('Sort task creation failed:', taskErr);
+    }
   } catch (err) {
     showError('Failed to close stream: ' + escHtml(err.message));
     console.error(err);
@@ -1701,11 +1715,12 @@ async function loadShifts() {
   loading.style.display = 'block';
   root.style.display = 'none';
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
 
   const { data, error } = await sb
     .from('schedules')
     .select('*')
+    .eq('org_id', currentProfile.org_id)
     .eq('breaker_id', currentUser.id)
     .order('scheduled_date', { ascending: true });
 
@@ -1791,13 +1806,17 @@ async function checkTodayShiftAndNotify() {
   const { data } = await sb
     .from('schedules')
     .select('*')
+    .eq('org_id', currentProfile.org_id)
     .eq('breaker_id', currentUser.id)
     .eq('scheduled_date', today)
-    .neq('status', 'cancelled');
+    .in('status', ['scheduled', 'in_progress'])
+    .order('clocked_in_at', { ascending: false });
 
   if (!data || data.length === 0) return;
 
-  const shift = data[0];
+  // Prioritize in_progress shift — breaker may have multiple shifts today
+  const inProgress = data.find(function(s){ return s.status === 'in_progress'; });
+  const shift = inProgress || data[0];
 
   // If already clocked in, just restore state silently
   if (shift.status === 'in_progress') {
@@ -1853,10 +1872,11 @@ async function checkTodayShiftAndNotify() {
     }
     this.disabled = true;
     this.textContent = 'Clocking in…';
-    await sb.from('schedules').update({
+    const { error: cinErr } = await sb.from('schedules').update({
       status: 'in_progress',
       clocked_in_at: new Date().toISOString()
-    }).eq('id', shift.id);
+    }).eq('id', shift.id).eq('org_id', currentProfile.org_id);
+    if (cinErr) { showError('Clock-in failed: ' + cinErr.message); this.disabled = false; this.textContent = 'Clock In'; return; }
     activeShiftId = shift.id;
     // Pre-fill stream key
     if (shift.stream_key) {
@@ -1936,6 +1956,7 @@ async function loadPayouts() {
     const { data: streamsData } = await sb
       .from('streams')
       .select('id, stream_key, break_date, final_sales, total_product_cost, total_other_costs')
+      .eq('org_id', currentProfile.org_id)
       .eq('breaker_id', currentUser.id)
       .eq('status', 'closed')
       .gte('closed_at', from)
@@ -2099,8 +2120,8 @@ async function renderNotifPanel() {
       const age = diff < 60 ? 'Just now' : diff < 3600 ? Math.floor(diff/60)+'m ago' : diff < 86400 ? Math.floor(diff/3600)+'h ago' : Math.floor(diff/86400)+'d ago';
       return '<div style="padding:0.75rem 1rem;border-bottom:1px solid #1e1e2d;cursor:pointer;display:flex;gap:0.65rem;align-items:flex-start;background:' + (n.read ? 'transparent' : 'rgba(79,110,247,0.04)') + ';" onclick="markNotifRead(\'' + n.id + '\',this)">' +
         '<div style="width:7px;height:7px;border-radius:50%;background:' + (n.read ? 'transparent' : '#4f6ef7') + ';flex-shrink:0;margin-top:5px;"></div>' +
-        '<div><div style="font-size:0.82rem;font-weight:700;color:#e2e8f0;margin-bottom:0.15rem;">' + (n.title||'').replace(/</g,'&lt;') + '</div>' +
-        '<div style="font-size:0.78rem;color:#64748b;line-height:1.4;">' + (n.message||'').replace(/</g,'&lt;') + '</div>' +
+        '<div><div style="font-size:0.82rem;font-weight:700;color:#e2e8f0;margin-bottom:0.15rem;">' + escHtml(n.title||'') + '</div>' +
+        '<div style="font-size:0.78rem;color:#64748b;line-height:1.4;">' + escHtml(n.message||'') + '</div>' +
         '<div style="font-size:0.68rem;color:#64748b;margin-top:0.2rem;">' + age + '</div></div></div>';
     }).join('');
   } catch(e) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Could not load.</div>'; }

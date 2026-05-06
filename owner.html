@@ -1057,6 +1057,7 @@
               <th>Fees</th>
               <th>Profit</th>
               <th>Spots</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="histTableBody"></tbody>
@@ -1705,6 +1706,40 @@
     <div class="modal-btn-row" style="margin-top:1.5rem;">
       <button class="btn btn-outline" id="chModalCancelBtn">Cancel</button>
       <button class="btn btn-primary" id="chModalSaveBtn">Save Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT BREAK MODAL -->
+<div class="modal-overlay" id="editBreakModal">
+  <div class="modal" style="max-width:440px;">
+    <h2>Edit Break</h2>
+    <input type="hidden" id="editBreakId">
+    <div style="display:grid;gap:1rem;margin-bottom:1.25rem;">
+      <div>
+        <label class="form-label">Revenue</label>
+        <input type="number" id="editBreakRevenue" class="form-input" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div>
+        <label class="form-label">Box Cost</label>
+        <input type="number" id="editBreakBoxCost" class="form-input" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div>
+        <label class="form-label">Platform Fees</label>
+        <input type="number" id="editBreakFees" class="form-input" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div>
+        <label class="form-label">Other Costs</label>
+        <input type="number" id="editBreakOther" class="form-input" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div>
+        <label class="form-label">Spots</label>
+        <input type="number" id="editBreakSpots" class="form-input" step="1" min="0" placeholder="0">
+      </div>
+    </div>
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="document.getElementById('editBreakModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" id="editBreakSaveBtn" onclick="confirmEditBreak()">Save Changes</button>
     </div>
   </div>
 </div>
@@ -2537,7 +2572,8 @@ async function ownerClockOut(scheduleId, name) {
   showLoading('Clocking out…');
   const { error } = await sb.from('schedules')
     .update({ status: 'completed', clocked_out_at: new Date().toISOString() })
-    .eq('id', scheduleId);
+    .eq('id', scheduleId)
+    .eq('org_id', currentProfile.org_id);
   hideLoading();
   if (error) { showGlobalError('Failed to clock out: ' + error.message); return; }
   // Refresh schedule tab + home tab (Live Right Now, KPIs, stream summary)
@@ -4167,7 +4203,7 @@ function renderHistoryTable(breaks) {
   tbody.innerHTML = '';
 
   if (breaks.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No breaks found for the selected filters.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No breaks found for the selected filters.</td></tr>';
     return;
   }
 
@@ -4187,7 +4223,8 @@ function renderHistoryTable(breaks) {
         '<td>' + fmt(b.total_product_cost) + '</td>' +
         '<td>' + fmt(b.estimated_fees) + '</td>' +
         '<td style="color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>' +
-        '<td style="text-align:center;">' + (b.spots || 0) + '</td>';
+        '<td style="text-align:center;">' + (b.spots || 0) + '</td>' +
+        '<td style="text-align:center;"><button onclick="openEditBreak(\'' + b.id + '\')" title="Edit break" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--primary)\'" onmouseout="this.style.color=\'var(--muted)\'">✏️</button></td>';
       tbody.appendChild(tr);
     });
   });
@@ -4195,10 +4232,53 @@ function renderHistoryTable(breaks) {
 
 async function loadStreamsMap(streamIds) {
   if (!streamIds.length) return {};
-  const { data } = await sb.from('streams').select('id, stream_key').in('id', streamIds);
+  const { data } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', streamIds);
   const map = {};
   (data || []).forEach(function (s) { map[s.id] = s.stream_key; });
   return map;
+}
+
+function openEditBreak(breakId) {
+  const b = historyData.find(function(x){ return x.id === breakId; });
+  if (!b) return;
+  document.getElementById('editBreakId').value = b.id;
+  document.getElementById('editBreakRevenue').value = parseFloat(b.revenue) || 0;
+  document.getElementById('editBreakBoxCost').value = parseFloat(b.total_product_cost) || 0;
+  document.getElementById('editBreakFees').value = parseFloat(b.estimated_fees) || 0;
+  document.getElementById('editBreakOther').value = parseFloat(b.other_costs) || 0;
+  document.getElementById('editBreakSpots').value = b.spots || 0;
+  document.getElementById('editBreakModal').classList.add('active');
+}
+
+async function confirmEditBreak() {
+  const id = document.getElementById('editBreakId').value;
+  const revenue = parseFloat(document.getElementById('editBreakRevenue').value) || 0;
+  const boxCost = parseFloat(document.getElementById('editBreakBoxCost').value) || 0;
+  const fees = parseFloat(document.getElementById('editBreakFees').value) || 0;
+  const other = parseFloat(document.getElementById('editBreakOther').value) || 0;
+  const spots = parseInt(document.getElementById('editBreakSpots').value) || 0;
+  const netProfit = revenue - boxCost - fees - other;
+
+  const btn = document.getElementById('editBreakSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const { error } = await sb.from('breaks').update({
+      revenue,
+      total_product_cost: boxCost,
+      estimated_fees: fees,
+      other_costs: other,
+      spots,
+      net_profit: netProfit
+    }).eq('id', id).eq('org_id', currentProfile.org_id);
+    if (error) throw error;
+    document.getElementById('editBreakModal').classList.remove('active');
+    showGlobalSuccess('Break updated.');
+    await loadHistory();
+  } catch(err) {
+    showGlobalError('Failed to update break: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Changes';
+  }
 }
 
 function exportHistoryCsv() {
@@ -4350,6 +4430,12 @@ async function confirmEditStream() {
 
     if (error) throw error;
 
+    // Create sort task if one doesn't already exist for this stream
+    const { data: existing } = await sb.from('sort_tasks').select('id').eq('stream_id', editingStreamId).eq('org_id', currentProfile.org_id).maybeSingle();
+    if (!existing) {
+      await sb.from('sort_tasks').insert({ org_id: currentProfile.org_id, stream_id: editingStreamId, status: 'pending' });
+    }
+
     document.getElementById('editStreamModal').classList.remove('active');
     await loadStreamSummary();
   } catch (err) {
@@ -4365,7 +4451,7 @@ async function deleteStream(streamId, streamKey) {
   showLoading('Deleting stream…');
   try {
     // Fetch all breaks so we can restore stock
-    const { data: streamBreaks } = await sb.from('breaks').select('products_used').eq('stream_id', streamId);
+    const { data: streamBreaks } = await sb.from('breaks').select('products_used').eq('stream_id', streamId).eq('org_id', currentProfile.org_id);
 
     // Restore product stock for every box used in these breaks
     const stockDeltas = {};
@@ -4376,17 +4462,30 @@ async function deleteStream(streamId, streamKey) {
         }
       });
     });
+    const logEntries = [];
     for (const [productId, qty] of Object.entries(stockDeltas)) {
-      const { data: prod } = await sb.from('products').select('current_stock').eq('id', productId).single();
+      const { data: prod } = await sb.from('products').select('current_stock,name,unit_cost').eq('id', productId).eq('org_id', currentProfile.org_id).single();
       if (prod) {
         await sb.from('products').update({ current_stock: (prod.current_stock || 0) + qty }).eq('id', productId);
+        logEntries.push({
+          org_id: currentProfile.org_id,
+          product_id: productId,
+          product_name: prod.name,
+          action: 'restored',
+          quantity: qty,
+          unit_cost: prod.unit_cost,
+          notes: 'Stream ' + streamKey + ' deleted — stock restored'
+        });
       }
+    }
+    if (logEntries.length) {
+      await sb.from('inventory_log').insert(logEntries);
     }
 
     // Delete breaks, sort task, then the stream record itself
-    await sb.from('breaks').delete().eq('stream_id', streamId);
-    await sb.from('sort_tasks').delete().eq('stream_id', streamId);
-    await sb.from('streams').delete().eq('id', streamId);
+    await sb.from('breaks').delete().eq('stream_id', streamId).eq('org_id', currentProfile.org_id);
+    await sb.from('sort_tasks').delete().eq('stream_id', streamId).eq('org_id', currentProfile.org_id);
+    await sb.from('streams').delete().eq('id', streamId).eq('org_id', currentProfile.org_id);
 
     hideLoading();
     await loadStreamSummary();
@@ -5884,6 +5983,7 @@ async function calcHours(profileId, fromTs, toTs) {
   let hoursQ = sb.from('schedules')
     .select('clocked_in_at, clocked_out_at')
     .eq('org_id', currentProfile.org_id)
+    .eq('status', 'completed')
     .or('breaker_id.eq.' + profileId + ',sorter_id.eq.' + profileId)
     .not('clocked_in_at', 'is', null)
     .not('clocked_out_at', 'is', null)

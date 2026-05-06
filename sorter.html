@@ -353,13 +353,13 @@ async function loadSortQueue() {
             await sb.from('sort_tasks').update({
               status: 'in_progress',
               sorter_id: currentUser.id
-            }).eq('id', taskId);
+            }).eq('id', taskId).eq('org_id', currentProfile.org_id);
             showSuccess('Started sorting. Mark complete when done.');
           } else if (action === 'complete') {
             await sb.from('sort_tasks').update({
               status: 'completed',
               completed_at: new Date().toISOString()
-            }).eq('id', taskId);
+            }).eq('id', taskId).eq('org_id', currentProfile.org_id);
             showSuccess('Stream marked as sorted and shipped!');
           }
           await loadSortQueue();
@@ -458,7 +458,7 @@ async function loadShifts() {
         btn.addEventListener('click', async function () {
           btn.disabled = true; btn.textContent = 'Clocking in…';
           try {
-            await sb.from('schedules').update({ status: 'in_progress', clocked_in_at: new Date().toISOString() }).eq('id', btn.dataset.shiftid);
+            await sb.from('schedules').update({ status: 'in_progress', clocked_in_at: new Date().toISOString() }).eq('id', btn.dataset.shiftid).eq('org_id', currentProfile.org_id);
             activeShiftId = btn.dataset.shiftid;
             showSuccess('Clocked in!');
             await loadShifts();
@@ -470,7 +470,7 @@ async function loadShifts() {
         btn.addEventListener('click', async function () {
           btn.disabled = true; btn.textContent = 'Clocking out…';
           try {
-            await sb.from('schedules').update({ status: 'completed', clocked_out_at: new Date().toISOString() }).eq('id', btn.dataset.shiftid);
+            await sb.from('schedules').update({ status: 'completed', clocked_out_at: new Date().toISOString() }).eq('id', btn.dataset.shiftid).eq('org_id', currentProfile.org_id);
             activeShiftId = null;
             const banner = document.getElementById('clockedInBanner');
             if (banner) banner.remove();
@@ -558,7 +558,7 @@ async function checkTodayShift() {
       await sb.from('schedules').update({
         status: 'in_progress',
         clocked_in_at: new Date().toISOString()
-      }).eq('id', shift.id);
+      }).eq('id', shift.id).eq('org_id', currentProfile.org_id);
       activeShiftId = shift.id;
       banner.remove();
       showClockedInBanner(shift);
@@ -592,7 +592,7 @@ function showClockedInBanner(shift) {
       await sb.from('schedules').update({
         status: 'completed',
         clocked_out_at: new Date().toISOString()
-      }).eq('id', activeShiftId);
+      }).eq('id', activeShiftId).eq('org_id', currentProfile.org_id);
       activeShiftId = null;
       banner.remove();
       showSuccess('Clocked out successfully.');
@@ -658,7 +658,7 @@ function closeNotifPanel() {
 }
 async function loadNotifCount() {
   try {
-    const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('profile_id', currentUser.id).eq('read', false);
+    const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('profile_id', currentUser.id).eq('org_id', currentProfile.org_id).eq('read', false);
     const badge = document.getElementById('notifBadge');
     if (count && count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'block'; }
     else { badge.style.display = 'none'; }
@@ -668,28 +668,28 @@ async function renderNotifPanel() {
   const list = document.getElementById('notifList');
   list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Loading…</div>';
   try {
-    const { data } = await sb.from('notifications').select('*').eq('profile_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
+    const { data } = await sb.from('notifications').select('*').eq('profile_id', currentUser.id).eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(30);
     if (!data || data.length === 0) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">No notifications yet.</div>'; return; }
     list.innerHTML = data.map(function(n) {
       const diff = Math.floor((Date.now() - new Date(n.created_at)) / 1000);
       const age = diff < 60 ? 'Just now' : diff < 3600 ? Math.floor(diff/60)+'m ago' : diff < 86400 ? Math.floor(diff/3600)+'h ago' : Math.floor(diff/86400)+'d ago';
       return '<div style="padding:0.75rem 1rem;border-bottom:1px solid #1e1e2d;cursor:pointer;display:flex;gap:0.65rem;align-items:flex-start;background:' + (n.read ? 'transparent' : 'rgba(79,110,247,0.04)') + ';" onclick="markNotifRead(\'' + n.id + '\',this)">' +
         '<div style="width:7px;height:7px;border-radius:50%;background:' + (n.read ? 'transparent' : '#4f6ef7') + ';flex-shrink:0;margin-top:5px;"></div>' +
-        '<div><div style="font-size:0.82rem;font-weight:700;color:#e2e8f0;margin-bottom:0.15rem;">' + (n.title||'').replace(/</g,'&lt;') + '</div>' +
-        '<div style="font-size:0.78rem;color:#64748b;line-height:1.4;">' + (n.message||'').replace(/</g,'&lt;') + '</div>' +
+        '<div><div style="font-size:0.82rem;font-weight:700;color:#e2e8f0;margin-bottom:0.15rem;">' + escHtml(n.title||'') + '</div>' +
+        '<div style="font-size:0.78rem;color:#64748b;line-height:1.4;">' + escHtml(n.message||'') + '</div>' +
         '<div style="font-size:0.68rem;color:#64748b;margin-top:0.2rem;">' + age + '</div></div></div>';
     }).join('');
   } catch(e) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Could not load.</div>'; }
 }
 async function markNotifRead(id, el) {
   try {
-    await sb.from('notifications').update({ read: true }).eq('id', id);
+    await sb.from('notifications').update({ read: true }).eq('id', id).eq('org_id', currentProfile.org_id);
     if (el) { el.style.background = 'transparent'; const dot = el.querySelector('div'); if(dot) dot.style.background = 'transparent'; }
     loadNotifCount();
   } catch(e) {}
 }
 async function markAllNotifsRead() {
-  try { await sb.from('notifications').update({ read: true }).eq('profile_id', currentUser.id).eq('read', false); renderNotifPanel(); loadNotifCount(); } catch(e) {}
+  try { await sb.from('notifications').update({ read: true }).eq('profile_id', currentUser.id).eq('org_id', currentProfile.org_id).eq('read', false); renderNotifPanel(); loadNotifCount(); } catch(e) {}
 }
 document.addEventListener('click', function(e) {
   if (notifPanelOpen && !document.getElementById('notifBellWrap').contains(e.target)) closeNotifPanel();
@@ -722,6 +722,7 @@ document.querySelectorAll('.pay-period-btn').forEach(function (btn) {
 });
 
 async function loadSorterPay() {
+  try {
   const from = getSorterPeriodFrom(sorterPayPeriod);
   const type = currentProfile.pay_type;
 
@@ -827,6 +828,11 @@ async function loadSorterPay() {
 
   document.getElementById('sorterPayStatsRow').innerHTML = statsHTML.join('');
   document.getElementById('sorterPayTotal').textContent = fmt(grandTotal);
+  } catch(err) {
+    console.error('loadSorterPay error:', err);
+    document.getElementById('sorterPayTotal').textContent = '—';
+    showError('Failed to load pay summary. Please refresh and try again.');
+  }
 }
 </script>
 </body>

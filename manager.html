@@ -853,7 +853,7 @@ function closeNotifPanel() {
 }
 async function loadNotifCount() {
   try {
-    const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('profile_id', currentUser.id).eq('read', false);
+    const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('profile_id', currentUser.id).eq('org_id', currentProfile.org_id).eq('read', false);
     const badge = document.getElementById('notifBadge');
     if (count && count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'block'; }
     else { badge.style.display = 'none'; }
@@ -863,28 +863,28 @@ async function renderNotifPanel() {
   const list = document.getElementById('notifList');
   list.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading…</div>';
   try {
-    const { data } = await sb.from('notifications').select('*').eq('profile_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
+    const { data } = await sb.from('notifications').select('*').eq('profile_id', currentUser.id).eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(30);
     if (!data || data.length === 0) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">No notifications yet.</div>'; return; }
     list.innerHTML = data.map(function(n) {
       const diff = Math.floor((Date.now() - new Date(n.created_at)) / 1000);
       const age = diff < 60 ? 'Just now' : diff < 3600 ? Math.floor(diff/60)+'m ago' : diff < 86400 ? Math.floor(diff/3600)+'h ago' : Math.floor(diff/86400)+'d ago';
       return '<div style="padding:0.75rem 1rem;border-bottom:1px solid rgba(79,110,247,0.08);cursor:pointer;display:flex;gap:0.65rem;align-items:flex-start;background:' + (n.read ? 'transparent' : 'rgba(79,110,247,0.04)') + ';" onclick="markNotifRead(\'' + n.id + '\',this)">' +
         '<div style="width:7px;height:7px;border-radius:50%;background:' + (n.read ? 'transparent' : '#4f6ef7') + ';flex-shrink:0;margin-top:5px;"></div>' +
-        '<div><div style="font-size:0.82rem;font-weight:700;color:#e8eaf6;margin-bottom:0.15rem;">' + (n.title||'').replace(/</g,'&lt;') + '</div>' +
-        '<div style="font-size:0.78rem;color:#5a6a8a;line-height:1.4;">' + (n.message||'').replace(/</g,'&lt;') + '</div>' +
+        '<div><div style="font-size:0.82rem;font-weight:700;color:#e8eaf6;margin-bottom:0.15rem;">' + escHtml(n.title||'') + '</div>' +
+        '<div style="font-size:0.78rem;color:#5a6a8a;line-height:1.4;">' + escHtml(n.message||'') + '</div>' +
         '<div style="font-size:0.68rem;color:#5a6a8a;margin-top:0.2rem;">' + age + '</div></div></div>';
     }).join('');
   } catch(e) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">Could not load.</div>'; }
 }
 async function markNotifRead(id, el) {
   try {
-    await sb.from('notifications').update({ read: true }).eq('id', id);
+    await sb.from('notifications').update({ read: true }).eq('id', id).eq('org_id', currentProfile.org_id);
     if (el) { el.style.background = 'transparent'; const dot = el.querySelector('div'); if(dot) dot.style.background = 'transparent'; }
     loadNotifCount();
   } catch(e) {}
 }
 async function markAllNotifsRead() {
-  try { await sb.from('notifications').update({ read: true }).eq('profile_id', currentUser.id).eq('read', false); renderNotifPanel(); loadNotifCount(); } catch(e) {}
+  try { await sb.from('notifications').update({ read: true }).eq('profile_id', currentUser.id).eq('org_id', currentProfile.org_id).eq('read', false); renderNotifPanel(); loadNotifCount(); } catch(e) {}
 }
 document.addEventListener('click', function(e) {
   if (notifPanelOpen && !document.getElementById('notifBellWrap').contains(e.target)) closeNotifPanel();
@@ -1139,7 +1139,7 @@ async function esSaveShift() {
       scheduled_time: document.getElementById('esTime').value,
       stream_key: document.getElementById('esStreamKey').value.trim() || null,
       notes: document.getElementById('esNotes').value.trim() || null
-    }).eq('id', id);
+    }).eq('id', id).eq('org_id', currentProfile.org_id);
     if (error) throw error;
     document.getElementById('editShiftModal').classList.remove('active');
     showGlobalSuccess('Shift updated.');
@@ -1154,7 +1154,7 @@ async function esSaveShift() {
 
 function cancelShift(id) {
   openConfirm('Cancel Shift', 'Are you sure you want to cancel this shift? The team member will no longer see it.', async function() {
-    const { error } = await sb.from('schedules').update({ status: 'cancelled' }).eq('id', id);
+    const { error } = await sb.from('schedules').update({ status: 'cancelled' }).eq('id', id).eq('org_id', currentProfile.org_id);
     if (error) { showGlobalError('Failed to cancel shift.'); return; }
     showGlobalSuccess('Shift cancelled.');
     await loadSchedule();
@@ -1289,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const btn = document.getElementById('editClockSaveBtn');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      const { error } = await sb.from('schedules').update(updates).eq('id', id);
+      const { error } = await sb.from('schedules').update(updates).eq('id', id).eq('org_id', currentProfile.org_id);
       if (error) throw error;
       document.getElementById('editClockModal').classList.remove('active');
       await loadClockLog();
@@ -1551,7 +1551,7 @@ async function loadSorting() {
     const streamIds = [...new Set(allTasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
     let streamMap = {};
     if (streamIds.length) {
-      const { data: streams } = await sb.from('streams').select('id, stream_key, break_date, break_count').in('id', streamIds);
+      const { data: streams } = await sb.from('streams').select('id, stream_key, break_date, break_count').eq('org_id', currentProfile.org_id).in('id', streamIds);
       (streams||[]).forEach(function(s){ streamMap[s.id] = s; });
     }
     const sorterIds = [...new Set(allTasks.filter(function(t){ return t.sorter_id; }).map(function(t){ return t.sorter_id; }))];
@@ -1610,7 +1610,7 @@ async function loadDashboard() {
   const streamIds = [...new Set((recent||[]).map(function(b){ return b.stream_id; }).filter(Boolean))];
   let streamMap = {};
   if (streamIds.length) {
-    const { data: streams } = await sb.from('streams').select('id, stream_key').in('id', streamIds);
+    const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', streamIds);
     (streams||[]).forEach(function(s){ streamMap[s.id] = s.stream_key; });
   }
   const breakerIds = [...new Set((recent||[]).map(function(b){ return b.breaker_id; }).filter(Boolean))];
@@ -1654,8 +1654,8 @@ async function loadStreamSummaryDetail() {
   const wrap = document.getElementById('ssSummaryWrap');
   if (!streamId) { wrap.style.display = 'none'; return; }
 
-  const { data: stream } = await sb.from('streams').select('*').eq('id', streamId).single();
-  const { data: breaks } = await sb.from('breaks').select('*').eq('stream_id', streamId).order('break_number');
+  const { data: stream } = await sb.from('streams').select('*').eq('id', streamId).eq('org_id', currentProfile.org_id).single();
+  const { data: breaks } = await sb.from('breaks').select('*').eq('stream_id', streamId).eq('org_id', currentProfile.org_id).order('break_number');
 
   if (!stream) return;
   const statsRow = document.getElementById('ssStatsRow');
@@ -1691,7 +1691,7 @@ async function loadHistory() {
   const streamIds = [...new Set((breaks||[]).map(function(b){ return b.stream_id; }).filter(Boolean))];
   let streamMap = {};
   if (streamIds.length) {
-    const { data: s } = await sb.from('streams').select('id, stream_key').in('id', streamIds);
+    const { data: s } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', streamIds);
     (s||[]).forEach(function(x){ streamMap[x.id] = x.stream_key; });
   }
   const breakerIds = [...new Set((breaks||[]).map(function(b){ return b.breaker_id; }).filter(Boolean))];
@@ -1723,11 +1723,16 @@ async function loadProductRoi() {
   const { data: breaks } = await sb.from('breaks').select('products_used, revenue').eq('org_id', currentProfile.org_id);
   const map = {};
   (breaks||[]).forEach(function(b){
-    (b.products_used||[]).forEach(function(p){
+    const pu = (b.products_used||[]).filter(function(p){ return p && p.name; });
+    const totalQty = pu.reduce(function(s,p){ return s+(p.qty||1); }, 0);
+    const breakRev = parseFloat(b.revenue) || 0;
+    pu.forEach(function(p){
       if (!map[p.name]) map[p.name] = { name: p.name, count: 0, units: 0, cost: 0, revenue: 0 };
       map[p.name].count++;
       map[p.name].units += p.qty || 1;
       map[p.name].cost += (p.unit_cost || p.cost || 0) * (p.qty || 1);
+      // Distribute break revenue proportionally by unit count
+      map[p.name].revenue += totalQty > 0 ? breakRev * ((p.qty||1) / totalQty) : 0;
     });
   });
   const products = Object.values(map);
@@ -1839,7 +1844,7 @@ async function loadSorterPerformance() {
   const rows = sorters.map(function(s){
     const myTasks = (tasks||[]).filter(function(t){ return t.sorter_id===s.id && t.status==='completed'; });
     const myShifts = (shifts||[]).filter(function(sh){ return sh.sorter_id===s.id; });
-    const totalHours = myShifts.reduce(function(sum,sh){ return sum+(new Date(sh.clocked_out_at)-new Date(sh.clocked_in_at))/3600000; }, 0);
+    const totalHours = myShifts.reduce(function(sum,sh){ if (!sh.clocked_in_at || !sh.clocked_out_at) return sum; return sum+(new Date(sh.clocked_out_at)-new Date(sh.clocked_in_at))/3600000; }, 0);
     const streams = new Set(myTasks.filter(function(t){ return t.stream_id; }).map(function(t){ return t.stream_id; }));
     return { name: s.display_name||'—', tasksDone: myTasks.length, streamsSorted: streams.size, shiftsWorked: myShifts.length, totalHours: totalHours, avgTasks: myShifts.length?myTasks.length/myShifts.length:0, avgHours: myShifts.length?totalHours/myShifts.length:0 };
   }).sort(function(a,b){ return b.tasksDone-a.tasksDone; });
