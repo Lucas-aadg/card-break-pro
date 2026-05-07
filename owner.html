@@ -2440,29 +2440,22 @@ async function loadHome() {
 async function loadEmpireKpis() {
   const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const monthStart = today.slice(0, 7) + '-01';
-  const [todayR, monthR, activeR, payrollR] = await Promise.all([
+  const [todayR, monthR, activeR] = await Promise.all([
     sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', today),
-    sb.from('streams').select('final_sales,total_product_cost,total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed').gte('break_date', monthStart),
-    sb.from('schedules').select('id').eq('org_id', currentProfile.org_id).eq('status', 'in_progress'),
-    sb.from('payroll_runs').select('total_paid').eq('org_id', currentProfile.org_id).gte('created_at', monthStart)
+    sb.from('streams').select('final_sales').eq('org_id', currentProfile.org_id).eq('status', 'closed').gte('break_date', monthStart),
+    sb.from('schedules').select('id').eq('org_id', currentProfile.org_id).eq('status', 'in_progress')
   ]);
   const todayRev = (todayR.data || []).reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
   const todayProfit = (todayR.data || []).reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0)-(parseFloat(x.total_product_cost)||0)-(parseFloat(x.total_other_costs)||0); }, 0);
   const monthRev = (monthR.data || []).reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
-  const monthCosts = (monthR.data || []).reduce(function(s,x){ return s+(parseFloat(x.total_product_cost)||0)+(parseFloat(x.total_other_costs)||0); }, 0);
-  const monthPayroll = (payrollR.data || []).reduce(function(s,x){ return s+(parseFloat(x.total_paid)||0); }, 0);
-  const monthProfit = monthRev - monthCosts - monthPayroll;
   const liveCount = (activeR.data || []).length;
   const el = document.getElementById('empireKpis');
   if (!el) return;
   const profitColor = todayProfit >= 0 ? 'var(--green)' : 'var(--red)';
-  const monthProfitColor = monthProfit >= 0 ? 'var(--green)' : 'var(--red)';
-  const monthName = new Date().toLocaleString('default',{month:'long'});
   el.innerHTML = [
     { label:"Today's Revenue", value: fmt(todayRev), sub:'closed streams today', color:'var(--primary)' },
-    { label:"Today's Profit", value: fmt(todayProfit), sub:'after box cost & fees', color: profitColor },
-    { label:'Month Revenue', value: fmt(monthRev), sub: monthName, color:'var(--primary)' },
-    { label:'Month Profit', value: fmt(monthProfit), sub: monthPayroll > 0 ? 'after costs + ' + fmt(monthPayroll) + ' payroll' : 'after all costs', color: monthProfitColor },
+    { label:"Today's Profit", value: fmt(todayProfit), sub:'after all costs', color: profitColor },
+    { label:'Month Revenue', value: fmt(monthRev), sub: new Date().toLocaleString('default',{month:'long'}), color:'var(--primary)' },
     { label:'Live Streams', value: liveCount, sub: liveCount === 1 ? '1 stream in progress' : liveCount + ' streams in progress', color:'var(--green)' }
   ].map(function(k) {
     return '<div class="empire-kpi" style="--kpi-color:' + k.color + '"><div class="empire-kpi-label">' + escHtml(k.label) + '</div><div class="empire-kpi-value">' + k.value + '</div><div class="empire-kpi-sub">' + escHtml(k.sub) + '</div></div>';
@@ -5577,6 +5570,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ── Payroll ───────────────────────────────────────────────
 let prCurrentResults = [];
 let prCurrentRange = { from: null, to: null, label: '' };
+let prCurrentStreamProfit = null;
 
 function getPayrollRange(preset) {
   const now = new Date();
@@ -5642,7 +5636,7 @@ async function loadPayroll() {
             });
             if (error) throw error;
             showGlobalSuccess('Payroll of ' + fmt(total) + ' marked as paid!');
-            await Promise.all([loadPayrollHistory(), loadEmpireKpis()]);
+            await loadPayrollHistory();
           } catch (err) {
             showGlobalError('Failed to record payroll: ' + escHtml(err.message));
           }
@@ -5763,6 +5757,17 @@ async function runPayroll() {
     } else {
       warningEl.style.display = 'none';
     }
+
+    // Fetch stream profit for this period to power "Net Profit After Payroll"
+    const { data: periodStreams } = await sb.from('streams')
+      .select('final_sales,total_product_cost,total_other_costs')
+      .eq('org_id', currentProfile.org_id)
+      .eq('status', 'closed')
+      .gte('break_date', prCurrentRange.from)
+      .lte('break_date', prCurrentRange.to);
+    prCurrentStreamProfit = (periodStreams || []).reduce(function(s, x) {
+      return s + (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
+    }, 0);
 
     renderPayrollResults();
   } catch (err) {
@@ -6078,7 +6083,15 @@ function renderPayrollResults() {
   document.getElementById('prTotalPayroll').textContent = fmt(grandTotal);
   document.getElementById('prBreakerTotal').textContent = fmt(bTotal);
   document.getElementById('prSorterTotal').textContent = fmt(sTotal);
-  document.getElementById('prNetAfterPayroll').textContent = '—';
+  const netEl = document.getElementById('prNetAfterPayroll');
+  if (prCurrentStreamProfit !== null) {
+    const net = prCurrentStreamProfit - grandTotal;
+    netEl.textContent = fmt(net);
+    netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+  } else {
+    netEl.textContent = '—';
+    netEl.style.color = 'var(--green)';
+  }
 
   document.getElementById('prResultsWrap').style.display = '';
   document.getElementById('prEmptyState').style.display = 'none';
