@@ -2274,6 +2274,11 @@ function escHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+// Returns YYYY-MM-DD in local time (avoids UTC offset flipping the date after ~5-8pm US)
+function ld(date) {
+  const d = date || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 
 function fmtTime(dateOrStr) {
   if (!dateOrStr) return '—';
@@ -2591,9 +2596,10 @@ async function loadInsights() {
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = ld();
     const monthStart = today.slice(0, 7) + '-01';
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const _30ago = new Date(); _30ago.setDate(_30ago.getDate() - 30);
+    const thirtyDaysAgo = ld(_30ago);
 
     const [streamsR, breaksR, productsR, invLogR] = await Promise.all([
       sb.from('streams').select('id,breaker_id,final_sales,total_product_cost,total_other_costs,break_count,break_date,channel_id').eq('org_id', currentProfile.org_id).eq('status','closed').gte('break_date', thirtyDaysAgo),
@@ -3694,11 +3700,11 @@ async function loadInvLog() {
   const now = new Date();
   let fromDate = null;
   if (period === 'today') {
-    fromDate = now.toISOString().slice(0, 10);
+    fromDate = ld(now);
   } else if (period === 'week') {
     const d = new Date(now);
     d.setDate(d.getDate() - d.getDay());
-    fromDate = d.toISOString().slice(0, 10);
+    fromDate = ld(d);
   } else if (period === 'month') {
     fromDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
   } else if (period === 'year') {
@@ -4132,8 +4138,9 @@ function invDeleteProduct(id) {
 //  HISTORY TAB
 // ══════════════════════════════════════════════════════════
 function setupHistory() {
-  const today = new Date().toISOString().slice(0, 10);
-  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const today = ld();
+  const _ma = new Date(); _ma.setDate(_ma.getDate() - 30);
+  const monthAgo = ld(_ma);
   document.getElementById('histDateFrom').value = monthAgo;
   document.getElementById('histDateTo').value = today;
 
@@ -5566,25 +5573,25 @@ let prCurrentRange = { from: null, to: null, label: '' };
 
 function getPayrollRange(preset) {
   const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = ld(now);
   let from, to = todayStr, label;
 
   if (preset === 'this_week') {
     const d = new Date(now); d.setDate(d.getDate() - d.getDay());
-    from = d.toISOString().slice(0, 10);
+    from = ld(d);
     label = 'This Week (' + from + ' – ' + to + ')';
   } else if (preset === 'last_two_weeks') {
     const d = new Date(now); d.setDate(d.getDate() - 13);
-    from = d.toISOString().slice(0, 10);
+    from = ld(d);
     label = 'Last 2 Weeks (' + from + ' – ' + to + ')';
   } else if (preset === 'this_month') {
     from = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
     label = 'This Month (' + from + ' – ' + to + ')';
   } else if (preset === 'last_month') {
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    from = lm.toISOString().slice(0, 10);
+    from = ld(lm);
     const lme = new Date(now.getFullYear(), now.getMonth(), 0);
-    to = lme.toISOString().slice(0, 10);
+    to = ld(lme);
     label = 'Last Month (' + from + ' – ' + to + ')';
   } else {
     from = document.getElementById('prFrom').value;
@@ -6430,7 +6437,7 @@ function renderCalendar() {
 
   const firstDay = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ld();
 
   // Empty cells
   for (let i = 0; i < firstDay; i++) {
@@ -6470,7 +6477,7 @@ function renderCalendar() {
 function renderSchedTable() {
   const tbody = document.getElementById('schedTableBody');
   tbody.innerHTML = '';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ld();
   const filterVal = (document.getElementById('ownerSchedFilterInput') ? document.getElementById('ownerSchedFilterInput').value : '').toLowerCase().trim();
   let upcoming = allSchedules.filter(function (s) { return s.scheduled_date >= today; });
   if (filterVal) {
