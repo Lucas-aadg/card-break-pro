@@ -4487,6 +4487,22 @@ async function confirmEditStream() {
 
     if (error) throw error;
 
+    // Sync each break's net_profit to use the actual fee rate from final_sales
+    try {
+      const { data: sBreaks } = await sb.from('breaks')
+        .select('id, revenue, total_product_cost, other_costs')
+        .eq('stream_id', editingStreamId).eq('org_id', currentProfile.org_id);
+      const totalRev = (sBreaks || []).reduce(function(s, b){ return s + (parseFloat(b.revenue)||0); }, 0);
+      if (totalRev > 0) {
+        const actualFeeRate = Math.max(0, (totalRev - finalSales) / totalRev);
+        for (const b of (sBreaks || [])) {
+          const rev = parseFloat(b.revenue) || 0;
+          const np = rev - (parseFloat(b.total_product_cost)||0) - (rev * actualFeeRate) - (parseFloat(b.other_costs)||0);
+          await sb.from('breaks').update({ net_profit: np }).eq('id', b.id).eq('org_id', currentProfile.org_id);
+        }
+      }
+    } catch (syncErr) { console.warn('Break profit sync failed:', syncErr); }
+
     // Create sort task if one doesn't already exist for this stream
     const { data: existing } = await sb.from('sort_tasks').select('id').eq('stream_id', editingStreamId).eq('org_id', currentProfile.org_id).maybeSingle();
     if (!existing) {
