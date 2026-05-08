@@ -5363,8 +5363,9 @@ function psSelectCard(cardId, groupPrefix) {
 }
 
 function psBreakerType(type) {
-  document.getElementById('psb-' + type.replace('_', '-')).checked = true;
-  psSelectCard('psb-' + type.replace('_', '-') + '-card', 'psb-');
+  const slug = type.replace(/_/g, '-');
+  document.getElementById('psb-' + slug).checked = true;
+  psSelectCard('psb-' + slug + '-card', 'psb-');
   // Show/hide relevant fields
   ['ps-commission-rate-group', 'ps-hourly-rate-group', 'ps-salary-group', 'ps-per-break-rate-group'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
@@ -5391,8 +5392,9 @@ function psBreakerType(type) {
 }
 
 function psSorterType(type) {
-  document.getElementById('pss-' + type.replace('_', '-')).checked = true;
-  psSelectCard('pss-' + type.replace('_', '-') + '-card', 'pss-');
+  const slug = type.replace(/_/g, '-');
+  document.getElementById('pss-' + slug).checked = true;
+  psSelectCard('pss-' + slug + '-card', 'pss-');
   ['pss-hourly-rate-group', 'pss-per-break-rate-group'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });

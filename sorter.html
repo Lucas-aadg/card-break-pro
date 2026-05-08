@@ -350,16 +350,19 @@ async function loadSortQueue() {
 
         try {
           if (action === 'start') {
-            await sb.from('sort_tasks').update({
+            const { error: startErr } = await sb.from('sort_tasks').update({
               status: 'in_progress',
               sorter_id: currentUser.id
             }).eq('id', taskId).eq('org_id', currentProfile.org_id);
+            if (startErr) throw startErr;
             showSuccess('Started sorting. Mark complete when done.');
           } else if (action === 'complete') {
-            await sb.from('sort_tasks').update({
+            const { error: doneErr } = await sb.from('sort_tasks').update({
               status: 'completed',
+              sorter_id: currentUser.id,
               completed_at: new Date().toISOString()
             }).eq('id', taskId).eq('org_id', currentProfile.org_id);
+            if (doneErr) throw doneErr;
             showSuccess('Stream marked as sorted and shipped!');
           }
           await loadSortQueue();
