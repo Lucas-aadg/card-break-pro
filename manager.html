@@ -506,8 +506,8 @@
       </div>
       <div class="tbl-wrap">
         <table class="data-table">
-          <thead><tr><th>Stream Key</th><th>Break Date</th><th>Breaks</th><th>Status</th><th>Assigned To</th><th>Completed At</th></tr></thead>
-          <tbody id="sortingTableBody"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+          <thead><tr><th>Stream Key</th><th>Break Date</th><th>Breaks</th><th>Status</th><th>Assigned To</th><th>Completed At</th><th></th></tr></thead>
+          <tbody id="sortingTableBody"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -623,6 +623,23 @@
     <div class="modal-btn-row" style="margin-top:1.5rem;">
       <button class="btn btn-outline" id="editClockCancelBtn">Cancel</button>
       <button class="btn btn-primary" id="editClockSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- COMPLETE SORT MODAL -->
+<div class="modal-overlay" id="completeSortModal">
+  <div class="modal" style="max-width:380px;">
+    <h2>Mark Sort as Complete</h2>
+    <input type="hidden" id="completeSortTaskId" />
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Stream: <strong id="completeSortStreamKey" style="color:var(--text);"></strong></p>
+    <div class="form-group">
+      <label for="completeSortSorterSelect">Assign to Sorter</label>
+      <select id="completeSortSorterSelect"><option value="">— select sorter —</option></select>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" onclick="document.getElementById('completeSortModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmCompleteSort()">Mark Complete</button>
     </div>
   </div>
 </div>
@@ -802,6 +819,28 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('settSaveProfile').addEventListener('click', saveProfile);
   document.getElementById('settSaveEmail').addEventListener('click', saveEmail);
   document.getElementById('settSavePassword').addEventListener('click', savePassword);
+
+  // Performance toggle buttons (wired once here to avoid listener stacking)
+  document.getElementById('perfBreakerBtn').addEventListener('click', function () {
+    if (perfView === 'breaker') return;
+    perfView = 'breaker';
+    document.getElementById('perfBreakerBtn').className = 'btn btn-primary btn-sm';
+    document.getElementById('perfSorterBtn').className = 'btn btn-outline btn-sm';
+    document.getElementById('perfBreakerWrap').style.display = '';
+    document.getElementById('perfSorterWrap').style.display = 'none';
+    document.getElementById('perfPanelTitle').textContent = 'Breaker Performance (All Time)';
+    loadBreakerPerformance();
+  });
+  document.getElementById('perfSorterBtn').addEventListener('click', function () {
+    if (perfView === 'sorter') return;
+    perfView = 'sorter';
+    document.getElementById('perfSorterBtn').className = 'btn btn-primary btn-sm';
+    document.getElementById('perfBreakerBtn').className = 'btn btn-outline btn-sm';
+    document.getElementById('perfSorterWrap').style.display = '';
+    document.getElementById('perfBreakerWrap').style.display = 'none';
+    document.getElementById('perfPanelTitle').textContent = 'Sorter Performance (All Time)';
+    loadSorterPerformance();
+  });
 
   init();
 });
@@ -1316,13 +1355,12 @@ function renderInventoryTable(filter) {
   if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No products found.</td></tr>'; return; }
   tbody.innerHTML = '';
   list.forEach(function(p) {
-    const avgDisplay = p.unit_cost ? fmt(p.unit_cost) : '—';
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td><strong>' + escHtml(p.name) + '</strong></td>' +
       '<td>' + escHtml(p.category||'—') + '</td>' +
-      '<td>' + fmt(p.cost_per_unit||0) + '</td>' +
-      '<td style="color:var(--muted);">' + avgDisplay + '</td>' +
+      '<td>' + fmt(p.unit_cost||0) + '</td>' +
+      '<td style="color:var(--muted);">—</td>' +
       '<td>' + (p.current_stock || 0) + '</td>' +
       '<td><div class="btn-row">' +
         '<button class="btn-sm btn-signout" onclick="invOpenEdit(\'' + p.id + '\')">Edit</button>' +
@@ -1362,7 +1400,7 @@ async function invHandleSave() {
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     const { data: inserted, error } = await sb.from('products').insert({
-      org_id: currentProfile.org_id, name, cost_per_unit: cost, unit_cost: trackAvg ? cost : null,
+      org_id: currentProfile.org_id, name, unit_cost: cost,
       category: category || null, current_stock: stock
     }).select('id').single();
     if (error) throw error;
@@ -1394,7 +1432,7 @@ function invOpenEdit(id) {
   if (!p) return;
   document.getElementById('pm-id').value = p.id;
   document.getElementById('pm-name').value = p.name || '';
-  document.getElementById('pm-cost').value = p.cost_per_unit || '';
+  document.getElementById('pm-cost').value = p.unit_cost || '';
   document.getElementById('pm-category').value = p.category || '';
   document.getElementById('pm-stock').value = p.current_stock || 0;
   document.getElementById('pm-restock').value = '';
@@ -1436,7 +1474,7 @@ async function pmHandleSave() {
   btn.disabled = true; btn.textContent = 'Saving…';
 
   try {
-    const updates = { name, cost_per_unit: cost, category: category || null };
+    const updates = { name, unit_cost: cost, category: category || null };
     let newStock = stock;
 
     if (restock > 0) {
@@ -1562,7 +1600,7 @@ async function loadSorting() {
     }
     const filtered = sortingFilter === 'all' ? allTasks : allTasks.filter(function(t){ return t.status === sortingFilter; });
     tbody.innerHTML = '';
-    if (!filtered.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No sort tasks found.</td></tr>'; return; }
+    if (!filtered.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No sort tasks found.</td></tr>'; return; }
     filtered.forEach(function(task){
       const s = streamMap[task.stream_id] || {};
       const statusBadge = task.status === 'completed' ? '<span class="badge badge-green">Completed</span>'
@@ -1570,6 +1608,9 @@ async function loadSorting() {
         : '<span class="badge badge-gray">Pending</span>';
       const sorterName = task.sorter_id && sorterMap[task.sorter_id] ? escHtml(sorterMap[task.sorter_id]) : '<span style="color:var(--muted);">Unassigned</span>';
       const completedAt = task.completed_at ? new Date(task.completed_at).toLocaleString() : '—';
+      const actionBtn = task.status !== 'completed'
+        ? '<button onclick="openCompleteSort(\'' + task.id + '\',\'' + escHtml(s.stream_key||'') + '\')" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:var(--green);border-radius:6px;padding:0.2rem 0.55rem;font-size:0.72rem;font-weight:600;cursor:pointer;">✓ Complete</button>'
+        : '';
       const tr = document.createElement('tr');
       tr.innerHTML =
         '<td style="font-weight:600;">' + escHtml(s.stream_key||'—') + '</td>' +
@@ -1577,11 +1618,44 @@ async function loadSorting() {
         '<td style="text-align:center;">' + (s.break_count||'—') + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td>' + sorterName + '</td>' +
-        '<td style="font-size:0.82rem;color:var(--muted);">' + completedAt + '</td>';
+        '<td style="font-size:0.82rem;color:var(--muted);">' + completedAt + '</td>' +
+        '<td>' + actionBtn + '</td>';
       tbody.appendChild(tr);
     });
   } catch(err) {
-    document.getElementById('sortingTableBody').innerHTML = '<tr class="empty-row"><td colspan="6">Failed to load.</td></tr>';
+    document.getElementById('sortingTableBody').innerHTML = '<tr class="empty-row"><td colspan="7">Failed to load.</td></tr>';
+  }
+}
+
+function openCompleteSort(taskId, streamKey) {
+  document.getElementById('completeSortTaskId').value = taskId;
+  document.getElementById('completeSortStreamKey').textContent = streamKey;
+  const sel = document.getElementById('completeSortSorterSelect');
+  sel.innerHTML = '<option value="">— select sorter —</option>';
+  allProfiles.filter(function(p){ return p.role === 'sorter'; }).forEach(function(p){
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.display_name;
+    sel.appendChild(opt);
+  });
+  document.getElementById('completeSortModal').classList.add('active');
+}
+
+async function confirmCompleteSort() {
+  const taskId = document.getElementById('completeSortTaskId').value;
+  const sorterId = document.getElementById('completeSortSorterSelect').value;
+  if (!sorterId) { showGlobalError('Please select a sorter.'); return; }
+  try {
+    const { error } = await sb.from('sort_tasks').update({
+      status: 'completed',
+      sorter_id: sorterId,
+      completed_at: new Date().toISOString()
+    }).eq('id', taskId).eq('org_id', currentProfile.org_id);
+    if (error) throw error;
+    document.getElementById('completeSortModal').classList.remove('active');
+    showGlobalSuccess('Sort task marked complete.');
+    await loadSorting();
+  } catch(err) {
+    showGlobalError('Failed to complete task: ' + escHtml(err.message));
   }
 }
 
@@ -1714,7 +1788,7 @@ async function loadHistory() {
       '<td>' + fmt(b.revenue) + '</td>' +
       '<td>' + fmt(b.total_product_cost) + '</td>' +
       '<td style="color:' + (profit>=0?'var(--green)':'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>' +
-      '<td style="text-align:center;">' + (b.total_units_used||0) + '</td>';
+      '<td style="text-align:center;">' + ((b.products_used||[]).reduce(function(s,p){ return s+(p.qty||0); }, 0) || b.total_units_used || 0) + '</td>';
     tbody.appendChild(tr);
   });
 }
@@ -1760,31 +1834,7 @@ async function loadProductRoi() {
 
 let perfView = 'breaker';
 
-function setupPerformance() {
-  document.getElementById('perfBreakerBtn').addEventListener('click', function () {
-    if (perfView === 'breaker') return;
-    perfView = 'breaker';
-    document.getElementById('perfBreakerBtn').className = 'btn btn-primary btn-sm';
-    document.getElementById('perfSorterBtn').className = 'btn btn-outline btn-sm';
-    document.getElementById('perfBreakerWrap').style.display = '';
-    document.getElementById('perfSorterWrap').style.display = 'none';
-    document.getElementById('perfPanelTitle').textContent = 'Breaker Performance (All Time)';
-    loadBreakerPerformance();
-  });
-  document.getElementById('perfSorterBtn').addEventListener('click', function () {
-    if (perfView === 'sorter') return;
-    perfView = 'sorter';
-    document.getElementById('perfSorterBtn').className = 'btn btn-primary btn-sm';
-    document.getElementById('perfBreakerBtn').className = 'btn btn-outline btn-sm';
-    document.getElementById('perfSorterWrap').style.display = '';
-    document.getElementById('perfBreakerWrap').style.display = 'none';
-    document.getElementById('perfPanelTitle').textContent = 'Sorter Performance (All Time)';
-    loadSorterPerformance();
-  });
-}
-
 async function loadPerformance() {
-  setupPerformance();
   perfView = 'breaker';
   document.getElementById('perfBreakerBtn').className = 'btn btn-primary btn-sm';
   document.getElementById('perfSorterBtn').className = 'btn btn-outline btn-sm';
