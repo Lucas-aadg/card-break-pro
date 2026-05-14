@@ -2178,6 +2178,20 @@
   </div>
 </div>
 
+<!-- CALENDAR SHIFT POPUP -->
+<div id="calPopup" style="display:none;position:fixed;z-index:600;background:#10101e;border:1px solid rgba(79,110,247,0.35);border-radius:12px;padding:1rem;min-width:230px;box-shadow:0 12px 40px rgba(0,0,0,0.7);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+    <div id="calPopupName" style="font-size:0.88rem;font-weight:800;color:var(--text);"></div>
+    <button onclick="calHidePopup()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;padding:0 0.2rem;">✕</button>
+  </div>
+  <div id="calPopupDetails" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.85rem;line-height:1.7;"></div>
+  <div style="display:flex;gap:0.4rem;">
+    <button onclick="calPopupEdit()" style="flex:1;background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);color:var(--primary);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">✏ Edit</button>
+    <button onclick="calPopupCopy()" style="flex:1;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);color:var(--green);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">⧉ Copy</button>
+    <button onclick="calPopupRemove()" style="flex:1;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:var(--red);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">✕ Remove</button>
+  </div>
+</div>
+
 <!-- EDIT SHIFT MODAL -->
 <div class="modal-overlay" id="editShiftModal">
   <div class="modal" style="max-width:420px;">
@@ -2991,7 +3005,7 @@ function setupTabNav() {
   });
 
   // Close dropdowns when clicking outside
-  document.addEventListener('click', function () { closeAllDropdowns(); });
+  document.addEventListener('click', function (e) { closeAllDropdowns(); if (!document.getElementById('calPopup').contains(e.target)) calHidePopup(); });
 
   // Initial active state
   updateNavActiveState('home');
@@ -6538,16 +6552,88 @@ function renderCalendar() {
     dayShifts.forEach(function (s) {
       const chip = document.createElement('div');
       const isDone = s.status === 'completed';
-      chip.style.cssText = 'font-size:0.65rem;font-weight:600;border-radius:4px;padding:2px 4px;margin-bottom:2px;background:' +
-        (isDone ? 'rgba(34,197,94,0.2)' : 'rgba(79,110,247,0.2)') + ';color:' +
-        (isDone ? 'var(--green)' : 'var(--primary)') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      const isActive = s.status === 'in_progress';
+      const chipColor = isDone ? 'rgba(34,197,94,0.2)' : isActive ? 'rgba(245,158,11,0.2)' : 'rgba(79,110,247,0.2)';
+      const chipText = isDone ? 'var(--green)' : isActive ? 'var(--yellow)' : 'var(--primary)';
+      chip.style.cssText = 'font-size:0.65rem;font-weight:600;border-radius:4px;padding:2px 4px;margin-bottom:2px;background:' + chipColor + ';color:' + chipText + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:opacity 0.15s;';
       chip.textContent = (s.scheduled_time ? s.scheduled_time.slice(0,5) + ' ' : '') + (schedDisplayName(s) || '');
       chip.title = (schedDisplayName(s) || '') + (s.stream_key ? ' — ' + s.stream_key : '');
+      chip.addEventListener('click', function(e) { e.stopPropagation(); calShowPopup(s.id, chip); });
+      chip.addEventListener('mouseenter', function() { chip.style.opacity = '0.75'; });
+      chip.addEventListener('mouseleave', function() { chip.style.opacity = '1'; });
       cell.appendChild(chip);
     });
 
     grid.appendChild(cell);
   }
+}
+
+// ── Calendar shift popup ─────────────────────────────────
+let calPopupShiftId = null;
+
+function calShowPopup(shiftId, anchorEl) {
+  const s = allSchedules.find(function(x){ return x.id === shiftId; });
+  if (!s) return;
+  calPopupShiftId = shiftId;
+  const popup = document.getElementById('calPopup');
+  document.getElementById('calPopupName').textContent = schedDisplayName(s) || '—';
+  const lines = [];
+  if (s.scheduled_date) lines.push('📅 ' + s.scheduled_date);
+  if (s.scheduled_time) lines.push('🕐 ' + s.scheduled_time.slice(0,5));
+  if (s.stream_key) lines.push('🔑 ' + escHtml(s.stream_key));
+  if (s.notes) lines.push('📝 ' + escHtml(s.notes));
+  lines.push(s.status === 'completed' ? '✅ Completed' : s.status === 'in_progress' ? '⏳ In Progress' : '📌 Scheduled');
+  document.getElementById('calPopupDetails').innerHTML = lines.join('<br>');
+  popup.style.display = 'block';
+  const rect = anchorEl.getBoundingClientRect();
+  const pw = 240, ph = 170;
+  let left = rect.left, top = rect.bottom + 6;
+  if (left + pw > window.innerWidth - 16) left = window.innerWidth - pw - 16;
+  if (top + ph > window.innerHeight - 16) top = rect.top - ph - 6;
+  popup.style.left = Math.max(8, left) + 'px';
+  popup.style.top = Math.max(8, top) + 'px';
+}
+
+function calHidePopup() {
+  document.getElementById('calPopup').style.display = 'none';
+  calPopupShiftId = null;
+}
+
+function calPopupEdit() {
+  const s = allSchedules.find(function(x){ return x.id === calPopupShiftId; });
+  if (!s) return;
+  calHidePopup();
+  document.getElementById('editSchedId').value = s.id;
+  document.getElementById('editSchedDate').value = s.scheduled_date || '';
+  document.getElementById('editSchedTime').value = s.scheduled_time || '';
+  document.getElementById('editSchedStreamKey').value = s.stream_key || '';
+  document.getElementById('editSchedNotes').value = s.notes || '';
+  document.getElementById('editSchedModal').classList.add('active');
+}
+
+function calPopupCopy() {
+  const s = allSchedules.find(function(x){ return x.id === calPopupShiftId; });
+  if (!s) return;
+  calHidePopup();
+  const personId = s.breaker_id || s.sorter_id;
+  if (personId) document.getElementById('schedBreaker').value = personId;
+  document.getElementById('schedDate').value = '';
+  document.getElementById('schedTime').value = s.scheduled_time || '';
+  document.getElementById('schedStreamKey').value = s.stream_key || '';
+  document.getElementById('schedNotes').value = s.notes || '';
+  document.getElementById('schedDate').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('schedDate').focus();
+  showGlobalSuccess('Shift details copied — pick a new date and click Add Shift.');
+}
+
+function calPopupRemove() {
+  const shiftId = calPopupShiftId;
+  calHidePopup();
+  openConfirm('Delete Shift', 'Permanently delete this scheduled shift?', async function() {
+    await sb.from('schedules').delete().eq('id', shiftId).eq('org_id', currentProfile.org_id);
+    await loadSchedules();
+    showGlobalSuccess('Shift deleted.');
+  });
 }
 
 function renderSchedTable() {
