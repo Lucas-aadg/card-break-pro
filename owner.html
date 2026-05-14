@@ -1562,6 +1562,21 @@
        TAB: SORTING
   ════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-sorting">
+
+    <!-- Backfill banner — shown when there are unassigned pending/in-progress tasks -->
+    <div id="sortBackfillBanner" style="display:none;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:0.82rem;font-weight:700;color:var(--yellow);margin-bottom:0.2rem;">⚠ Unassigned Sort Tasks</div>
+        <div id="sortBackfillMsg" style="font-size:0.78rem;color:var(--muted);"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+        <select id="backfillSorterSelect" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:0.82rem;padding:0.4rem 0.75rem;outline:none;">
+          <option value="">— assign sorter —</option>
+        </select>
+        <button onclick="runBackfill()" style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);color:var(--yellow);border-radius:7px;padding:0.4rem 0.9rem;font-size:0.8rem;font-weight:700;cursor:pointer;white-space:nowrap;">Mark All Complete</button>
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">Sort Queue</div>
@@ -7146,10 +7161,73 @@ async function loadSorting() {
         '<td style="text-align:center;white-space:nowrap;">' + completeBtn + '<button onclick="deleteSortTask(\'' + task.id + '\',\'' + escHtml(s.stream_key || task.id) + '\')" title="Remove sort task" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
       tbody.appendChild(tr);
     });
+    // Backfill banner: show if any tasks are pending/in_progress OR completed with no sorter assigned
+    const unassigned = allTasks.filter(function(t) { return t.status !== 'completed' || !t.sorter_id; });
+    const banner = document.getElementById('sortBackfillBanner');
+    const msg = document.getElementById('sortBackfillMsg');
+    const sel = document.getElementById('backfillSorterSelect');
+    if (banner && unassigned.length > 0) {
+      const pending = unassigned.filter(function(t){ return t.status !== 'completed'; }).length;
+      const noSorter = unassigned.filter(function(t){ return t.status === 'completed' && !t.sorter_id; }).length;
+      let msgParts = [];
+      if (pending) msgParts.push(pending + ' task' + (pending !== 1 ? 's' : '') + ' still pending');
+      if (noSorter) msgParts.push(noSorter + ' completed with no sorter assigned');
+      if (msg) msg.textContent = msgParts.join(' · ') + ' — assign a sorter and mark all complete so payroll counts correctly.';
+      if (sel) {
+        sel.innerHTML = '<option value="">— assign sorter —</option>';
+        allProfiles.filter(function(p){ return p.role === 'sorter'; }).forEach(function(p){
+          const opt = document.createElement('option');
+          opt.value = p.id; opt.textContent = p.display_name;
+          sel.appendChild(opt);
+        });
+      }
+      banner.style.display = 'flex';
+    } else if (banner) {
+      banner.style.display = 'none';
+    }
   } catch (err) {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Failed to load sort tasks.</td></tr>';
     console.error(err);
   }
+}
+
+async function runBackfill() {
+  const sorterId = document.getElementById('backfillSorterSelect').value;
+  if (!sorterId) { showGlobalError('Select a sorter to assign.'); return; }
+  const sorter = allProfiles.find(function(p){ return p.id === sorterId; });
+  const sorterName = sorter ? sorter.display_name : 'selected sorter';
+
+  openConfirm(
+    'Backfill Sort History',
+    'Mark ALL pending / in-progress / unassigned sort tasks as completed and assign them to ' + sorterName + '? This fixes payroll for all historical tasks.',
+    async function() {
+      showLoading('Backfilling…');
+      try {
+        const now = new Date().toISOString();
+
+        // Fix all pending + in_progress tasks → completed
+        let q1 = sb.from('sort_tasks').update({
+          status: 'completed',
+          sorter_id: sorterId,
+          completed_at: now
+        }).eq('org_id', currentProfile.org_id).in('status', ['pending', 'in_progress']);
+        await q1;
+
+        // Fix completed tasks with no sorter_id
+        let q2 = sb.from('sort_tasks').update({
+          sorter_id: sorterId
+        }).eq('org_id', currentProfile.org_id).eq('status', 'completed').is('sorter_id', null);
+        await q2;
+
+        hideLoading();
+        showGlobalSuccess('All historical sort tasks assigned to ' + sorterName + '. Payroll will now count them correctly.');
+        await loadSorting();
+      } catch(err) {
+        hideLoading();
+        showGlobalError('Backfill failed: ' + escHtml(err.message));
+      }
+    }
+  );
 }
 
 async function deleteSortTask(taskId, streamKey) {
