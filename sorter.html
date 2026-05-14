@@ -103,6 +103,30 @@
 
     /* TODAY BADGE */
     .today-badge { background: var(--primary); color: #fff; font-size: 0.65rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 0.5rem; }
+
+    /* ── MY SCHEDULE WEEK GRID ── */
+    .wg-wrap{overflow-x:auto;}
+    .wg-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:560px;}
+    .wg-table th{text-align:center;font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);padding:0.65rem 0.3rem;border-bottom:2px solid var(--border);}
+    .wg-table th.wg-today-hd{color:var(--primary);}
+    .wg-table td{vertical-align:top;padding:3px;border:1px solid rgba(79,110,247,0.06);}
+    .wg-day-cell{min-height:82px;position:relative;}
+    .wg-day-cell.wg-today-cell{background:rgba(79,110,247,0.04);}
+    .wg-nav-btn{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:0.38rem 0.85rem;cursor:pointer;font-size:0.82rem;font-weight:600;transition:border-color 0.15s,color 0.15s;}
+    .wg-nav-btn:hover{border-color:var(--primary);color:var(--primary);}
+    .my-sched-chip{background:linear-gradient(135deg,rgba(79,110,247,0.18),rgba(99,102,241,0.1));border:1px solid rgba(79,110,247,0.35);border-radius:8px;padding:8px 10px;font-size:0.78rem;position:relative;overflow:hidden;margin-bottom:4px;}
+    .my-sched-chip.msc-done{background:linear-gradient(135deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08));border-color:rgba(34,197,94,0.4);}
+    .my-sched-chip.msc-live{background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(245,158,11,0.08));border-color:rgba(245,158,11,0.4);}
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); display: none; align-items: center; justify-content: center; z-index: 999; padding: 1rem; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
+    .modal h2 { font-size: 1.05rem; margin-bottom: 1.25rem; }
+    .modal-btn-row { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+    .modal-btn-row .btn { flex: 1; }
+    .form-group { margin-bottom: 1rem; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem; }
+    input, select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 0.9rem; padding: 0.6rem 0.85rem; outline: none; transition: border-color 0.2s; font-family: inherit; }
+    input:focus, select:focus { border-color: var(--primary); }
   </style>
 </head>
 <body>
@@ -162,6 +186,22 @@
 
   <!-- ── MY SHIFTS TAB ── -->
   <div class="tab-content" id="tab-shifts">
+    <!-- MY SCHEDULE WEEK VIEW -->
+    <div class="panel" style="padding:0;overflow:hidden;margin-bottom:1.25rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.4rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.12);flex-wrap:wrap;gap:0.5rem;">
+        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--primary);">My Schedule</div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <button class="wg-nav-btn" id="mySchedPrev" style="padding:0.3rem 0.7rem;">&#8592;</button>
+          <span id="mySchedWeekLabel" style="font-size:0.82rem;font-weight:700;color:var(--text);min-width:170px;text-align:center;"></span>
+          <button class="wg-nav-btn" id="mySchedNext" style="padding:0.3rem 0.7rem;">&#8594;</button>
+          <button class="wg-nav-btn" id="mySchedToday" style="font-size:0.72rem;padding:0.28rem 0.6rem;">Today</button>
+        </div>
+      </div>
+      <div id="myScheduleWeekView" style="padding:0.85rem 0.75rem;">
+        <div style="color:var(--muted);font-size:0.85rem;text-align:center;padding:1.5rem;">Loading&#8230;</div>
+      </div>
+    </div>
+
     <div id="shiftsLoading" style="color:var(--muted);font-size:0.85rem;padding:2rem;text-align:center;">Loading shifts…</div>
     <div id="shiftsRoot" style="display:none;">
       <!-- Upcoming -->
@@ -265,7 +305,7 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     hideMessages();
     if (btn.dataset.tab === 'queue') loadSortQueue();
-    if (btn.dataset.tab === 'shifts') loadShifts();
+    if (btn.dataset.tab === 'shifts') { loadShifts(); loadMyScheduleView(); }
     if (btn.dataset.tab === 'pay') loadSorterPay();
   });
 });
@@ -640,6 +680,8 @@ async function initAuth() {
     await checkTodayShift();
     loadNotifCount();
     setInterval(loadNotifCount, 60000);
+    setupMySchedNav();
+    loadMyScheduleView();
 
     hideLoading();
   } catch (err) {
@@ -837,6 +879,141 @@ async function loadSorterPay() {
     showError('Failed to load pay summary. Please refresh and try again.');
   }
 }
+
+// ── My Schedule Week View ─────────────────────────────────
+let mySchedWeekRef = new Date();
+let srtAllProfiles = [];
+
+async function loadMyScheduleView() {
+  if (!srtAllProfiles.length) {
+    const { data } = await sb.from('profiles').select('id, display_name, role').eq('org_id', currentProfile.org_id).neq('id', currentUser.id);
+    srtAllProfiles = data || [];
+  }
+  renderMyWeekGrid();
+}
+
+function getWeekDaysSrt(ref) {
+  const d = new Date(ref);
+  const day = d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return Array.from({length:7}, function(_,i){ const dd=new Date(mon); dd.setDate(mon.getDate()+i); return dd; });
+}
+
+function srtLocalDate(d) {
+  const dd = d || new Date();
+  return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+}
+
+function renderMyWeekGrid() {
+  const days = getWeekDaysSrt(mySchedWeekRef);
+  const todayStr = srtLocalDate();
+  const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const s0=days[0], s6=days[6];
+  const labelEl = document.getElementById('mySchedWeekLabel');
+  if (labelEl) labelEl.textContent = MON_NAMES[s0.getMonth()]+' '+s0.getDate()+(s0.getMonth()!==s6.getMonth()?' – '+MON_NAMES[s6.getMonth()]:'–')+s6.getDate()+', '+s6.getFullYear();
+
+  const dateStrs = days.map(function(d){return srtLocalDate(d);});
+  const weekStart=dateStrs[0], weekEnd=dateStrs[6];
+
+  sb.from('schedules').select('*').eq('org_id',currentProfile.org_id).or('breaker_id.eq.'+currentUser.id+',sorter_id.eq.'+currentUser.id).gte('scheduled_date',weekStart).lte('scheduled_date',weekEnd).neq('status','cancelled').then(function(res){
+    const myShifts = res.data || [];
+    const shiftByDate = {};
+    myShifts.forEach(function(s){ if(!shiftByDate[s.scheduled_date])shiftByDate[s.scheduled_date]=[]; shiftByDate[s.scheduled_date].push(s); });
+
+    let html = '<div class="wg-wrap"><table class="wg-table"><thead><tr>';
+    days.forEach(function(d,i){
+      const ds=srtLocalDate(d);
+      html+='<th class="'+(ds===todayStr?'wg-today-hd':'')+'">'+DAY_NAMES[i]+'<br><span style="font-size:0.82rem;font-weight:'+(ds===todayStr?'900':'600')+';">'+d.getDate()+'</span></th>';
+    });
+    html+='</tr></thead><tbody><tr>';
+    dateStrs.forEach(function(ds){
+      const isToday=ds===todayStr;
+      const shifts=shiftByDate[ds]||[];
+      html+='<td class="wg-day-cell'+(isToday?' wg-today-cell':'')+'" style="min-height:90px;">';
+      if(shifts.length){
+        shifts.forEach(function(s){
+          const cls=s.status==='completed'?'my-sched-chip msc-done':s.status==='in_progress'?'my-sched-chip msc-live':'my-sched-chip';
+          html+='<div class="'+cls+'">';
+          if(s.scheduled_time) html+='<div style="color:var(--primary);font-size:0.72rem;font-weight:700;">'+s.scheduled_time.slice(0,5)+'</div>';
+          if(s.stream_key) html+='<div style="color:var(--muted);font-size:0.67rem;">'+escHtml(s.stream_key)+'</div>';
+          const statusTxt=s.status==='completed'?'<span style="color:var(--green);font-size:0.65rem;">&#10003; Done</span>':s.status==='in_progress'?'<span style="color:var(--yellow);font-size:0.65rem;">&#9679; Live</span>':'<span style="color:var(--muted);font-size:0.65rem;">Scheduled</span>';
+          html+=statusTxt;
+          if(s.status!=='completed') html+='<button onclick="openSwapRequest(\''+s.id+'\',\''+escHtml(ds)+'\')" style="display:block;margin-top:6px;width:100%;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);color:#a855f7;border-radius:5px;padding:3px 0;font-size:0.65rem;font-weight:700;cursor:pointer;">&#8644; Request Swap</button>';
+          html+='</div>';
+        });
+      } else {
+        html+='<div style="text-align:center;color:rgba(90,106,138,0.3);font-size:1.5rem;padding-top:1.5rem;">&#183;</div>';
+      }
+      html+='</td>';
+    });
+    html+='</tr></tbody></table></div>';
+    const container = document.getElementById('myScheduleWeekView');
+    if (container) container.innerHTML = html;
+  });
+}
+
+function setupMySchedNav() {
+  var prevBtn = document.getElementById('mySchedPrev');
+  var nextBtn = document.getElementById('mySchedNext');
+  var todayBtn = document.getElementById('mySchedToday');
+  if (prevBtn) prevBtn.addEventListener('click', function(){ mySchedWeekRef.setDate(mySchedWeekRef.getDate()-7); renderMyWeekGrid(); });
+  if (nextBtn) nextBtn.addEventListener('click', function(){ mySchedWeekRef.setDate(mySchedWeekRef.getDate()+7); renderMyWeekGrid(); });
+  if (todayBtn) todayBtn.addEventListener('click', function(){ mySchedWeekRef = new Date(); renderMyWeekGrid(); });
+}
+
+// ── Swap Request ──────────────────────────────────────────
+let swapShiftId=null, swapShiftDate=null;
+function openSwapRequest(shiftId, dateStr) {
+  swapShiftId=shiftId; swapShiftDate=dateStr;
+  const sel=document.getElementById('swapPersonSelect');
+  sel.innerHTML='<option value="">&#8212; select person &#8212;</option>';
+  srtAllProfiles.forEach(function(p){
+    const opt=document.createElement('option');
+    opt.value=p.id; opt.textContent=p.display_name+' ('+p.role+')';
+    sel.appendChild(opt);
+  });
+  document.getElementById('swapModal').classList.add('active');
+}
+
+async function confirmSwapRequest() {
+  const withPersonId=document.getElementById('swapPersonSelect').value;
+  const note=document.getElementById('swapNote').value.trim();
+  if(!withPersonId){showError('Select a person.');return;}
+  const withPerson=srtAllProfiles.find(function(p){return p.id===withPersonId;});
+  const myName=currentProfile.display_name||'Someone';
+  const msg=myName+' wants to swap their '+swapShiftDate+' shift'+(withPerson?' with '+withPerson.display_name:'')+(note?' — Note: '+note:'');
+  try {
+    const {data:owners}=await sb.from('profiles').select('id').eq('org_id',currentProfile.org_id).in('role',['owner','manager']);
+    if(owners&&owners.length){
+      await sb.from('notifications').insert(owners.map(function(o){return{org_id:currentProfile.org_id,profile_id:o.id,title:'Swap Request',message:msg,read:false};}));
+    }
+    document.getElementById('swapModal').classList.remove('active');
+    showSuccess('Swap request sent to your manager.');
+  } catch(err){showError('Failed to send request: '+escHtml(err.message));}
+}
 </script>
+
+<!-- SWAP REQUEST MODAL -->
+<div class="modal-overlay" id="swapModal">
+  <div class="modal" style="max-width:380px;">
+    <h2>Request Shift Swap</h2>
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Your manager will be notified and can approve the swap.</p>
+    <div class="form-group">
+      <label for="swapPersonSelect">Swap with</label>
+      <select id="swapPersonSelect"><option value="">&#8212; select person &#8212;</option></select>
+    </div>
+    <div class="form-group">
+      <label for="swapNote">Note (optional)</label>
+      <input type="text" id="swapNote" placeholder="e.g. family emergency" />
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" onclick="document.getElementById('swapModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSwapRequest()">Send Request</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

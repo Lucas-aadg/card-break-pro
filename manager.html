@@ -103,6 +103,34 @@
     .lb-rank.bronze { color: #b45309; }
     .confirm-text { color: var(--text); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.25rem; }
     .code-display { font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: 800; letter-spacing: 4px; color: var(--primary); background: rgba(79,110,247,0.08); border: 2px dashed rgba(79,110,247,0.4); border-radius: 8px; padding: 1rem 1.5rem; text-align: center; margin: 1rem 0; }
+
+    /* ── SCHEDULE WEEK GRID ── */
+    .wg-wrap{overflow-x:auto;}
+    .wg-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:720px;}
+    .wg-table th{text-align:center;font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);padding:0.65rem 0.3rem;border-bottom:2px solid var(--border);}
+    .wg-table th.wg-today-hd{color:var(--primary);}
+    .wg-table td{vertical-align:top;padding:3px;border:1px solid rgba(79,110,247,0.06);}
+    .wg-staff-cell{width:130px;min-width:110px;padding:0.55rem 0.65rem;border-right:2px solid var(--border);background:rgba(0,0,0,0.2);vertical-align:middle;}
+    .wg-hrs-cell{width:48px;min-width:44px;text-align:center;border-left:2px solid var(--border);background:rgba(0,0,0,0.2);font-size:0.73rem;color:var(--muted);font-weight:800;vertical-align:middle;padding:0.35rem;}
+    .wg-day-cell{min-height:82px;position:relative;transition:background 0.12s;}
+    .wg-day-cell.wg-today-cell{background:rgba(79,110,247,0.04);}
+    .wg-day-cell.wg-drag-over{background:rgba(79,110,247,0.13)!important;outline:2px dashed rgba(79,110,247,0.45);outline-offset:-2px;}
+    .wg-role-row td{background:rgba(79,110,247,0.04);padding:0.32rem 0.65rem;font-size:0.61rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:rgba(79,110,247,0.55);border-bottom:1px solid var(--border);}
+    .sc{background:linear-gradient(135deg,rgba(79,110,247,0.18),rgba(99,102,241,0.1));border:1px solid rgba(79,110,247,0.35);border-radius:7px;padding:5px 7px;margin-bottom:3px;font-size:0.69rem;cursor:grab;user-select:none;position:relative;overflow:hidden;transition:box-shadow 0.15s,transform 0.12s,opacity 0.15s;}
+    .sc::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);pointer-events:none;}
+    .sc:hover{box-shadow:0 4px 16px rgba(79,110,247,0.3);transform:translateY(-1px);}
+    .sc:active{cursor:grabbing;}
+    .sc.sc-done{background:linear-gradient(135deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08));border-color:rgba(34,197,94,0.4);}
+    .sc.sc-live{background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(245,158,11,0.08));border-color:rgba(245,158,11,0.4);}
+    .sc.sc-drag{opacity:0.35;transform:scale(0.95);pointer-events:none;}
+    .sc-time{color:var(--primary);font-size:0.65rem;margin-bottom:1px;}
+    .sc-key{color:var(--muted);font-size:0.63rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+    .wg-add-btn{width:100%;min-height:76px;display:flex;align-items:center;justify-content:center;color:transparent;border:2px dashed transparent;border-radius:7px;cursor:pointer;font-size:1.6rem;font-weight:200;background:none;transition:all 0.15s;padding:0;line-height:1;}
+    .wg-day-cell:hover .wg-add-btn{color:rgba(79,110,247,0.4);border-color:rgba(79,110,247,0.2);background:rgba(79,110,247,0.025);}
+    .wg-nav-btn{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:0.38rem 0.85rem;cursor:pointer;font-size:0.82rem;font-weight:600;transition:border-color 0.15s,color 0.15s;}
+    .wg-nav-btn:hover{border-color:var(--primary);color:var(--primary);}
+    .wg-view-btn{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:0.33rem 0.85rem;cursor:pointer;font-size:0.78rem;font-weight:600;transition:all 0.15s;}
+    .wg-view-btn.active{background:rgba(79,110,247,0.12);border-color:rgba(79,110,247,0.4);color:var(--primary);}
   </style>
 </head>
 <body>
@@ -224,21 +252,40 @@
       <button class="btn btn-primary" id="schedSaveBtn">Add Shift</button>
     </div>
 
-    <!-- Calendar -->
-    <div class="panel">
-      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
-        <span id="calChannelLabel" style="font-weight:700;">Schedule Calendar</span>
-        <div style="display:flex;gap:0.5rem;align-items:center;">
-          <button id="calPrevBtn" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.25rem 0.65rem;cursor:pointer;">&#8592;</button>
-          <span id="calMonthLabel" style="font-weight:700;font-size:0.95rem;min-width:120px;text-align:center;"></span>
-          <button id="calNextBtn" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.25rem 0.65rem;cursor:pointer;">&#8594;</button>
+    <!-- Week / Month Scheduler -->
+    <div class="panel" style="padding:0;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;padding:1rem 1.4rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.12);">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <button class="wg-nav-btn" id="wgPrevBtn">&#8592;</button>
+          <span id="schedWeekLabel" style="font-size:0.9rem;font-weight:700;color:var(--text);min-width:190px;text-align:center;"></span>
+          <button class="wg-nav-btn" id="wgNextBtn">&#8594;</button>
+          <button class="wg-nav-btn" id="wgTodayBtn" style="font-size:0.73rem;padding:0.33rem 0.65rem;">Today</button>
+        </div>
+        <div style="display:flex;gap:0.35rem;">
+          <button class="wg-view-btn active" id="schedViewWeekBtn">Week</button>
+          <button class="wg-view-btn" id="schedViewMonthBtn">Month</button>
         </div>
       </div>
-      <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
-      <div style="display:flex;gap:1rem;margin-top:0.75rem;flex-wrap:wrap;">
-        <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(79,110,247,0.3);border-radius:3px;display:inline-block;"></span> Scheduled</span>
-        <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(245,158,11,0.3);border-radius:3px;display:inline-block;"></span> In Progress</span>
-        <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(34,197,94,0.3);border-radius:3px;display:inline-block;"></span> Completed</span>
+      <!-- Week grid -->
+      <div id="schedWeekView" style="padding:0.85rem 0.75rem;">
+        <div style="color:var(--muted);font-size:0.85rem;text-align:center;padding:2rem;">Loading&#8230;</div>
+      </div>
+      <!-- Month calendar (toggle) -->
+      <div id="schedMonthView" style="display:none;padding:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+          <span id="calChannelLabel" style="font-weight:700;font-size:0.85rem;">Calendar</span>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <button id="calPrevBtn" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.25rem 0.65rem;cursor:pointer;">&#8592;</button>
+            <span id="calMonthLabel" style="font-weight:700;font-size:0.95rem;min-width:120px;text-align:center;"></span>
+            <button id="calNextBtn" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.25rem 0.65rem;cursor:pointer;">&#8594;</button>
+          </div>
+        </div>
+        <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
+        <div style="display:flex;gap:1rem;margin-top:0.75rem;flex-wrap:wrap;">
+          <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(79,110,247,0.3);border-radius:3px;display:inline-block;"></span> Scheduled</span>
+          <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(245,158,11,0.3);border-radius:3px;display:inline-block;"></span> In Progress</span>
+          <span style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.35rem;"><span style="width:10px;height:10px;background:rgba(34,197,94,0.3);border-radius:3px;display:inline-block;"></span> Completed</span>
+        </div>
       </div>
     </div>
 
@@ -593,10 +640,27 @@
     <button onclick="calHidePopup()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;padding:0 0.2rem;">✕</button>
   </div>
   <div id="calPopupDetails" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.85rem;line-height:1.7;"></div>
-  <div style="display:flex;gap:0.4rem;">
-    <button onclick="calPopupEdit()" style="flex:1;background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);color:var(--primary);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">✏ Edit</button>
-    <button onclick="calPopupCopy()" style="flex:1;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);color:var(--green);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">⧉ Copy</button>
-    <button onclick="calPopupRemove()" style="flex:1;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:var(--red);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">✕ Remove</button>
+  <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+    <button onclick="calPopupEdit()" style="flex:1;background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);color:var(--primary);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">&#9999; Edit</button>
+    <button onclick="calPopupCopy()" style="flex:1;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);color:var(--green);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">&#10697; Copy</button>
+    <button onclick="calPopupRemove()" style="flex:1;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:var(--red);border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">&#10005; Remove</button>
+    <button onclick="openReassign(calPopupShiftId)" style="flex:1;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);color:#a855f7;border-radius:7px;padding:0.45rem 0.5rem;font-size:0.78rem;font-weight:700;cursor:pointer;">&#8596; Reassign</button>
+  </div>
+</div>
+
+<!-- REASSIGN MODAL -->
+<div class="modal-overlay" id="reassignModal">
+  <div class="modal" style="max-width:360px;">
+    <h2>Reassign Shift</h2>
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Assign this shift to a different team member.</p>
+    <div class="form-group">
+      <label for="reassignPersonSelect">New Team Member</label>
+      <select id="reassignPersonSelect"><option value="">&#8212; select person &#8212;</option></select>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" onclick="document.getElementById('reassignModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmReassign()">Reassign</button>
+    </div>
   </div>
 </div>
 
@@ -735,7 +799,7 @@ function switchTab(tab) {
     if (gBtn) gBtn.classList.add('has-active');
   }
 
-  if (tab === 'schedule') { loadSchedule(); loadCalendar(); loadClockLog(); }
+  if (tab === 'schedule') { loadAllProfiles().then(function(){ loadSchedule(); renderWeekGrid(); }); loadCalendar(); loadClockLog(); }
   else if (tab === 'dashboard') loadDashboard();
   else if (tab === 'streamSummary') loadStreamSummaryStreams();
   else if (tab === 'history') { const t = new Date(); document.getElementById('histTo').value = localDate(t); t.setDate(t.getDate()-30); document.getElementById('histFrom').value = localDate(t); }
@@ -789,6 +853,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Schedule
   document.getElementById('schedSaveBtn').addEventListener('click', createShift);
+  // Week grid nav
+  document.getElementById('wgPrevBtn').addEventListener('click', schedWeekPrev);
+  document.getElementById('wgNextBtn').addEventListener('click', schedWeekNext);
+  document.getElementById('wgTodayBtn').addEventListener('click', schedWeekToday);
+  document.getElementById('schedViewWeekBtn').addEventListener('click', schedShowWeek);
+  document.getElementById('schedViewMonthBtn').addEventListener('click', schedShowMonth);
   document.getElementById('calPrevBtn').addEventListener('click', function(){
     if (calCurrentDate.getFullYear() === CAL_MIN_YEAR && calCurrentDate.getMonth() === CAL_MIN_MONTH) return;
     calCurrentDate.setMonth(calCurrentDate.getMonth()-1);
@@ -1061,6 +1131,7 @@ async function loadSchedule() {
 
   allSchedules = shifts || [];
   renderScheduleTable(allSchedules);
+  if (document.getElementById('schedViewWeekBtn') && document.getElementById('schedViewWeekBtn').classList.contains('active')) renderWeekGrid();
 }
 
 function renderScheduleTable(shifts) {
@@ -1334,7 +1405,187 @@ function calPopupRemove() {
     showGlobalSuccess('Shift removed.');
     await loadSchedule();
     loadCalendar();
+    if (document.getElementById('schedViewWeekBtn') && document.getElementById('schedViewWeekBtn').classList.contains('active')) renderWeekGrid();
   });
+}
+
+// ── Week grid ─────────────────────────────────────────────
+let schedWeekRef = new Date();
+let wgDragShiftId = null;
+
+function getWeekDays(ref) {
+  const d = new Date(ref);
+  const day = d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return Array.from({length:7}, function(_,i){ const dd = new Date(mon); dd.setDate(mon.getDate()+i); return dd; });
+}
+
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function schedWeekPrev() { schedWeekRef.setDate(schedWeekRef.getDate()-7); renderWeekGrid(); }
+function schedWeekNext() { schedWeekRef.setDate(schedWeekRef.getDate()+7); renderWeekGrid(); }
+function schedWeekToday() { schedWeekRef = new Date(); renderWeekGrid(); }
+
+function schedShowWeek() {
+  document.getElementById('schedWeekView').style.display='';
+  document.getElementById('schedMonthView').style.display='none';
+  document.getElementById('schedViewWeekBtn').classList.add('active');
+  document.getElementById('schedViewMonthBtn').classList.remove('active');
+  renderWeekGrid();
+}
+function schedShowMonth() {
+  document.getElementById('schedWeekView').style.display='none';
+  document.getElementById('schedMonthView').style.display='';
+  document.getElementById('schedViewWeekBtn').classList.remove('active');
+  document.getElementById('schedViewMonthBtn').classList.add('active');
+  loadCalendar();
+}
+
+function renderWeekGrid() {
+  const days = getWeekDays(schedWeekRef);
+  const todayStr = localDateStr(new Date());
+  const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const s0 = days[0], s6 = days[6];
+  const rangeLabel = MON_NAMES[s0.getMonth()] + ' ' + s0.getDate() + (s0.getMonth()!==s6.getMonth()?' – '+MON_NAMES[s6.getMonth()]:'–') + s6.getDate() + ', ' + s6.getFullYear();
+  const labelEl = document.getElementById('schedWeekLabel');
+  if (labelEl) labelEl.textContent = rangeLabel;
+
+  const dateStrs = days.map(function(d){ return localDateStr(d); });
+  const weekStart = dateStrs[0], weekEnd = dateStrs[6];
+
+  const shiftMap = {};
+  const hoursMap = {};
+  allSchedules.forEach(function(s) {
+    if (s.status === 'cancelled') return;
+    const pid = s.breaker_id || s.sorter_id;
+    if (!pid) return;
+    if (s.scheduled_date >= weekStart && s.scheduled_date <= weekEnd) {
+      if (!shiftMap[pid]) shiftMap[pid] = {};
+      if (!shiftMap[pid][s.scheduled_date]) shiftMap[pid][s.scheduled_date] = [];
+      shiftMap[pid][s.scheduled_date].push(s);
+    }
+    if (s.clocked_in_at && s.clocked_out_at && s.scheduled_date >= weekStart && s.scheduled_date <= weekEnd) {
+      const hrs = Math.max(0,(new Date(s.clocked_out_at)-new Date(s.clocked_in_at))/3600000);
+      hoursMap[pid] = (hoursMap[pid]||0) + hrs;
+    }
+  });
+
+  const breakers = allProfiles.filter(function(p){ return p.role==='breaker'||p.role==='breaker/manager'; });
+  const sorters = allProfiles.filter(function(p){ return p.role==='sorter'; });
+
+  function escH(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function makeChip(s) {
+    const cls = s.status==='completed'?'sc sc-done':s.status==='in_progress'?'sc sc-live':'sc';
+    const statusLine = s.status==='completed'?'<div class="sc-key" style="color:var(--green);">&#10003; Done</div>':s.status==='in_progress'?'<div class="sc-key" style="color:var(--yellow);">&#9679; Live</div>':'';
+    return '<div class="'+cls+'" draggable="true" data-sid="'+s.id+'" style="touch-action:none;">'+(s.scheduled_time?'<div class="sc-time">'+s.scheduled_time.slice(0,5)+'</div>':'')+(s.stream_key?'<div class="sc-key">'+escH(s.stream_key)+'</div>':'')+statusLine+'</div>';
+  }
+
+  function makeRow(p) {
+    const initials = (p.display_name||'?').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2);
+    const roleColor = p.role==='sorter'?'#a855f7':'#4f6ef7';
+    const hrs = hoursMap[p.id]||0;
+    let row = '<tr><td class="wg-staff-cell"><div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:30px;height:30px;border-radius:50%;background:'+roleColor+';display:flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:800;color:#fff;flex-shrink:0;">'+initials+'</div><div style="min-width:0;"><div style="font-weight:700;font-size:0.77rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">'+escH(p.display_name)+'</div><div style="font-size:0.59rem;color:var(--muted);text-transform:uppercase;">'+p.role+'</div></div></div></td>';
+    dateStrs.forEach(function(ds){
+      const isToday = ds===todayStr;
+      const shifts = (shiftMap[p.id]&&shiftMap[p.id][ds])||[];
+      row += '<td class="wg-day-cell'+(isToday?' wg-today-cell':'')+'" data-person="'+p.id+'" data-date="'+ds+'">';
+      shifts.forEach(function(s){ row += makeChip(s); });
+      row += '<button class="wg-add-btn" data-person="'+p.id+'" data-date="'+ds+'">+</button>';
+      row += '</td>';
+    });
+    row += '<td class="wg-hrs-cell">'+(hrs>0?hrs.toFixed(1)+'h':'—')+'</td></tr>';
+    return row;
+  }
+
+  let thead = '<thead><tr><th class="wg-staff-cell" style="text-align:left;font-size:0.68rem;">Team</th>';
+  days.forEach(function(d,i){ const ds=localDateStr(d); thead+='<th class="'+(ds===todayStr?'wg-today-hd':'')+'">'+DAY_NAMES[i]+'<br><span style="font-size:0.82rem;font-weight:'+(ds===todayStr?'900':'600')+';">'+d.getDate()+'</span></th>'; });
+  thead += '<th class="wg-hrs-cell">Hrs</th></tr></thead>';
+
+  let tbody = '<tbody>';
+  if (breakers.length) { tbody+='<tr class="wg-role-row"><td colspan="9">Breakers</td></tr>'; breakers.forEach(function(p){tbody+=makeRow(p);}); }
+  if (sorters.length) { tbody+='<tr class="wg-role-row"><td colspan="9">Sorters</td></tr>'; sorters.forEach(function(p){tbody+=makeRow(p);}); }
+  if (!breakers.length&&!sorters.length) tbody+='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;font-style:italic;">No team members yet.</td></tr>';
+  tbody += '</tbody>';
+
+  const container = document.getElementById('schedWeekView');
+  container.innerHTML = '<div class="wg-wrap"><table class="wg-table">'+thead+tbody+'</table></div>';
+
+  container.querySelectorAll('.sc[draggable]').forEach(function(chip){
+    chip.addEventListener('dragstart',function(e){ wgDragShiftId=chip.dataset.sid; e.dataTransfer.effectAllowed='move'; setTimeout(function(){chip.classList.add('sc-drag');},0); });
+    chip.addEventListener('dragend',function(){chip.classList.remove('sc-drag');wgDragShiftId=null;});
+    chip.addEventListener('click',function(e){e.stopPropagation();calShowPopup(chip.dataset.sid,chip);});
+  });
+
+  container.querySelectorAll('.wg-day-cell').forEach(function(cell){
+    cell.addEventListener('dragover',function(e){e.preventDefault();cell.classList.add('wg-drag-over');});
+    cell.addEventListener('dragleave',function(e){if(!cell.contains(e.relatedTarget))cell.classList.remove('wg-drag-over');});
+    cell.addEventListener('drop',async function(e){
+      e.preventDefault(); cell.classList.remove('wg-drag-over');
+      if(!wgDragShiftId)return;
+      const newDate=cell.dataset.date, newPerson=cell.dataset.person;
+      const shift=allSchedules.find(function(s){return s.id===wgDragShiftId;});
+      const updates={scheduled_date:newDate};
+      if(shift){
+        const curPerson=shift.breaker_id||shift.sorter_id;
+        if(curPerson!==newPerson){
+          const np=allProfiles.find(function(p){return p.id===newPerson;});
+          if(np){if(np.role==='sorter'){updates.sorter_id=newPerson;updates.breaker_id=null;}else{updates.breaker_id=newPerson;updates.sorter_id=null;}}
+        }
+      }
+      try{await sb.from('schedules').update(updates).eq('id',wgDragShiftId).eq('org_id',currentProfile.org_id);wgDragShiftId=null;await loadSchedule();renderWeekGrid();showGlobalSuccess('Shift moved.');}
+      catch(err){showGlobalError('Move failed: '+escH(err.message));}
+    });
+  });
+
+  container.querySelectorAll('.wg-add-btn').forEach(function(btn){
+    btn.addEventListener('click',function(e){e.stopPropagation();mgQuickAddShift(btn.dataset.person,btn.dataset.date);});
+  });
+}
+
+function mgQuickAddShift(personId, dateStr) {
+  const sel = document.getElementById('schedBreaker');
+  if (sel) sel.value = personId || '';
+  const di = document.getElementById('schedDate');
+  if (di) di.value = dateStr || '';
+  const ti = document.getElementById('schedTime');
+  if (ti) { ti.scrollIntoView({behavior:'smooth',block:'center'}); ti.focus(); }
+}
+
+// ── Reassign ─────────────────────────────────────────────
+let reassignShiftId = null;
+
+function openReassign(shiftId) {
+  reassignShiftId = shiftId;
+  calHidePopup();
+  const sel = document.getElementById('reassignPersonSelect');
+  sel.innerHTML = '<option value="">— select person —</option>';
+  allProfiles.forEach(function(p){
+    const opt=document.createElement('option');
+    opt.value=p.id; opt.textContent=p.display_name+' ('+p.role+')';
+    sel.appendChild(opt);
+  });
+  document.getElementById('reassignModal').classList.add('active');
+}
+
+async function confirmReassign() {
+  const newPersonId = document.getElementById('reassignPersonSelect').value;
+  if (!newPersonId) { showGlobalError('Select a person.'); return; }
+  const np = allProfiles.find(function(p){return p.id===newPersonId;});
+  const updates = {};
+  if (np && np.role==='sorter') { updates.sorter_id=newPersonId; updates.breaker_id=null; }
+  else { updates.breaker_id=newPersonId; updates.sorter_id=null; }
+  try {
+    await sb.from('schedules').update(updates).eq('id',reassignShiftId).eq('org_id',currentProfile.org_id);
+    document.getElementById('reassignModal').classList.remove('active');
+    showGlobalSuccess('Shift reassigned.');
+    await loadSchedule();
+    if (document.getElementById('schedViewWeekBtn') && document.getElementById('schedViewWeekBtn').classList.contains('active')) renderWeekGrid();
+  } catch(err) { showGlobalError('Reassign failed: '+(err.message||'Unknown error')); }
 }
 
 async function loadClockLog() {
