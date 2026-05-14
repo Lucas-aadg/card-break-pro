@@ -5679,9 +5679,9 @@ document.addEventListener('DOMContentLoaded', function () {
       if (payType === 'per_break' || payType === 'hourly_per_break') {
         updates.per_break_rate = parseFloat(document.getElementById('ps-sorter-per-break-rate').value) || 0;
         const catRates = {};
-        document.querySelectorAll('.cat-rate-input').forEach(function(inp) {
+        document.querySelectorAll('#pss-category-rates-body .cat-rate-input').forEach(function(inp) {
           const val = parseFloat(inp.value);
-          if (!isNaN(val) && val >= 0) catRates[inp.dataset.category] = val;
+          if (!isNaN(val) && val > 0) catRates[inp.dataset.category] = val;
         });
         updates.category_rates = catRates;
       }
@@ -6084,7 +6084,7 @@ async function calcSorterPay(p, fromTs, toTs, result) {
   // Per break sorted component
   if (type === 'per_break' || type === 'hourly_per_break') {
     const categoryRates = p.category_rates || {};
-    const hasCategoryRates = Object.keys(categoryRates).length > 0;
+    const hasCategoryRates = Object.keys(categoryRates).some(function(k) { return parseFloat(categoryRates[k]) > 0; });
     const defaultRate = parseFloat(p.per_break_rate) || 0;
 
     let sorterTasksPayQ = sb.from('sort_tasks')
