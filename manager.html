@@ -1661,15 +1661,24 @@ async function confirmCompleteSort() {
 
 // ── REPORTS ──────────────────────────────────────────────
 async function loadDashboard() {
-  const today = localDate();
-  const { data: todayBreaks } = await sb.from('breaks').select('revenue, net_profit').eq('org_id', currentProfile.org_id).eq('break_date', today);
-  const { data: allBreaks } = await sb.from('breaks').select('revenue, net_profit').eq('org_id', currentProfile.org_id);
-  const { data: allStreams } = await sb.from('streams').select('id').eq('org_id', currentProfile.org_id).eq('status', 'closed');
+  const todayStr = localDate();
+  const { data: todayBreaks } = await sb.from('breaks').select('revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id).eq('break_date', todayStr);
+  const { data: allBreaks } = await sb.from('breaks').select('revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id);
+  const { data: allClosedStreams } = await sb.from('streams').select('id, net_profit, commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed');
+  const { data: todayClosedStreams } = await sb.from('streams').select('id, net_profit, commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', todayStr);
 
   const todayRev = (todayBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.revenue)||0); },0);
-  const todayProfit = (todayBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.net_profit)||0); },0);
   const totalRev = (allBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.revenue)||0); },0);
-  const totalProfit = (allBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.net_profit)||0); },0);
+
+  const todayClosedIds = new Set((todayClosedStreams||[]).map(function(s){ return s.id; }));
+  const todayClosedProfit = (todayClosedStreams||[]).reduce(function(s,x){ return s+(parseFloat(x.net_profit)||0)-(parseFloat(x.commission_payout)||0); },0);
+  const todayActiveProfit = (todayBreaks||[]).filter(function(b){ return !todayClosedIds.has(b.stream_id); }).reduce(function(s,b){ return s+(parseFloat(b.net_profit)||0); },0);
+  const todayProfit = todayClosedProfit + todayActiveProfit;
+
+  const allClosedIds = new Set((allClosedStreams||[]).map(function(s){ return s.id; }));
+  const closedProfit = (allClosedStreams||[]).reduce(function(s,x){ return s+(parseFloat(x.net_profit)||0)-(parseFloat(x.commission_payout)||0); },0);
+  const activeProfit = (allBreaks||[]).filter(function(b){ return !allClosedIds.has(b.stream_id); }).reduce(function(s,b){ return s+(parseFloat(b.net_profit)||0); },0);
+  const totalProfit = closedProfit + activeProfit;
 
   document.getElementById('dash-revenue').textContent = fmt(todayRev);
   document.getElementById('dash-profit').textContent = fmt(todayProfit);
@@ -1678,14 +1687,14 @@ async function loadDashboard() {
   document.getElementById('dash-totalRevenue').textContent = fmt(totalRev);
   document.getElementById('dash-totalProfit').textContent = fmt(totalProfit);
   document.getElementById('dash-totalBreaks').textContent = (allBreaks||[]).length;
-  document.getElementById('dash-totalStreams').textContent = (allStreams||[]).length;
+  document.getElementById('dash-totalStreams').textContent = (allClosedStreams||[]).length;
 
-  const { data: recent } = await sb.from('breaks').select('break_date, stream_id, break_number, breaker_id, revenue, net_profit').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(10);
-  const streamIds = [...new Set((recent||[]).map(function(b){ return b.stream_id; }).filter(Boolean))];
-  let streamMap = {};
-  if (streamIds.length) {
-    const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', streamIds);
-    (streams||[]).forEach(function(s){ streamMap[s.id] = s.stream_key; });
+  const { data: recent } = await sb.from('breaks').select('*').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(10);
+  const recentStreamIds = [...new Set((recent||[]).map(function(b){ return b.stream_id; }).filter(Boolean))];
+  let recentStreamMap = {};
+  if (recentStreamIds.length) {
+    const { data: rStreams } = await sb.from('streams').select('id, stream_key, status, final_sales, total_submitted_revenue').eq('org_id', currentProfile.org_id).in('id', recentStreamIds);
+    (rStreams||[]).forEach(function(s){ recentStreamMap[s.id] = s; });
   }
   const breakerIds = [...new Set((recent||[]).map(function(b){ return b.breaker_id; }).filter(Boolean))];
   let breakerMap = {};
@@ -1696,11 +1705,19 @@ async function loadDashboard() {
   const tbody = document.getElementById('dashRecentBody');
   tbody.innerHTML = '';
   (recent||[]).forEach(function(b){
-    const profit = parseFloat(b.net_profit) || 0;
+    const stream = recentStreamMap[b.stream_id];
+    let profit;
+    if (stream && stream.status === 'closed' && stream.final_sales != null && (parseFloat(stream.total_submitted_revenue)||0) > 0) {
+      const actualFeeRate = Math.max(0, (parseFloat(stream.total_submitted_revenue) - parseFloat(stream.final_sales)) / parseFloat(stream.total_submitted_revenue));
+      const rev = parseFloat(b.revenue) || 0;
+      profit = rev - (parseFloat(b.total_product_cost)||0) - (rev * actualFeeRate) - (parseFloat(b.other_costs)||0);
+    } else {
+      profit = parseFloat(b.net_profit) || 0;
+    }
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td>' + escHtml(b.break_date||'') + '</td>' +
-      '<td>' + escHtml(streamMap[b.stream_id]||'—') + '</td>' +
+      '<td>' + escHtml((stream && stream.stream_key)||'—') + '</td>' +
       '<td style="text-align:center;">' + (b.break_number||'—') + '</td>' +
       '<td>' + escHtml(breakerMap[b.breaker_id]||'—') + '</td>' +
       '<td>' + fmt(b.revenue) + '</td>' +
