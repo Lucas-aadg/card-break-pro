@@ -4647,11 +4647,14 @@ async function loadDashboard() {
     const todayCount = (todayBreaks || []).length;
 
     // Today's profit: closed streams use actual net_profit; active streams use estimated break profit
-    let todayStreamsQ = sb.from('streams').select('id, net_profit, commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', todayStr);
+    let todayStreamsQ = sb.from('streams').select('id, net_profit, commission_payout, final_sales, total_product_cost, total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', todayStr);
     if (chStreamIds) todayStreamsQ = todayStreamsQ.in('id', chStreamIds);
     const { data: todayClosedStreams } = await todayStreamsQ;
     const todayClosedIds = new Set((todayClosedStreams || []).map(function (s) { return s.id; }));
-    const todayClosedProfit = (todayClosedStreams || []).reduce(function (s, x) { return s + (parseFloat(x.net_profit) || 0) - (parseFloat(x.commission_payout) || 0); }, 0);
+    const todayClosedProfit = (todayClosedStreams || []).reduce(function (s, x) {
+      const np = x.net_profit != null ? parseFloat(x.net_profit) : (parseFloat(x.final_sales)||0) - (parseFloat(x.total_product_cost)||0) - (parseFloat(x.total_other_costs)||0);
+      return s + np - (parseFloat(x.commission_payout) || 0);
+    }, 0);
     const todayActiveProfit = (todayBreaks || []).filter(function (b) { return !todayClosedIds.has(b.stream_id); }).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
     const todayProfit = todayClosedProfit + todayActiveProfit;
 
@@ -4670,11 +4673,14 @@ async function loadDashboard() {
 
     const totalRev = (allBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
 
-    let allClosedStreamsQ = sb.from('streams').select('id, net_profit, commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed');
+    let allClosedStreamsQ = sb.from('streams').select('id, net_profit, commission_payout, final_sales, total_product_cost, total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed');
     if (chStreamIds) allClosedStreamsQ = allClosedStreamsQ.in('id', chStreamIds);
     const { data: allClosedStreams } = await allClosedStreamsQ;
     const allClosedIds = new Set((allClosedStreams || []).map(function (s) { return s.id; }));
-    const closedProfit = (allClosedStreams || []).reduce(function (s, x) { return s + (parseFloat(x.net_profit) || 0) - (parseFloat(x.commission_payout) || 0); }, 0);
+    const closedProfit = (allClosedStreams || []).reduce(function (s, x) {
+      const np = x.net_profit != null ? parseFloat(x.net_profit) : (parseFloat(x.final_sales)||0) - (parseFloat(x.total_product_cost)||0) - (parseFloat(x.total_other_costs)||0);
+      return s + np - (parseFloat(x.commission_payout) || 0);
+    }, 0);
     const activeProfit = (allBreaks || []).filter(function (b) { return !allClosedIds.has(b.stream_id); }).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
     const totalProfit = closedProfit + activeProfit;
 

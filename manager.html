@@ -1664,19 +1664,24 @@ async function loadDashboard() {
   const todayStr = localDate();
   const { data: todayBreaks } = await sb.from('breaks').select('revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id).eq('break_date', todayStr);
   const { data: allBreaks } = await sb.from('breaks').select('revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id);
-  const { data: allClosedStreams } = await sb.from('streams').select('id, net_profit, commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed');
-  const { data: todayClosedStreams } = await sb.from('streams').select('id, net_profit, commission_payout').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', todayStr);
+  const { data: allClosedStreams } = await sb.from('streams').select('id, net_profit, commission_payout, final_sales, total_product_cost, total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed');
+  const { data: todayClosedStreams } = await sb.from('streams').select('id, net_profit, commission_payout, final_sales, total_product_cost, total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', todayStr);
 
   const todayRev = (todayBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.revenue)||0); },0);
   const totalRev = (allBreaks||[]).reduce(function(s,b){ return s+(parseFloat(b.revenue)||0); },0);
 
+  function streamNetProfit(x) {
+    const np = x.net_profit != null ? parseFloat(x.net_profit) : (parseFloat(x.final_sales)||0) - (parseFloat(x.total_product_cost)||0) - (parseFloat(x.total_other_costs)||0);
+    return np - (parseFloat(x.commission_payout) || 0);
+  }
+
   const todayClosedIds = new Set((todayClosedStreams||[]).map(function(s){ return s.id; }));
-  const todayClosedProfit = (todayClosedStreams||[]).reduce(function(s,x){ return s+(parseFloat(x.net_profit)||0)-(parseFloat(x.commission_payout)||0); },0);
+  const todayClosedProfit = (todayClosedStreams||[]).reduce(function(s,x){ return s+streamNetProfit(x); },0);
   const todayActiveProfit = (todayBreaks||[]).filter(function(b){ return !todayClosedIds.has(b.stream_id); }).reduce(function(s,b){ return s+(parseFloat(b.net_profit)||0); },0);
   const todayProfit = todayClosedProfit + todayActiveProfit;
 
   const allClosedIds = new Set((allClosedStreams||[]).map(function(s){ return s.id; }));
-  const closedProfit = (allClosedStreams||[]).reduce(function(s,x){ return s+(parseFloat(x.net_profit)||0)-(parseFloat(x.commission_payout)||0); },0);
+  const closedProfit = (allClosedStreams||[]).reduce(function(s,x){ return s+streamNetProfit(x); },0);
   const activeProfit = (allBreaks||[]).filter(function(b){ return !allClosedIds.has(b.stream_id); }).reduce(function(s,b){ return s+(parseFloat(b.net_profit)||0); },0);
   const totalProfit = closedProfit + activeProfit;
 
