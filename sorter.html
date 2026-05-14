@@ -397,12 +397,13 @@ async function loadSortQueue() {
             if (startErr) throw startErr;
             showSuccess('Started sorting. Mark complete when done.');
           } else if (action === 'complete') {
-            const { error: doneErr } = await sb.from('sort_tasks').update({
+            const { data: updatedRows, error: doneErr } = await sb.from('sort_tasks').update({
               status: 'completed',
               sorter_id: currentUser.id,
               completed_at: new Date().toISOString()
-            }).eq('id', taskId).eq('org_id', currentProfile.org_id);
+            }).eq('id', taskId).eq('org_id', currentProfile.org_id).select();
             if (doneErr) throw doneErr;
+            if (!updatedRows || updatedRows.length === 0) throw new Error('Update blocked — ask your owner to run the sort_tasks RLS fix in Supabase.');
             showSuccess('Stream marked as sorted and shipped!');
           }
           await loadSortQueue();
