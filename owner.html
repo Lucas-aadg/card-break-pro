@@ -6081,86 +6081,42 @@ async function calcSorterPay(p, fromTs, toTs, result) {
     parts.push(hours.toFixed(2) + ' hrs × $' + rate.toFixed(2) + '/hr = ' + fmt(earned));
   }
 
-  // Per break sorted component
+  // Per break sorted — flat rate, no category complexity
   if (type === 'per_break' || type === 'hourly_per_break') {
-    const categoryRates = p.category_rates || {};
-    const hasCategoryRates = Object.keys(categoryRates).some(function(k) { return parseFloat(categoryRates[k]) > 0; });
-    const defaultRate = parseFloat(p.per_break_rate) || 0;
+    const rate = parseFloat(p.per_break_rate) || 0;
 
-    let sorterTasksPayQ = sb.from('sort_tasks')
-      .select('id, stream_id')
+    // Fetch all completed tasks for this sorter then filter client-side
+    // using completed_at if set, falling back to created_at — prevents NULL completed_at dropping tasks
+    let q = sb.from('sort_tasks')
+      .select('id, completed_at, created_at, stream_id')
       .eq('sorter_id', p.id)
       .eq('org_id', currentProfile.org_id)
-      .eq('status', 'completed')
-      .gte('completed_at', fromTs)
-      .lte('completed_at', toTs);
+      .eq('status', 'completed');
     if (activeChannel) {
       const chStreamIds = await getActiveChannelStreamIds();
-      if (chStreamIds && chStreamIds.length > 0) sorterTasksPayQ = sorterTasksPayQ.in('stream_id', chStreamIds);
-      else if (chStreamIds && chStreamIds.length === 0) { result.breakdown = 'No tasks for this channel'; result.total = 0; return; }
+      if (chStreamIds && chStreamIds.length === 0) { result.breakdown = 'No tasks for this channel'; result.total = 0; return; }
+      if (chStreamIds) q = q.in('stream_id', chStreamIds);
     }
-    const { data: tasks } = await sorterTasksPayQ;
+    const { data: allTasks } = await q;
 
-    if (hasCategoryRates && tasks && tasks.length) {
-      // Build stream → category map
-      const streamIds = [...new Set((tasks).filter(function(t){ return t.stream_id; }).map(function(t){ return t.stream_id; }))];
-      const streamCatMap = {};
+    const tasks = (allTasks || []).filter(function(t) {
+      const d = t.completed_at || t.created_at;
+      return d >= fromTs && d <= toTs;
+    });
 
-      if (streamIds.length) {
-        const { data: streamBreaks } = await sb.from('breaks')
-          .select('stream_id, products_used')
-          .in('stream_id', streamIds)
-          .not('products_used', 'is', null);
+    const breakCount = tasks.length;
+    const earned = breakCount * rate;
+    total += earned;
+    parts.push(breakCount + ' task' + (breakCount !== 1 ? 's' : '') + ' sorted × $' + rate.toFixed(2) + ' = ' + fmt(earned));
 
-        const productIds = [];
-        const streamProdMap = {};
-        (streamBreaks || []).forEach(function(b) {
-          if (!streamProdMap[b.stream_id] && b.products_used && b.products_used.length) {
-            const pid = b.products_used[0].product_id;
-            if (pid) { streamProdMap[b.stream_id] = pid; productIds.push(pid); }
-          }
-        });
-
-        if (productIds.length) {
-          const { data: prods } = await sb.from('products').select('id, category').in('id', [...new Set(productIds)]);
-          const prodCatMap = {};
-          (prods || []).forEach(function(prod){ prodCatMap[prod.id] = prod.category; });
-          Object.entries(streamProdMap).forEach(function(entry){
-            streamCatMap[entry[0]] = prodCatMap[entry[1]];
-          });
-        }
-      }
-
-      // Tally by category
-      const catTally = {};
-      tasks.forEach(function(task) {
-        const cat = task.stream_id && streamCatMap[task.stream_id] ? streamCatMap[task.stream_id] : '__default__';
-        if (!catTally[cat]) catTally[cat] = 0;
-        catTally[cat]++;
-      });
-
-      const catParts = [];
-      Object.entries(catTally).forEach(function(entry) {
-        const cat = entry[0]; const count = entry[1];
-        const rate = cat !== '__default__' && categoryRates[cat] != null ? parseFloat(categoryRates[cat]) : defaultRate;
-        const earned = count * rate;
-        total += earned;
-        catParts.push(count + ' ' + (cat === '__default__' ? 'uncategorized' : cat) + ' × $' + rate.toFixed(2) + ' = ' + fmt(earned));
-      });
-      parts.push(catParts.join(' + '));
-    } else {
-      // Flat rate fallback
-      const breakCount = (tasks || []).length;
-      const earned = breakCount * defaultRate;
-      total += earned;
-      parts.push(breakCount + ' breaks sorted × $' + defaultRate.toFixed(2) + ' = ' + fmt(earned));
-    }
+    if (rate === 0) parts.push('⚠ rate is $0 — re-save pay settings in Team tab');
+    if (breakCount === 0) parts.push('(no completed tasks found in this period)');
   }
 
   if (!type || type === 'not_set') {
-    result.breakdown = '⚠ Pay type not configured';
+    result.breakdown = '⚠ Pay type not configured — set it in Team → Pay Settings';
   } else {
-    result.breakdown = parts.join(' + ') || '—';
+    result.breakdown = parts.join(' · ') || '—';
   }
   result.total = total;
 }
