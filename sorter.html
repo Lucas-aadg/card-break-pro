@@ -854,65 +854,60 @@ async function loadSorterPay() {
       return d >= from;
     });
 
-    // Build stream → category map if category rates are configured
-    const streamCatMap = {};
-    if (hasCategoryRates && tasks.length) {
-      const streamIds = [...new Set(tasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
-      if (streamIds.length) {
-        const { data: bks } = await sb.from('breaks').select('stream_id, products_used').in('stream_id', streamIds).not('products_used', 'is', null);
-        const streamToPid = {};
-        (bks || []).forEach(function(b) {
-          if (!streamToPid[b.stream_id] && b.products_used && b.products_used.length) {
-            const pid = b.products_used[0].product_id;
-            if (pid) streamToPid[b.stream_id] = pid;
-          }
-        });
-        const pids = [...new Set(Object.values(streamToPid))];
-        if (pids.length) {
-          const { data: prods } = await sb.from('products').select('id, category').in('id', pids);
-          const pidCat = {};
-          (prods || []).forEach(function(pr){ pidCat[pr.id] = pr.category; });
-          Object.keys(streamToPid).forEach(function(sid){ streamCatMap[sid] = pidCat[streamToPid[sid]]; });
-        }
+    // Get all breaks within those sorted streams — pay is per break, not per stream
+    const taskStreamIds = [...new Set(tasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
+    let allBreaks = [];
+    if (taskStreamIds.length) {
+      const { data: bks } = await sb.from('breaks').select('stream_id, products_used').in('stream_id', taskStreamIds);
+      allBreaks = bks || [];
+    }
+
+    // Build product_id → category map if category rates configured
+    const pidCat = {};
+    if (hasCategoryRates && allBreaks.length) {
+      const pids = [];
+      allBreaks.forEach(function(b){ (b.products_used||[]).forEach(function(p){ if(p.product_id) pids.push(p.product_id); }); });
+      const uniquePids = [...new Set(pids)];
+      if (uniquePids.length) {
+        const { data: prods } = await sb.from('products').select('id, category').in('id', uniquePids);
+        (prods||[]).forEach(function(pr){ pidCat[pr.id] = pr.category; });
       }
     }
 
-    // Rate per task
-    function rateForTask(t) {
-      const cat = (t.stream_id && streamCatMap[t.stream_id]) || null;
+    function rateForBreak(b) {
+      const pu = b.products_used || [];
+      const cat = hasCategoryRates && pu[0] && pu[0].product_id && pidCat[pu[0].product_id] ? pidCat[pu[0].product_id] : null;
       return (cat && parseFloat(categoryRates[cat]) > 0) ? parseFloat(categoryRates[cat]) : defaultRate;
     }
 
-    const rate = defaultRate; // used for label display
+    // Build stream → stream_key map for display
+    const streamKeyMap = {};
 
-    // Get stream keys for display
-    const streamIds = [...new Set((tasks||[]).map(function(t){return t.stream_id;}).filter(Boolean))];
-    let streamMap = {};
-    if (streamIds.length) {
-      const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', streamIds);
-      (streams||[]).forEach(function(s){ streamMap[s.id] = s.stream_key; });
+    if (taskStreamIds.length) {
+      const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', taskStreamIds);
+      (streams||[]).forEach(function(s){ streamKeyMap[s.id] = s.stream_key; });
     }
 
-    const count = (tasks||[]).length;
+    const breakCount = allBreaks.length;
     let totalBreakPay = 0;
     const tbody = document.getElementById('sorterBreakBody');
     tbody.innerHTML = '';
-    (tasks||[]).forEach(function(t) {
-      const taskRate = rateForTask(t);
-      const taskPay = taskRate;
-      totalBreakPay += taskPay;
+    allBreaks.forEach(function(b) {
+      const bRate = rateForBreak(b);
+      totalBreakPay += bRate;
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
+      const cat = (b.products_used||[])[0] && pidCat[((b.products_used||[])[0]).product_id] ? pidCat[((b.products_used||[])[0]).product_id] : '—';
       tr.innerHTML =
-        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + (t.completed_at ? new Date(t.completed_at).toLocaleDateString() : '—') + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;">' + escHtml(streamMap[t.stream_id] || '—') + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(taskRate) + '</td>';
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + escHtml(cat) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + escHtml(streamKeyMap[b.stream_id] || '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(bRate) + '</td>';
       tbody.appendChild(tr);
     });
-    if (!count) tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No trays sorted this period.</td></tr>';
+    if (!breakCount) tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No breaks sorted this period.</td></tr>';
     document.getElementById('sorterBreakSection').style.display = '';
-    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Trays Sorted</div><div style="font-size:1.4rem;font-weight:900;color:#e2e8f0;">' + count + '</div></div>');
-    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Tray Pay</div><div style="font-size:1.4rem;font-weight:900;color:#22c55e;">' + fmt(totalBreakPay) + '</div></div>');
+    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Breaks Sorted</div><div style="font-size:1.4rem;font-weight:900;color:#e2e8f0;">' + breakCount + '</div></div>');
+    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Break Pay</div><div style="font-size:1.4rem;font-weight:900;color:#22c55e;">' + fmt(totalBreakPay) + '</div></div>');
     grandTotal += totalBreakPay;
   }
 

@@ -6109,46 +6109,53 @@ async function calcSorterPay(p, fromTs, toTs, result) {
     });
 
     if (!tasks.length) {
-      parts.push('0 tasks sorted (none found in this period)');
-    } else if (hasCategoryRates) {
-      // Map tasks → stream → product category
+      parts.push('0 breaks sorted (none found in this period)');
+    } else {
+      // Count individual BREAKS within each sorted stream, not streams themselves
       const streamIds = [...new Set(tasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
-      const streamCatMap = {};
-      if (streamIds.length) {
-        const { data: bks } = await sb.from('breaks').select('stream_id, products_used').in('stream_id', streamIds).not('products_used', 'is', null);
-        const streamToPid = {};
-        (bks || []).forEach(function(b) {
-          if (!streamToPid[b.stream_id] && b.products_used && b.products_used.length) {
-            const pid = b.products_used[0].product_id;
-            if (pid) streamToPid[b.stream_id] = pid;
-          }
+      const { data: allBreaks } = await sb.from('breaks')
+        .select('stream_id, products_used')
+        .in('stream_id', streamIds);
+
+      // Build product_id → category map
+      const pidCat = {};
+      if (hasCategoryRates) {
+        const pids = [];
+        (allBreaks || []).forEach(function(b) {
+          (b.products_used || []).forEach(function(p){ if (p.product_id) pids.push(p.product_id); });
         });
-        const pids = [...new Set(Object.values(streamToPid))];
-        if (pids.length) {
-          const { data: prods } = await sb.from('products').select('id, category').in('id', pids);
-          const pidCat = {};
+        const uniquePids = [...new Set(pids)];
+        if (uniquePids.length) {
+          const { data: prods } = await sb.from('products').select('id, category').in('id', uniquePids);
           (prods || []).forEach(function(pr){ pidCat[pr.id] = pr.category; });
-          Object.keys(streamToPid).forEach(function(sid){ streamCatMap[sid] = pidCat[streamToPid[sid]]; });
         }
       }
+
+      // Tally breaks per category
       const catTally = {};
-      tasks.forEach(function(t) {
-        const cat = (t.stream_id && streamCatMap[t.stream_id]) || '__default__';
+      (allBreaks || []).forEach(function(b) {
+        const pu = b.products_used || [];
+        const cat = hasCategoryRates && pu[0] && pu[0].product_id && pidCat[pu[0].product_id]
+          ? pidCat[pu[0].product_id] : '__default__';
         catTally[cat] = (catTally[cat] || 0) + 1;
       });
-      const catParts = [];
-      Object.entries(catTally).forEach(function(entry) {
-        const cat = entry[0]; const count = entry[1];
-        const rate = cat !== '__default__' && parseFloat(categoryRates[cat]) > 0 ? parseFloat(categoryRates[cat]) : defaultRate;
-        const earned = count * rate;
+
+      const totalBreaks = Object.values(catTally).reduce(function(s,n){ return s+n; }, 0);
+      if (hasCategoryRates) {
+        const catParts = [];
+        Object.entries(catTally).forEach(function(entry) {
+          const cat = entry[0]; const count = entry[1];
+          const rate = cat !== '__default__' && parseFloat(categoryRates[cat]) > 0 ? parseFloat(categoryRates[cat]) : defaultRate;
+          const earned = count * rate;
+          total += earned;
+          catParts.push(count + ' ' + (cat === '__default__' ? 'other' : cat) + ' × $' + rate.toFixed(2) + ' = ' + fmt(earned));
+        });
+        parts.push(totalBreaks + ' breaks · ' + catParts.join(' + '));
+      } else {
+        const earned = totalBreaks * defaultRate;
         total += earned;
-        catParts.push(count + ' ' + (cat === '__default__' ? 'other' : cat) + ' × $' + rate.toFixed(2) + ' = ' + fmt(earned));
-      });
-      parts.push(catParts.join(' + '));
-    } else {
-      const earned = tasks.length * defaultRate;
-      total += earned;
-      parts.push(tasks.length + ' tray' + (tasks.length !== 1 ? 's' : '') + ' sorted × $' + defaultRate.toFixed(2) + ' = ' + fmt(earned));
+        parts.push(totalBreaks + ' break' + (totalBreaks !== 1 ? 's' : '') + ' sorted × $' + defaultRate.toFixed(2) + ' = ' + fmt(earned));
+      }
     }
     if (defaultRate === 0 && !hasCategoryRates) parts.push('⚠ rate is $0 — set it in Team → Pay Settings');
   }
