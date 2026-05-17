@@ -5678,7 +5678,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       if (payType === 'per_break' || payType === 'hourly_per_break') {
         const perBreakRate = parseFloat(document.getElementById('ps-sorter-per-break-rate').value) || 0;
-        if (perBreakRate <= 0) { showGlobalError('Please enter a rate per break greater than $0.'); btn.disabled = false; btn.textContent = 'Save'; return; }
+        if (perBreakRate <= 0) { showGlobalError('Please enter a Rate per Break greater than $0.'); return; }
         updates.per_break_rate = perBreakRate;
         const catRates = {};
         document.querySelectorAll('#pss-category-rates-body .cat-rate-input').forEach(function(inp) {
@@ -5693,7 +5693,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const btn = document.getElementById('psSaveBtn');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      const { error } = await sb.from('profiles').update(updates).eq('id', id);
+      const { error } = await sb.from('profiles').update(updates).eq('id', id).eq('org_id', currentProfile.org_id);
       if (error) throw error;
       document.getElementById('paySettingsModal').classList.remove('active');
       await loadAllProfiles();
