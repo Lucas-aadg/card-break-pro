@@ -2178,14 +2178,15 @@
           <input type="number" id="ps-sorter-hourly-rate" min="0" step="0.01" placeholder="e.g. 15.00" />
         </div>
         <div class="form-group ps-sorter-field-per-break ps-sorter-field-hourly-per-break" id="pss-per-break-rate-group">
-          <label for="ps-sorter-per-break-rate">Rate per Break Sorted ($) <span style="color:var(--red);font-weight:800;">*</span></label>
+          <label for="ps-sorter-per-break-rate">Default Rate per Tray ($) <span style="color:var(--red);font-weight:800;">*</span> <span style="font-weight:400;color:var(--muted);font-size:0.75rem;">— used when no category rate matches</span></label>
           <input type="number" id="ps-sorter-per-break-rate" min="0.01" step="0.01" placeholder="e.g. 4.00" />
         </div>
       </div>
 
       <!-- Category Rates — only shown for per_break types -->
       <div id="pss-category-rates-group" style="display:none;margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--border);">
-        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.75rem;">Rate per Break by Category</div>
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Rate by Product Type <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.72rem;">(optional — overrides default rate per category)</span></div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem;">e.g. Baseball $3, Pokemon $5, Football $4</div>
         <div id="pss-category-rates-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem 1rem;"></div>
       </div>
     </div>
@@ -6083,12 +6084,13 @@ async function calcSorterPay(p, fromTs, toTs, result) {
     parts.push(hours.toFixed(2) + ' hrs × $' + rate.toFixed(2) + '/hr = ' + fmt(earned));
   }
 
-  // Per break sorted — flat rate, no category complexity
+  // Per break sorted — category-aware
   if (type === 'per_break' || type === 'hourly_per_break') {
-    const rate = parseFloat(p.per_break_rate) || 0;
+    const defaultRate = parseFloat(p.per_break_rate) || 0;
+    const categoryRates = p.category_rates || {};
+    const hasCategoryRates = Object.keys(categoryRates).some(function(k) { return parseFloat(categoryRates[k]) > 0; });
 
-    // Fetch all completed tasks for this sorter then filter client-side
-    // using completed_at if set, falling back to created_at — prevents NULL completed_at dropping tasks
+    // Fetch all completed tasks, filter client-side so NULL completed_at doesn't drop tasks
     let q = sb.from('sort_tasks')
       .select('id, completed_at, created_at, stream_id')
       .eq('sorter_id', p.id)
@@ -6106,13 +6108,49 @@ async function calcSorterPay(p, fromTs, toTs, result) {
       return d >= fromTs && d <= toTs;
     });
 
-    const breakCount = tasks.length;
-    const earned = breakCount * rate;
-    total += earned;
-    parts.push(breakCount + ' task' + (breakCount !== 1 ? 's' : '') + ' sorted × $' + rate.toFixed(2) + ' = ' + fmt(earned));
-
-    if (rate === 0) parts.push('⚠ rate is $0 — re-save pay settings in Team tab');
-    if (breakCount === 0) parts.push('(no completed tasks found in this period)');
+    if (!tasks.length) {
+      parts.push('0 tasks sorted (none found in this period)');
+    } else if (hasCategoryRates) {
+      // Map tasks → stream → product category
+      const streamIds = [...new Set(tasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
+      const streamCatMap = {};
+      if (streamIds.length) {
+        const { data: bks } = await sb.from('breaks').select('stream_id, products_used').in('stream_id', streamIds).not('products_used', 'is', null);
+        const streamToPid = {};
+        (bks || []).forEach(function(b) {
+          if (!streamToPid[b.stream_id] && b.products_used && b.products_used.length) {
+            const pid = b.products_used[0].product_id;
+            if (pid) streamToPid[b.stream_id] = pid;
+          }
+        });
+        const pids = [...new Set(Object.values(streamToPid))];
+        if (pids.length) {
+          const { data: prods } = await sb.from('products').select('id, category').in('id', pids);
+          const pidCat = {};
+          (prods || []).forEach(function(pr){ pidCat[pr.id] = pr.category; });
+          Object.keys(streamToPid).forEach(function(sid){ streamCatMap[sid] = pidCat[streamToPid[sid]]; });
+        }
+      }
+      const catTally = {};
+      tasks.forEach(function(t) {
+        const cat = (t.stream_id && streamCatMap[t.stream_id]) || '__default__';
+        catTally[cat] = (catTally[cat] || 0) + 1;
+      });
+      const catParts = [];
+      Object.entries(catTally).forEach(function(entry) {
+        const cat = entry[0]; const count = entry[1];
+        const rate = cat !== '__default__' && parseFloat(categoryRates[cat]) > 0 ? parseFloat(categoryRates[cat]) : defaultRate;
+        const earned = count * rate;
+        total += earned;
+        catParts.push(count + ' ' + (cat === '__default__' ? 'other' : cat) + ' × $' + rate.toFixed(2) + ' = ' + fmt(earned));
+      });
+      parts.push(catParts.join(' + '));
+    } else {
+      const earned = tasks.length * defaultRate;
+      total += earned;
+      parts.push(tasks.length + ' tray' + (tasks.length !== 1 ? 's' : '') + ' sorted × $' + defaultRate.toFixed(2) + ' = ' + fmt(earned));
+    }
+    if (defaultRate === 0 && !hasCategoryRates) parts.push('⚠ rate is $0 — set it in Team → Pay Settings');
   }
 
   if (!type || type === 'not_set') {
