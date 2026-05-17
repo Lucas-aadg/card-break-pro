@@ -769,6 +769,10 @@ document.querySelectorAll('.pay-period-btn').forEach(function (btn) {
 
 async function loadSorterPay() {
   try {
+  // Always re-fetch profile so rate changes by owner show immediately
+  const { data: freshProfile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  if (freshProfile) currentProfile = freshProfile;
+
   const from = getSorterPeriodFrom(sorterPayPeriod);
   const type = currentProfile.pay_type;
 
@@ -835,14 +839,18 @@ async function loadSorterPay() {
   // ── Per break component ────────────────────────────────
   if (type === 'per_break' || type === 'hourly_per_break') {
     const rate = parseFloat(currentProfile.per_break_rate) || 0;
-    const { data: tasks } = await sb
+    // Fetch all completed tasks then filter client-side — avoids NULL completed_at being dropped by SQL comparison
+    const { data: allSortTasks } = await sb
       .from('sort_tasks')
-      .select('id, completed_at, stream_id')
+      .select('id, completed_at, created_at, stream_id')
       .eq('sorter_id', currentUser.id)
       .eq('org_id', currentProfile.org_id)
       .eq('status', 'completed')
-      .gte('completed_at', from)
       .order('completed_at', { ascending: false });
+    const tasks = (allSortTasks || []).filter(function(t) {
+      const d = t.completed_at || t.created_at;
+      return d >= from;
+    });
 
     // Get stream keys for display
     const streamIds = [...new Set((tasks||[]).map(function(t){return t.stream_id;}).filter(Boolean))];
