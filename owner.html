@@ -2178,8 +2178,8 @@
           <input type="number" id="ps-sorter-hourly-rate" min="0" step="0.01" placeholder="e.g. 15.00" />
         </div>
         <div class="form-group ps-sorter-field-per-break ps-sorter-field-hourly-per-break" id="pss-per-break-rate-group">
-          <label for="ps-sorter-per-break-rate">Default Rate per Break ($) — fallback if category has no rate</label>
-          <input type="number" id="ps-sorter-per-break-rate" min="0" step="0.01" placeholder="e.g. 4.00" />
+          <label for="ps-sorter-per-break-rate">Rate per Break Sorted ($) <span style="color:var(--red);font-weight:800;">*</span></label>
+          <input type="number" id="ps-sorter-per-break-rate" min="0.01" step="0.01" placeholder="e.g. 4.00" />
         </div>
       </div>
 
@@ -5677,7 +5677,9 @@ document.addEventListener('DOMContentLoaded', function () {
         updates.hourly_rate = parseFloat(document.getElementById('ps-sorter-hourly-rate').value) || 0;
       }
       if (payType === 'per_break' || payType === 'hourly_per_break') {
-        updates.per_break_rate = parseFloat(document.getElementById('ps-sorter-per-break-rate').value) || 0;
+        const perBreakRate = parseFloat(document.getElementById('ps-sorter-per-break-rate').value) || 0;
+        if (perBreakRate <= 0) { showGlobalError('Please enter a rate per break greater than $0.'); btn.disabled = false; btn.textContent = 'Save'; return; }
+        updates.per_break_rate = perBreakRate;
         const catRates = {};
         document.querySelectorAll('#pss-category-rates-body .cat-rate-input').forEach(function(inp) {
           const val = parseFloat(inp.value);
