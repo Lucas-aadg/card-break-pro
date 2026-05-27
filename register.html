@@ -138,6 +138,17 @@
       margin: 1.5rem 0;
     }
     .spacer { margin-top: 1.5rem; }
+    .plan-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1.25rem; }
+    .plan-opt {
+      border: 2px solid var(--border); border-radius: 8px; padding: 0.75rem 0.5rem;
+      text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+      background: var(--bg);
+    }
+    .plan-opt:hover { border-color: var(--primary); }
+    .plan-opt.selected { border-color: var(--primary); background: rgba(79,110,247,0.07); }
+    .plan-opt-name { font-size: 0.8rem; font-weight: 800; color: var(--text); margin-bottom: 0.2rem; }
+    .plan-opt-price { font-size: 0.72rem; color: var(--primary); font-weight: 700; }
+    .plan-opt-trial { font-size: 0.65rem; color: var(--muted); margin-top: 0.15rem; }
   </style>
 </head>
 <body>
@@ -181,7 +192,27 @@
         <input type="password" id="confirmPassword" placeholder="Repeat password" required autocomplete="new-password" />
       </div>
 
-      <button type="submit" id="registerBtn" class="btn btn-primary">Create Business Account</button>
+      <div class="spacer"></div>
+      <div class="section-title">Choose Your Plan</div>
+      <div class="plan-selector" id="planSelector">
+        <div class="plan-opt selected" data-tier="starter" onclick="selectPlan('starter')">
+          <div class="plan-opt-name">Starter</div>
+          <div class="plan-opt-price">$99/mo</div>
+          <div class="plan-opt-trial">14-day free trial</div>
+        </div>
+        <div class="plan-opt" data-tier="pro" onclick="selectPlan('pro')">
+          <div class="plan-opt-name">Pro ✦</div>
+          <div class="plan-opt-price">$399.99/mo</div>
+          <div class="plan-opt-trial">7-day free trial</div>
+        </div>
+        <div class="plan-opt" data-tier="empire" onclick="selectPlan('empire')">
+          <div class="plan-opt-name">Empire</div>
+          <div class="plan-opt-price">$999.99/mo</div>
+          <div class="plan-opt-trial">Book a Demo</div>
+        </div>
+      </div>
+
+      <button type="submit" id="registerBtn" class="btn btn-primary">Start Free Trial</button>
       <p style="margin-top:0.75rem;text-align:center;font-size:0.78rem;color:var(--muted);">By registering you agree to our <a href="/terms" target="_blank" style="color:var(--primary);">Terms of Service</a> and <a href="/privacy" target="_blank" style="color:var(--primary);">Privacy Policy</a>.</p>
     </form>
 
@@ -202,6 +233,28 @@
     const successBox = document.getElementById('successBox');
     const registerBtn = document.getElementById('registerBtn');
     const registerForm = document.getElementById('registerForm');
+
+    let selectedTier = 'starter';
+
+    function selectPlan(tier) {
+      selectedTier = tier;
+      document.querySelectorAll('.plan-opt').forEach(function(el) {
+        el.classList.toggle('selected', el.dataset.tier === tier);
+      });
+      if (tier === 'empire') {
+        registerBtn.textContent = 'Create Account & Book Demo';
+      } else if (tier === 'pro') {
+        registerBtn.textContent = 'Start 7-Day Free Trial';
+      } else {
+        registerBtn.textContent = 'Start 14-Day Free Trial';
+      }
+    }
+
+    // Pre-select tier from query param (e.g. ?plan=pro from landing page CTAs)
+    (function() {
+      const p = new URLSearchParams(window.location.search).get('plan');
+      if (p && ['starter','pro','empire'].includes(p)) selectPlan(p);
+    })();
 
     function escHtml(str) {
       return String(str)
@@ -307,14 +360,23 @@
           return;
         }
 
+        // Empire tier: redirect to mailto instead of checkout
+        if (selectedTier === 'empire') {
+          showSuccess('Account created! Redirecting to book your demo…');
+          registerBtn.textContent = 'Redirecting…';
+          setTimeout(function() {
+            window.location.href = 'mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Setup&body=Hi%2C%20I%20just%20registered%20for%20Card%20Break%20Pro.%20Email%3A%20' + encodeURIComponent(email) + '%0AOrgId%3A%20' + encodeURIComponent(orgId);
+          }, 1000);
+          return;
+        }
+
         showSuccess('Account created! Redirecting to start your free trial…');
         registerBtn.textContent = 'Redirecting…';
 
-        // Redirect to Stripe Checkout for $250/mo subscription
         const response = await fetch('/api/create-checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: authData.user.id, email: authData.user.email, orgId: orgId })
+          body: JSON.stringify({ userId: authData.user.id, email: authData.user.email, orgId: orgId, tier: selectedTier })
         });
 
         let responseData;

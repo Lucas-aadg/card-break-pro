@@ -241,10 +241,10 @@
 
         <div class="plan-row">
           <div>
-            <div class="plan-name">Card Break Pro</div>
-            <div class="plan-period">Billed monthly</div>
+            <div class="plan-name" id="planName">Card Break Pro</div>
+            <div class="plan-period" id="planPeriod">Billed monthly</div>
           </div>
-          <div class="plan-price">$250<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span></div>
+          <div class="plan-price" id="planPrice">—</div>
         </div>
 
         <!-- Active: manage via Stripe portal -->
@@ -319,7 +319,7 @@
 
         const { data: sub, error: subError } = await sb
           .from('subscriptions')
-          .select('status, stripe_customer_id, comped')
+          .select('status, stripe_customer_id, comped, tier')
           .eq('org_id', profile.org_id)
           .maybeSingle();
 
@@ -340,6 +340,20 @@
         const status = sub ? sub.status : 'inactive';
         setStatus(status);
 
+        // Populate plan display based on tier
+        const TIER_DISPLAY = {
+          starter: { name: 'Starter', price: '$99<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span>', period: 'Billed monthly &bull; 14-day free trial' },
+          pro:     { name: 'Pro',     price: '$399.99<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span>', period: 'Billed monthly &bull; 7-day free trial' },
+          empire:  { name: 'Empire',  price: '$999.99<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span>', period: 'Billed monthly' },
+          legacy:  { name: 'Card Break Pro', price: '$250<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span>', period: 'Legacy plan &bull; Billed monthly' },
+          exempt:  { name: 'Complimentary',  price: '<span style="font-size:1rem;color:var(--muted)">—</span>', period: 'Provided complimentary access' }
+        };
+        const tier = sub ? (sub.tier || 'legacy') : 'legacy';
+        const tierInfo = TIER_DISPLAY[tier] || TIER_DISPLAY.legacy;
+        document.getElementById('planName').textContent = tierInfo.name;
+        document.getElementById('planPrice').innerHTML = tierInfo.price;
+        document.getElementById('planPeriod').innerHTML = tierInfo.period;
+
         // Check for ?subscribed=true query param
         const params = new URLSearchParams(window.location.search);
         if (params.get('subscribed') === 'true') {
@@ -348,6 +362,19 @@
 
         if (status === 'active') {
           manageBtn.style.display = 'block';
+          // Upgrade CTA for non-empire tiers
+          if (tier === 'starter' || tier === 'pro' || tier === 'legacy') {
+            const upgradeHint = document.createElement('p');
+            upgradeHint.style.cssText = 'text-align:center;font-size:0.8rem;color:var(--muted);margin-top:0.75rem;';
+            if (tier === 'starter') {
+              upgradeHint.innerHTML = 'Want AI Insights? <a href="/register?plan=pro" style="color:var(--primary);font-weight:600;">Upgrade to Pro →</a>';
+            } else if (tier === 'pro') {
+              upgradeHint.innerHTML = 'Want the Empire Dashboard? <a href="mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Inquiry" style="color:var(--primary);font-weight:600;">Contact us for Empire →</a>';
+            } else {
+              upgradeHint.innerHTML = 'See our new plans: <a href="/register" style="color:var(--primary);font-weight:600;">View Plans →</a>';
+            }
+            manageBtn.parentNode.appendChild(upgradeHint);
+          }
           manageBtn.addEventListener('click', async function () {
             manageBtn.disabled = true;
             manageBtn.textContent = 'Opening portal\u2026';

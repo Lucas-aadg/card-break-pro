@@ -37,6 +37,21 @@ async function getOrgAndOwner(sb, { subscriptionId, customerId }) {
   return { orgId: subRecord.org_id, ownerId: owner?.id ?? null };
 }
 
+// Maps tier name to seat limits stored in subscriptions table
+const TIER_LIMITS = {
+  starter: { max_breakers: 3,    max_sorters: 2, max_managers: 1 },
+  pro:     { max_breakers: 8,    max_sorters: 4, max_managers: 2 },
+  empire:  { max_breakers: null, max_sorters: null, max_managers: null },
+  legacy:  { max_breakers: null, max_sorters: null, max_managers: null }
+};
+
+// Maps Stripe Price IDs to tier names for plan-change events
+const PRICE_TIER_MAP = {
+  [process.env.STRIPE_PRICE_ID_STARTER]: 'starter',
+  [process.env.STRIPE_PRICE_ID_PRO]:     'pro',
+  [process.env.STRIPE_PRICE_ID_EMPIRE]:  'empire'
+};
+
 module.exports = async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
@@ -66,12 +81,18 @@ module.exports = async (req, res) => {
         const session = event.data.object;
         const { userId, orgId } = getMetadata(session);
         if (!orgId) break;
+        const tier = session.metadata?.tier || 'starter';
+        const limits = TIER_LIMITS[tier] || TIER_LIMITS.starter;
         const { error } = await sb.from('subscriptions').upsert({
           org_id: orgId,
           user_id: userId,
           stripe_customer_id: session.customer,
           stripe_subscription_id: session.subscription,
           status: 'active',
+          tier,
+          max_breakers:  limits.max_breakers,
+          max_sorters:   limits.max_sorters,
+          max_managers:  limits.max_managers,
           updated_at: new Date().toISOString()
         }, { onConflict: 'org_id' });
         if (error) console.error('Supabase upsert error (checkout.session.completed):', error);
@@ -80,10 +101,20 @@ module.exports = async (req, res) => {
 
       case 'customer.subscription.updated': {
         const sub = event.data.object;
-        // Treat 'trialing' as 'active' for access purposes
         const status = sub.status === 'trialing' ? 'active' : sub.status;
+        const updateFields = { status, updated_at: new Date().toISOString() };
+        // Detect plan change via portal (price switched) and update tier + limits
+        const priceId = sub.items?.data?.[0]?.price?.id;
+        const newTier = PRICE_TIER_MAP[priceId];
+        if (newTier) {
+          const limits = TIER_LIMITS[newTier] || {};
+          updateFields.tier = newTier;
+          updateFields.max_breakers = limits.max_breakers !== undefined ? limits.max_breakers : null;
+          updateFields.max_sorters  = limits.max_sorters  !== undefined ? limits.max_sorters  : null;
+          updateFields.max_managers = limits.max_managers !== undefined ? limits.max_managers : null;
+        }
         const { error } = await sb.from('subscriptions')
-          .update({ status, updated_at: new Date().toISOString() })
+          .update(updateFields)
           .eq('stripe_subscription_id', sub.id);
         if (error) console.error('Supabase update error (customer.subscription.updated):', error);
         break;
