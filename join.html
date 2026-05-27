@@ -423,6 +423,18 @@
         const orgId = codeData.org_id;
         const codeId = codeData.id;
 
+        // Seat limit check — verify this role has capacity before creating the user
+        const { data: canAdd, error: seatErr } = await sb.rpc('can_add_member', {
+          p_org_id: orgId,
+          p_role: role
+        });
+        if (seatErr || canAdd === false) {
+          showError('This organization has reached its ' + role + ' seat limit. Ask your owner to upgrade the subscription.');
+          joinBtn.disabled = false;
+          joinBtn.textContent = 'Join Team';
+          return;
+        }
+
         // Step 2: Create auth user
         const { data: authData, error: authError } = await sb.auth.signUp({
           email,

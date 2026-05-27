@@ -25,19 +25,30 @@ module.exports = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Look up the org's stripe_customer_id from the database — never trust client-provided customerId
-    const { data: org, error: orgError } = await sb
-      .from('organizations')
-      .select('stripe_customer_id')
-      .eq('owner_id', user.id)
+    // Get profile to resolve org_id for this user
+    const { data: profile, error: profileError } = await sb
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
       .single();
 
-    if (orgError || !org || !org.stripe_customer_id) {
+    if (profileError || !profile) {
+      return res.status(400).json({ error: 'Profile not found.' });
+    }
+
+    // stripe_customer_id lives in subscriptions, not organizations
+    const { data: sub, error: subError } = await sb
+      .from('subscriptions')
+      .select('stripe_customer_id')
+      .eq('org_id', profile.org_id)
+      .single();
+
+    if (subError || !sub || !sub.stripe_customer_id) {
       return res.status(400).json({ error: 'No billing account found.' });
     }
 
     const session = await stripe.billingPortal.sessions.create({
-      customer: org.stripe_customer_id,
+      customer: sub.stripe_customer_id,
       return_url: process.env.APP_URL + '/billing.html'
     });
 
