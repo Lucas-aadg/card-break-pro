@@ -1,0 +1,169 @@
+# ============================================================
+# CARD BREAK PRO — Artillery Load Test
+# ============================================================
+#
+# !! WARNING: DO NOT RUN AGAINST PRODUCTION !!
+# This script simulates 50 concurrent users.
+# Running against production will impact real customers on the
+# current nano compute instance (already at 53% RAM).
+#
+# HOW TO RUN (against staging only):
+#   npm install -g artillery
+#   SUPABASE_URL=... SUPABASE_ANON_KEY=... artillery run cardbreakpro-load-test.yml
+#
+# Set these env vars to your STAGING environment values before running.
+# ============================================================
+
+config:
+  target: "{{ $env.VERCEL_STAGING_URL }}"
+  phases:
+    - name: "Warm up"
+      duration: 30
+      arrivalRate: 5
+    - name: "Ramp to target"
+      duration: 60
+      arrivalRate: 5
+      rampTo: 50
+    - name: "Sustained load"
+      duration: 120
+      arrivalRate: 50
+  environments:
+    production:
+      target: "https://cardbreakpro.com"
+      # Intentionally left without phases to prevent accidental prod run.
+      # Override manually only for off-hours testing with explicit approval.
+  variables:
+    supabase_url: "{{ $env.SUPABASE_URL }}"
+    supabase_anon_key: "{{ $env.SUPABASE_ANON_KEY }}"
+    demo_email: "testdemo@gmail.com"
+    demo_password: "Testdemorun1"
+  http:
+    timeout: 10
+    pool: 50
+  plugins:
+    metrics-by-endpoint: {}
+
+scenarios:
+  # ── Scenario 1: Static page load (25% of traffic) ───────────
+  - name: "Static Page Load"
+    weight: 25
+    flow:
+      - get:
+          url: "/login"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/register"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/"
+          expect:
+            - statusCode: 200
+
+  # ── Scenario 2: Auth flow (25% of traffic) ──────────────────
+  # Authenticates against Supabase and loads profile.
+  - name: "Auth + Profile Load"
+    weight: 25
+    flow:
+      - post:
+          url: "{{ supabase_url }}/auth/v1/token?grant_type=password"
+          headers:
+            apikey: "{{ supabase_anon_key }}"
+            Content-Type: "application/json"
+          json:
+            email: "{{ demo_email }}"
+            password: "{{ demo_password }}"
+          capture:
+            - json: "$.access_token"
+              as: "access_token"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - get:
+          url: "{{ supabase_url }}/rest/v1/profiles?select=*&limit=1"
+          headers:
+            apikey: "{{ supabase_anon_key }}"
+            Authorization: "Bearer {{ access_token }}"
+          expect:
+            - statusCode: 200
+
+  # ── Scenario 3: Read streams (sorter/owner analytics) ───────
+  - name: "Read Streams + Breaks"
+    weight: 30
+    flow:
+      - post:
+          url: "{{ supabase_url }}/auth/v1/token?grant_type=password"
+          headers:
+            apikey: "{{ supabase_anon_key }}"
+            Content-Type: "application/json"
+          json:
+            email: "{{ demo_email }}"
+            password: "{{ demo_password }}"
+          capture:
+            - json: "$.access_token"
+              as: "access_token"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "{{ supabase_url }}/rest/v1/streams?select=*&status=eq.closed&order=created_at.desc&limit=10"
+          headers:
+            apikey: "{{ supabase_anon_key }}"
+            Authorization: "Bearer {{ access_token }}"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "{{ supabase_url }}/rest/v1/sort_tasks?select=*&status=eq.pending"
+          headers:
+            apikey: "{{ supabase_anon_key }}"
+            Authorization: "Bearer {{ access_token }}"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "{{ supabase_url }}/rest/v1/products?select=*&active=eq.true"
+          headers:
+            apikey: "{{ supabase_anon_key }}"
+            Authorization: "Bearer {{ access_token }}"
+          expect:
+            - statusCode: 200
+
+  # ── Scenario 4: Stripe checkout API (20% of traffic) ────────
+  # Tests the Vercel serverless function cold start and response.
+  # NOTE: Uses obviously invalid data — checkout will fail at Stripe,
+  # but the serverless function itself will respond. No Stripe charges.
+  - name: "Checkout API Latency"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/create-checkout"
+          headers:
+            Content-Type: "application/json"
+          json:
+            userId: "00000000-0000-0000-0000-000000000000"
+            email: "loadtest@example.com"
+            orgId: "00000000-0000-0000-0000-000000000000"
+          expect:
+            # Expects 400 or 500 (invalid IDs) — testing function responsiveness, not success
+            - statusCode:
+                oneOf: [200, 400, 500]
+
+# ============================================================
+# EXPECTED BASELINE RESULTS (Supabase Small compute)
+# ============================================================
+# Metric                  | Target      | Alarm threshold
+# ----------------------- | ----------- | ---------------
+# p50 response time       | < 200ms     | > 500ms
+# p95 response time       | < 800ms     | > 2000ms
+# p99 response time       | < 2000ms    | > 5000ms
+# Error rate              | < 1%        | > 5%
+# Supabase connections    | < 50        | > 80 (pool limit)
+# Auth token requests     | < 500ms     | > 1500ms
+#
+# If p95 > 2000ms on Small compute: upgrade to Medium.
+# If error rate > 5%: check Supabase connection pool limits.
+# ============================================================
