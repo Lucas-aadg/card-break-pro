@@ -139,7 +139,7 @@
     /* Sorter Guide Modal */
     #sorterGuide{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;}
     #sorterGuide.sg-open{display:flex;}
-    .sg-box{background:var(--card);border:1px solid var(--border);border-radius:16px;width:90%;max-width:520px;padding:2rem;position:relative;max-height:90vh;overflow-y:auto;}
+    .sg-box{background:var(--card);border:1px solid var(--border);border-radius:16px;width:92%;max-width:520px;padding:1.5rem 1.5rem 1.25rem;position:relative;max-height:80vh;overflow-y:auto;}
     .sg-screen{display:none;}
     .sg-screen.sg-active{display:block;}
     .sg-step{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-bottom:0.6rem;}
@@ -1163,8 +1163,9 @@ function sgFinish() {
 </div>
 
 <!-- Sorter First-Time Guide -->
-<div id="sorterGuide">
+<div id="sorterGuide" onclick="if(event.target===this)sgFinish()">
   <div class="sg-box">
+    <button onclick="sgFinish()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#64748b;font-size:1.4rem;cursor:pointer;line-height:1;padding:4px;z-index:1;" title="Skip guide">✕</button>
 
     <!-- Screen 1: Welcome -->
     <div class="sg-screen sg-active">

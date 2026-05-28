@@ -2032,8 +2032,9 @@
 <!-- ═══════════════════════════════════════════
      OWNER WELCOME MODAL (first login)
 ═══════════════════════════════════════════ -->
-<div id="ownerWelcomeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:1rem;">
-  <div class="owm-card">
+<div id="ownerWelcomeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)owmSkip()">
+  <div class="owm-card" style="position:relative;">
+    <button onclick="owmSkip()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#64748b;font-size:1.4rem;cursor:pointer;line-height:1;padding:4px;z-index:1;" title="Skip">✕</button>
     <!-- Screen 1: Welcome -->
     <div id="owmScreen1" class="owm-screen active">
       <div class="owm-header">
@@ -7565,6 +7566,13 @@ async function checkAndShowWizard(orgInfo) {
 function owmNext() {
   document.getElementById('owmScreen1').classList.remove('active');
   document.getElementById('owmScreen2').classList.add('active');
+}
+
+function owmSkip() {
+  const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id);
+  localStorage.setItem(welcomeKey, '1');
+  document.getElementById('ownerWelcomeModal').style.display = 'none';
+  sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id).then().catch(() => {});
 }
 
 async function owmFinish() {

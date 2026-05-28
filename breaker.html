@@ -377,7 +377,7 @@
     /* Breaker Guide Modal */
     #breakerGuide{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;}
     #breakerGuide.bg-open{display:flex;}
-    .bg-box{background:var(--card);border:1px solid var(--border);border-radius:16px;width:90%;max-width:520px;padding:2rem;position:relative;max-height:90vh;overflow-y:auto;}
+    .bg-box{background:var(--card);border:1px solid var(--border);border-radius:16px;width:92%;max-width:520px;padding:1.5rem 1.5rem 1.25rem;position:relative;max-height:80vh;overflow-y:auto;}
     .bg-screen{display:none;}
     .bg-screen.bg-active{display:block;}
     .bg-step{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-bottom:0.6rem;}
@@ -2452,8 +2452,9 @@ initAuth();
 </script>
 
 <!-- Breaker First-Time Guide -->
-<div id="breakerGuide">
+<div id="breakerGuide" onclick="if(event.target===this)bgFinish()">
   <div class="bg-box">
+    <button onclick="bgFinish()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#64748b;font-size:1.4rem;cursor:pointer;line-height:1;padding:4px;z-index:1;" title="Skip guide">✕</button>
 
     <!-- Screen 1: Welcome -->
     <div class="bg-screen bg-active">
