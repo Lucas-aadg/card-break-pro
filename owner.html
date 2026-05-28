@@ -2545,16 +2545,6 @@ async function loadHome() {
 async function loadEmpireKpis() {
   const el = document.getElementById('empireKpis');
   if (!el) return;
-  if (orgTier !== 'empire' && orgTier !== 'exempt') {
-    el.innerHTML = '<div style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;padding:2rem;background:rgba(79,110,247,0.04);border:1px solid rgba(79,110,247,0.12);border-radius:12px;">' +
-      '<div style="text-align:center;max-width:360px;">' +
-      '<div style="font-size:1.8rem;margin-bottom:0.5rem;">🏛️</div>' +
-      '<div style="font-weight:800;font-size:1rem;margin-bottom:0.4rem;color:var(--text);">Empire Dashboard</div>' +
-      '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:1rem;line-height:1.5;">Real-time revenue &amp; KPI analytics are exclusive to the Empire plan.</div>' +
-      '<a href="/billing.html" style="display:inline-block;background:linear-gradient(135deg,#4f6ef7,#6366f1);color:#fff;padding:0.5rem 1.5rem;border-radius:8px;font-weight:700;font-size:0.82rem;text-decoration:none;">Upgrade to Empire →</a>' +
-      '</div></div>';
-    return;
-  }
   const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const monthStart = today.slice(0, 7) + '-01';
   const [todayR, monthR, activeR] = await Promise.all([
@@ -2955,7 +2945,7 @@ async function initAuth() {
     } else {
       const { data } = await sb
         .from('subscriptions')
-        .select('status, comped')
+        .select('status, comped, tier')
         .eq('org_id', profile.org_id)
         .maybeSingle();
       sub = data;
