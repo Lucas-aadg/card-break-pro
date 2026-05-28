@@ -47,9 +47,12 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'No billing account found.' });
     }
 
+    const appUrl = process.env.APP_URL ||
+      ((req.headers['x-forwarded-proto'] || 'https') + '://' + (req.headers['x-forwarded-host'] || req.headers['host']));
+
     const session = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
-      return_url: process.env.APP_URL + '/billing.html'
+      return_url: appUrl + '/billing.html'
     });
 
     res.status(200).json({ url: session.url });
