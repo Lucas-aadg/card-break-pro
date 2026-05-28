@@ -1135,10 +1135,17 @@ function sgBack() {
 }
 
 function sgFinish() {
-  localStorage.setItem('cbp_sorter_guide_done_' + currentUser.id, '1');
-  document.getElementById('sorterGuide').classList.remove('sg-open');
-  if (typeof cbpTrack === 'function') cbpTrack('sorter_onboarding_complete', { organization_id: currentProfile?.org_id });
-  sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id).then().catch(() => {});
+  const g = document.getElementById('sorterGuide');
+  if (g) { g.classList.remove('sg-open'); g.style.display = 'none'; }
+  try {
+    if (currentUser && currentUser.id) {
+      localStorage.setItem('cbp_sorter_guide_done_' + currentUser.id, '1');
+    }
+  } catch(e) {}
+  if (currentUser && currentUser.id) {
+    if (typeof cbpTrack === 'function') cbpTrack('sorter_onboarding_complete', { organization_id: currentProfile?.org_id });
+    sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id).then().catch(() => {});
+  }
 }
 </script>
 
@@ -1165,7 +1172,7 @@ function sgFinish() {
 <!-- Sorter First-Time Guide -->
 <div id="sorterGuide" onclick="if(event.target===this)sgFinish()">
   <div class="sg-box">
-    <button onclick="sgFinish()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#64748b;font-size:1.4rem;cursor:pointer;line-height:1;padding:4px;z-index:1;" title="Skip guide">✕</button>
+    <button onclick="sgFinish()" style="position:absolute;top:10px;right:10px;background:rgba(45,45,61,0.9);border:1px solid rgba(79,110,247,0.2);color:#e2e8f0;font-size:1rem;cursor:pointer;line-height:1;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:2;" title="Skip guide">✕</button>
 
     <!-- Screen 1: Welcome -->
     <div class="sg-screen sg-active">

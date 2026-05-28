@@ -2034,7 +2034,7 @@
 ═══════════════════════════════════════════ -->
 <div id="ownerWelcomeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)owmSkip()">
   <div class="owm-card" style="position:relative;">
-    <button onclick="owmSkip()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#64748b;font-size:1.4rem;cursor:pointer;line-height:1;padding:4px;z-index:1;" title="Skip">✕</button>
+    <button onclick="owmSkip()" style="position:absolute;top:10px;right:10px;background:rgba(45,45,61,0.9);border:1px solid rgba(79,110,247,0.2);color:#e2e8f0;font-size:1rem;cursor:pointer;line-height:1;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:2;" title="Skip">✕</button>
     <!-- Screen 1: Welcome -->
     <div id="owmScreen1" class="owm-screen active">
       <div class="owm-header">
@@ -7569,19 +7569,25 @@ function owmNext() {
 }
 
 function owmSkip() {
-  const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id);
-  localStorage.setItem(welcomeKey, '1');
   document.getElementById('ownerWelcomeModal').style.display = 'none';
-  sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id).then().catch(() => {});
+  try {
+    const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id || 'guest');
+    localStorage.setItem(welcomeKey, '1');
+  } catch(e) {}
+  if (currentProfile?.org_id) {
+    sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id).then().catch(() => {});
+  }
 }
 
 async function owmFinish() {
-  // Set localStorage gate FIRST — modal never shows again regardless of DB
-  const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id);
-  localStorage.setItem(welcomeKey, '1');
   document.getElementById('ownerWelcomeModal').style.display = 'none';
-  // DB update fire-and-forget
-  sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id).then().catch(() => {});
+  try {
+    const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id || 'guest');
+    localStorage.setItem(welcomeKey, '1');
+  } catch(e) {}
+  if (currentProfile?.org_id) {
+    sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id).then().catch(() => {});
+  }
   // Start checklist
   await oclInit();
 }
