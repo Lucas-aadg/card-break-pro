@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="config.js"></script>
+  <script src="analytics.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -581,6 +582,38 @@
     .my-sched-chip{background:linear-gradient(135deg,rgba(79,110,247,0.18),rgba(99,102,241,0.1));border:1px solid rgba(79,110,247,0.35);border-radius:8px;padding:8px 10px;font-size:0.78rem;position:relative;overflow:hidden;}
     .my-sched-chip.msc-done{background:linear-gradient(135deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08));border-color:rgba(34,197,94,0.4);}
     .my-sched-chip.msc-live{background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(245,158,11,0.08));border-color:rgba(245,158,11,0.4);}
+
+    /* ── Owner Welcome Modal ── */
+    #ownerWelcomeModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:1rem;}
+    .owm-card{background:#10101e;border:1px solid rgba(79,110,247,0.3);border-radius:18px;width:100%;max-width:540px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,0.7);}
+    .owm-header{background:linear-gradient(135deg,rgba(79,110,247,0.15),rgba(99,102,241,0.05));padding:2rem 2.25rem 1.5rem;border-bottom:1px solid rgba(79,110,247,0.15);}
+    .owm-body{padding:2rem 2.25rem 2.25rem;}
+    .owm-screen{display:none;}.owm-screen.active{display:block;}
+    .owm-orient-item{display:flex;gap:1rem;align-items:flex-start;padding:0.9rem 0;border-bottom:1px solid rgba(79,110,247,0.08);}
+    .owm-orient-item:last-child{border-bottom:none;padding-bottom:0;}
+    .owm-orient-icon{width:38px;height:38px;border-radius:10px;background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+    .owm-orient-text h4{font-size:0.88rem;font-weight:700;color:var(--text);margin-bottom:0.2rem;}
+    .owm-orient-text p{font-size:0.78rem;color:var(--muted);line-height:1.45;margin:0;}
+    .owm-orient-time{font-size:0.68rem;font-weight:700;color:var(--primary);background:rgba(79,110,247,0.1);border-radius:4px;padding:0.15rem 0.4rem;margin-left:auto;flex-shrink:0;height:fit-content;}
+
+    /* ── Onboarding Checklist Widget ── */
+    #onboardingChecklist{position:fixed;bottom:1.5rem;right:1.5rem;z-index:2500;width:300px;font-family:'Segoe UI',system-ui,sans-serif;}
+    .ocl-collapsed{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:0.75rem 1rem;cursor:pointer;display:flex;align-items:center;gap:0.6rem;box-shadow:0 4px 20px rgba(0,0,0,0.4);}
+    .ocl-collapsed:hover{border-color:var(--primary);}
+    .ocl-progress-ring{width:28px;height:28px;flex-shrink:0;}
+    .ocl-progress-ring circle{transition:stroke-dashoffset 0.4s ease;}
+    .ocl-expanded{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.5);}
+    .ocl-exp-header{display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1rem;border-bottom:1px solid var(--border);cursor:pointer;}
+    .ocl-exp-header:hover{background:rgba(79,110,247,0.04);}
+    .ocl-step{padding:0.75rem 1rem;display:flex;align-items:flex-start;gap:0.65rem;border-bottom:1px solid rgba(255,255,255,0.04);}
+    .ocl-step:last-of-type{border-bottom:1px solid var(--border);}
+    .ocl-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+    .ocl-check.done{background:var(--green);border-color:var(--green);}
+    .ocl-step-text h5{font-size:0.8rem;font-weight:700;color:var(--text);margin:0 0 0.15rem;}
+    .ocl-step-text p{font-size:0.72rem;color:var(--muted);margin:0;line-height:1.4;}
+    .ocl-go-btn{margin-left:auto;flex-shrink:0;background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.25);color:var(--primary);border-radius:6px;padding:0.25rem 0.6rem;font-size:0.7rem;font-weight:700;cursor:pointer;transition:background 0.15s;}
+    .ocl-go-btn:hover{background:rgba(79,110,247,0.22);}
+    .ocl-complete-banner{padding:1.25rem 1rem;text-align:center;}
   </style>
 </head>
 <body>
@@ -1989,6 +2022,135 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════
+     OWNER WELCOME MODAL (first login)
+═══════════════════════════════════════════ -->
+<div id="ownerWelcomeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:1rem;">
+  <div class="owm-card">
+    <!-- Screen 1: Welcome -->
+    <div id="owmScreen1" class="owm-screen active">
+      <div class="owm-header">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:2px;margin-bottom:0.5rem;">Card Break Pro</div>
+        <h2 style="font-size:1.5rem;font-weight:900;color:var(--text);margin:0 0 0.5rem;">Welcome to CardBreakPro.</h2>
+        <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;margin:0;">You just replaced every spreadsheet, group chat, and manual calculation your operation runs on.</p>
+      </div>
+      <div class="owm-body">
+        <p style="color:var(--muted);font-size:0.88rem;line-height:1.6;margin:0 0 1.5rem;">Let's get you set up in under 10 minutes. You'll have real-time profit tracking, your team on the platform, and payroll calculated automatically before you close your first stream.</p>
+        <button class="btn btn-primary" style="width:100%;padding:0.9rem;font-size:0.95rem;" onclick="owmNext()">Start Setup →</button>
+      </div>
+    </div>
+    <!-- Screen 2: Orientation overview -->
+    <div id="owmScreen2" class="owm-screen">
+      <div class="owm-header">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:2px;margin-bottom:0.5rem;">Quick Orientation</div>
+        <h2 style="font-size:1.3rem;font-weight:900;color:var(--text);margin:0 0 0.3rem;">Here's what we'll set up.</h2>
+        <p style="color:var(--muted);font-size:0.82rem;margin:0;">Total time: under 10 minutes.</p>
+      </div>
+      <div class="owm-body">
+        <div class="owm-orient-item">
+          <div class="owm-orient-icon">📺</div>
+          <div class="owm-orient-text">
+            <h4>Create your channel</h4>
+            <p>Your breaking channel is where streams are organized. Name it and assign a sport or category.</p>
+          </div>
+          <div class="owm-orient-time">2 min</div>
+        </div>
+        <div class="owm-orient-item">
+          <div class="owm-orient-icon">📦</div>
+          <div class="owm-orient-text">
+            <h4>Add your products</h4>
+            <p>Enter the boxes you break with cost and category. Profit tracking works from the moment you add them.</p>
+          </div>
+          <div class="owm-orient-time">3 min</div>
+        </div>
+        <div class="owm-orient-item">
+          <div class="owm-orient-icon">👥</div>
+          <div class="owm-orient-text">
+            <h4>Invite your team</h4>
+            <p>Share an invite code. Your breakers and sorters join in one click and see their schedule immediately.</p>
+          </div>
+          <div class="owm-orient-time">2 min</div>
+        </div>
+        <div class="owm-orient-item">
+          <div class="owm-orient-icon">💰</div>
+          <div class="owm-orient-text">
+            <h4>Configure payroll</h4>
+            <p>Set commission, hourly, or flat rate for each team member. The platform calculates everything automatically.</p>
+          </div>
+          <div class="owm-orient-time">3 min</div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;padding:0.9rem;font-size:0.95rem;margin-top:1.5rem;" onclick="owmFinish()">Let's Go →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     ONBOARDING CHECKLIST WIDGET
+═══════════════════════════════════════════ -->
+<div id="onboardingChecklist" style="display:none;">
+  <!-- Collapsed state -->
+  <div id="oclCollapsed" class="ocl-collapsed" onclick="oclExpand()" style="display:none;">
+    <svg class="ocl-progress-ring" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(79,110,247,0.2)" stroke-width="2.5"/>
+      <circle id="oclRingFill" cx="14" cy="14" r="11" fill="none" stroke="#4f6ef7" stroke-width="2.5"
+        stroke-dasharray="69.1" stroke-dashoffset="69.1" stroke-linecap="round" transform="rotate(-90 14 14)"/>
+    </svg>
+    <span id="oclCollapsedLabel" style="font-size:0.82rem;font-weight:700;color:var(--text);">Setup: 0 of 4 done</span>
+    <span style="margin-left:auto;color:var(--muted);font-size:0.75rem;">▲</span>
+  </div>
+  <!-- Expanded state -->
+  <div id="oclExpanded" class="ocl-expanded">
+    <div class="ocl-exp-header" onclick="oclCollapse()">
+      <div>
+        <div style="font-size:0.82rem;font-weight:800;color:var(--text);">Setup Checklist</div>
+        <div id="oclExpandedSub" style="font-size:0.72rem;color:var(--muted);margin-top:0.1rem;">0 of 4 steps complete</div>
+      </div>
+      <span style="color:var(--muted);font-size:0.75rem;">▼</span>
+    </div>
+
+    <div class="ocl-step" id="oclStep1">
+      <div class="ocl-check" id="oclCheck1"></div>
+      <div class="ocl-step-text">
+        <h5>Create your first channel</h5>
+        <p>Set up the channel where your breaks happen.</p>
+      </div>
+      <button class="ocl-go-btn" onclick="oclGo(1)">Go</button>
+    </div>
+    <div class="ocl-step" id="oclStep2" style="opacity:0.5;pointer-events:none;">
+      <div class="ocl-check" id="oclCheck2"></div>
+      <div class="ocl-step-text">
+        <h5>Add your products</h5>
+        <p>Enter the boxes you break with cost &amp; category.</p>
+      </div>
+      <button class="ocl-go-btn" onclick="oclGo(2)">Go</button>
+    </div>
+    <div class="ocl-step" id="oclStep3" style="opacity:0.5;pointer-events:none;">
+      <div class="ocl-check" id="oclCheck3"></div>
+      <div class="ocl-step-text">
+        <h5>Invite your team</h5>
+        <p>Send invite codes to your breakers and sorters.</p>
+      </div>
+      <button class="ocl-go-btn" onclick="oclGo(3)">Go</button>
+    </div>
+    <div class="ocl-step" id="oclStep4" style="opacity:0.5;pointer-events:none;">
+      <div class="ocl-check" id="oclCheck4"></div>
+      <div class="ocl-step-text">
+        <h5>Configure payroll settings</h5>
+        <p>Set each team member's pay structure.</p>
+      </div>
+      <button class="ocl-go-btn" onclick="oclGo(4)">Go</button>
+    </div>
+
+    <div id="oclComplete" class="ocl-complete-banner" style="display:none;">
+      <div style="font-size:1.5rem;margin-bottom:0.5rem;">🎉</div>
+      <div style="font-size:0.92rem;font-weight:800;color:var(--text);margin-bottom:0.35rem;">You're live.</div>
+      <div style="font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:1rem;">Your operation is set up and ready to run. Go break some boxes.</div>
+      <button class="btn btn-primary" style="font-size:0.82rem;padding:0.5rem 1.2rem;" onclick="oclDismiss()">Dismiss</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM MODAL (generic) -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal" style="max-width:400px;">
@@ -2545,6 +2707,7 @@ async function loadHome() {
 async function loadEmpireKpis() {
   const el = document.getElementById('empireKpis');
   if (!el) return;
+  cbpTrack('empire_dashboard_viewed', { org_id: currentProfile && currentProfile.org_id });
   const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const monthStart = today.slice(0, 7) + '-01';
   const [todayR, monthR, activeR] = await Promise.all([
@@ -2697,6 +2860,7 @@ async function loadInsights() {
   const el = document.getElementById('insightsBody');
   const btn = document.getElementById('insightsRefreshBtn');
   if (!el) return;
+  cbpTrack('ai_insights_viewed', { org_id: currentProfile && currentProfile.org_id });
   if (orgTier === 'starter') {
     el.innerHTML = '<div style="padding:1.5rem;text-align:center;">' +
       '<div style="font-size:1.5rem;margin-bottom:0.5rem;">✦</div>' +
@@ -2892,6 +3056,8 @@ document.addEventListener('DOMContentLoaded', function() {
       } else {
         const { error } = await sb.from('channels').insert({ org_id: currentProfile.org_id, name, icon, color, sort_order: orgChannels.length });
         if (error) throw error;
+        cbpTrack('owner_channel_created', { org_id: currentProfile.org_id });
+        oclRefresh();
       }
       document.getElementById('channelModal').classList.remove('active');
       await loadChannels();
@@ -2972,6 +3138,23 @@ async function initAuth() {
     orgTier = sub ? (sub.tier || 'legacy') : 'legacy';
     document.getElementById('ownerBadge').textContent = escHtml(profile.display_name);
 
+    // PostHog: identify user with org/tier context
+    const { data: orgInfo } = await sb.from('organizations').select('name,first_login_shown,checklist_dismissed').eq('id', profile.org_id).maybeSingle();
+    const daysSince = Math.round((Date.now() - new Date(currentUser.created_at || Date.now()).getTime()) / 86400000);
+    cbpIdentify(currentUser.id, {
+      organization_id: profile.org_id,
+      organization_name: orgInfo?.name || '',
+      subscription_tier: orgTier,
+      days_since_signup: daysSince,
+      role: 'owner'
+    });
+    // Fire first-login event once per session using localStorage
+    if (!localStorage.getItem('cbp_owner_login_' + currentUser.id)) {
+      cbpTrack('owner_first_login', { org_id: profile.org_id });
+      localStorage.setItem('cbp_owner_login_' + currentUser.id, '1');
+    }
+    cbpTrackPage('owner_dashboard');
+
     await Promise.all([loadChannels(), loadAllProfiles()]);
     await loadProducts();
     populateChannelDropdowns();
@@ -2994,8 +3177,8 @@ async function initAuth() {
     loadNotifCount();
     setInterval(loadNotifCount, 60000); // refresh every minute
 
-    // Setup wizard (first-time setup)
-    await checkAndShowWizard();
+    // Onboarding: welcome modal + checklist widget
+    await checkAndShowWizard(orgInfo);
 
     hideLoading();
   } catch (err) {
@@ -3548,6 +3731,12 @@ async function beHandleSubmit() {
     });
     if (breakErr) throw breakErr;
 
+    // PostHog: track break logged
+    cbpTrack('break_logged', { org_id: currentProfile.org_id, break_number: beBreakNumber });
+    if (beBreakNumber === 1 && beSubmittedBreaks.length === 0) {
+      cbpTrack('owner_first_break_logged', { org_id: currentProfile.org_id });
+    }
+
     // Deduct stock + log usage
     for (const used of productsUsed) {
       const product = orgProducts.find(function (p) { return p.id === used.product_id; });
@@ -3759,6 +3948,12 @@ function setupCloseOutModal() {
       beRenderProductTable();
 
       showGlobalSuccess('Stream closed! Net Profit: ' + fmt(netProfit));
+      cbpTrack('stream_closed', { org_id: currentProfile.org_id, net_profit: netProfit });
+      // Fire first-stream event using a localStorage flag
+      if (!localStorage.getItem('cbp_first_stream_' + currentProfile.org_id)) {
+        cbpTrack('owner_first_stream_closed', { org_id: currentProfile.org_id });
+        localStorage.setItem('cbp_first_stream_' + currentProfile.org_id, '1');
+      }
     } catch (err) {
       showGlobalError('Close out failed: ' + escHtml(err.message));
       console.error(err);
@@ -4085,6 +4280,8 @@ async function invHandleSave() {
       channel_id: channelSelVal
     }).select('id').single();
     if (error) throw error;
+    cbpTrack('owner_product_added', { org_id: currentProfile.org_id });
+    oclRefresh();
 
     // Log initial stock
     if (stock > 0 && newProd) {
@@ -5226,6 +5423,8 @@ async function generateInviteCode() {
     document.getElementById('inviteCodeDisplay').style.display = 'block';
     await loadTeam();
     showGlobalSuccess('Invite code generated!');
+    cbpTrack('owner_team_member_invited', { org_id: currentProfile.org_id });
+    oclRefresh();
   } catch (err) {
     showGlobalError('Failed to generate code: ' + escHtml(err.message));
   } finally {
@@ -5712,6 +5911,8 @@ document.addEventListener('DOMContentLoaded', function () {
       await loadAllProfiles();
       await loadTeam();
       showGlobalSuccess('Pay settings saved for ' + profile.display_name + '.');
+      cbpTrack('owner_payroll_configured', { org_id: currentProfile.org_id });
+      oclRefresh();
     } catch (err) {
       showGlobalError('Failed to save: ' + escHtml(err.message));
     } finally {
@@ -7337,18 +7538,146 @@ function updateTimeFormatBtns() {
   btn24.style.border = is24 ? 'none' : '1px solid var(--border)';
 }
 
-// ── Setup Wizard ──────────────────────────────────────────
-let wizardStep = 1;
-const WIZARD_STEPS = 5;
+// ── Owner Welcome Modal + Onboarding Checklist ───────────
+async function checkAndShowWizard(orgInfo) {
+  // If first_login_shown is false (or null = new column default), show 2-screen welcome modal
+  if (!orgInfo || !orgInfo.first_login_shown) {
+    document.getElementById('ownerWelcomeModal').style.display = 'flex';
+    return; // checklist shows after modal closes
+  }
+  // Checklist shown until dismissed
+  if (!orgInfo.checklist_dismissed) {
+    await oclInit();
+  }
+}
 
-async function checkAndShowWizard() {
+function owmNext() {
+  document.getElementById('owmScreen1').classList.remove('active');
+  document.getElementById('owmScreen2').classList.add('active');
+}
+
+async function owmFinish() {
+  document.getElementById('ownerWelcomeModal').style.display = 'none';
+  // Mark first_login_shown so it never shows again
+  await sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id);
+  // Start checklist
+  await oclInit();
+  // Navigate to Channels tab so owner lands on Step 1
+  const channelTab = document.querySelector('[data-tab="channels"]');
+  if (channelTab) channelTab.click();
+}
+
+// ── Onboarding Checklist Widget ───────────────────────────
+let oclState = { s1: false, s2: false, s3: false, s4: false };
+let oclPollTimer = null;
+
+async function oclInit() {
+  const el = document.getElementById('onboardingChecklist');
+  el.style.display = 'block';
+  document.getElementById('oclExpanded').style.display = 'block';
+  document.getElementById('oclCollapsed').style.display = 'none';
+  await oclRefresh();
+  // Poll every 30 seconds while on page
+  if (oclPollTimer) clearInterval(oclPollTimer);
+  oclPollTimer = setInterval(oclRefresh, 30000);
+}
+
+async function oclRefresh() {
   try {
-    const { data: org } = await sb.from('orgs').select('setup_complete').eq('id', currentProfile.org_id).maybeSingle();
-    if (!org || org.setup_complete) return; // Already completed
-    showWizard();
-  } catch (e) {
-    // If orgs query fails (e.g. no RLS), silently skip
-    console.warn('Wizard check skipped:', e.message);
+    const orgId = currentProfile.org_id;
+    const [chRes, prRes, invRes, payRes] = await Promise.all([
+      sb.from('channels').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
+      sb.from('products').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
+      sb.from('invite_codes').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
+      sb.from('profiles').select('id', { count: 'exact', head: true }).eq('org_id', orgId).not('pay_type', 'is', null).neq('role', 'owner')
+    ]);
+    oclState = {
+      s1: (chRes.count || 0) > 0,
+      s2: (prRes.count || 0) > 0,
+      s3: (invRes.count || 0) > 0,
+      s4: (payRes.count || 0) > 0
+    };
+    oclRender();
+  } catch (e) { /* silent — checklist is non-critical */ }
+}
+
+function oclRender() {
+  const steps = [oclState.s1, oclState.s2, oclState.s3, oclState.s4];
+  const done = steps.filter(Boolean).length;
+  const all = done === 4;
+
+  steps.forEach(function (completed, i) {
+    const n = i + 1;
+    const check = document.getElementById('oclCheck' + n);
+    const step = document.getElementById('oclStep' + n);
+    if (!check || !step) return;
+    if (completed) {
+      check.classList.add('done');
+      check.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      step.style.opacity = '1';
+      step.style.pointerEvents = 'auto';
+    } else {
+      check.classList.remove('done');
+      check.innerHTML = '';
+      // Unlock steps in order (step N unlocks when step N-1 is done)
+      const prev = i === 0 ? true : steps[i - 1];
+      step.style.opacity = prev ? '1' : '0.5';
+      step.style.pointerEvents = prev ? 'auto' : 'none';
+    }
+  });
+
+  // Progress ring (SVG dashoffset)
+  const circumference = 69.1;
+  const offset = circumference - (done / 4) * circumference;
+  const ring = document.getElementById('oclRingFill');
+  if (ring) ring.style.strokeDashoffset = offset;
+
+  // Collapsed label
+  const collLabel = document.getElementById('oclCollapsedLabel');
+  if (collLabel) collLabel.textContent = 'Setup: ' + done + ' of 4 done';
+
+  // Expanded subtitle
+  const expSub = document.getElementById('oclExpandedSub');
+  if (expSub) expSub.textContent = done + ' of 4 steps complete';
+
+  // Completion screen
+  const completeBanner = document.getElementById('oclComplete');
+  if (all && completeBanner) {
+    completeBanner.style.display = 'block';
+    if (!localStorage.getItem('cbp_onboarding_complete_' + currentProfile.org_id)) {
+      cbpTrack('owner_onboarding_complete', { org_id: currentProfile.org_id });
+      localStorage.setItem('cbp_onboarding_complete_' + currentProfile.org_id, '1');
+    }
+    clearInterval(oclPollTimer);
+  }
+}
+
+function oclExpand() {
+  document.getElementById('oclCollapsed').style.display = 'none';
+  document.getElementById('oclExpanded').style.display = 'block';
+}
+function oclCollapse() {
+  document.getElementById('oclExpanded').style.display = 'none';
+  document.getElementById('oclCollapsed').style.display = 'flex';
+}
+async function oclDismiss() {
+  document.getElementById('onboardingChecklist').style.display = 'none';
+  clearInterval(oclPollTimer);
+  await sb.from('organizations').update({ checklist_dismissed: true }).eq('id', currentProfile.org_id);
+}
+
+function oclGo(step) {
+  const tabMap = { 1: 'channels', 2: 'inventory', 3: 'team', 4: 'team' };
+  const tabName = tabMap[step];
+  if (!tabName) return;
+  const btn = document.querySelector('[data-tab="' + tabName + '"]');
+  if (btn) btn.click();
+  // For payroll (step 4), also scroll to pay settings note
+  if (step === 4) {
+    setTimeout(function () {
+      const ps = document.querySelector('#tab-team');
+      if (ps) ps.scrollIntoView({ behavior: 'smooth' });
+    }, 300);
   }
 }
 
@@ -7418,6 +7747,8 @@ async function wizCreateChannel() {
     if (error) throw error;
     await loadChannels();
     populateChannelDropdowns();
+    cbpTrack('owner_channel_created', { org_id: currentProfile.org_id });
+    oclRefresh();
     wizNext();
   } catch (e) {
     errEl.textContent = e.message; errEl.style.display = 'block';
@@ -7464,6 +7795,8 @@ async function wizCreateProduct() {
     const { error } = await sb.from('products').insert({ org_id: currentProfile.org_id, name, category: category || null, cost_per_box: cost, quantity: qty });
     if (error) throw error;
     await loadProducts();
+    cbpTrack('owner_product_added', { org_id: currentProfile.org_id });
+    oclRefresh();
     wizNext();
   } catch (e) {
     errEl.textContent = e.message; errEl.style.display = 'block';

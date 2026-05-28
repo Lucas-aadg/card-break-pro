@@ -12,5 +12,11 @@
     { "source": "/sorter", "destination": "/sorter.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/privacy", "destination": "/privacy.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/trial-cron",
+      "schedule": "0 14 * * *"
+    }
   ]
 }

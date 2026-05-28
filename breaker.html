@@ -7,6 +7,7 @@
   <title>Card Break Pro — Break Entry</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
+  <script src="analytics.js"></script>
   <style>
     :root {
       --bg: #0d0d14;
@@ -365,6 +366,26 @@
     .my-sched-chip{background:linear-gradient(135deg,rgba(79,110,247,0.18),rgba(99,102,241,0.1));border:1px solid rgba(79,110,247,0.35);border-radius:8px;padding:8px 10px;font-size:0.78rem;position:relative;overflow:hidden;margin-bottom:4px;}
     .my-sched-chip.msc-done{background:linear-gradient(135deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08));border-color:rgba(34,197,94,0.4);}
     .my-sched-chip.msc-live{background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(245,158,11,0.08));border-color:rgba(245,158,11,0.4);}
+
+    /* Breaker Guide Modal */
+    #breakerGuide{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;}
+    #breakerGuide.bg-open{display:flex;}
+    .bg-box{background:var(--card);border:1px solid var(--border);border-radius:16px;width:90%;max-width:520px;padding:2rem;position:relative;max-height:90vh;overflow-y:auto;}
+    .bg-screen{display:none;}
+    .bg-screen.bg-active{display:block;}
+    .bg-step{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-bottom:0.6rem;}
+    .bg-title{font-size:1.45rem;font-weight:800;color:var(--text);margin-bottom:0.75rem;line-height:1.3;}
+    .bg-body{color:#a0aec0;font-size:0.93rem;line-height:1.65;margin-bottom:1.5rem;}
+    .bg-icon{font-size:2.4rem;margin-bottom:0.75rem;}
+    .bg-actions{display:flex;justify-content:space-between;align-items:center;gap:0.75rem;}
+    .bg-btn-next{background:var(--primary);color:#fff;border:none;border-radius:8px;padding:0.65rem 1.5rem;font-weight:700;font-size:0.95rem;cursor:pointer;transition:opacity 0.15s;flex:1;}
+    .bg-btn-next:hover{opacity:0.85;}
+    .bg-btn-back{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1.1rem;font-weight:600;font-size:0.9rem;cursor:pointer;}
+    .bg-btn-back:hover{color:var(--text);}
+    .bg-dots{display:flex;gap:6px;justify-content:center;margin-top:1.25rem;}
+    .bg-dot{width:7px;height:7px;border-radius:50%;background:var(--border);transition:background 0.2s;}
+    .bg-dot.bg-dot-active{background:var(--primary);}
+    .bg-highlight{background:rgba(79,110,247,0.12);border-left:3px solid var(--primary);border-radius:6px;padding:0.6rem 0.9rem;margin:0.75rem 0;font-size:0.88rem;color:var(--text);}
   </style>
 </head>
 <body>
@@ -866,6 +887,7 @@ async function initAuth() {
     setInterval(loadNotifCount, 60000);
     loadMyScheduleView();
     hideLoading();
+    checkBreakerOnboarding();
   } catch (err) {
     hideLoading();
     showError('Failed to initialize: ' + err.message);
@@ -1432,6 +1454,11 @@ async function handleSubmitBreak() {
     renderProductTable();
 
     showSuccess('Break ' + (breakNumber - 1) + ' submitted! Running total updated.');
+    const fbFlagKey = 'cbp_breaker_first_break_' + (currentUser?.id || '');
+    if (!localStorage.getItem(fbFlagKey)) {
+      localStorage.setItem(fbFlagKey, '1');
+      if (typeof cbpTrack === 'function') cbpTrack('breaker_first_break_submitted', { organization_id: currentProfile?.org_id });
+    }
   } catch (err) {
     showError('Failed to submit break: ' + escHtml(err.message));
     console.error(err);
@@ -2323,8 +2350,225 @@ document.addEventListener('click', function(e) {
   if (notifPanelOpen && !document.getElementById('notifBellWrap').contains(e.target)) closeNotifPanel();
 });
 
+// ── Breaker Guide ────────────────────────────────────────
+let bgCurrentScreen = 0;
+const BG_TOTAL = 7;
+
+async function checkBreakerOnboarding() {
+  if (!currentProfile) return;
+  if (currentProfile.onboarding_complete) return;
+
+  const orgId = currentProfile.org_id;
+  const { data: orgRow } = await sb.from('organizations').select('name').eq('id', orgId).maybeSingle();
+  const orgName = orgRow?.name || 'your organization';
+
+  const daysSince = currentProfile.created_at
+    ? Math.floor((Date.now() - new Date(currentProfile.created_at).getTime()) / 86400000)
+    : 0;
+
+  if (typeof cbpIdentify === 'function') {
+    cbpIdentify(currentUser.id, {
+      role: 'breaker',
+      organization_id: orgId,
+      organization_name: orgName,
+      days_since_signup: daysSince
+    });
+  }
+
+  const flagKey = 'cbp_breaker_first_login_' + currentUser.id;
+  if (!localStorage.getItem(flagKey)) {
+    localStorage.setItem(flagKey, '1');
+    if (typeof cbpTrack === 'function') cbpTrack('breaker_first_login', { organization_id: orgId });
+  }
+
+  showBreakerGuide();
+}
+
+function showBreakerGuide() {
+  bgCurrentScreen = 0;
+  bgRender();
+  document.getElementById('breakerGuide').classList.add('bg-open');
+}
+
+function bgRender() {
+  document.querySelectorAll('.bg-screen').forEach((s, i) => {
+    s.classList.toggle('bg-active', i === bgCurrentScreen);
+  });
+  document.querySelectorAll('.bg-dot').forEach((d, i) => {
+    d.classList.toggle('bg-dot-active', i === bgCurrentScreen);
+  });
+}
+
+function bgNext() {
+  if (bgCurrentScreen < BG_TOTAL - 1) {
+    bgCurrentScreen++;
+    bgRender();
+  }
+}
+
+function bgBack() {
+  if (bgCurrentScreen > 0) {
+    bgCurrentScreen--;
+    bgRender();
+  }
+}
+
+async function bgFinish() {
+  document.getElementById('breakerGuide').classList.remove('bg-open');
+
+  if (typeof cbpTrack === 'function') {
+    cbpTrack('breaker_onboarding_complete', {
+      organization_id: currentProfile?.org_id
+    });
+  }
+
+  await sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id);
+}
+
 // ── Boot ──────────────────────────────────────────────────
 initAuth();
 </script>
+
+<!-- Breaker First-Time Guide -->
+<div id="breakerGuide">
+  <div class="bg-box">
+
+    <!-- Screen 1: Welcome -->
+    <div class="bg-screen bg-active">
+      <div class="bg-icon">👋</div>
+      <div class="bg-step">Step 1 of 7</div>
+      <div class="bg-title">Welcome to Card Break Pro</div>
+      <div class="bg-body">
+        Your owner has set up your account and you're ready to start breaking. This quick guide will walk you through everything you need to know — it only takes 2 minutes.
+        <div class="bg-highlight">This guide will only show once. Take 2 minutes to read it carefully.</div>
+      </div>
+      <div class="bg-actions">
+        <button class="bg-btn-next" onclick="bgNext()">Let's Go →</button>
+      </div>
+    </div>
+
+    <!-- Screen 2: Your Schedule -->
+    <div class="bg-screen">
+      <div class="bg-icon">📅</div>
+      <div class="bg-step">Step 2 of 7</div>
+      <div class="bg-title">Your Schedule</div>
+      <div class="bg-body">
+        Your owner assigns shifts to you directly. Check the <strong>My Schedule</strong> tab to see your upcoming shifts, times, and any notes from your owner.
+        <div class="bg-highlight">Your owner controls the schedule. If a shift looks wrong, reach out to them — not through this app.</div>
+      </div>
+      <div class="bg-actions">
+        <button class="bg-btn-back" onclick="bgBack()">Back</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 3: Clocking In -->
+    <div class="bg-screen">
+      <div class="bg-icon">⏱️</div>
+      <div class="bg-step">Step 3 of 7</div>
+      <div class="bg-title">Clocking In</div>
+      <div class="bg-body">
+        When your shift starts, clock in using the <strong>Clock In / Out</strong> button in the app. The system automatically tracks your hours from that moment.
+        <div class="bg-highlight">Always clock in before you start breaking. Hours are only tracked when you're clocked in.</div>
+        Don't forget to clock out when your shift ends — your payout depends on accurate hours.
+      </div>
+      <div class="bg-actions">
+        <button class="bg-btn-back" onclick="bgBack()">Back</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 4: Logging Breaks -->
+    <div class="bg-screen">
+      <div class="bg-icon">📦</div>
+      <div class="bg-step">Step 4 of 7</div>
+      <div class="bg-title">Logging Breaks</div>
+      <div class="bg-body">
+        This is the most important part of your job. After each break closes:
+        <div class="bg-highlight">
+          1. Enter the stream key your owner gives you<br>
+          2. Select each product that was in the break<br>
+          3. Enter the quantity sold for each<br>
+          4. Hit <strong>Submit Break</strong>
+        </div>
+        Submit every break as it closes. Don't batch them — the running total needs to stay live for your owner.
+      </div>
+      <div class="bg-actions">
+        <button class="bg-btn-back" onclick="bgBack()">Back</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 5: Closing Out -->
+    <div class="bg-screen">
+      <div class="bg-icon">✅</div>
+      <div class="bg-step">Step 5 of 7</div>
+      <div class="bg-title">Closing Out</div>
+      <div class="bg-body">
+        When the stream ends, use <strong>Close Out Stream</strong>. The system automatically:
+        <ul style="margin:0.5rem 0 0.5rem 1.2rem;line-height:1.8;">
+          <li>Calculates your commission</li>
+          <li>Records your payout</li>
+          <li>Closes the stream in the system</li>
+        </ul>
+        <div class="bg-highlight">Nothing is manual. Don't calculate your own pay — the system handles it based on what you submitted.</div>
+      </div>
+      <div class="bg-actions">
+        <button class="bg-btn-back" onclick="bgBack()">Back</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 6: Your Payouts -->
+    <div class="bg-screen">
+      <div class="bg-icon">💰</div>
+      <div class="bg-step">Step 6 of 7</div>
+      <div class="bg-title">Your Payouts</div>
+      <div class="bg-body">
+        After each stream closes, your commission and hours are recorded. You can view your full payout history and commission breakdown in the <strong>My Payouts</strong> tab anytime.
+        <div class="bg-highlight">If a payout looks wrong, talk to your owner. Only they can adjust records.</div>
+        Your pay rate and commission structure were set by your owner when they added you to the team.
+      </div>
+      <div class="bg-actions">
+        <button class="bg-btn-back" onclick="bgBack()">Back</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 7: Ready -->
+    <div class="bg-screen">
+      <div class="bg-icon">🚀</div>
+      <div class="bg-step">Step 7 of 7</div>
+      <div class="bg-title">You Are Ready</div>
+      <div class="bg-body">
+        That's everything. You now know how to:
+        <ul style="margin:0.5rem 0 0.75rem 1.2rem;line-height:1.8;">
+          <li>Check your schedule</li>
+          <li>Clock in and out</li>
+          <li>Log each break correctly</li>
+          <li>Close out a stream</li>
+          <li>View your payouts</li>
+        </ul>
+        <strong style="color:var(--text);">Start breaking.</strong>
+      </div>
+      <div class="bg-actions">
+        <button class="bg-btn-back" onclick="bgBack()">Back</button>
+        <button class="bg-btn-next" onclick="bgFinish()">Go to My Dashboard ✓</button>
+      </div>
+    </div>
+
+    <!-- Dots -->
+    <div class="bg-dots">
+      <div class="bg-dot bg-dot-active"></div>
+      <div class="bg-dot"></div>
+      <div class="bg-dot"></div>
+      <div class="bg-dot"></div>
+      <div class="bg-dot"></div>
+      <div class="bg-dot"></div>
+      <div class="bg-dot"></div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

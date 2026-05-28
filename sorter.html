@@ -7,6 +7,7 @@
   <title>Card Break Pro — Sorter</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
+  <script src="analytics.js"></script>
   <style>
     :root {
       --bg: #0d0d14; --card: #13131e; --border: #2d2d3d;
@@ -127,6 +128,26 @@
     label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem; }
     input, select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 0.9rem; padding: 0.6rem 0.85rem; outline: none; transition: border-color 0.2s; font-family: inherit; }
     input:focus, select:focus { border-color: var(--primary); }
+
+    /* Sorter Guide Modal */
+    #sorterGuide{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;}
+    #sorterGuide.sg-open{display:flex;}
+    .sg-box{background:var(--card);border:1px solid var(--border);border-radius:16px;width:90%;max-width:520px;padding:2rem;position:relative;max-height:90vh;overflow-y:auto;}
+    .sg-screen{display:none;}
+    .sg-screen.sg-active{display:block;}
+    .sg-step{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-bottom:0.6rem;}
+    .sg-title{font-size:1.45rem;font-weight:800;color:var(--text);margin-bottom:0.75rem;line-height:1.3;}
+    .sg-body{color:#a0aec0;font-size:0.93rem;line-height:1.65;margin-bottom:1.5rem;}
+    .sg-icon{font-size:2.4rem;margin-bottom:0.75rem;}
+    .sg-actions{display:flex;justify-content:space-between;align-items:center;gap:0.75rem;}
+    .sg-btn-next{background:var(--primary);color:#fff;border:none;border-radius:8px;padding:0.65rem 1.5rem;font-weight:700;font-size:0.95rem;cursor:pointer;transition:opacity 0.15s;flex:1;}
+    .sg-btn-next:hover{opacity:0.85;}
+    .sg-btn-back{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1.1rem;font-weight:600;font-size:0.9rem;cursor:pointer;}
+    .sg-btn-back:hover{color:var(--text);}
+    .sg-dots{display:flex;gap:6px;justify-content:center;margin-top:1.25rem;}
+    .sg-dot{width:7px;height:7px;border-radius:50%;background:var(--border);transition:background 0.2s;}
+    .sg-dot.sg-dot-active{background:var(--primary);}
+    .sg-highlight{background:rgba(79,110,247,0.12);border-left:3px solid var(--primary);border-radius:6px;padding:0.6rem 0.9rem;margin:0.75rem 0;font-size:0.88rem;color:var(--text);}
   </style>
 </head>
 <body>
@@ -396,6 +417,11 @@ async function loadSortQueue() {
             }).eq('id', taskId).eq('org_id', currentProfile.org_id);
             if (startErr) throw startErr;
             showSuccess('Started sorting. Mark complete when done.');
+            const sfsFlagKey = 'cbp_sorter_first_sort_' + (currentUser?.id || '');
+            if (!localStorage.getItem(sfsFlagKey)) {
+              localStorage.setItem(sfsFlagKey, '1');
+              if (typeof cbpTrack === 'function') cbpTrack('sorter_first_sort_started', { organization_id: currentProfile?.org_id });
+            }
           } else if (action === 'complete') {
             const { data: updatedRows, error: doneErr } = await sb.from('sort_tasks').update({
               status: 'completed',
@@ -685,6 +711,7 @@ async function initAuth() {
     loadMyScheduleView();
 
     hideLoading();
+    checkSorterOnboarding();
   } catch (err) {
     hideLoading();
     showError('Failed to load: ' + escHtml(err.message));
@@ -1033,6 +1060,81 @@ async function confirmSwapRequest() {
     showSuccess('Swap request sent to your manager.');
   } catch(err){showError('Failed to send request: '+escHtml(err.message));}
 }
+
+// ── Sorter Guide ─────────────────────────────────────────
+let sgCurrentScreen = 0;
+const SG_TOTAL = 6;
+
+async function checkSorterOnboarding() {
+  if (!currentProfile) return;
+  if (currentProfile.onboarding_complete) return;
+
+  const orgId = currentProfile.org_id;
+  const { data: orgRow } = await sb.from('organizations').select('name').eq('id', orgId).maybeSingle();
+  const orgName = orgRow?.name || 'your organization';
+
+  const daysSince = currentProfile.created_at
+    ? Math.floor((Date.now() - new Date(currentProfile.created_at).getTime()) / 86400000)
+    : 0;
+
+  if (typeof cbpIdentify === 'function') {
+    cbpIdentify(currentUser.id, {
+      role: 'sorter',
+      organization_id: orgId,
+      organization_name: orgName,
+      days_since_signup: daysSince
+    });
+  }
+
+  const flagKey = 'cbp_sorter_first_login_' + currentUser.id;
+  if (!localStorage.getItem(flagKey)) {
+    localStorage.setItem(flagKey, '1');
+    if (typeof cbpTrack === 'function') cbpTrack('sorter_first_login', { organization_id: orgId });
+  }
+
+  showSorterGuide();
+}
+
+function showSorterGuide() {
+  sgCurrentScreen = 0;
+  sgRender();
+  document.getElementById('sorterGuide').classList.add('sg-open');
+}
+
+function sgRender() {
+  document.querySelectorAll('.sg-screen').forEach((s, i) => {
+    s.classList.toggle('sg-active', i === sgCurrentScreen);
+  });
+  document.querySelectorAll('.sg-dot').forEach((d, i) => {
+    d.classList.toggle('sg-dot-active', i === sgCurrentScreen);
+  });
+}
+
+function sgNext() {
+  if (sgCurrentScreen < SG_TOTAL - 1) {
+    sgCurrentScreen++;
+    sgRender();
+  }
+}
+
+function sgBack() {
+  if (sgCurrentScreen > 0) {
+    sgCurrentScreen--;
+    sgRender();
+  }
+}
+
+async function sgFinish() {
+  document.getElementById('sorterGuide').classList.remove('sg-open');
+
+  if (typeof cbpTrack === 'function') {
+    cbpTrack('sorter_onboarding_complete', {
+      organization_id: currentProfile?.org_id
+    });
+  }
+
+  await sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id);
+}
 </script>
 
 <!-- SWAP REQUEST MODAL -->
@@ -1051,6 +1153,124 @@ async function confirmSwapRequest() {
     <div class="modal-btn-row">
       <button class="btn btn-outline" onclick="document.getElementById('swapModal').classList.remove('active')">Cancel</button>
       <button class="btn btn-primary" onclick="confirmSwapRequest()">Send Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sorter First-Time Guide -->
+<div id="sorterGuide">
+  <div class="sg-box">
+
+    <!-- Screen 1: Welcome -->
+    <div class="sg-screen sg-active">
+      <div class="sg-icon">👋</div>
+      <div class="sg-step">Step 1 of 6</div>
+      <div class="sg-title">Welcome to Card Break Pro</div>
+      <div class="sg-body">
+        You've been added as a sorter. Your job is to process and ship the cards that sell during breaks. This guide walks you through how the system works.
+        <div class="sg-highlight">This guide only shows once. Take 2 minutes to read it.</div>
+      </div>
+      <div class="sg-actions">
+        <button class="sg-btn-next" onclick="sgNext()">Let's Go →</button>
+      </div>
+    </div>
+
+    <!-- Screen 2: Your Queue -->
+    <div class="sg-screen">
+      <div class="sg-icon">📋</div>
+      <div class="sg-step">Step 2 of 6</div>
+      <div class="sg-title">Your Sort Queue</div>
+      <div class="sg-body">
+        Your main screen is the <strong>Sort Queue</strong>. When a stream ends, streams that need sorting appear here automatically.
+        <div class="sg-highlight">You do not add tasks yourself. Tasks are created by the system when streams close.</div>
+        Each task shows the stream name, how many breaks it had, and when it was posted.
+      </div>
+      <div class="sg-actions">
+        <button class="sg-btn-back" onclick="sgBack()">Back</button>
+        <button class="sg-btn-next" onclick="sgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 3: Clocking In -->
+    <div class="sg-screen">
+      <div class="sg-icon">⏱️</div>
+      <div class="sg-step">Step 3 of 6</div>
+      <div class="sg-title">Clocking In</div>
+      <div class="sg-body">
+        Before you start working, clock in using the <strong>Clock In</strong> button. Your hours are tracked from that moment until you clock out.
+        <div class="sg-highlight">Always clock in first. Your hourly pay depends on accurate clock times.</div>
+        Clock out as soon as your shift ends — do not leave it running.
+      </div>
+      <div class="sg-actions">
+        <button class="sg-btn-back" onclick="sgBack()">Back</button>
+        <button class="sg-btn-next" onclick="sgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 4: Starting a Sort -->
+    <div class="sg-screen">
+      <div class="sg-icon">📦</div>
+      <div class="sg-step">Step 4 of 6</div>
+      <div class="sg-title">Starting and Completing a Sort</div>
+      <div class="sg-body">
+        Click <strong>Start Sorting</strong> on a task to claim it. Only one sorter can work a task at a time. When you're done:
+        <div class="sg-highlight">
+          1. Pull and package the cards for that stream<br>
+          2. Ship them out<br>
+          3. Click <strong>Mark Complete</strong>
+        </div>
+        Do not mark complete until the order is actually shipped. Your owner tracks this data.
+      </div>
+      <div class="sg-actions">
+        <button class="sg-btn-back" onclick="sgBack()">Back</button>
+        <button class="sg-btn-next" onclick="sgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 5: Your Pay -->
+    <div class="sg-screen">
+      <div class="sg-icon">💰</div>
+      <div class="sg-step">Step 5 of 6</div>
+      <div class="sg-title">Your Pay</div>
+      <div class="sg-body">
+        Your pay is calculated automatically based on your hours clocked. You can view your full pay history and shift breakdown in the <strong>My Pay</strong> tab.
+        <div class="sg-highlight">If something looks wrong, talk to your owner. They control your rate and can adjust records.</div>
+      </div>
+      <div class="sg-actions">
+        <button class="sg-btn-back" onclick="sgBack()">Back</button>
+        <button class="sg-btn-next" onclick="sgNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Screen 6: Ready -->
+    <div class="sg-screen">
+      <div class="sg-icon">🚀</div>
+      <div class="sg-step">Step 6 of 6</div>
+      <div class="sg-title">You Are Ready</div>
+      <div class="sg-body">
+        You now know how to:
+        <ul style="margin:0.5rem 0 0.75rem 1.2rem;line-height:1.8;">
+          <li>Check your sort queue</li>
+          <li>Clock in and out</li>
+          <li>Start and complete sort tasks</li>
+          <li>View your pay</li>
+        </ul>
+        <strong style="color:var(--text);">Go sort some cards.</strong>
+      </div>
+      <div class="sg-actions">
+        <button class="sg-btn-back" onclick="sgBack()">Back</button>
+        <button class="sg-btn-next" onclick="sgFinish()">Go to My Dashboard ✓</button>
+      </div>
+    </div>
+
+    <!-- Dots -->
+    <div class="sg-dots">
+      <div class="sg-dot sg-dot-active"></div>
+      <div class="sg-dot"></div>
+      <div class="sg-dot"></div>
+      <div class="sg-dot"></div>
+      <div class="sg-dot"></div>
+      <div class="sg-dot"></div>
     </div>
   </div>
 </div>
