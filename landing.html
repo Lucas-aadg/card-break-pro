@@ -442,25 +442,37 @@
 
     /* ── PRICING ── */
     .pricing-section { text-align: center; }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      max-width: 1060px;
+      margin: 0 auto;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .pricing-grid { grid-template-columns: 1fr; max-width: 500px; } }
     .price-card {
       background: var(--card);
-      border: 1px solid var(--border-bright);
+      border: 1px solid var(--border);
       border-radius: 20px;
-      padding: 3rem;
-      max-width: 480px;
-      margin: 0 auto;
-      box-shadow: 0 0 60px rgba(79,110,247,0.1);
+      padding: 2.5rem 2rem;
       backdrop-filter: blur(12px);
       position: relative;
       overflow: hidden;
+      text-align: left;
+    }
+    .price-card.featured {
+      border-color: var(--border-bright);
+      box-shadow: 0 0 60px rgba(79,110,247,0.12);
     }
     .price-card::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(79,110,247,0.8), transparent);
+      background: linear-gradient(90deg, transparent, rgba(79,110,247,0.4), transparent);
     }
+    .price-card.featured::before { background: linear-gradient(90deg, transparent, rgba(79,110,247,0.9), transparent); }
     .price-badge {
       display: inline-block;
       background: rgba(79,110,247,0.1);
@@ -471,33 +483,51 @@
       text-transform: uppercase;
       padding: 0.3rem 0.8rem;
       border-radius: 100px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
     }
-    .price-amount { font-size: 4rem; font-weight: 900; color: var(--text); letter-spacing: -2px; line-height: 1; }
-    .price-amount sup { font-size: 1.5rem; vertical-align: top; margin-top: 0.7rem; display: inline-block; font-weight: 700; }
-    .price-period { color: var(--muted); font-size: 1rem; margin-bottom: 2rem; }
-    .price-includes { list-style: none; text-align: left; margin-bottom: 2rem; }
+    .price-badge.popular { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .price-badge.empire-badge { background: rgba(168,85,247,0.1); color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
+    .price-name { font-size: 1.1rem; font-weight: 800; color: var(--text); margin-bottom: 0.25rem; }
+    .price-desc { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.5rem; line-height: 1.5; }
+    .price-amount { font-size: 3.2rem; font-weight: 900; color: var(--text); letter-spacing: -2px; line-height: 1; }
+    .price-amount sup { font-size: 1.3rem; vertical-align: top; margin-top: 0.5rem; display: inline-block; font-weight: 700; }
+    .price-amount sub { font-size: 1rem; font-weight: 600; color: var(--muted); letter-spacing: 0; vertical-align: baseline; }
+    .price-period { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.75rem; margin-top: 0.25rem; }
+    .price-includes { list-style: none; text-align: left; margin-bottom: 1.75rem; }
     .price-includes li {
       display: flex; align-items: flex-start; gap: 0.6rem;
-      font-size: 0.9rem; padding: 0.5rem 0;
-      border-bottom: 1px solid rgba(79,110,247,0.07);
+      font-size: 0.85rem; padding: 0.45rem 0;
+      border-bottom: 1px solid rgba(79,110,247,0.06);
+      color: var(--text);
     }
     .price-includes li:last-child { border-bottom: none; }
     .price-includes li::before { content: '✓'; color: var(--green); font-weight: 800; flex-shrink: 0; }
+    .price-includes li.locked { color: var(--muted); }
+    .price-includes li.locked::before { content: '—'; color: var(--muted); }
     .price-cta {
       display: block; width: 100%;
       background: linear-gradient(135deg, #4f6ef7, #6366f1);
       color: #fff;
-      font-size: 1.05rem; font-weight: 700;
-      padding: 1rem; border-radius: 10px;
+      font-size: 0.95rem; font-weight: 700;
+      padding: 0.875rem; border-radius: 10px;
       text-decoration: none; letter-spacing: 0.3px;
       transition: opacity 0.2s, transform 0.15s;
       border: none; cursor: pointer;
-      box-shadow: 0 4px 24px rgba(79,110,247,0.4);
-      font-family: inherit;
+      box-shadow: 0 4px 24px rgba(79,110,247,0.35);
+      font-family: inherit; text-align: center;
     }
     .price-cta:hover { opacity: 0.9; transform: translateY(-1px); }
-    .price-note { font-size: 0.78rem; color: var(--muted); margin-top: 1rem; }
+    .price-cta.outline {
+      background: transparent;
+      border: 1px solid var(--border-bright);
+      color: var(--text);
+      box-shadow: none;
+    }
+    .price-cta.empire-cta {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      box-shadow: 0 4px 24px rgba(168,85,247,0.3);
+    }
+    .price-note { font-size: 0.75rem; color: var(--muted); margin-top: 0.75rem; text-align: center; }
     .trial-pill {
       display: inline-block; background: rgba(34,197,94,0.1);
       border: 1px solid rgba(34,197,94,0.25); color: var(--green);
@@ -578,7 +608,7 @@
   <div class="hero-cta-group">
     <a href="register.html" class="hero-cta">Start Free 14-Day Trial</a>
   </div>
-  <p class="hero-sub">14 days free. No credit card required to start. $250/mo after trial. Cancel anytime.</p>
+  <p class="hero-sub">Plans from $99/mo. Free trial on Starter &amp; Pro. No credit card required.</p>
 </div>
 
 <!-- ── NUMBERS STRIP ── -->
@@ -1032,12 +1062,12 @@
         <div class="faq-a">Under 10 minutes. Register, add your inventory, send invite codes to your team. You can be running your first tracked break the same day.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">What happens after the 14-day trial?</div>
-        <div class="faq-a">You'll be charged $250/month. You can cancel any time before the trial ends and you won't be charged anything. No hidden fees, no contracts.</div>
+        <div class="faq-q">What happens after the free trial?</div>
+        <div class="faq-a">Starter includes a 14-day free trial, Pro includes 7 days. After your trial ends, you'll be charged the plan rate. Cancel any time before the trial ends and you won't be charged. No hidden fees, no contracts.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">How many breakers can I add?</div>
-        <div class="faq-a">Unlimited. Add as many breakers and sorters as your operation needs. One flat price covers your whole team — no per-seat charges.</div>
+        <div class="faq-q">How many team members can I add?</div>
+        <div class="faq-a">Starter supports up to 3 breakers and 2 sorters. Pro supports up to 8 breakers, 4 sorters, and 2 managers. Empire is unlimited — add as many team members as your operation needs.</div>
       </div>
       <div class="faq-item">
         <div class="faq-q">Can my breakers see my financials?</div>
@@ -1070,30 +1100,71 @@
 <!-- ── PRICING ── -->
 <section class="pricing-section" data-page="home">
   <div class="section-inner">
-    <div class="section-label">Simple pricing</div>
-    <div class="section-title" style="margin-bottom:0.5rem;">One price. <span>Runs your whole operation.</span></div>
-    <p class="section-sub" style="margin:0 auto 3rem;">The spreadsheets, the group texts, the manual math, the commission disputes, the inventory guesswork — gone. Your team keeps doing what they do. The platform handles everything else.</p>
-    <div class="price-card">
-      <div class="trial-pill">14-Day Free Trial</div>
-      <div class="price-badge" style="display:block;margin-top:0.5rem;">All Features Included</div>
-      <div class="price-amount" style="margin-top:1rem;"><sup>$</sup>250</div>
-      <div class="price-period">per month after trial</div>
-      <ul class="price-includes">
-        <li>14-day free trial — no credit card required</li>
-        <li>Unlimited breaks and streams</li>
-        <li>Unlimited team members (breakers + sorters)</li>
-        <li>Live break entry with break even calculator</li>
-        <li>Full analytics — dashboard, ROI, performance reports</li>
-        <li>AI insights — hottest box, top breaker, best ROI</li>
-        <li>Channel assignments — multi-account support</li>
-        <li>Team scheduling with clock in/out</li>
-        <li>Commission tracking and payout logs</li>
-        <li>Inventory management with log history</li>
-        <li>Sort queue and shipping management</li>
-        <li>No contracts — cancel anytime</li>
-      </ul>
-      <a href="register.html" class="price-cta">Start Free Trial — No Card Needed</a>
-      <p class="price-note">14 days free, then $250/month. Cancel before the trial ends and pay nothing.</p>
+    <div class="section-label">Plans &amp; Pricing</div>
+    <div class="section-title" style="margin-bottom:0.5rem;">The right plan for <span>your operation.</span></div>
+    <p class="section-sub" style="margin:0 auto 3rem;">Start free. Scale when you're ready. Every plan includes live break entry, channels, scheduling, payroll, and full analytics.</p>
+    <div class="pricing-grid">
+
+      <!-- STARTER -->
+      <div class="price-card">
+        <div class="price-badge">Starter</div>
+        <div class="price-name">Starter</div>
+        <div class="price-desc">Everything you need to run a lean, organized operation.</div>
+        <div class="price-amount"><sup>$</sup>99<sub>/mo</sub></div>
+        <div class="price-period">14-day free trial · no credit card required</div>
+        <ul class="price-includes">
+          <li>Unlimited breaks &amp; streams</li>
+          <li>Up to 3 breakers + 2 sorters</li>
+          <li>Live break entry with break-even calculator</li>
+          <li>Channel assignments &amp; multi-account support</li>
+          <li>Full analytics — ROI, performance reports</li>
+          <li>Team scheduling with clock in/out</li>
+          <li>Commission tracking &amp; payroll</li>
+          <li>Inventory management</li>
+          <li class="locked">AI Insights (Pro+)</li>
+          <li class="locked">Empire Dashboard (Empire only)</li>
+        </ul>
+        <a href="register.html?plan=starter" class="price-cta outline">Start Free Trial</a>
+        <p class="price-note">14 days free, then $99/mo. Cancel anytime.</p>
+      </div>
+
+      <!-- PRO (featured) -->
+      <div class="price-card featured">
+        <div class="price-badge popular">Most Popular</div>
+        <div class="price-name">Pro</div>
+        <div class="price-desc">Built for growing operations that need AI-powered intelligence.</div>
+        <div class="price-amount"><sup>$</sup>399<sub style="font-size:0.8rem;">.99/mo</sub></div>
+        <div class="price-period">7-day free trial · no credit card required</div>
+        <ul class="price-includes">
+          <li>Everything in Starter</li>
+          <li>Up to 8 breakers + 4 sorters + 2 managers</li>
+          <li>AI Insights — hottest box, top breaker, best ROI</li>
+          <li>Sort queue &amp; shipping management</li>
+          <li>Priority email support</li>
+          <li class="locked">Empire Dashboard (Empire only)</li>
+        </ul>
+        <a href="register.html?plan=pro" class="price-cta">Start Free Trial</a>
+        <p class="price-note">7 days free, then $399.99/mo. Cancel anytime.</p>
+      </div>
+
+      <!-- EMPIRE -->
+      <div class="price-card">
+        <div class="price-badge empire-badge">Enterprise</div>
+        <div class="price-name">Empire</div>
+        <div class="price-desc">For high-volume operations that need real-time KPI command.</div>
+        <div class="price-amount"><sup>$</sup>999<sub style="font-size:0.8rem;">.99/mo</sub></div>
+        <div class="price-period">No trial — includes onboarding session</div>
+        <ul class="price-includes">
+          <li>Everything in Pro</li>
+          <li>Unlimited team seats</li>
+          <li>Empire Dashboard — real-time revenue &amp; KPIs</li>
+          <li>Dedicated onboarding session</li>
+          <li>Phone &amp; Slack support</li>
+        </ul>
+        <a href="mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Inquiry" class="price-cta empire-cta">Book a Demo</a>
+        <p class="price-note">Contact us to get started. Custom volume pricing available.</p>
+      </div>
+
     </div>
   </div>
 </section>

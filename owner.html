@@ -2361,6 +2361,7 @@ const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonK
 // ── Global State ──────────────────────────────────────────
 let currentUser = null;
 let currentProfile = null;
+let orgTier = 'legacy';
 let orgProducts = [];
 let beCurrentStream = null;
 let beSubmittedBreaks = [];
@@ -2542,6 +2543,18 @@ async function loadHome() {
 }
 
 async function loadEmpireKpis() {
+  const el = document.getElementById('empireKpis');
+  if (!el) return;
+  if (orgTier !== 'empire' && orgTier !== 'exempt') {
+    el.innerHTML = '<div style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;padding:2rem;background:rgba(79,110,247,0.04);border:1px solid rgba(79,110,247,0.12);border-radius:12px;">' +
+      '<div style="text-align:center;max-width:360px;">' +
+      '<div style="font-size:1.8rem;margin-bottom:0.5rem;">🏛️</div>' +
+      '<div style="font-weight:800;font-size:1rem;margin-bottom:0.4rem;color:var(--text);">Empire Dashboard</div>' +
+      '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:1rem;line-height:1.5;">Real-time revenue &amp; KPI analytics are exclusive to the Empire plan.</div>' +
+      '<a href="/billing.html" style="display:inline-block;background:linear-gradient(135deg,#4f6ef7,#6366f1);color:#fff;padding:0.5rem 1.5rem;border-radius:8px;font-weight:700;font-size:0.82rem;text-decoration:none;">Upgrade to Empire →</a>' +
+      '</div></div>';
+    return;
+  }
   const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const monthStart = today.slice(0, 7) + '-01';
   const [todayR, monthR, activeR] = await Promise.all([
@@ -2553,8 +2566,6 @@ async function loadEmpireKpis() {
   const todayProfit = (todayR.data || []).reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0)-(parseFloat(x.total_product_cost)||0)-(parseFloat(x.total_other_costs)||0); }, 0);
   const monthRev = (monthR.data || []).reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
   const liveCount = (activeR.data || []).length;
-  const el = document.getElementById('empireKpis');
-  if (!el) return;
   const profitColor = todayProfit >= 0 ? 'var(--green)' : 'var(--red)';
   el.innerHTML = [
     { label:"Today's Revenue", value: fmt(todayRev), sub:'closed streams today', color:'var(--primary)' },
@@ -2696,6 +2707,16 @@ async function loadInsights() {
   const el = document.getElementById('insightsBody');
   const btn = document.getElementById('insightsRefreshBtn');
   if (!el) return;
+  if (orgTier === 'starter') {
+    el.innerHTML = '<div style="padding:1.5rem;text-align:center;">' +
+      '<div style="font-size:1.5rem;margin-bottom:0.5rem;">✦</div>' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:0.4rem;color:var(--text);">AI Insights</div>' +
+      '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:1rem;line-height:1.5;">AI-powered business intelligence is available on Pro and Empire plans.</div>' +
+      '<a href="/billing.html" style="display:inline-block;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);color:#a855f7;padding:0.4rem 1.2rem;border-radius:8px;font-weight:700;font-size:0.82rem;text-decoration:none;">Upgrade to Pro →</a>' +
+      '</div>';
+    if (btn) btn.style.display = 'none';
+    return;
+  }
   el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:1.5rem 0;"><div style="font-size:1.5rem;margin-bottom:0.5rem;animation:spin 1s linear infinite;display:inline-block;">✦</div><br>Analyzing your operation…</div>';
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
@@ -2922,7 +2943,7 @@ async function initAuth() {
       for (let attempt = 0; attempt < 10; attempt++) {
         const { data } = await sb
           .from('subscriptions')
-          .select('status, comped')
+          .select('status, comped, tier')
           .eq('org_id', profile.org_id)
           .maybeSingle();
         sub = data;
@@ -2958,6 +2979,7 @@ async function initAuth() {
     }
 
     currentProfile = profile;
+    orgTier = sub ? (sub.tier || 'legacy') : 'legacy';
     document.getElementById('ownerBadge').textContent = escHtml(profile.display_name);
 
     await Promise.all([loadChannels(), loadAllProfiles()]);
