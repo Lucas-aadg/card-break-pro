@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="apple-touch-icon" href="/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CardBreakPro" />
+  <meta name="theme-color" content="#4f6ef7" />
+  <link rel="stylesheet" href="/mobile.css" />
   <title>Card Break Pro — Manager Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
@@ -2362,5 +2369,30 @@ function printTable(title, subtitle, tableId) {
   setTimeout(function(){ win.print(); }, 400);
 }
 </script>
+
+<!-- ── Manager Bottom Navigation (mobile only) ── -->
+<nav class="btm-nav" id="managerBtmNav">
+  <button class="btm-nav-item active" id="btn-btm-mgr-schedule" onclick="switchTab('schedule');managerBtmActive('schedule')">
+    <span class="btm-nav-icon">📅</span><span class="btm-nav-label">Schedule</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-mgr-dashboard" onclick="switchTab('dashboard');managerBtmActive('dashboard')">
+    <span class="btm-nav-icon">📊</span><span class="btm-nav-label">Dashboard</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-mgr-inventory" onclick="switchTab('inventory');managerBtmActive('inventory')">
+    <span class="btm-nav-icon">🗂️</span><span class="btm-nav-label">Inventory</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-mgr-sorting" onclick="switchTab('sorting');managerBtmActive('sorting')">
+    <span class="btm-nav-icon">📦</span><span class="btm-nav-label">Sort Queue</span>
+  </button>
+</nav>
+<script>
+function managerBtmActive(tab) {
+  document.querySelectorAll('.btm-nav-item').forEach(function(b){ b.classList.remove('active'); });
+  const map = { schedule:'btn-btm-mgr-schedule', dashboard:'btn-btm-mgr-dashboard', inventory:'btn-btm-mgr-inventory', sorting:'btn-btm-mgr-sorting' };
+  if (map[tab]) document.getElementById(map[tab]).classList.add('active');
+}
+</script>
+
+<script src="/pwa.js"></script>
 </body>
 </html>

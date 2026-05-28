@@ -1,0 +1,590 @@
+/* ================================================================
+   CardBreakPro — Mobile Stylesheet
+   Covers: Bottom Nav, Break Entry, Owner Dashboard, Sort Queue,
+   Scheduling, Forms, Typography, and PWA install animation.
+   Applied at max-width: 1023px (mobile + tablet).
+   Desktop layout is untouched above 1024px.
+================================================================ */
+
+/* ── Slideup animation for install banner ─────────────────── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ================================================================
+   TASK 8 — TYPOGRAPHY & SPACING (global mobile base)
+================================================================ */
+@media (max-width: 1023px) {
+  body { font-size: 14px; line-height: 1.5; }
+
+  /* Minimum body text */
+  p, li, td, th, span, div { font-size: inherit; }
+
+  /* Padding inside cards */
+  .panel { padding: 16px !important; }
+
+  /* Page container side padding */
+  .main { padding: 12px !important; }
+
+  /* Prevent cramped spacing between interactive elements */
+  .btn-row { gap: 10px !important; }
+}
+
+/* ================================================================
+   TASK 7 — GLOBAL FORM & INPUT FIXES (prevent iOS zoom + touch)
+================================================================ */
+@media (max-width: 1023px) {
+  /* 16px prevents iOS from zooming on input focus */
+  input, select, textarea {
+    font-size: 16px !important;
+    min-height: 48px !important;
+    padding: 0.6rem 0.9rem !important;
+  }
+
+  /* Large touch targets on select options */
+  select { height: 48px !important; }
+
+  /* Buttons: minimum 48px height */
+  .btn, button.btn {
+    min-height: 48px !important;
+    font-size: 0.9rem !important;
+  }
+
+  /* Full-width buttons on mobile by default */
+  .btn-row { flex-direction: column; }
+  .btn-row .btn { width: 100%; }
+
+  /* Remove hover states that break on touch */
+  @media (hover: none) {
+    .btn:hover { opacity: 1 !important; }
+    .panel:hover { border-color: var(--border) !important; box-shadow: none !important; }
+    .nav-dd-item:hover { background: none !important; color: var(--muted) !important; }
+  }
+
+  /* Active press feedback instead */
+  .btn:active { opacity: 0.75 !important; transform: scale(0.98) !important; }
+  a:active, button:active { opacity: 0.75; }
+
+  /* Bottom sheet modals */
+  .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+  .modal-overlay .modal,
+  .modal-overlay > div:last-child {
+    border-radius: 20px 20px 0 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 92vh !important;
+    overflow-y: auto !important;
+    padding: 1.5rem !important;
+  }
+  .modal-btn-row { gap: 10px !important; }
+  .modal-btn-row .btn { min-height: 52px !important; }
+
+  /* Form rows — always single column on mobile */
+  .form-row-2, .form-row-3 { grid-template-columns: 1fr !important; }
+}
+
+/* ================================================================
+   TASK 2 — MOBILE NAVIGATION: Hide desktop nav, show bottom tabs
+================================================================ */
+@media (max-width: 1023px) {
+  /* ── Hide desktop elements ── */
+  .nav-menu,
+  .nav-group,
+  .nav-help-link,
+  .breaker-tabs,
+  .nav-actions .btn-sm:not(.nav-notif-keep) {
+    display: none !important;
+  }
+
+  /* ── Simplified mobile top bar ── */
+  nav {
+    padding: 0 12px !important;
+    min-height: 48px !important;
+    justify-content: space-between !important;
+  }
+  .brand { margin-right: 0 !important; font-size: 0.9rem !important; }
+  .nav-right, .nav-actions { gap: 8px !important; }
+
+  /* Keep sign-out and notification bell visible */
+  .nav-right .btn-sm { display: inline-flex !important; }
+
+  /* ── Body padding for bottom nav ── */
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* ── BOTTOM NAV BASE ── */
+  .btm-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    background: #0e0e1c;
+    border-top: 1px solid rgba(79,110,247,0.18);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .btm-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    padding: 6px 0 4px;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: #5a6a8a;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.15s;
+    /* minimum 44x44 touch target */
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btm-nav-item.active { color: #4f6ef7; }
+  .btm-nav-item:active { opacity: 0.7; }
+  .btm-nav-icon { font-size: 1.3rem; line-height: 1; }
+  .btm-nav-label { font-size: 0.6rem; }
+
+  /* "More" slide-up sheet */
+  #moreSheet {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 700;
+  }
+  #moreSheet.open { display: block; }
+  #moreSheetScrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+  }
+  #moreSheetPanel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #0e0e1c;
+    border: 1px solid rgba(79,110,247,0.2);
+    border-radius: 20px 20px 0 0;
+    padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 8px);
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .more-sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    margin: 12px auto 8px;
+  }
+  .more-sheet-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #5a6a8a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 16px 8px;
+  }
+  .more-sheet-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: none;
+    border: none;
+    border-bottom: 1px solid rgba(45,45,61,0.5);
+    color: #e2e8f0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 14px 16px;
+    cursor: pointer;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .more-sheet-item:last-child { border-bottom: none; }
+  .more-sheet-item:active { background: rgba(79,110,247,0.06); }
+  .more-sheet-icon { font-size: 1.2rem; width: 28px; text-align: center; }
+}
+
+/* Desktop: hide bottom nav and mobile-only elements */
+@media (min-width: 1024px) {
+  .btm-nav { display: none !important; }
+  #moreSheet { display: none !important; }
+  #mobileBreakHeader { display: none !important; }
+  #mobileCloseConfirm { display: none !important; }
+}
+
+/* Mobile: hide desktop tab bars that are replaced by bottom nav */
+@media (max-width: 1023px) {
+  .breaker-tabs { display: none !important; }
+  div.tabs { display: none !important; }
+}
+
+/* ================================================================
+   TASK 3 — BREAKER BREAK ENTRY (mobile rebuild)
+================================================================ */
+@media (max-width: 1023px) {
+
+  /* ── Mobile break header bar (counter + revenue) ── */
+  #mobileBreakHeader {
+    background: #0e0e1c;
+    border: 1px solid rgba(79,110,247,0.2);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  #mobileBreakHeader .mbh-stat { text-align: center; }
+  #mobileBreakHeader .mbh-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #5a6a8a;
+    margin-bottom: 2px;
+  }
+  #mobileBreakHeader .mbh-value {
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: #e2e8f0;
+  }
+  #mobileBreakHeader .mbh-value.green { color: #22c55e; }
+
+  /* ── Break even: MASSIVE prominent display ── */
+  #breakEvenBanner {
+    background: linear-gradient(135deg, rgba(79,110,247,0.18), rgba(79,110,247,0.08)) !important;
+    border: 2px solid rgba(79,110,247,0.5) !important;
+    border-radius: 14px !important;
+    padding: 16px !important;
+    text-align: center !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+  }
+  #breakEvenBanner > div:first-child { text-align: center; }
+  #statBreakEven {
+    font-size: 2.8rem !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+  }
+  #statBreakEvenSpot {
+    font-size: 1.8rem !important;
+    font-weight: 800 !important;
+  }
+  #breakEvenBanner > div:last-child {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+  }
+
+  /* ── Product table → vertical card list on mobile ── */
+  .product-table thead { display: none; }
+  .product-table, .product-table tbody, .product-table tr, .product-table td {
+    display: block !important;
+    width: 100% !important;
+  }
+  .product-table tr {
+    border: 1px solid rgba(45,45,61,0.6);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,0.02);
+  }
+  .product-table td { border: none !important; padding: 3px 0 !important; }
+  .product-table td::before {
+    content: attr(data-label) ': ';
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #5a6a8a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 6px;
+  }
+  .product-table td input[type="number"] {
+    width: 80px !important;
+    min-height: 44px !important;
+    font-size: 16px !important;
+    text-align: center;
+  }
+
+  /* ── Submit Break: full-width, prominent ── */
+  #submitBreakBtn {
+    width: 100% !important;
+    min-height: 56px !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    border-radius: 12px !important;
+    letter-spacing: 0.5px !important;
+    order: 0 !important;
+  }
+
+  /* ── Close Stream: visually distinct, below submit ── */
+  #closeStreamBtn {
+    width: 100% !important;
+    min-height: 48px !important;
+    background: rgba(239,68,68,0.1) !important;
+    color: #ef4444 !important;
+    border: 1px solid rgba(239,68,68,0.35) !important;
+    font-size: 0.85rem !important;
+    order: 1 !important;
+  }
+
+  /* Reset/Refresh: smaller, below */
+  #resetEntryBtn, #refreshProductsBtn {
+    width: 100% !important;
+    min-height: 44px !important;
+    font-size: 0.82rem !important;
+    order: 2 !important;
+  }
+
+  /* ── Revenue input: large ── */
+  #revenueInput {
+    font-size: 1.2rem !important;
+    font-weight: 700 !important;
+    min-height: 54px !important;
+  }
+
+  /* ── Session grid: single column ── */
+  .session-grid { grid-template-columns: 1fr !important; }
+
+  /* ── Stats grid: 2x2 ── */
+  .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .stat-card { padding: 10px 12px !important; }
+  .stat-value { font-size: 1.1rem !important; }
+
+  /* ── Running total panel ── */
+  .running-total-panel { padding: 14px !important; }
+  .break-list { max-height: 200px; overflow-y: auto; }
+  .stream-total-line { font-size: 1rem !important; font-weight: 800; }
+  .total-amount { font-size: 1.3rem !important; }
+
+  /* Calc grid single column */
+  .calc-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+}
+
+/* ================================================================
+   TASK 4 — OWNER DASHBOARD (mobile rebuild)
+================================================================ */
+@media (max-width: 1023px) {
+
+  /* ── Empire KPIs: 2x2 above fold ── */
+  .empire-kpis {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+  .empire-kpi {
+    padding: 14px 12px !important;
+    border-radius: 12px !important;
+  }
+  .empire-kpi-label { font-size: 0.62rem !important; }
+  .empire-kpi-value { font-size: 1.3rem !important; }
+
+  /* ── Channel grid: single column ── */
+  .channel-grid { grid-template-columns: 1fr !important; }
+
+  /* ── Home bottom row: stacked single column ── */
+  #tab-home > div[style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Break entry column layout: single column ── */
+  .break-entry-col-layout { display: block !important; }
+  .break-entry-col-layout > * { margin-bottom: 12px; }
+
+  /* ── Greeting: compact on mobile ── */
+  .home-greeting { padding: 12px 0 8px !important; }
+  .greeting-headline { font-size: 1.2rem !important; }
+
+  /* ── Recent streams table: scrollable ── */
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .data-table { font-size: 0.8rem !important; }
+  .data-table td, .data-table th { padding: 0.5rem 0.6rem !important; }
+}
+
+/* ================================================================
+   TASK 5 — SORT QUEUE MOBILE REBUILD
+================================================================ */
+@media (max-width: 1023px) {
+
+  /* ── Sort task cards: large, readable ── */
+  .sort-card {
+    padding: 16px !important;
+    border-radius: 12px !important;
+    margin-bottom: 12px !important;
+  }
+  .sort-card-title { font-size: 1rem !important; font-weight: 800 !important; }
+  .sort-card-meta { font-size: 0.82rem !important; margin-top: 4px; }
+
+  /* ── Action buttons: full width, large ── */
+  .sort-card-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+    flex-wrap: nowrap !important;
+  }
+  .sort-card-actions .btn {
+    width: 100% !important;
+    min-height: 56px !important;
+    font-size: 0.95rem !important;
+  }
+
+  /* ── Status badges: color coded ── */
+  .status-pending  { background: rgba(100,116,139,0.15); color: #64748b; }
+  .status-progress { background: rgba(79,110,247,0.15);  color: #4f6ef7; }
+  .status-complete { background: rgba(34,197,94,0.15);   color: #22c55e; }
+
+  /* ── Pull to refresh hint ── */
+  .ptr-hint {
+    text-align: center;
+    color: #5a6a8a;
+    font-size: 0.75rem;
+    padding: 8px;
+  }
+
+  /* ── Empty state ── */
+  .sort-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #5a6a8a;
+  }
+  .sort-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+  .sort-empty-title { font-size: 1.05rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.4rem; }
+}
+
+/* ================================================================
+   TASK 6 — SCHEDULING MOBILE REBUILD
+================================================================ */
+@media (max-width: 1023px) {
+
+  /* ── Week view: horizontal scroll ── */
+  .wg-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+  .wg-table { min-width: 580px !important; }
+
+  /* ── My schedule chips: larger tap targets ── */
+  .my-sched-chip {
+    padding: 12px 14px !important;
+    font-size: 0.85rem !important;
+    border-radius: 10px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* ── Clock in button: full width, can't miss it ── */
+  #sorterClockInBtn, #sorterClockOutBtn,
+  #breakerClockInBtn, #breakerClockOutBtn {
+    width: 100% !important;
+    min-height: 56px !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    border-radius: 12px !important;
+    margin-bottom: 8px;
+  }
+
+  /* Today highlight */
+  .wg-today-hd { color: #4f6ef7 !important; }
+  .wg-today-cell { background: rgba(79,110,247,0.06) !important; }
+}
+
+/* ================================================================
+   MOBILE CLOSE-STREAM CONFIRMATION OVERLAY
+================================================================ */
+#mobileCloseConfirm {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  background: rgba(0,0,0,0.75);
+  align-items: flex-end;
+  justify-content: center;
+}
+#mobileCloseConfirm.open { display: flex; }
+#mobileCloseConfirmPanel {
+  background: #0e0e1c;
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 20px 20px 0 0;
+  padding: 1.5rem 1.5rem calc(env(safe-area-inset-bottom, 0px) + 1.5rem);
+  width: 100%;
+  max-width: 520px;
+}
+#mobileCloseConfirmPanel h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  margin-bottom: 0.6rem;
+}
+#mobileCloseConfirmPanel p {
+  font-size: 0.88rem;
+  color: #5a6a8a;
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+#mobileCloseConfirmPanel .mcc-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#mobileCloseConfirmPanel .mcc-btns button {
+  min-height: 52px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+.mcc-confirm { background: #ef4444; color: #fff; }
+.mcc-cancel  { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1) !important; }
+
+/* ================================================================
+   MISC MOBILE IMPROVEMENTS
+================================================================ */
+@media (max-width: 1023px) {
+
+  /* Main padding accounts for sticky top nav */
+  .main { padding-top: 8px !important; }
+
+  /* Overflow tables scroll horizontally */
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Badge text never wraps */
+  .badge { white-space: nowrap; }
+
+  /* Section headings: smaller, don't overflow */
+  .section-heading-label { font-size: 0.85rem !important; }
+
+  /* Stat cards in manager/owner: 2 columns */
+  .stats-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* Improve filter rows */
+  .filter-row { flex-direction: column; gap: 8px; }
+  .filter-row > * { min-width: 0 !important; width: 100% !important; }
+  .filter-row .btn { width: 100%; }
+
+  /* Notification panel */
+  #notifPanel {
+    width: 280px !important;
+    right: 0 !important;
+    left: auto !important;
+  }
+}
+
+/* ================================================================
+   PWA STANDALONE MODE — extra padding for status bar
+================================================================ */
+@media all and (display-mode: standalone) {
+  nav {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+  }
+}

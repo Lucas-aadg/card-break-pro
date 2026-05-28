@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="apple-touch-icon" href="/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CardBreakPro" />
+  <meta name="theme-color" content="#4f6ef7" />
+  <link rel="stylesheet" href="/mobile.css" />
   <title>Card Break Pro — Sorter</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
@@ -199,6 +206,7 @@
         <div class="panel-title">Sort Queue — Oldest First</div>
         <button class="btn btn-outline" id="refreshQueueBtn" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
       </div>
+      <div class="ptr-hint">Pull down to refresh</div>
       <div id="sortQueueList" class="sort-queue">
         <div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading queue…</div>
       </div>
@@ -361,7 +369,7 @@ async function loadSortQueue() {
     }
 
     if (!tasks.length) {
-      list.innerHTML = '<div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">All caught up — no streams to sort.</div>';
+      list.innerHTML = '<div class="sort-empty"><div class="sort-empty-icon">✅</div><div class="sort-empty-title">Queue is clear. Nice work.</div><div style="font-size:0.85rem;color:var(--muted);">No streams waiting to be sorted.</div></div>';
       return;
     }
 
@@ -380,11 +388,11 @@ async function loadSortQueue() {
 
       let actionsHtml = '';
       if (task.status === 'pending') {
-        actionsHtml = '<button class="btn btn-yellow" data-action="start" data-id="' + task.id + '" style="font-size:0.8rem;padding:0.45rem 0.9rem;">Start Sorting</button>';
+        actionsHtml = '<button class="btn btn-yellow" data-action="start" data-id="' + task.id + '">▶ Start Sorting</button>';
       } else if (isInProgress) {
-        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '" style="font-size:0.8rem;padding:0.45rem 0.9rem;">Mark Complete</button>';
+        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">✓ Mark Complete</button>';
       } else if (isOtherProgress) {
-        actionsHtml = '<span style="font-size:0.8rem;color:var(--muted);">In progress by another sorter</span>';
+        actionsHtml = '<span style="font-size:0.82rem;color:var(--muted);padding:0.5rem 0;display:block;">In progress by another sorter</span>';
       }
 
       const breakCount = s.break_count || '?';
@@ -1275,5 +1283,37 @@ async function sgFinish() {
   </div>
 </div>
 
+<!-- ── Sorter Bottom Navigation (mobile only) ── -->
+<nav class="btm-nav" id="sorterBtmNav">
+  <button class="btm-nav-item active" id="btn-btm-queue" onclick="sorterBtmNav('queue')">
+    <span class="btm-nav-icon">📋</span><span class="btm-nav-label">My Queue</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-sched" onclick="sorterBtmNav('shifts')">
+    <span class="btm-nav-icon">📅</span><span class="btm-nav-label">Schedule</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-pay" onclick="sorterBtmNav('pay')">
+    <span class="btm-nav-icon">💰</span><span class="btm-nav-label">My Pay</span>
+  </button>
+</nav>
+
+<script>
+function sorterBtmNav(tab) {
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(c){ c.classList.remove('active'); });
+  document.querySelectorAll('.btm-nav-item').forEach(function(b){ b.classList.remove('active'); });
+
+  const content = document.getElementById('tab-' + tab);
+  if (content) content.classList.add('active');
+
+  const btnMap = { queue: 'btn-btm-queue', shifts: 'btn-btm-sched', pay: 'btn-btm-pay' };
+  if (btnMap[tab]) document.getElementById(btnMap[tab]).classList.add('active');
+
+  if (tab === 'queue') loadSortQueue && loadSortQueue();
+  if (tab === 'shifts') { loadShifts && loadShifts(); loadMyScheduleView && loadMyScheduleView(); }
+  if (tab === 'pay') loadSorterPay && loadSorterPay();
+}
+</script>
+
+<script src="/pwa.js"></script>
 </body>
 </html>

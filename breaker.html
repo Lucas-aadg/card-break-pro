@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="apple-touch-icon" href="/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CardBreakPro" />
+  <meta name="theme-color" content="#4f6ef7" />
+  <link rel="stylesheet" href="/mobile.css" />
   <title>Card Break Pro — Break Entry</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
@@ -433,6 +440,22 @@
   <div id="successBox" class="success-box"></div>
 
   <div class="breaker-tab-content active" id="breaker-tab-entry">
+
+  <!-- MOBILE BREAK HEADER (hidden on desktop via mobile.css) -->
+  <div id="mobileBreakHeader">
+    <div class="mbh-stat">
+      <div class="mbh-label">Breaks Logged</div>
+      <div class="mbh-value" id="mobileBreakCount">0</div>
+    </div>
+    <div class="mbh-stat">
+      <div class="mbh-label">Stream Total</div>
+      <div class="mbh-value green" id="mobileStreamTotal">$0.00</div>
+    </div>
+    <div class="mbh-stat">
+      <div class="mbh-label">Break #</div>
+      <div class="mbh-value" id="mobileBreakNum">1</div>
+    </div>
+  </div>
 
   <!-- SESSION -->
   <div class="panel">
@@ -1012,12 +1035,12 @@ function renderProductTable() {
     const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
 
     tr.innerHTML =
-      '<td>' + escHtml(p.name) + '</td>' +
-      '<td style="color:var(--muted);">' + escHtml(p.category || '—') + '</td>' +
-      '<td>' + fmt(p.unit_cost) + '</td>' +
-      '<td><input type="number" class="qty-input" data-idx="' + idx + '" data-unit-cost="' + p.unit_cost + '" data-stock="' + p.current_stock + '" min="0" max="' + p.current_stock + '" value="0" placeholder="0" /></td>' +
-      '<td class="ext-cost" id="extCost_' + idx + '">$0.00</td>' +
-      '<td class="' + stockClass + '" id="stockAfter_' + idx + '">' + stockLabel + '</td>';
+      '<td data-label="Product">' + escHtml(p.name) + '</td>' +
+      '<td data-label="Category" style="color:var(--muted);">' + escHtml(p.category || '—') + '</td>' +
+      '<td data-label="Unit Cost">' + fmt(p.unit_cost) + '</td>' +
+      '<td data-label="Qty Used"><input type="number" class="qty-input" data-idx="' + idx + '" data-unit-cost="' + p.unit_cost + '" data-stock="' + p.current_stock + '" min="0" max="' + p.current_stock + '" value="0" placeholder="0" /></td>' +
+      '<td data-label="Ext. Cost" class="ext-cost" id="extCost_' + idx + '">$0.00</td>' +
+      '<td data-label="Stock After" class="' + stockClass + '" id="stockAfter_' + idx + '">' + stockLabel + '</td>';
 
     tbody.appendChild(tr);
   });
@@ -2570,5 +2593,90 @@ initAuth();
   </div>
 </div>
 
+<!-- ── Breaker Bottom Navigation (mobile only) ── -->
+<nav class="btm-nav" id="breakerBtmNav">
+  <button class="btm-nav-item active" id="btn-btm-entry" onclick="breakerBtmNav('entry')">
+    <span class="btm-nav-icon">📦</span><span class="btm-nav-label">My Stream</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-shifts" onclick="breakerBtmNav('shifts')">
+    <span class="btm-nav-icon">📅</span><span class="btm-nav-label">Schedule</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-payouts" onclick="breakerBtmNav('payouts')">
+    <span class="btm-nav-icon">💰</span><span class="btm-nav-label">Payouts</span>
+  </button>
+</nav>
+
+<!-- ── Close-Stream Confirmation (mobile-first) ── -->
+<div id="mobileCloseConfirm">
+  <div id="mobileCloseConfirmPanel">
+    <h3>Close This Stream?</h3>
+    <p>This will calculate final profit and commissions for all submitted breaks. This action cannot be undone.</p>
+    <div class="mcc-btns">
+      <button class="mcc-confirm" onclick="mobileCloseConfirmed()">Close Stream</button>
+      <button class="mcc-cancel" onclick="closeMobileCloseConfirm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function breakerBtmNav(tab) {
+  document.querySelectorAll('.breaker-tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.btm-nav-item').forEach(function(b){ b.classList.remove('active'); });
+  const content = document.getElementById('breaker-tab-' + tab);
+  if (content) content.classList.add('active');
+  const btn = document.getElementById('btn-btm-' + tab);
+  if (btn) btn.classList.add('active');
+  // Trigger existing tab logic if needed
+  if (tab === 'payouts') loadMyPay && loadMyPay();
+  if (tab === 'shifts') loadMyScheduleView && loadMyScheduleView();
+  // Sync mobile header
+  updateMobileBreakHeader();
+}
+
+function updateMobileBreakHeader() {
+  const countEl = document.getElementById('mobileBreakCount');
+  const totalEl = document.getElementById('mobileStreamTotal');
+  const numEl   = document.getElementById('mobileBreakNum');
+  if (countEl) countEl.textContent = (typeof submittedBreaks !== 'undefined' ? submittedBreaks.length : 0);
+  if (totalEl) totalEl.textContent = document.getElementById('streamTotalDisplay') ? document.getElementById('streamTotalDisplay').textContent : '$0.00';
+  if (numEl)   numEl.textContent   = document.getElementById('breakNumDisplay') ? document.getElementById('breakNumDisplay').textContent : '1';
+}
+
+// Patch close-stream button on mobile to show confirmation first
+document.addEventListener('DOMContentLoaded', function() {
+  const closeBtn = document.getElementById('closeStreamBtn');
+  if (!closeBtn) return;
+  closeBtn.addEventListener('click', function(e) {
+    if (window.innerWidth <= 1023) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      document.getElementById('mobileCloseConfirm').classList.add('open');
+      return false;
+    }
+  }, true);
+});
+
+function mobileCloseConfirmed() {
+  closeMobileCloseConfirm();
+  openCloseOutModal();
+}
+function closeMobileCloseConfirm() {
+  document.getElementById('mobileCloseConfirm').classList.remove('open');
+}
+
+// Keep mobile header in sync after each break submit
+const _origShowSuccess = window.showSuccess;
+if (typeof _origShowSuccess === 'function') {
+  window.showSuccess = function(msg) {
+    _origShowSuccess(msg);
+    updateMobileBreakHeader();
+  };
+}
+
+// Initial sync
+setTimeout(updateMobileBreakHeader, 1500);
+</script>
+
+<script src="/pwa.js"></script>
 </body>
 </html>
