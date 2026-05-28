@@ -45,9 +45,12 @@ const TIER_LIMITS = {
   legacy:  { max_breakers: null, max_sorters: null, max_managers: null }
 };
 
-// Maps Stripe Price IDs to tier names for plan-change events
+// Maps Stripe Price IDs to tier names for plan-change events.
+// New Starter price ($129.99) is hardcoded so the webhook recognizes it
+// even before the STRIPE_PRICE_ID_STARTER env var is updated in Vercel.
 const PRICE_TIER_MAP = {
   [process.env.STRIPE_PRICE_ID_STARTER]: 'starter',
+  'price_1TcA00AQv5DHthFTUHf8QFvL':      'starter',
   [process.env.STRIPE_PRICE_ID_PRO]:     'pro',
   [process.env.STRIPE_PRICE_ID_EMPIRE]:  'empire'
 };

@@ -1,7 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const PRICE_IDS = {
-  starter: process.env.STRIPE_PRICE_ID_STARTER,
+  starter: process.env.STRIPE_PRICE_ID_STARTER || 'price_1TcA00AQv5DHthFTUHf8QFvL',
   pro:     process.env.STRIPE_PRICE_ID_PRO,
   empire:  process.env.STRIPE_PRICE_ID_EMPIRE
 };
