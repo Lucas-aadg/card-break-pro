@@ -3124,7 +3124,7 @@ async function initAuth() {
       sub = data;
     }
 
-    if (!sub || (sub.status !== 'active' && !sub.comped)) {
+    if (!sub || (sub.tier !== 'exempt' && sub.status !== 'active' && !sub.comped)) {
       // Show a full-page paywall overlay instead of the dashboard
       document.body.innerHTML = `
         <div style="min-height:100vh;background:#0d0d14;display:flex;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;">
