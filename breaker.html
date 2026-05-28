@@ -747,6 +747,72 @@
   </div>
 </div>
 
+<!-- SLIP IMPORT MODAL -->
+<div class="modal-overlay" id="slipImportModal">
+  <div class="modal" style="max-width:520px;">
+    <!-- Step: Upload -->
+    <div id="siUploadStep">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+        <h2 style="margin:0;font-size:1.2rem;">Import Buyer Slips</h2>
+        <span style="font-size:0.72rem;color:var(--muted);background:var(--bg);padding:0.25rem 0.65rem;border-radius:100px;border:1px solid var(--border);">Step 1 of 3</span>
+      </div>
+      <div id="siDropZone" style="border:2px dashed rgba(79,110,247,0.4);border-radius:12px;padding:2rem 1.5rem;text-align:center;cursor:pointer;background:rgba(79,110,247,0.04);transition:.2s;" onclick="document.getElementById('siFileInput').click()">
+        <div style="font-size:2.5rem;margin-bottom:0.6rem;">📄</div>
+        <div style="font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:0.4rem;">Drop your Whatnot packing slip PDF here</div>
+        <div style="font-size:0.8rem;color:var(--muted);">or tap to select file</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:0.6rem;">PDF only · Max 50MB</div>
+      </div>
+      <input type="file" id="siFileInput" accept="application/pdf,.pdf" style="display:none;" />
+      <div style="text-align:center;margin-top:0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.5;">
+        Export your packing slips from Whatnot after your stream ends and upload here.<br>Takes 10 seconds and unlocks your buyer intelligence.
+      </div>
+      <div id="siParsingStatus" style="display:none;text-align:center;padding:1rem;color:var(--muted);font-size:0.88rem;">
+        Parsing your slips…
+      </div>
+      <div id="siUploadError" style="display:none;margin-top:0.75rem;padding:0.75rem 1rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;color:var(--red);font-size:0.85rem;"></div>
+      <div class="modal-btn-row" style="margin-top:1.25rem;">
+        <button class="btn btn-outline" onclick="skipSlipImport()">Skip for Now</button>
+      </div>
+    </div>
+    <!-- Step: Preview -->
+    <div id="siPreviewStep" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+        <h2 style="margin:0;font-size:1.2rem;">Import Preview</h2>
+        <span style="font-size:0.72rem;color:var(--muted);background:var(--bg);padding:0.25rem 0.65rem;border-radius:100px;border:1px solid var(--border);">Step 1 of 3</span>
+      </div>
+      <div id="siStats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem;margin-bottom:1.1rem;"></div>
+      <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Top Spenders This Stream</div>
+      <div id="siTopList" style="margin-bottom:1.1rem;"></div>
+      <div class="modal-btn-row">
+        <button class="btn btn-outline" onclick="skipSlipImport()">Skip</button>
+        <button class="btn" id="siConfirmBtn" onclick="confirmSlipImport()">Confirm Import</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HIT LOGGING MODAL -->
+<div class="modal-overlay" id="hitLoggingModal">
+  <div class="modal" style="max-width:520px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+      <h2 style="margin:0;font-size:1.2rem;">Log Big Hits</h2>
+      <span style="font-size:0.72rem;color:var(--muted);background:var(--bg);padding:0.25rem 0.65rem;border-radius:100px;border:1px solid var(--border);">Step 2 of 3</span>
+    </div>
+    <!-- Top Spenders Panel -->
+    <div id="hlTopSpenders" style="display:none;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.18);border-radius:10px;padding:0.85rem 1rem;margin-bottom:1rem;">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Top Spenders — This Stream</div>
+      <div id="hlSpenderList"></div>
+    </div>
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:0.85rem;">Did anyone pull a big hit tonight?</div>
+    <div id="hitRows"></div>
+    <button class="btn btn-outline" style="width:100%;margin-bottom:0.85rem;font-size:0.85rem;" onclick="addHitRow()">+ Add Hit</button>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" onclick="skipHitLogging()">Skip</button>
+      <button class="btn" id="submitHitsBtn" onclick="submitAllHits()">Submit Hits</button>
+    </div>
+  </div>
+</div>
+
 <!-- CLOSE OUT MODAL -->
 <div class="modal-overlay" id="closeOutModal">
   <div class="modal">
@@ -1568,6 +1634,12 @@ async function openCloseOutModal() {
     currentStream ? (parseFloat(currentStream.total_other_costs) || 0) : 0;
   document.getElementById('finalFeeRow').style.display = 'none';
 
+  // Open slip import modal first; final closeout opens after import + hit logging
+  document.getElementById('slipImportModal').classList.add('active');
+  initSlipImportModal();
+}
+
+function openFinalCloseout() {
   document.getElementById('closeOutModal').classList.add('active');
 }
 
@@ -2740,6 +2812,236 @@ if (typeof _origShowSuccess === 'function') {
 
 // Initial sync
 setTimeout(updateMobileBreakHeader, 1500);
+</script>
+
+<!-- ── Buyer Intelligence ─────────────────────────────────── -->
+<script>
+'use strict';
+
+var _parsedSlipData = null;   // result from /api/import-slip
+var _importedBuyers = [];     // buyers after confirmed import
+var _currentImportId = null;
+
+// ── Drag-and-drop wiring ──────────────────────────────────
+function initSlipImportModal() {
+  _parsedSlipData = null;
+  _importedBuyers = [];
+  document.getElementById('siUploadStep').style.display = '';
+  document.getElementById('siPreviewStep').style.display = 'none';
+  document.getElementById('siParsingStatus').style.display = 'none';
+  document.getElementById('siUploadError').style.display = 'none';
+  document.getElementById('siFileInput').value = '';
+  var dz = document.getElementById('siDropZone');
+  dz.ondragover = function(e) { e.preventDefault(); dz.style.borderColor = 'var(--primary)'; dz.style.background = 'rgba(79,110,247,0.08)'; };
+  dz.ondragleave = function() { dz.style.borderColor = 'rgba(79,110,247,0.4)'; dz.style.background = 'rgba(79,110,247,0.04)'; };
+  dz.ondrop = function(e) { e.preventDefault(); dz.style.borderColor = 'rgba(79,110,247,0.4)'; dz.style.background = 'rgba(79,110,247,0.04)'; var f = e.dataTransfer.files[0]; if (f) handleSlipFile(f); };
+  document.getElementById('siFileInput').onchange = function() { if (this.files[0]) handleSlipFile(this.files[0]); };
+}
+
+async function handleSlipFile(file) {
+  if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+    showSlipError('Please select a PDF file.'); return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    showSlipError('File is too large. Maximum 50MB.'); return;
+  }
+  document.getElementById('siDropZone').style.display = 'none';
+  document.getElementById('siParsingStatus').style.display = 'block';
+  document.getElementById('siUploadError').style.display = 'none';
+  try {
+    var formData = new FormData();
+    formData.append('file', file);
+    var resp = await fetch('/api/import-slip', { method: 'POST', body: formData });
+    var json = await resp.json();
+    if (!resp.ok) throw new Error(json.error || 'Parse failed');
+    _parsedSlipData = json;
+    _parsedSlipData._filename = file.name;
+    showSlipPreview(json);
+  } catch (err) {
+    document.getElementById('siDropZone').style.display = '';
+    showSlipError('Could not parse PDF: ' + err.message);
+  } finally {
+    document.getElementById('siParsingStatus').style.display = 'none';
+  }
+}
+
+function showSlipError(msg) {
+  var el = document.getElementById('siUploadError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function showSlipPreview(data) {
+  document.getElementById('siUploadStep').style.display = 'none';
+  document.getElementById('siPreviewStep').style.display = '';
+
+  // Stats
+  var stats = document.getElementById('siStats');
+  stats.innerHTML = siStatCard(data.totalBuyersFound, 'Buyers Found') +
+    siStatCard(data.totalNewBuyers, 'New Buyers') +
+    siStatCard('$' + (data.totalRevenueParsed || 0).toFixed(2), 'Revenue');
+
+  // Top spenders (up to 5)
+  var sorted = (data.buyers || []).slice().sort(function(a,b){ return (b.totalSpent||0)-(a.totalSpent||0); }).slice(0,5);
+  var list = document.getElementById('siTopList');
+  if (sorted.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">No buyer data found.</div>';
+  } else {
+    list.innerHTML = sorted.map(function(b, i) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;' +
+        (i < sorted.length - 1 ? 'border-bottom:1px solid var(--border);' : '') + '">' +
+        '<span style="font-size:0.85rem;font-weight:600;">@' + escHtml(b.username) + (b.isNew ? ' <span style="font-size:0.65rem;background:rgba(34,197,94,0.15);color:#22c55e;padding:1px 5px;border-radius:4px;font-weight:700;">NEW</span>' : '') + '</span>' +
+        '<span style="font-size:0.85rem;font-weight:700;color:var(--primary);">$' + (b.totalSpent||0).toFixed(2) + '</span></div>';
+    }).join('');
+  }
+}
+
+function siStatCard(value, label) {
+  return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.65rem;text-align:center;">' +
+    '<div style="font-size:1.1rem;font-weight:800;color:var(--text);">' + value + '</div>' +
+    '<div style="font-size:0.7rem;color:var(--muted);margin-top:0.15rem;">' + label + '</div></div>';
+}
+
+async function confirmSlipImport() {
+  if (!_parsedSlipData || !currentProfile) { skipSlipImport(); return; }
+  var btn = document.getElementById('siConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+  try {
+    var resp = await fetch('/api/process-import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orgId: currentProfile.org_id,
+        streamId: currentStream ? currentStream.id : null,
+        buyers: _parsedSlipData.buyers,
+        streamDate: _parsedSlipData.streamDate,
+        importedBy: currentUser.id,
+        rawFilename: _parsedSlipData._filename || null
+      })
+    });
+    var result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || 'Import failed');
+    _currentImportId = result.importId;
+    _importedBuyers = _parsedSlipData.buyers || [];
+  } catch (err) {
+    console.warn('Import process error:', err.message);
+    _importedBuyers = _parsedSlipData ? (_parsedSlipData.buyers || []) : [];
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Confirm Import';
+  }
+  document.getElementById('slipImportModal').classList.remove('active');
+  openHitLoggingModal();
+}
+
+function skipSlipImport() {
+  _importedBuyers = [];
+  document.getElementById('slipImportModal').classList.remove('active');
+  openHitLoggingModal();
+}
+
+// ── Hit Logging ───────────────────────────────────────────
+var _hitBuyerOptions = [];
+
+function openHitLoggingModal() {
+  document.getElementById('hitRows').innerHTML = '';
+  _hitBuyerOptions = _importedBuyers.map(function(b) { return b.username; });
+
+  // Show top spenders panel if we have import data
+  var spendersPanel = document.getElementById('hlTopSpenders');
+  if (_importedBuyers.length > 0) {
+    var sorted = _importedBuyers.slice().sort(function(a,b){ return (b.totalSpent||0)-(a.totalSpent||0); }).slice(0,5);
+    document.getElementById('hlSpenderList').innerHTML = sorted.map(function(b) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;font-size:0.82rem;">' +
+        '<span style="font-weight:600;">@' + escHtml(b.username) + '</span>' +
+        '<span style="color:var(--primary);font-weight:700;">$' + (b.totalSpent||0).toFixed(2) + '</span></div>';
+    }).join('');
+    spendersPanel.style.display = '';
+  } else {
+    spendersPanel.style.display = 'none';
+  }
+
+  addHitRow();
+  document.getElementById('hitLoggingModal').classList.add('active');
+}
+
+function addHitRow() {
+  var container = document.getElementById('hitRows');
+  var fld = 'background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.5rem 0.75rem;font-size:0.85rem;width:100%;box-sizing:border-box;margin-bottom:0.4rem;';
+  var row = document.createElement('div');
+  row.className = 'hit-row';
+  row.style.cssText = 'background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem;position:relative;';
+  row.innerHTML =
+    '<button onclick="this.closest(\'.hit-row\').remove()" style="position:absolute;top:0.4rem;right:0.4rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;">✕</button>' +
+    '<select class="hit-buyer" style="' + fld + '">' +
+      '<option value="">Select buyer…</option>' +
+      (_hitBuyerOptions.length > 0
+        ? _hitBuyerOptions.map(function(u){ return '<option value="' + escHtml(u) + '">@' + escHtml(u) + '</option>'; }).join('')
+        : '') +
+    '</select>' +
+    '<input class="hit-break-name" placeholder="Break name" style="' + fld + '" />' +
+    '<input class="hit-desc" placeholder="Describe the hit (e.g. Luka Doncic 1/1 Logoman Auto)" style="' + fld + '" />' +
+    '<select class="hit-type" style="' + fld.replace('margin-bottom:0.4rem;','') + '">' +
+      '<option value="auto">Auto</option><option value="patch">Patch</option><option value="rookie">Rookie</option><option value="case_hit">Case Hit</option><option value="other">Other</option>' +
+    '</select>';
+  container.appendChild(row);
+}
+
+async function submitAllHits() {
+  var rows = document.querySelectorAll('.hit-row');
+  var hits = [];
+  rows.forEach(function(row) {
+    var username = row.querySelector('.hit-buyer').value.trim();
+    var breakName = row.querySelector('.hit-break-name').value.trim();
+    var desc = row.querySelector('.hit-desc').value.trim();
+    var type = row.querySelector('.hit-type').value;
+    if (username && desc) hits.push({ username, breakName, desc, type });
+  });
+
+  if (hits.length === 0) { skipHitLogging(); return; }
+
+  var btn = document.getElementById('submitHitsBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    for (var hit of hits) {
+      // Look up buyer_id
+      var { data: buyer } = await sb.from('buyers')
+        .select('id')
+        .eq('organization_id', currentProfile.org_id)
+        .eq('platform', 'whatnot')
+        .eq('username', hit.username.toLowerCase())
+        .maybeSingle();
+
+      if (buyer) {
+        await sb.from('buyer_hits').insert({
+          organization_id: currentProfile.org_id,
+          buyer_id: buyer.id,
+          stream_id: currentStream ? currentStream.id : null,
+          break_name: hit.breakName || null,
+          hit_description: hit.desc,
+          hit_type: hit.type,
+          submitted_by: currentUser.id
+        }).catch(function(e){ console.warn('Hit insert error:', e.message); });
+      }
+    }
+  } catch (err) {
+    console.error('submitAllHits error:', err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit Hits';
+  }
+
+  document.getElementById('hitLoggingModal').classList.remove('active');
+  openFinalCloseout();
+}
+
+function skipHitLogging() {
+  document.getElementById('hitLoggingModal').classList.remove('active');
+  openFinalCloseout();
+}
 </script>
 
 <script src="/pwa.js"></script>

@@ -4,6 +4,8 @@
   "dependencies": {
     "stripe": "^14.0.0",
     "@supabase/supabase-js": "^2.0.0",
-    "resend": "^3.0.0"
+    "resend": "^3.0.0",
+    "pdf-parse": "^1.1.1",
+    "busboy": "^1.6.0"
   }
 }

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CardBreakPro — Outreach Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07070f; --card: rgba(16,16,30,0.95); --border: rgba(79,110,247,0.15);
+      --border-bright: rgba(79,110,247,0.35); --primary: #4f6ef7; --green: #22c55e;
+      --red: #ef4444; --yellow: #f59e0b; --purple: #a855f7; --text: #e8eaf6; --muted: #5a6a8a;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; padding: 2rem; }
+    h1 { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 0.25rem; }
+    h1 span { color: var(--primary); }
+    .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.75rem; margin-bottom: 2rem; }
+    @media(max-width:900px){ .stats { grid-template-columns: repeat(3,1fr); } }
+    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; text-align: center; }
+    .stat-val { font-size: 1.6rem; font-weight: 900; }
+    .stat-lbl { font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 0.2rem; }
+
+    /* Add form */
+    .form-panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem; }
+    .form-panel h2 { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 1rem; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.85rem; margin-bottom: 1rem; }
+    @media(max-width:700px){ .form-grid { grid-template-columns: 1fr; } }
+    .form-grid-wide { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-bottom: 1rem; }
+    @media(max-width:700px){ .form-grid-wide { grid-template-columns: 1fr; } }
+    label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.3rem; }
+    input, select, textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 0.88rem; padding: 0.55rem 0.8rem; outline: none; font-family: inherit; transition: border-color 0.2s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 70px; }
+
+    /* Buttons */
+    .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: linear-gradient(135deg, #4f6ef7, #6366f1); color: #fff; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-sm { padding: 0.25rem 0.65rem; font-size: 0.72rem; border-radius: 6px; border: none; cursor: pointer; font-family: inherit; font-weight: 600; }
+    .btn-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+
+    /* Filters */
+    .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+    .filter-btn { padding: 0.3rem 0.85rem; border-radius: 100px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 0.75rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+    .filter-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .search-input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.82rem; padding: 0.35rem 0.8rem; outline: none; font-family: inherit; margin-left: auto; width: 200px; }
+    .search-input:focus { border-color: var(--primary); }
+
+    /* Table */
+    .tbl-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th { text-align: left; color: var(--muted); font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--card); }
+    td { padding: 0.6rem 0.85rem; border-bottom: 1px solid rgba(79,110,247,0.06); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(79,110,247,0.03); }
+    .empty-row td { color: var(--muted); font-style: italic; text-align: center; padding: 2.5rem; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 0.18rem 0.6rem; border-radius: 100px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; }
+    .badge-gray    { background: rgba(90,106,138,0.15); color: var(--muted); border: 1px solid rgba(90,106,138,0.25); }
+    .badge-blue    { background: rgba(79,110,247,0.12); color: var(--primary); border: 1px solid rgba(79,110,247,0.3); }
+    .badge-yellow  { background: rgba(245,158,11,0.12); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-green   { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+    .badge-purple  { background: rgba(168,85,247,0.12); color: var(--purple); border: 1px solid rgba(168,85,247,0.3); }
+
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 999; padding: 1rem; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: rgba(12,12,24,0.98); border: 1px solid var(--border-bright); border-radius: 16px; padding: 1.75rem; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+    .modal h2 { font-size: 1rem; font-weight: 800; margin-bottom: 1.25rem; }
+    .modal-btn-row { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+    .modal-btn-row .btn { flex: 1; }
+
+    /* Follow-up highlight */
+    .followup-due { color: var(--red); font-weight: 700; }
+    .followup-soon { color: var(--yellow); font-weight: 600; }
+
+    /* Top bar */
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+    .account-link { color: var(--primary); text-decoration: none; font-size: 0.8rem; font-weight: 600; }
+    .account-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>CARD <span>BREAK</span> PRO — Outreach Tracker</h1>
+    <div class="sub">Track every DM, follow-up, and conversion. Local to this browser.</div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline btn-sm" onclick="exportCSV()">Export CSV</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ Add Contact</button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats" id="statsRow"></div>
+
+<!-- Filters -->
+<div class="filters">
+  <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">All</button>
+  <button class="filter-btn" data-filter="no_reply" onclick="setFilter('no_reply',this)">No Reply</button>
+  <button class="filter-btn" data-filter="replied" onclick="setFilter('replied',this)">Replied</button>
+  <button class="filter-btn" data-filter="interested" onclick="setFilter('interested',this)">Interested</button>
+  <button class="filter-btn" data-filter="trialing" onclick="setFilter('trialing',this)">Trialing</button>
+  <button class="filter-btn" data-filter="converted" onclick="setFilter('converted',this)">Converted</button>
+  <button class="filter-btn" data-filter="followup" onclick="setFilter('followup',this)">⚡ Follow-Up Due</button>
+  <input class="search-input" type="text" placeholder="Search accounts…" id="searchInput" oninput="renderTable()" />
+</div>
+
+<!-- Table -->
+<div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Account</th>
+        <th>Platform</th>
+        <th>Date Contacted</th>
+        <th>Message</th>
+        <th>Response</th>
+        <th>Status</th>
+        <th>Follow-Up</th>
+        <th>Notes</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="contactModal">
+  <div class="modal">
+    <h2 id="modalTitle">Add Contact</h2>
+    <input type="hidden" id="editId" />
+    <div class="form-grid">
+      <div>
+        <label>Account Name *</label>
+        <input type="text" id="f-name" placeholder="@BreakKing" />
+      </div>
+      <div>
+        <label>Platform</label>
+        <select id="f-platform">
+          <option value="Whatnot">Whatnot</option>
+          <option value="Instagram">Instagram</option>
+          <option value="TikTok">TikTok</option>
+          <option value="Twitter/X">Twitter/X</option>
+          <option value="YouTube">YouTube</option>
+          <option value="Facebook">Facebook</option>
+          <option value="Discord">Discord</option>
+        </select>
+      </div>
+      <div>
+        <label>Profile Link</label>
+        <input type="text" id="f-link" placeholder="https://whatnot.com/..." />
+      </div>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label>Date Contacted</label>
+        <input type="date" id="f-date" />
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="f-status">
+          <option value="no_reply">No Reply</option>
+          <option value="replied">Replied</option>
+          <option value="interested">Interested</option>
+          <option value="trialing">Trialing</option>
+          <option value="converted">Converted</option>
+        </select>
+      </div>
+      <div>
+        <label>Follow-Up Date</label>
+        <input type="date" id="f-followup" />
+      </div>
+    </div>
+    <div style="margin-bottom:0.85rem;">
+      <label>Message Sent</label>
+      <textarea id="f-message" placeholder="Paste the DM you sent…"></textarea>
+    </div>
+    <div style="margin-bottom:0.85rem;">
+      <label>Response Received</label>
+      <textarea id="f-response" placeholder="What they said back…"></textarea>
+    </div>
+    <div>
+      <label>Notes</label>
+      <input type="text" id="f-notes" placeholder="Any extra context…" />
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveContact()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const STORAGE_KEY = 'cbp_outreach_v1';
+let contacts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let currentFilter = 'all';
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts)); }
+
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function statusBadge(s) {
+  const map = {
+    no_reply:  ['badge-gray',   'No Reply'],
+    replied:   ['badge-blue',   'Replied'],
+    interested:['badge-yellow', 'Interested'],
+    trialing:  ['badge-purple', 'Trialing'],
+    converted: ['badge-green',  'Converted']
+  };
+  const [cls, label] = map[s] || ['badge-gray', s];
+  return '<span class="badge ' + cls + '">' + label + '</span>';
+}
+
+function followupClass(dateStr) {
+  if (!dateStr) return '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(dateStr + 'T00:00:00');
+  const diff = (d - today) / 86400000;
+  if (diff < 0) return 'followup-due';
+  if (diff <= 2) return 'followup-soon';
+  return '';
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderStats() {
+  const total = contacts.length;
+  const statuses = { no_reply:0, replied:0, interested:0, trialing:0, converted:0 };
+  const todayStr = today();
+  let followups = 0;
+  contacts.forEach(function(c) {
+    if (statuses[c.status] !== undefined) statuses[c.status]++;
+    if (c.followup && c.followup <= todayStr) followups++;
+  });
+  const items = [
+    { val: total, lbl: 'Total', color: 'var(--primary)' },
+    { val: statuses.no_reply, lbl: 'No Reply', color: 'var(--muted)' },
+    { val: statuses.replied + statuses.interested, lbl: 'Engaged', color: 'var(--yellow)' },
+    { val: statuses.trialing, lbl: 'Trialing', color: 'var(--purple)' },
+    { val: statuses.converted, lbl: 'Converted', color: 'var(--green)' },
+    { val: followups, lbl: 'Follow-Ups Due', color: 'var(--red)' }
+  ];
+  document.getElementById('statsRow').innerHTML = items.map(function(i) {
+    return '<div class="stat"><div class="stat-val" style="color:' + i.color + ';">' + i.val + '</div><div class="stat-lbl">' + i.lbl + '</div></div>';
+  }).join('');
+}
+
+function renderTable() {
+  const search = (document.getElementById('searchInput').value || '').toLowerCase();
+  const todayStr = today();
+  let filtered = contacts.filter(function(c) {
+    if (currentFilter === 'followup') return c.followup && c.followup <= todayStr;
+    if (currentFilter !== 'all' && c.status !== currentFilter) return false;
+    if (search && !(c.name||'').toLowerCase().includes(search) && !(c.notes||'').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  filtered.sort(function(a,b){ return (b.created||0)-(a.created||0); });
+
+  const tbody = document.getElementById('tableBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No contacts found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(function(c) {
+    const fuClass = followupClass(c.followup);
+    const link = c.link ? '<a href="' + esc(c.link) + '" target="_blank" class="account-link">' + esc(c.platform) + ' ↗</a>' : esc(c.platform||'');
+    const msg = c.message ? '<span title="' + esc(c.message) + '" style="cursor:help;color:var(--muted);">View ↗</span>' : '—';
+    const resp = c.response ? '<span title="' + esc(c.response) + '" style="cursor:help;color:var(--green);">View ↗</span>' : '<span style="color:var(--muted);">—</span>';
+    return '<tr>' +
+      '<td><strong>' + esc(c.name) + '</strong></td>' +
+      '<td>' + link + '</td>' +
+      '<td style="color:var(--muted);">' + (c.date||'—') + '</td>' +
+      '<td>' + msg + '</td>' +
+      '<td>' + resp + '</td>' +
+      '<td>' + statusBadge(c.status) + '</td>' +
+      '<td class="' + fuClass + '">' + (c.followup||'—') + '</td>' +
+      '<td style="color:var(--muted);font-size:0.78rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.notes||'') + '</td>' +
+      '<td><div style="display:flex;gap:0.35rem;">' +
+        '<button class="btn-sm" style="background:rgba(79,110,247,0.12);color:var(--primary);" onclick="openEdit(\'' + c.id + '\')">Edit</button>' +
+        '<button class="btn-sm" style="background:rgba(239,68,68,0.1);color:var(--red);" onclick="deleteContact(\'' + c.id + '\')">✕</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function render() { renderStats(); renderTable(); }
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderTable();
+}
+
+function openAddModal() {
+  document.getElementById('modalTitle').textContent = 'Add Contact';
+  document.getElementById('editId').value = '';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-platform').value = 'Whatnot';
+  document.getElementById('f-link').value = '';
+  document.getElementById('f-date').value = today();
+  document.getElementById('f-status').value = 'no_reply';
+  document.getElementById('f-followup').value = '';
+  document.getElementById('f-message').value = '';
+  document.getElementById('f-response').value = '';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('contactModal').classList.add('active');
+}
+
+function openEdit(id) {
+  const c = contacts.find(function(x){ return x.id===id; });
+  if (!c) return;
+  document.getElementById('modalTitle').textContent = 'Edit Contact';
+  document.getElementById('editId').value = c.id;
+  document.getElementById('f-name').value = c.name||'';
+  document.getElementById('f-platform').value = c.platform||'Whatnot';
+  document.getElementById('f-link').value = c.link||'';
+  document.getElementById('f-date').value = c.date||'';
+  document.getElementById('f-status').value = c.status||'no_reply';
+  document.getElementById('f-followup').value = c.followup||'';
+  document.getElementById('f-message').value = c.message||'';
+  document.getElementById('f-response').value = c.response||'';
+  document.getElementById('f-notes').value = c.notes||'';
+  document.getElementById('contactModal').classList.add('active');
+}
+
+function closeModal() { document.getElementById('contactModal').classList.remove('active'); }
+
+function saveContact() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { alert('Account name is required.'); return; }
+  const id = document.getElementById('editId').value;
+  const data = {
+    name,
+    platform: document.getElementById('f-platform').value,
+    link: document.getElementById('f-link').value.trim(),
+    date: document.getElementById('f-date').value,
+    status: document.getElementById('f-status').value,
+    followup: document.getElementById('f-followup').value,
+    message: document.getElementById('f-message').value.trim(),
+    response: document.getElementById('f-response').value.trim(),
+    notes: document.getElementById('f-notes').value.trim()
+  };
+  if (id) {
+    const idx = contacts.findIndex(function(x){ return x.id===id; });
+    if (idx > -1) contacts[idx] = Object.assign(contacts[idx], data);
+  } else {
+    data.id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    data.created = Date.now();
+    contacts.unshift(data);
+  }
+  save(); closeModal(); render();
+}
+
+function deleteContact(id) {
+  if (!confirm('Delete this contact?')) return;
+  contacts = contacts.filter(function(c){ return c.id!==id; });
+  save(); render();
+}
+
+function exportCSV() {
+  if (!contacts.length) { alert('No contacts to export.'); return; }
+  const headers = ['Account','Platform','Link','Date Contacted','Status','Follow-Up','Message','Response','Notes'];
+  const rows = contacts.map(function(c) {
+    return [c.name,c.platform,c.link,c.date,c.status,c.followup,c.message,c.response,c.notes]
+      .map(function(v){ return '"'+(v||'').replace(/"/g,'""')+'"'; }).join(',');
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = 'cbp-outreach-' + today() + '.csv';
+  a.click();
+}
+
+document.getElementById('contactModal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeModal(); });
+
+render();
+</script>
+</body>
+</html>

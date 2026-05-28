@@ -658,6 +658,8 @@
         <button class="nav-dd-item" data-tab="history">Break History</button>
         <button class="nav-dd-item" data-tab="productRoi">Product ROI</button>
         <button class="nav-dd-item" data-tab="performance">Performance</button>
+        <div class="dd-section-label">CRM</div>
+        <button class="nav-dd-item" data-tab="buyers">Buyers</button>
       </div>
     </div>
 
@@ -1638,6 +1640,24 @@
             <tr class="empty-row"><td colspan="6">Loading…</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB: BUYERS
+  ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-buyers">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+      <h2 style="margin:0;font-size:1.1rem;font-weight:800;">Buyer Intelligence</h2>
+      <div style="display:flex;gap:0.5rem;">
+        <button class="btn btn-sm" id="buyersViewAllTime" onclick="setBuyersView('alltime')" style="padding:0.35rem 0.9rem;">All Time</button>
+        <button class="btn btn-sm btn-outline" id="buyersViewRecent" onclick="setBuyersView('recent')" style="padding:0.35rem 0.9rem;">Last 30 Days</button>
+      </div>
+    </div>
+    <div class="panel" style="padding:0;overflow:hidden;">
+      <div id="buyersLeaderboard" style="padding:0.25rem 0;">
+        <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer data…</div>
       </div>
     </div>
   </div>
@@ -3326,6 +3346,7 @@ async function switchTab(tab) {
     else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
     else if (tab === 'sorting') { await loadAllProfiles(); await loadSorting(); }
     else if (tab === 'settings') { await loadSettings(); await renderSettingsChannelList(); }
+    else if (tab === 'buyers') await loadBuyersTab();
   } catch (err) {
     showGlobalError('Failed to load tab: ' + escHtml(err.message));
     console.error(err);
@@ -8148,6 +8169,9 @@ function printTable(title, subtitle, tableId) {
   <button class="btm-nav-item" id="btn-btm-team" onclick="ownerBtmNav('team')">
     <span class="btm-nav-icon">👥</span><span class="btm-nav-label">Team</span>
   </button>
+  <button class="btm-nav-item" id="btn-btm-buyers" onclick="ownerBtmNav('buyers')">
+    <span class="btm-nav-icon">🏆</span><span class="btm-nav-label">Buyers</span>
+  </button>
   <button class="btm-nav-item" id="btn-btm-more" onclick="openMoreSheet()">
     <span class="btm-nav-icon">⋯</span><span class="btm-nav-label">More</span>
   </button>
@@ -8175,7 +8199,7 @@ function printTable(title, subtitle, tableId) {
 function ownerBtmNav(tab) {
   switchTab(tab);
   document.querySelectorAll('.btm-nav-item').forEach(function(b){ b.classList.remove('active'); });
-  const map = { home: 'btn-btm-home', breakEntry: 'btn-btm-breakEntry', inventory: 'btn-btm-inventory', team: 'btn-btm-team' };
+  const map = { home: 'btn-btm-home', breakEntry: 'btn-btm-breakEntry', inventory: 'btn-btm-inventory', team: 'btn-btm-team', buyers: 'btn-btm-buyers' };
   if (map[tab]) document.getElementById(map[tab]).classList.add('active');
 }
 function openMoreSheet() { document.getElementById('moreSheet').classList.add('open'); }
@@ -8194,6 +8218,296 @@ function closeMoreSheet() { document.getElementById('moreSheet').classList.remov
   setTimeout(updateMoreSheet, 2000);
   document.addEventListener('cbpTierLoaded', updateMoreSheet);
 })();
+</script>
+
+<!-- ── Buyer Profile Overlay ─────────────────────────────── -->
+<div id="buyerProfileOverlay" style="position:fixed;inset:0;background:var(--bg);z-index:2000;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;">
+  <div style="max-width:720px;margin:0 auto;padding:1.25rem 1.25rem 6rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.5rem;position:sticky;top:0;background:var(--bg);padding:0.75rem 0;z-index:10;border-bottom:1px solid var(--border);">
+      <button onclick="closeBuyerProfile()" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:1.4rem;line-height:1;padding:0.25rem;">←</button>
+      <span style="font-weight:700;font-size:1rem;">Buyer Profile</span>
+    </div>
+    <!-- Header -->
+    <div style="margin-bottom:1.25rem;">
+      <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+        <div id="bpUsername" style="font-size:1.5rem;font-weight:800;"></div>
+        <div id="bpTempBadge"></div>
+        <div id="bpNewBadge" style="display:none;font-size:0.7rem;background:rgba(34,197,94,0.15);color:#22c55e;padding:2px 7px;border-radius:4px;font-weight:700;">NEW BUYER</div>
+      </div>
+      <div id="bpFirstSeen" style="font-size:0.8rem;color:var(--muted);"></div>
+    </div>
+    <!-- Stats row -->
+    <div id="bpStats" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.65rem;margin-bottom:1.25rem;"></div>
+    <!-- Preferred Products -->
+    <div class="panel" style="margin-bottom:1rem;">
+      <div class="panel-title">Buys Most Often</div>
+      <div id="bpPreferred"></div>
+    </div>
+    <!-- Hit History -->
+    <div class="panel" style="margin-bottom:1rem;">
+      <div class="panel-title">Hit History</div>
+      <div id="bpHits"></div>
+    </div>
+    <!-- Purchase History -->
+    <div class="panel" style="margin-bottom:1rem;">
+      <div class="panel-title">Purchase History</div>
+      <div id="bpPurchases"></div>
+      <div id="bpPurchasePager" style="display:flex;gap:0.5rem;margin-top:0.75rem;"></div>
+    </div>
+    <!-- Notes -->
+    <div class="panel">
+      <div class="panel-title">Private Notes</div>
+      <textarea id="bpNotes" rows="4" placeholder="Add private notes about this buyer…" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.75rem;font-size:0.88rem;resize:vertical;box-sizing:border-box;"></textarea>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:0.35rem;">Auto-saves when you click away</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Buyer Intelligence JS ─────────────────────────────── -->
+<script>
+'use strict';
+
+var _buyersViewMode = 'alltime';
+var _buyerProfileId = null;
+var _bpPurchasePage = 0;
+var _bpPurchases = [];
+const BP_PAGE_SIZE = 25;
+
+// ── Buyers Tab ────────────────────────────────────────────
+function setBuyersView(mode) {
+  _buyersViewMode = mode;
+  document.getElementById('buyersViewAllTime').className = mode === 'alltime' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('buyersViewRecent').className = mode === 'recent' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  loadBuyersTab();
+}
+
+async function loadBuyersTab() {
+  const el = document.getElementById('buyersLeaderboard');
+  if (!el || !currentProfile) return;
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading…</div>';
+
+  try {
+    let buyers;
+    if (_buyersViewMode === 'alltime') {
+      const { data, error } = await sb.from('buyers')
+        .select('id,username,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer')
+        .eq('organization_id', currentProfile.org_id)
+        .order('total_spent', { ascending: false })
+        .limit(15);
+      if (error) throw error;
+      buyers = data || [];
+    } else {
+      // Recent: sum purchases from last 30 days
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      const { data: purch, error } = await sb.from('buyer_purchases')
+        .select('buyer_id, amount')
+        .eq('organization_id', currentProfile.org_id)
+        .gte('purchase_date', cutoff.toISOString().split('T')[0]);
+      if (error) throw error;
+
+      // Aggregate by buyer_id
+      const sums = {};
+      (purch || []).forEach(p => { sums[p.buyer_id] = (sums[p.buyer_id] || 0) + Number(p.amount || 0); });
+      const sorted = Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, 15);
+      if (sorted.length === 0) { el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No purchases in the last 30 days.</div>'; return; }
+
+      const ids = sorted.map(x => x[0]);
+      const { data: buyerRows } = await sb.from('buyers').select('id,username,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer').in('id', ids);
+      const byId = {};
+      (buyerRows || []).forEach(b => { byId[b.id] = b; });
+      buyers = sorted.map(([id, recentSpent]) => { const b = byId[id]; if (!b) return null; return { ...b, _recentSpent: recentSpent }; }).filter(Boolean);
+    }
+
+    if (buyers.length === 0) {
+      el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No buyer data yet. Import packing slips during stream closeout to build your buyer intelligence.</div>';
+      return;
+    }
+
+    el.innerHTML = buyers.map(function(b, i) {
+      const spent = _buyersViewMode === 'recent' ? (b._recentSpent || 0) : Number(b.total_spent || 0);
+      const temp = b.temperature || 'cold';
+      const tempColor = temp === 'hot' ? '#22c55e' : temp === 'warm' ? '#f59e0b' : '#64748b';
+      const lastDate = b.last_purchase_date ? relativeDate(b.last_purchase_date) : 'Never';
+      return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1.25rem;' + (i % 2 === 0 ? '' : 'background:rgba(255,255,255,0.015);') + '">' +
+        '<div style="font-size:0.75rem;font-weight:800;color:var(--muted);width:1.5rem;text-align:center;">' + (i+1) + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;">' +
+            '<span>@' + escHtml(b.username) + '</span>' +
+            (b.is_new_buyer ? '<span style="font-size:0.62rem;background:rgba(34,197,94,0.12);color:#22c55e;padding:1px 4px;border-radius:3px;font-weight:700;">NEW</span>' : '') +
+          '</div>' +
+          '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.1rem;">' + lastDate + ' · ' + (b.total_breaks_purchased || 0) + ' breaks · ' + (b.total_streams_participated || 0) + ' streams</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:0.35rem;flex-shrink:0;">' +
+          '<span style="width:8px;height:8px;border-radius:50%;background:' + tempColor + ';display:inline-block;"></span>' +
+          '<span style="font-size:0.72rem;color:' + tempColor + ';font-weight:700;text-transform:capitalize;">' + temp + '</span>' +
+        '</div>' +
+        '<div style="font-size:0.95rem;font-weight:800;color:var(--primary);min-width:60px;text-align:right;">$' + spent.toFixed(2) + '</div>' +
+        '<button onclick="openBuyerProfile(\'' + b.id + '\')" style="background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.25);color:var(--primary);border-radius:6px;padding:0.3rem 0.65rem;font-size:0.75rem;font-weight:600;cursor:pointer;flex-shrink:0;">Profile</button>' +
+      '</div>';
+    }).join('');
+  } catch (err) {
+    el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load buyers: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+function relativeDate(dateStr) {
+  if (!dateStr) return 'Never';
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return days + ' days ago';
+  if (days < 30) return Math.floor(days / 7) + 'w ago';
+  if (days < 365) return Math.floor(days / 30) + 'mo ago';
+  return Math.floor(days / 365) + 'y ago';
+}
+
+// ── Buyer Profile ─────────────────────────────────────────
+async function openBuyerProfile(buyerId) {
+  _buyerProfileId = buyerId;
+  _bpPurchasePage = 0;
+  const overlay = document.getElementById('buyerProfileOverlay');
+  overlay.style.transform = 'translateX(100%)';
+  overlay.style.display = 'block';
+  requestAnimationFrame(function() { overlay.style.transform = 'translateX(0)'; });
+
+  // Clear previous state
+  ['bpUsername','bpFirstSeen','bpStats','bpPreferred','bpHits','bpPurchases','bpPurchasePager'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = id === 'bpUsername' ? '' : '<div style="color:var(--muted);font-size:0.82rem;">Loading…</div>';
+  });
+  document.getElementById('bpTempBadge').innerHTML = '';
+  document.getElementById('bpNewBadge').style.display = 'none';
+  document.getElementById('bpNotes').value = '';
+
+  try {
+    const [buyerRes, hitsRes, purchasesRes] = await Promise.all([
+      sb.from('buyers').select('*').eq('id', buyerId).single(),
+      sb.from('buyer_hits').select('*').eq('buyer_id', buyerId).order('submitted_at', { ascending: false }),
+      sb.from('buyer_purchases').select('*').eq('buyer_id', buyerId).order('purchase_date', { ascending: false })
+    ]);
+
+    const buyer = buyerRes.data;
+    if (!buyer) throw new Error('Buyer not found');
+
+    // Header
+    document.getElementById('bpUsername').textContent = '@' + buyer.username;
+    const temp = buyer.temperature || 'cold';
+    const tempColor = temp === 'hot' ? '#22c55e' : temp === 'warm' ? '#f59e0b' : '#64748b';
+    document.getElementById('bpTempBadge').innerHTML = '<span style="background:' + tempColor + '1a;color:' + tempColor + ';border:1px solid ' + tempColor + '44;border-radius:100px;padding:0.2rem 0.7rem;font-size:0.75rem;font-weight:700;text-transform:capitalize;">' + temp + '</span>';
+    if (buyer.is_new_buyer) document.getElementById('bpNewBadge').style.display = '';
+    document.getElementById('bpFirstSeen').textContent = buyer.first_seen_date ? 'First seen ' + buyer.first_seen_date : '';
+
+    // Stats
+    const stats = [
+      { value: '$' + Number(buyer.total_spent || 0).toFixed(2), label: 'Total Spent' },
+      { value: buyer.total_breaks_purchased || 0, label: 'Breaks' },
+      { value: buyer.total_streams_participated || 0, label: 'Streams' },
+      { value: buyer.last_purchase_date ? relativeDate(buyer.last_purchase_date) : 'Never', label: 'Last Purchase' }
+    ];
+    document.getElementById('bpStats').innerHTML = stats.map(function(s) {
+      return '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">' +
+        '<div style="font-size:1rem;font-weight:800;">' + s.value + '</div>' +
+        '<div style="font-size:0.7rem;color:var(--muted);margin-top:0.15rem;">' + s.label + '</div></div>';
+    }).join('');
+
+    // Notes
+    document.getElementById('bpNotes').value = buyer.notes || '';
+    document.getElementById('bpNotes').onblur = function() { saveBuyerNotes(buyerId, this.value); };
+
+    // Preferred products
+    const purchases = purchasesRes.data || [];
+    _bpPurchases = purchases;
+    const nameCounts = {};
+    purchases.forEach(p => { if (p.break_name) nameCounts[p.break_name] = (nameCounts[p.break_name] || 0) + 1; });
+    const top3 = Object.entries(nameCounts).sort((a,b) => b[1]-a[1]).slice(0,3);
+    document.getElementById('bpPreferred').innerHTML = top3.length === 0
+      ? '<div style="color:var(--muted);font-size:0.82rem;">No purchase history yet.</div>'
+      : top3.map(function([name, count]) {
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.45rem 0;border-bottom:1px solid var(--border);">' +
+            '<span style="font-size:0.88rem;font-weight:600;">' + escHtml(name) + '</span>' +
+            '<span style="font-size:0.78rem;color:var(--muted);">' + count + 'x</span></div>';
+        }).join('');
+
+    // Hits
+    const hits = hitsRes.data || [];
+    const hitTypeLabels = { rookie:'Rookie', auto:'Auto', patch:'Patch', case_hit:'Case Hit', other:'Other' };
+    document.getElementById('bpHits').innerHTML = hits.length === 0
+      ? '<div style="color:var(--muted);font-size:0.82rem;">No hits logged yet. Breakers log hits during stream closeout.</div>'
+      : hits.map(function(h) {
+          return '<div style="padding:0.6rem 0;border-bottom:1px solid var(--border);">' +
+            '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">' +
+              '<span style="font-size:0.82rem;font-weight:700;">' + escHtml(h.hit_description) + '</span>' +
+              '<span style="font-size:0.68rem;background:rgba(79,110,247,0.12);color:var(--primary);padding:1px 5px;border-radius:3px;">' + (hitTypeLabels[h.hit_type] || h.hit_type) + '</span>' +
+            '</div>' +
+            (h.break_name ? '<div style="font-size:0.75rem;color:var(--muted);">' + escHtml(h.break_name) + '</div>' : '') +
+            '<div style="font-size:0.72rem;color:var(--muted);">' + (h.submitted_at ? new Date(h.submitted_at).toLocaleDateString() : '') + '</div>' +
+          '</div>';
+        }).join('');
+
+    // Purchases (paginated)
+    renderBpPurchases();
+
+  } catch (err) {
+    document.getElementById('bpUsername').textContent = 'Error loading profile';
+    console.error('openBuyerProfile error:', err);
+  }
+}
+
+function renderBpPurchases() {
+  const start = _bpPurchasePage * BP_PAGE_SIZE;
+  const page = _bpPurchases.slice(start, start + BP_PAGE_SIZE);
+  const el = document.getElementById('bpPurchases');
+  if (page.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">No purchases recorded.</div>';
+  } else {
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">' +
+      '<thead><tr>' +
+        '<th style="text-align:left;padding:0.4rem 0;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);">Date</th>' +
+        '<th style="text-align:left;padding:0.4rem 0.4rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);">Break</th>' +
+        '<th style="text-align:right;padding:0.4rem 0;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);">Amount</th>' +
+      '</tr></thead>' +
+      '<tbody>' + page.map(function(p) {
+        return '<tr><td style="padding:0.4rem 0;color:var(--muted);">' + (p.purchase_date || '') + '</td>' +
+          '<td style="padding:0.4rem 0.4rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(p.break_name || '—') + '</td>' +
+          '<td style="padding:0.4rem 0;text-align:right;font-weight:700;color:var(--primary);">$' + Number(p.amount||0).toFixed(2) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  // Pager
+  const totalPages = Math.ceil(_bpPurchases.length / BP_PAGE_SIZE);
+  const pager = document.getElementById('bpPurchasePager');
+  pager.innerHTML = '';
+  if (totalPages > 1) {
+    if (_bpPurchasePage > 0) {
+      var prev = document.createElement('button');
+      prev.className = 'btn btn-sm btn-outline';
+      prev.textContent = '← Prev';
+      prev.onclick = function() { _bpPurchasePage--; renderBpPurchases(); };
+      pager.appendChild(prev);
+    }
+    var pageInfo = document.createElement('span');
+    pageInfo.style.cssText = 'font-size:0.78rem;color:var(--muted);align-self:center;';
+    pageInfo.textContent = 'Page ' + (_bpPurchasePage+1) + ' of ' + totalPages;
+    pager.appendChild(pageInfo);
+    if (_bpPurchasePage < totalPages - 1) {
+      var next = document.createElement('button');
+      next.className = 'btn btn-sm btn-outline';
+      next.textContent = 'Next →';
+      next.onclick = function() { _bpPurchasePage++; renderBpPurchases(); };
+      pager.appendChild(next);
+    }
+  }
+}
+
+async function saveBuyerNotes(buyerId, notes) {
+  await sb.from('buyers').update({ notes, updated_at: new Date().toISOString() }).eq('id', buyerId).catch(() => {});
+}
+
+function closeBuyerProfile() {
+  const overlay = document.getElementById('buyerProfileOverlay');
+  overlay.style.transform = 'translateX(100%)';
+}
 </script>
 
 <script src="/pwa.js"></script>

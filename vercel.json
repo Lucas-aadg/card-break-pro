@@ -29,6 +29,10 @@
     {
       "path": "/api/cron-renewal-reminder",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron-buyer-alerts",
+      "schedule": "0 9 * * *"
     }
   ]
 }
