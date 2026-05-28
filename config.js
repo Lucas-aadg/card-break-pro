@@ -13,6 +13,6 @@ window.SUPABASE_CONFIG = {
 // PostHog analytics — get your key from posthog.com → Project Settings → Project API Key
 // Leave as 'YOUR_POSTHOG_KEY' to disable analytics entirely (safe for local dev)
 window.POSTHOG_CONFIG = {
-  apiKey: 'YOUR_POSTHOG_KEY',
+  apiKey: 'phx_328Wt7EVzEUU8iEzoqdqMXRwL8r3SPdQYQagSnk4KqkrZ7KGs',
   host: 'https://us.i.posthog.com'
 };
