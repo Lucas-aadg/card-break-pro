@@ -908,6 +908,7 @@ async function initAuth() {
     await checkTodayShiftAndNotify();
     loadNotifCount();
     setInterval(loadNotifCount, 60000);
+    setupNotifRealtime();
     loadMyScheduleView();
     hideLoading();
     checkBreakerOnboarding();
@@ -1436,6 +1437,19 @@ async function handleSubmitBreak() {
       }
     }
 
+    // Fire inventory-low notification check (fire and forget)
+    var lowCheck = productsUsed
+      .map(function(u) { return products.find(function(p) { return p.id === u.product_id; }); })
+      .filter(function(p) { return p && p.current_stock <= 3; })
+      .map(function(p) { return { id: p.id, name: p.name, current_stock: p.current_stock }; });
+    if (lowCheck.length > 0) {
+      fetch('/api/notify-inventory-low', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org_id: currentProfile.org_id, products: lowCheck })
+      }).catch(function() {});
+    }
+
     // Update stream totals
     const newTotalRevenue = (parseFloat(stream.total_submitted_revenue) || 0) + revenue;
     const newTotalBoxCost = (parseFloat(stream.total_product_cost) || 0) + boxCost;
@@ -1610,8 +1624,9 @@ async function handleConfirmClose() {
 
     if (error) throw error;
 
-    // Save stream id before clearing state
+    // Save stream id and key before clearing state
     const closedStreamId = currentStream.id;
+    const closedStreamKey = currentStream.stream_key || '';
 
     // Sync each break's net_profit to use the actual fee rate from final_sales
     try {
@@ -1674,6 +1689,18 @@ async function handleConfirmClose() {
     } catch (taskErr) {
       console.warn('Sort task creation failed:', taskErr);
     }
+
+    // Notify sorters that stream is closed (fire and forget)
+    fetch('/api/notify-stream-closed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stream_id: closedStreamId,
+        stream_key: closedStreamKey,
+        break_count: submittedBreaks.length,
+        org_id: currentProfile.org_id
+      })
+    }).catch(function() {});
   } catch (err) {
     showError('Failed to close stream: ' + escHtml(err.message));
     console.error(err);
@@ -2325,6 +2352,8 @@ function setupPayoutListeners() {
 
 // ── Notifications ─────────────────────────────────────────
 let notifPanelOpen = false;
+let _notifRealtimeChannel = null;
+
 function toggleNotifPanel() {
   notifPanelOpen = !notifPanelOpen;
   document.getElementById('notifPanel').style.display = notifPanelOpen ? 'block' : 'none';
@@ -2335,39 +2364,68 @@ function closeNotifPanel() {
   document.getElementById('notifPanel').style.display = 'none';
 }
 async function loadNotifCount() {
+  if (!currentUser) return;
   try {
-    const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('profile_id', currentUser.id).eq('read', false);
+    const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true })
+      .eq('user_id', currentUser.id).eq('is_read', false);
     const badge = document.getElementById('notifBadge');
     if (count && count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'block'; }
     else { badge.style.display = 'none'; }
   } catch (e) {}
 }
+function notifTypeIcon(type) {
+  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳' };
+  return icons[type] || '🔔';
+}
 async function renderNotifPanel() {
   const list = document.getElementById('notifList');
   list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Loading…</div>';
   try {
-    const { data } = await sb.from('notifications').select('*').eq('profile_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
-    if (!data || data.length === 0) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">No notifications yet.</div>'; return; }
+    const { data } = await sb.from('notifications').select('*')
+      .eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
+    if (!data || data.length === 0) {
+      list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">You are all caught up.</div>';
+      return;
+    }
     list.innerHTML = data.map(function(n) {
       const diff = Math.floor((Date.now() - new Date(n.created_at)) / 1000);
       const age = diff < 60 ? 'Just now' : diff < 3600 ? Math.floor(diff/60)+'m ago' : diff < 86400 ? Math.floor(diff/3600)+'h ago' : Math.floor(diff/86400)+'d ago';
-      return '<div style="padding:0.75rem 1rem;border-bottom:1px solid #1e1e2d;cursor:pointer;display:flex;gap:0.65rem;align-items:flex-start;background:' + (n.read ? 'transparent' : 'rgba(79,110,247,0.04)') + ';" onclick="markNotifRead(\'' + n.id + '\',this)">' +
-        '<div style="width:7px;height:7px;border-radius:50%;background:' + (n.read ? 'transparent' : '#4f6ef7') + ';flex-shrink:0;margin-top:5px;"></div>' +
-        '<div><div style="font-size:0.82rem;font-weight:700;color:#e2e8f0;margin-bottom:0.15rem;">' + escHtml(n.title||'') + '</div>' +
-        '<div style="font-size:0.78rem;color:#64748b;line-height:1.4;">' + escHtml(n.message||'') + '</div>' +
-        '<div style="font-size:0.68rem;color:#64748b;margin-top:0.2rem;">' + age + '</div></div></div>';
+      const hasUrl = n.action_url ? ' onclick="notifClick(\'' + n.id + '\',\'' + escHtml(n.action_url) + '\',this)"' : ' onclick="markNotifRead(\'' + n.id + '\',this)"';
+      return '<div style="padding:0.75rem 1rem;border-bottom:1px solid #1e1e2d;cursor:pointer;display:flex;gap:0.65rem;align-items:flex-start;background:' + (n.is_read ? 'transparent' : 'rgba(79,110,247,0.06)') + ';"' + hasUrl + '>' +
+        '<div style="font-size:1.1rem;flex-shrink:0;">' + notifTypeIcon(n.type) + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:0.82rem;font-weight:700;color:#e2e8f0;margin-bottom:0.15rem;">' + escHtml(n.title||'') + '</div>' +
+          '<div style="font-size:0.78rem;color:#64748b;line-height:1.4;">' + escHtml(n.body||'') + '</div>' +
+          '<div style="font-size:0.68rem;color:#64748b;margin-top:0.2rem;">' + age + '</div>' +
+        '</div>' +
+        '<div style="width:7px;height:7px;border-radius:50%;background:' + (n.is_read ? 'transparent' : '#4f6ef7') + ';flex-shrink:0;margin-top:5px;"></div>' +
+      '</div>';
     }).join('');
   } catch(e) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Could not load.</div>'; }
 }
+async function notifClick(id, url, el) {
+  await markNotifRead(id, el);
+  if (url && url !== 'undefined') window.location.href = url;
+}
 async function markNotifRead(id, el) {
   try {
-    await sb.from('notifications').update({ read: true }).eq('id', id);
-    if (el) { el.style.background = 'transparent'; const dot = el.querySelector('div'); if(dot) dot.style.background = 'transparent'; }
+    await sb.from('notifications').update({ is_read: true }).eq('id', id);
+    if (el) { el.style.background = 'transparent'; const dot = el.querySelector('div:last-child'); if(dot) dot.style.background = 'transparent'; }
     loadNotifCount();
   } catch(e) {}
 }
 async function markAllNotifsRead() {
-  try { await sb.from('notifications').update({ read: true }).eq('profile_id', currentUser.id).eq('read', false); renderNotifPanel(); loadNotifCount(); } catch(e) {}
+  try {
+    await sb.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
+    renderNotifPanel(); loadNotifCount();
+  } catch(e) {}
+}
+function setupNotifRealtime() {
+  if (_notifRealtimeChannel || !currentUser) return;
+  _notifRealtimeChannel = sb.channel('notifs-breaker-' + currentUser.id)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + currentUser.id },
+      function() { loadNotifCount(); if (notifPanelOpen) renderNotifPanel(); })
+    .subscribe();
 }
 document.addEventListener('click', function(e) {
   if (notifPanelOpen && !document.getElementById('notifBellWrap').contains(e.target)) closeNotifPanel();

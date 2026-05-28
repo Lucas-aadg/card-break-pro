@@ -17,6 +17,18 @@
     {
       "path": "/api/trial-cron",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron-shift-reminder",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron-daily-digest",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron-renewal-reminder",
+      "schedule": "0 10 * * *"
     }
   ]
 }

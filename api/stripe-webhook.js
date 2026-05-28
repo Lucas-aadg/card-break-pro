@@ -1,5 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
+const { sendEmail } = require('./send-email');
+const APP_URL = process.env.APP_URL || 'https://cardbreakpro.com';
 
 // Disable body parsing so we get the raw body for Stripe signature verification
 module.exports.config = {
@@ -134,10 +136,52 @@ module.exports = async (req, res) => {
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
+        // Update subscription status
         const { error } = await sb.from('subscriptions')
           .update({ status: 'past_due', updated_at: new Date().toISOString() })
           .eq('stripe_customer_id', invoice.customer);
         if (error) console.error('Supabase update error (invoice.payment_failed):', error);
+
+        // Notify owner (skip GasPackBreaks / exempt tier)
+        const { orgId: pfOrgId, ownerId: pfOwnerId } = await getOrgAndOwner(sb, { customerId: invoice.customer });
+        if (pfOrgId && pfOwnerId) {
+          // Check if exempt
+          const { data: pfSub } = await sb.from('subscriptions').select('tier').eq('org_id', pfOrgId).maybeSingle();
+          if (pfSub?.tier !== 'exempt') {
+            const billingUrl = APP_URL + '/billing';
+            const notifTitle = 'Payment failed — action required';
+            const notifBody  = 'Your last payment did not go through. You have a 3-day grace period before access is restricted. Update your payment method now to avoid interruption.';
+
+            // Check prefs
+            const { data: pfPrefs } = await sb.from('notification_preferences').select('*').eq('user_id', pfOwnerId).maybeSingle();
+            if (pfPrefs?.notify_payment_failed !== false) {
+              if (pfPrefs?.in_app_notifications_enabled !== false) {
+                await sb.from('notifications').insert({
+                  organization_id: pfOrgId,
+                  user_id: pfOwnerId,
+                  type: 'payment_failed',
+                  title: notifTitle,
+                  body: notifBody,
+                  action_url: billingUrl
+                }).catch(e => console.error('payment_failed notif insert error:', e.message));
+              }
+              if (pfPrefs?.email_notifications_enabled !== false) {
+                const { data: authUser } = await sb.auth.admin.getUserById(pfOwnerId);
+                const ownerEmail = authUser?.user?.email;
+                if (ownerEmail) {
+                  const { data: ownerProfile } = await sb.from('profiles').select('display_name').eq('id', pfOwnerId).maybeSingle();
+                  const firstName = (ownerProfile?.display_name || '').split(' ')[0] || 'there';
+                  await sendEmail({
+                    to: ownerEmail,
+                    subject: 'Your CardBreakPro payment failed',
+                    html: buildPaymentFailedHtml(firstName, billingUrl),
+                    text: buildPaymentFailedText(firstName, billingUrl)
+                  }).catch(e => console.error('payment_failed email error:', e.message));
+                }
+              }
+            }
+          }
+        }
         break;
       }
 
@@ -179,11 +223,12 @@ module.exports = async (req, res) => {
         const { orgId, ownerId } = await getOrgAndOwner(sb, { subscriptionId: sub.id });
         if (orgId && ownerId) {
           const { error } = await sb.from('notifications').insert({
-            org_id: orgId,
-            profile_id: ownerId,
+            organization_id: orgId,
+            user_id: ownerId,
+            type: 'trial_ending',
             title: 'Trial Ending in 3 Days',
-            message: 'Your free trial ends in 3 days. Visit Billing to add a payment method and keep your dashboard access.',
-            read: false
+            body: 'Your free trial ends in 3 days. Visit Billing to add a payment method and keep your dashboard access.',
+            action_url: APP_URL + '/billing'
           });
           if (error) console.error('Supabase insert error (trial_will_end notification):', error);
         }
@@ -199,11 +244,12 @@ module.exports = async (req, res) => {
         if (orgId && ownerId) {
           const amount = invoice.amount_due ? '$' + (invoice.amount_due / 100).toFixed(2) : '$250.00';
           const { error } = await sb.from('notifications').insert({
-            org_id: orgId,
-            profile_id: ownerId,
+            organization_id: orgId,
+            user_id: ownerId,
+            type: 'renewal_reminder',
             title: 'Upcoming Renewal',
-            message: `Your Card Break Pro subscription renews in ~7 days for ${amount}. Manage your billing at cardbreakpro.com/billing.`,
-            read: false
+            body: `Your Card Break Pro subscription renews in ~7 days for ${amount}. Manage your billing at cardbreakpro.com/billing.`,
+            action_url: APP_URL + '/billing'
           });
           if (error) console.error('Supabase insert error (invoice.upcoming notification):', error);
         }
@@ -232,3 +278,45 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+function buildPaymentFailedText(name, billingUrl) {
+  return `Hey ${name},
+
+Your last CardBreakPro payment didn't go through.
+
+Here's what that means: you have a 3-day grace period before access is restricted. Nothing has changed yet — your platform is still fully operational. But if this doesn't get resolved, your team will lose access.
+
+Fix it here: ${billingUrl}
+
+Once you update your payment method, your subscription resumes immediately and the grace period is cleared.
+
+If you think this was an error or you have questions, reply to this email.
+
+— Lucas
+Card Break Pro`;
+}
+
+function buildPaymentFailedHtml(name, billingUrl) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;">
+<div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+  <div style="background:#0d0d14;padding:24px 28px;">
+    <div style="font-size:1rem;font-weight:800;letter-spacing:2px;color:#e2e8f0;">CARD <span style="color:#4f6ef7;">BREAK</span> PRO</div>
+  </div>
+  <div style="padding:32px 28px;">
+    <p style="margin:0 0 16px;font-size:1rem;color:#1e293b;">Hey ${name},</p>
+    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+      <div style="font-size:0.75rem;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Payment Failed</div>
+      <div style="font-size:0.95rem;font-weight:700;color:#1e293b;">Your last payment didn't go through.</div>
+    </div>
+    <p style="margin:0 0 16px;font-size:0.9rem;color:#334155;line-height:1.7;">You have a <strong>3-day grace period</strong> before access is restricted. Nothing has changed yet — your platform is still fully operational.</p>
+    <p style="margin:0 0 24px;font-size:0.9rem;color:#334155;line-height:1.7;">Update your payment method now and your subscription resumes immediately.</p>
+    <a href="${billingUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:0.9rem;margin-bottom:24px;">Fix Payment Now →</a>
+    <p style="margin:0 0 4px;font-size:0.85rem;color:#64748b;">If you think this was an error or have questions, reply to this email.</p>
+    <p style="margin:24px 0 0;font-size:0.88rem;color:#334155;">— Lucas</p>
+    <p style="margin:0;font-size:0.82rem;color:#94a3b8;">Card Break Pro</p>
+  </div>
+</div>
+</body></html>`;
+}

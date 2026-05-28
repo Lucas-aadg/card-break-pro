@@ -201,6 +201,14 @@
     }
     .panel-header .panel-title { margin-bottom: 0; }
 
+    /* ── TOGGLE SWITCH ── */
+    .toggle-switch { position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0; }
+    .toggle-switch input { opacity:0;width:0;height:0; }
+    .toggle-slider { position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:24px;transition:.2s; }
+    .toggle-slider::before { content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s; }
+    .toggle-switch input:checked + .toggle-slider { background:var(--primary); }
+    .toggle-switch input:checked + .toggle-slider::before { transform:translateX(20px); }
+
     /* ── FORM ELEMENTS ── */
     label {
       display: block;
@@ -1717,6 +1725,70 @@
       </div>
     </div>
 
+    <!-- Notification Preferences -->
+    <div class="panel" id="notifPrefPanel">
+      <div class="panel-title">Notification Preferences</div>
+
+      <!-- Daily digest time (owners only) -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-weight:600;font-size:0.9rem;">Daily Digest Time</div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">Time you receive your daily summary email (UTC)</div>
+        </div>
+        <input type="time" id="notifDigestTime" value="08:30" style="background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.4rem 0.75rem;font-size:0.85rem;cursor:pointer;" />
+      </div>
+
+      <!-- Channel toggles -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-weight:600;font-size:0.9rem;">Email Notifications</div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">Receive notification emails at your registered address</div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="notifEmailEnabled" checked><span class="toggle-slider"></span></label>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-weight:600;font-size:0.9rem;">In-App Notifications</div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">Show notification badge and panel in the dashboard</div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="notifInAppEnabled" checked><span class="toggle-slider"></span></label>
+      </div>
+
+      <!-- Per-type toggles -->
+      <div style="margin-top:0.5rem;padding-top:0.5rem;">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Notification Types</div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.88rem;font-weight:500;">Stream Closed</div>
+          <label class="toggle-switch"><input type="checkbox" id="notifStreamClosed" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.88rem;font-weight:500;">Shift Reminders</div>
+          <label class="toggle-switch"><input type="checkbox" id="notifShiftReminder" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.88rem;font-weight:500;">Low Inventory Alerts</div>
+          <label class="toggle-switch"><input type="checkbox" id="notifInventoryLow" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-size:0.88rem;font-weight:500;">Payment Alerts</div>
+            <div id="notifPaymentWarn" style="display:none;font-size:0.75rem;color:#f59e0b;margin-top:0.2rem;">Warning: disabling this means you won't be notified of failed payments.</div>
+          </div>
+          <label class="toggle-switch"><input type="checkbox" id="notifPaymentFailed" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0;">
+          <div style="font-size:0.88rem;font-weight:500;">Daily Digest</div>
+          <label class="toggle-switch"><input type="checkbox" id="notifDailyDigest" checked><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem;display:flex;align-items:center;gap:1rem;">
+        <button class="btn btn-sm" id="saveNotifPrefsBtn" style="padding:0.5rem 1.25rem;">Save Preferences</button>
+        <span id="notifPrefStatus" style="font-size:0.82rem;color:var(--muted);"></span>
+      </div>
+    </div>
+
     <!-- Danger Zone -->
     <div class="panel" style="border-color:rgba(239,68,68,0.25);">
       <div class="panel-title" style="color:var(--red);">Danger Zone</div>
@@ -3181,9 +3253,13 @@ async function initAuth() {
     // Load initial tab data
     await loadHome();
 
-    // Notifications count
+    // Notifications
     loadNotifCount();
-    setInterval(loadNotifCount, 60000); // refresh every minute
+    setInterval(loadNotifCount, 60000);
+    setupNotifRealtime();
+    checkPaymentFailedBanner();
+    loadNotifPrefs();
+    setupNotifPrefsListeners();
 
     // Onboarding: welcome modal + checklist widget
     await checkAndShowWizard(orgInfo);
@@ -7846,12 +7922,15 @@ function closeNotifPanel() {
   document.getElementById('notifPanel').style.display = 'none';
 }
 
+let _notifRealtimeChannel = null;
+
 async function loadNotifCount() {
+  if (!currentUser) return;
   try {
     const { count } = await sb.from('notifications')
       .select('id', { count: 'exact', head: true })
-      .eq('profile_id', currentUser.id)
-      .eq('read', false);
+      .eq('user_id', currentUser.id)
+      .eq('is_read', false);
     const badge = document.getElementById('notifBadge');
     if (count && count > 0) {
       badge.textContent = count > 99 ? '99+' : count;
@@ -7859,7 +7938,12 @@ async function loadNotifCount() {
     } else {
       badge.style.display = 'none';
     }
-  } catch (e) { /* table may not exist yet */ }
+  } catch (e) {}
+}
+
+function notifTypeIcon(type) {
+  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳' };
+  return icons[type] || '🔔';
 }
 
 async function renderNotifPanel() {
@@ -7868,23 +7952,25 @@ async function renderNotifPanel() {
   try {
     const { data, error } = await sb.from('notifications')
       .select('*')
-      .eq('profile_id', currentUser.id)
+      .eq('user_id', currentUser.id)
       .order('created_at', { ascending: false })
       .limit(30);
     if (error) throw error;
     if (!data || data.length === 0) {
-      list.innerHTML = '<div class="notif-empty">No notifications yet.</div>';
+      list.innerHTML = '<div class="notif-empty">You are all caught up.</div>';
       return;
     }
     list.innerHTML = data.map(function (n) {
       const age = timeAgo(n.created_at);
-      return '<div class="notif-item ' + (n.read ? '' : 'unread') + '" onclick="markNotifRead(\'' + n.id + '\',this)">' +
-        '<div class="notif-dot ' + (n.read ? 'read' : '') + '"></div>' +
-        '<div>' +
+      const hasUrl = n.action_url ? ' onclick="notifClick(\'' + n.id + '\',\'' + escHtml(n.action_url) + '\',this)"' : ' onclick="markNotifRead(\'' + n.id + '\',this)"';
+      return '<div class="notif-item ' + (n.is_read ? '' : 'unread') + '"' + hasUrl + '>' +
+        '<div style="font-size:1.1rem;">' + notifTypeIcon(n.type) + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
           '<div class="notif-title">' + escHtml(n.title || '') + '</div>' +
-          '<div class="notif-msg">' + escHtml(n.message || '') + '</div>' +
+          '<div class="notif-msg">' + escHtml(n.body || '') + '</div>' +
           '<div class="notif-time">' + age + '</div>' +
         '</div>' +
+        '<div class="notif-dot ' + (n.is_read ? 'read' : '') + '"></div>' +
       '</div>';
     }).join('');
   } catch (e) {
@@ -7892,9 +7978,14 @@ async function renderNotifPanel() {
   }
 }
 
+async function notifClick(id, url, el) {
+  await markNotifRead(id, el);
+  if (url && url !== 'undefined') window.location.href = url;
+}
+
 async function markNotifRead(id, el) {
   try {
-    await sb.from('notifications').update({ read: true }).eq('id', id);
+    await sb.from('notifications').update({ is_read: true }).eq('id', id);
     if (el) {
       el.classList.remove('unread');
       const dot = el.querySelector('.notif-dot');
@@ -7906,10 +7997,101 @@ async function markNotifRead(id, el) {
 
 async function markAllNotifsRead() {
   try {
-    await sb.from('notifications').update({ read: true }).eq('profile_id', currentUser.id).eq('read', false);
+    await sb.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
     renderNotifPanel();
     loadNotifCount();
   } catch (e) {}
+}
+
+function setupNotifRealtime() {
+  if (_notifRealtimeChannel || !currentUser) return;
+  _notifRealtimeChannel = sb.channel('notifs-owner-' + currentUser.id)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + currentUser.id },
+      function() { loadNotifCount(); if (notifPanelOpen) renderNotifPanel(); })
+    .subscribe();
+}
+
+// ── Payment-Failed Banner ──────────────────────────────────
+async function checkPaymentFailedBanner() {
+  try {
+    const { data: sub } = await sb.from('subscriptions').select('status, tier').eq('org_id', currentProfile.org_id).maybeSingle();
+    if (!sub || sub.tier === 'exempt' || sub.status !== 'past_due') return;
+
+    // Banner not already showing
+    if (document.getElementById('paymentFailedBanner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'paymentFailedBanner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#dc2626;color:#fff;padding:0.75rem 1rem;display:flex;align-items:center;justify-content:center;gap:1rem;font-size:0.88rem;font-weight:600;text-align:center;';
+    banner.innerHTML = '<span>⚠️ Your last payment failed. You have a 3-day grace period before access is restricted.</span>'
+      + '<a href="/billing" style="color:#fff;text-decoration:underline;white-space:nowrap;">Fix Now →</a>';
+    document.body.prepend(banner);
+
+    // Push page content down so banner doesn't overlap nav
+    const nav = document.querySelector('.top-nav');
+    if (nav) nav.style.top = banner.offsetHeight + 'px';
+  } catch (e) {}
+}
+
+// ── Notification Preferences ───────────────────────────────
+async function loadNotifPrefs() {
+  try {
+    const { data } = await sb.from('notification_preferences').select('*').eq('user_id', currentUser.id).maybeSingle();
+    if (!data) return;
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val !== false; };
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    setVal('notifDigestTime', data.daily_digest_time ? data.daily_digest_time.slice(0, 5) : '08:30');
+    set('notifEmailEnabled', data.email_notifications_enabled);
+    set('notifInAppEnabled', data.in_app_notifications_enabled);
+    set('notifStreamClosed', data.notify_stream_closed);
+    set('notifShiftReminder', data.notify_shift_reminder);
+    set('notifInventoryLow', data.notify_inventory_low);
+    set('notifPaymentFailed', data.notify_payment_failed);
+    set('notifDailyDigest', data.notify_daily_digest);
+    updatePaymentWarn();
+  } catch (e) {}
+}
+
+function updatePaymentWarn() {
+  const warn = document.getElementById('notifPaymentWarn');
+  const chk = document.getElementById('notifPaymentFailed');
+  if (warn && chk) warn.style.display = chk.checked ? 'none' : 'block';
+}
+
+async function saveNotifPrefs() {
+  const btn = document.getElementById('saveNotifPrefsBtn');
+  const status = document.getElementById('notifPrefStatus');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const get = (id) => { const el = document.getElementById(id); return el ? el.checked : true; };
+    const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : '08:30'; };
+    const { error } = await sb.from('notification_preferences').upsert({
+      user_id: currentUser.id,
+      organization_id: currentProfile.org_id,
+      daily_digest_time: getVal('notifDigestTime'),
+      email_notifications_enabled: get('notifEmailEnabled'),
+      in_app_notifications_enabled: get('notifInAppEnabled'),
+      notify_stream_closed: get('notifStreamClosed'),
+      notify_shift_reminder: get('notifShiftReminder'),
+      notify_inventory_low: get('notifInventoryLow'),
+      notify_payment_failed: get('notifPaymentFailed'),
+      notify_daily_digest: get('notifDailyDigest'),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+    if (error) throw error;
+    if (status) { status.textContent = 'Saved!'; status.style.color = '#22c55e'; setTimeout(function() { status.textContent = ''; }, 3000); }
+  } catch (e) {
+    if (status) { status.textContent = 'Save failed — try again'; status.style.color = '#ef4444'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Preferences'; }
+  }
+}
+
+function setupNotifPrefsListeners() {
+  const saveBtn = document.getElementById('saveNotifPrefsBtn');
+  if (saveBtn) saveBtn.addEventListener('click', saveNotifPrefs);
+  const payChk = document.getElementById('notifPaymentFailed');
+  if (payChk) payChk.addEventListener('change', updatePaymentWarn);
 }
 
 function timeAgo(isoStr) {
