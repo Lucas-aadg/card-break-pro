@@ -1075,7 +1075,9 @@ const SG_TOTAL = 6;
 
 async function checkSorterOnboarding() {
   if (!currentProfile) return;
-  if (currentProfile.onboarding_complete) return;
+  const doneKey = 'cbp_sorter_guide_done_' + currentUser.id;
+  if (localStorage.getItem(doneKey)) return;
+  if (currentProfile.onboarding_complete) { localStorage.setItem(doneKey, '1'); return; }
 
   const orgId = currentProfile.org_id;
   const { data: orgRow } = await sb.from('organizations').select('name').eq('id', orgId).maybeSingle();
@@ -1132,16 +1134,11 @@ function sgBack() {
   }
 }
 
-async function sgFinish() {
+function sgFinish() {
+  localStorage.setItem('cbp_sorter_guide_done_' + currentUser.id, '1');
   document.getElementById('sorterGuide').classList.remove('sg-open');
-
-  if (typeof cbpTrack === 'function') {
-    cbpTrack('sorter_onboarding_complete', {
-      organization_id: currentProfile?.org_id
-    });
-  }
-
-  await sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id);
+  if (typeof cbpTrack === 'function') cbpTrack('sorter_onboarding_complete', { organization_id: currentProfile?.org_id });
+  sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id).then().catch(() => {});
 }
 </script>
 

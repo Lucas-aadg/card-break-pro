@@ -7547,13 +7547,17 @@ function updateTimeFormatBtns() {
 
 // ── Owner Welcome Modal + Onboarding Checklist ───────────
 async function checkAndShowWizard(orgInfo) {
-  // If first_login_shown is false (or null = new column default), show 2-screen welcome modal
-  if (!orgInfo || !orgInfo.first_login_shown) {
+  const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id);
+  const welcomeDone = localStorage.getItem(welcomeKey) || (orgInfo && orgInfo.first_login_shown);
+
+  if (!welcomeDone) {
     document.getElementById('ownerWelcomeModal').style.display = 'flex';
-    return; // checklist shows after modal closes
+    return; // checklist shows after modal closes via owmFinish()
   }
   // Checklist shown until dismissed
-  if (!orgInfo.checklist_dismissed) {
+  const checklistKey = 'cbp_owner_checklist_dismissed_' + (currentProfile?.org_id || currentUser?.id);
+  const checklistDone = localStorage.getItem(checklistKey) || (orgInfo && orgInfo.checklist_dismissed);
+  if (!checklistDone) {
     await oclInit();
   }
 }
@@ -7564,14 +7568,14 @@ function owmNext() {
 }
 
 async function owmFinish() {
+  // Set localStorage gate FIRST — modal never shows again regardless of DB
+  const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id);
+  localStorage.setItem(welcomeKey, '1');
   document.getElementById('ownerWelcomeModal').style.display = 'none';
-  // Mark first_login_shown so it never shows again
-  await sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id);
+  // DB update fire-and-forget
+  sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id).then().catch(() => {});
   // Start checklist
   await oclInit();
-  // Navigate to Channels tab so owner lands on Step 1
-  const channelTab = document.querySelector('[data-tab="channels"]');
-  if (channelTab) channelTab.click();
 }
 
 // ── Onboarding Checklist Widget ───────────────────────────
@@ -7667,10 +7671,12 @@ function oclCollapse() {
   document.getElementById('oclExpanded').style.display = 'none';
   document.getElementById('oclCollapsed').style.display = 'flex';
 }
-async function oclDismiss() {
+function oclDismiss() {
+  const checklistKey = 'cbp_owner_checklist_dismissed_' + (currentProfile?.org_id || currentUser?.id);
+  localStorage.setItem(checklistKey, '1');
   document.getElementById('onboardingChecklist').style.display = 'none';
   clearInterval(oclPollTimer);
-  await sb.from('organizations').update({ checklist_dismissed: true }).eq('id', currentProfile.org_id);
+  sb.from('organizations').update({ checklist_dismissed: true }).eq('id', currentProfile.org_id).then().catch(() => {});
 }
 
 function oclGo(step) {
