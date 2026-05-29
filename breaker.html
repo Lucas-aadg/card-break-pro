@@ -754,7 +754,7 @@
     <div id="siUploadStep">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
         <h2 style="margin:0;font-size:1.2rem;">Import Buyer Slips</h2>
-        <span style="font-size:0.72rem;color:var(--muted);background:var(--bg);padding:0.25rem 0.65rem;border-radius:100px;border:1px solid var(--border);">Step 1 of 3</span>
+        <button onclick="skipSlipImport()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:0.25rem 0.5rem;" title="Skip">✕</button>
       </div>
       <div id="siDropZone" style="border:2px dashed rgba(79,110,247,0.4);border-radius:12px;padding:2rem 1.5rem;text-align:center;cursor:pointer;background:rgba(79,110,247,0.04);transition:.2s;" onclick="document.getElementById('siFileInput').click()">
         <div style="font-size:2.5rem;margin-bottom:0.6rem;">📄</div>
@@ -796,7 +796,7 @@
   <div class="modal" style="max-width:520px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
       <h2 style="margin:0;font-size:1.2rem;">Log Big Hits</h2>
-      <span style="font-size:0.72rem;color:var(--muted);background:var(--bg);padding:0.25rem 0.65rem;border-radius:100px;border:1px solid var(--border);">Step 2 of 3</span>
+      <button onclick="skipHitLogging()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:0.25rem 0.5rem;" title="Skip">✕</button>
     </div>
     <!-- Top Spenders Panel -->
     <div id="hlTopSpenders" style="display:none;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.18);border-radius:10px;padding:0.85rem 1rem;margin-bottom:1rem;">
@@ -2535,6 +2535,11 @@ async function checkBreakerOnboarding() {
     localStorage.setItem(flagKey, '1');
     if (typeof cbpTrack === 'function') cbpTrack('breaker_first_login', { organization_id: orgId });
   }
+
+  // Mark as seen immediately — prevents re-showing if user closes tab mid-guide
+  // bgFinish() will also mark done when guide is completed/skipped
+  localStorage.setItem(doneKey, '1');
+  sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id).catch(() => {});
 
   showBreakerGuide();
 }
