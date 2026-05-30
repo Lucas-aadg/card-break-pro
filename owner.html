@@ -678,6 +678,7 @@
         <button class="nav-dd-item" data-tab="invLog">Inventory Log</button>
         <div class="dd-section-label">Account</div>
         <button class="nav-dd-item" data-tab="settings">Settings</button>
+        <button class="nav-dd-item" data-tab="referEarn">Refer &amp; Earn</button>
       </div>
     </div>
 
@@ -1821,6 +1822,87 @@
           <div style="font-size:0.82rem;color:var(--muted);max-width:480px;">Permanently deletes all breaks, streams, and products for your organization. This cannot be undone.</div>
         </div>
         <button class="btn-sm btn-danger-sm" id="resetDataBtn" style="flex-shrink:0;padding:0.5rem 1rem;">Reset Data</button>
+      </div>
+    </div>
+
+  </div>
+
+<!-- ══════════════════════════════════════════
+     REFER & EARN TAB
+═════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-referEarn">
+
+    <!-- Referral Code -->
+    <div class="panel">
+      <div class="panel-title">Your Referral Code</div>
+      <div id="referEarnCodeLoading" style="color:var(--muted);font-size:0.88rem;padding:0.5rem 0;">Loading your code…</div>
+      <div id="referEarnCodeBlock" style="display:none;">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+          <div id="referEarnCode" style="font-size:1.9rem;font-weight:900;letter-spacing:4px;color:var(--primary);font-family:'Courier New',monospace;background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.2);border-radius:10px;padding:0.75rem 1.25rem;">——</div>
+          <button class="btn btn-outline btn-sm" id="referEarnCopyBtn" style="padding:0.5rem 1rem;font-size:0.8rem;">Copy Code</button>
+        </div>
+
+        <!-- Share message -->
+        <div style="margin-bottom:1.5rem;">
+          <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Share Message</div>
+          <div id="referEarnShareMsg" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:0.88rem;color:var(--text);line-height:1.65;white-space:pre-wrap;"></div>
+          <div style="margin-top:0.5rem;display:flex;gap:0.5rem;">
+            <button class="btn btn-outline btn-sm" id="referEarnCopyMsgBtn" style="padding:0.4rem 0.9rem;font-size:0.78rem;">Copy Message</button>
+            <span id="referEarnCopyMsgStatus" style="font-size:0.78rem;color:var(--green);display:none;align-items:center;">Copied!</span>
+          </div>
+        </div>
+
+        <!-- How it works -->
+        <div style="background:rgba(79,110,247,0.05);border:1px solid rgba(79,110,247,0.15);border-radius:10px;padding:1rem 1.2rem;">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--primary);margin-bottom:0.6rem;text-transform:uppercase;letter-spacing:0.5px;">How It Works</div>
+          <div style="font-size:0.83rem;color:var(--muted);line-height:1.7;">
+            <div style="margin-bottom:0.3rem;">1. Share your code with other breaking operations.</div>
+            <div style="margin-bottom:0.3rem;">2. They get <strong style="color:var(--text);">21 days free</strong> instead of 14 when they sign up.</div>
+            <div>3. When they convert to a paying plan, you earn <strong style="color:var(--green);">1 free month</strong> on your subscription.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="panel">
+      <div class="panel-title">Referral Stats</div>
+      <div id="referEarnStatsLoading" style="color:var(--muted);font-size:0.88rem;">Loading…</div>
+      <div id="referEarnStats" style="display:none;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;">
+        <div style="text-align:center;padding:1rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;">
+          <div id="reStat0" style="font-size:1.8rem;font-weight:900;color:var(--primary);">0</div>
+          <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:0.25rem;">Codes Used</div>
+        </div>
+        <div style="text-align:center;padding:1rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;">
+          <div id="reStat1" style="font-size:1.8rem;font-weight:900;color:var(--green);">0</div>
+          <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:0.25rem;">Converted</div>
+        </div>
+        <div style="text-align:center;padding:1rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;">
+          <div id="reStat2" style="font-size:1.8rem;font-weight:900;color:var(--green);">0</div>
+          <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:0.25rem;">Months Earned</div>
+        </div>
+        <div style="text-align:center;padding:1rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;">
+          <div id="reStat3" style="font-size:1.8rem;font-weight:900;color:var(--yellow);">0</div>
+          <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:0.25rem;">Pending</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Referral History -->
+    <div class="panel">
+      <div class="panel-title">Referral History</div>
+      <div id="referEarnHistoryLoading" style="color:var(--muted);font-size:0.88rem;">Loading…</div>
+      <div id="referEarnHistoryEmpty" style="display:none;color:var(--muted);font-size:0.88rem;padding:1rem 0;">No referrals yet. Share your code to get started.</div>
+      <div id="referEarnHistoryTable" style="display:none;overflow-x:auto;">
+        <table class="data-table">
+          <thead><tr>
+            <th>Date Used</th>
+            <th>Operation</th>
+            <th>Status</th>
+            <th>Reward</th>
+          </tr></thead>
+          <tbody id="referEarnHistoryBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -3393,6 +3475,7 @@ async function switchTab(tab) {
     else if (tab === 'sorting') { await loadAllProfiles(); await loadSorting(); }
     else if (tab === 'settings') { await loadSettings(); await renderSettingsChannelList(); }
     else if (tab === 'buyers') await loadBuyersTab();
+    else if (tab === 'referEarn') await loadReferEarn();
   } catch (err) {
     showGlobalError('Failed to load tab: ' + escHtml(err.message));
     console.error(err);
@@ -8718,6 +8801,133 @@ function setupLogHitModal() {
       btn.disabled = false; btn.textContent = 'Log Hit';
     }
   });
+}
+
+// ── Refer & Earn ──────────────────────────────────────────
+async function loadReferEarn() {
+  const codeLoading    = document.getElementById('referEarnCodeLoading');
+  const codeBlock      = document.getElementById('referEarnCodeBlock');
+  const codeEl         = document.getElementById('referEarnCode');
+  const statsLoading   = document.getElementById('referEarnStatsLoading');
+  const statsEl        = document.getElementById('referEarnStats');
+  const histLoading    = document.getElementById('referEarnHistoryLoading');
+  const histEmpty      = document.getElementById('referEarnHistoryEmpty');
+  const histTable      = document.getElementById('referEarnHistoryTable');
+  const histBody       = document.getElementById('referEarnHistoryBody');
+
+  // Reset
+  codeLoading.style.display    = '';
+  codeBlock.style.display      = 'none';
+  statsLoading.style.display   = '';
+  statsEl.style.display        = 'none';
+  histLoading.style.display    = '';
+  histEmpty.style.display      = 'none';
+  histTable.style.display      = 'none';
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+
+    // Fetch or create referral code
+    const codeRes = await fetch('/api/generate-referral-code', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const codeData = await codeRes.json();
+    if (!codeData.code) throw new Error(codeData.error || 'Failed to load referral code');
+
+    const code = codeData.code;
+    codeEl.textContent = code.code;
+
+    const shareMsg = "Hey — I've been using CardBreakPro to run my breaking operation and it's been a game changer. No more spreadsheets, profit calculated automatically, team managed in one place. Use my code " + code.code + " when you sign up and you'll get 21 days free instead of 14. Check it out at cardbreakpro.com.";
+    document.getElementById('referEarnShareMsg').textContent = shareMsg;
+
+    codeLoading.style.display  = 'none';
+    codeBlock.style.display    = '';
+
+    // Stats
+    document.getElementById('reStat0').textContent = code.times_used      || 0;
+    document.getElementById('reStat1').textContent = code.times_converted  || 0;
+    document.getElementById('reStat2').textContent = code.total_credits_earned || 0;
+    const pending = (code.times_converted || 0) < (code.times_used || 0)
+      ? (code.times_used || 0) - (code.times_converted || 0)
+      : 0;
+    document.getElementById('reStat3').textContent = pending;
+    statsLoading.style.display = 'none';
+    statsEl.style.display      = 'grid';
+
+    // Copy code button
+    document.getElementById('referEarnCopyBtn').onclick = function() {
+      navigator.clipboard.writeText(code.code).then(function() {
+        const btn = document.getElementById('referEarnCopyBtn');
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy Code'; }, 1800);
+      });
+    };
+
+    // Copy message button
+    document.getElementById('referEarnCopyMsgBtn').onclick = function() {
+      navigator.clipboard.writeText(shareMsg).then(function() {
+        const statusEl = document.getElementById('referEarnCopyMsgStatus');
+        statusEl.style.display = 'inline-flex';
+        setTimeout(function() { statusEl.style.display = 'none'; }, 1800);
+      });
+    };
+
+    // Fetch referral history
+    const { data: uses, error: usesErr } = await sb
+      .from('referral_uses')
+      .select('id, used_at, converted_at, status, reward_granted, referred_organization_id')
+      .eq('referral_code_id', code.id)
+      .order('used_at', { ascending: false });
+
+    histLoading.style.display = 'none';
+
+    if (usesErr || !uses || uses.length === 0) {
+      histEmpty.style.display = '';
+      return;
+    }
+
+    // Fetch org names for history (masked for privacy)
+    const orgIds = uses.map(u => u.referred_organization_id).filter(Boolean);
+    const orgNames = {};
+    if (orgIds.length > 0) {
+      const { data: orgs } = await sb.from('organizations').select('id, name').in('id', orgIds);
+      (orgs || []).forEach(function(o) { orgNames[o.id] = o.name; });
+    }
+
+    histBody.innerHTML = '';
+    uses.forEach(function(use) {
+      const rawName = orgNames[use.referred_organization_id] || 'Unknown';
+      const maskedName = rawName.length > 3
+        ? rawName.slice(0, 3) + '*'.repeat(Math.min(rawName.length - 3, 6))
+        : rawName;
+
+      const usedDate = use.used_at
+        ? new Date(use.used_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '—';
+
+      const statusColors = { pending: '#f59e0b', converted: '#22c55e', expired: '#64748b' };
+      const statusColor  = statusColors[use.status] || '#64748b';
+      const statusBadge  = '<span style="background:' + statusColor + '1a;color:' + statusColor + ';border:1px solid ' + statusColor + '44;border-radius:100px;padding:0.15rem 0.55rem;font-size:0.72rem;font-weight:700;text-transform:capitalize;">' + (use.status || 'pending') + '</span>';
+
+      const rewardBadge = use.reward_granted
+        ? '<span style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.25);border-radius:100px;padding:0.15rem 0.55rem;font-size:0.72rem;font-weight:700;">+1 mo earned</span>'
+        : '<span style="color:var(--muted);font-size:0.78rem;">' + (use.status === 'pending' ? 'Pending' : '—') + '</span>';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escHtml(usedDate) + '</td><td style="font-family:monospace;">' + escHtml(maskedName) + '</td><td>' + statusBadge + '</td><td>' + rewardBadge + '</td>';
+      histBody.appendChild(tr);
+    });
+
+    histTable.style.display = '';
+
+  } catch (err) {
+    codeLoading.style.display  = 'none';
+    statsLoading.style.display = 'none';
+    histLoading.style.display  = 'none';
+    showGlobalError('Failed to load referral data: ' + escHtml(err.message));
+  }
 }
 
 // ── Buyer Profile ─────────────────────────────────────────

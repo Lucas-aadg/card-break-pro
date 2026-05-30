@@ -35,120 +35,110 @@
       border-radius: 12px;
       padding: 2.5rem;
       width: 100%;
-      max-width: 440px;
+      max-width: 480px;
     }
-    .brand {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-    .brand h1 {
-      font-size: 1.8rem;
-      font-weight: 800;
-      letter-spacing: 2px;
-      color: var(--text);
-    }
+    .brand { text-align: center; margin-bottom: 2rem; }
+    .brand h1 { font-size: 1.8rem; font-weight: 800; letter-spacing: 2px; color: var(--text); }
     .brand h1 span { color: var(--primary); }
-    .brand p {
-      color: var(--muted);
-      font-size: 0.85rem;
-      margin-top: 0.4rem;
-    }
+    .brand p { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }
     .section-title {
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--border);
+      font-size: 0.7rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1rem;
+      padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
     }
-    .form-group {
-      margin-bottom: 1.1rem;
-    }
+    .form-group { margin-bottom: 1.1rem; }
     label {
-      display: block;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 0.4rem;
+      display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.4rem;
     }
     input {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 0.95rem;
-      padding: 0.75rem 1rem;
-      transition: border-color 0.2s;
-      outline: none;
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.95rem;
+      padding: 0.75rem 1rem; transition: border-color 0.2s; outline: none;
     }
     input:focus { border-color: var(--primary); }
     .btn {
-      width: 100%;
-      padding: 0.875rem;
-      border: none;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s;
-      letter-spacing: 0.5px;
+      width: 100%; padding: 0.875rem; border: none; border-radius: 8px;
+      font-size: 0.95rem; font-weight: 700; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s; letter-spacing: 0.5px;
     }
     .btn:active { transform: scale(0.98); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: var(--primary); color: #fff; }
     .btn-primary:hover:not(:disabled) { opacity: 0.9; }
     .error-box {
-      background: rgba(239,68,68,0.1);
-      border: 1px solid rgba(239,68,68,0.3);
-      border-radius: 8px;
-      color: var(--red);
-      font-size: 0.875rem;
-      padding: 0.75rem 1rem;
-      margin-bottom: 1.25rem;
-      display: none;
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px; color: var(--red); font-size: 0.875rem;
+      padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: none;
     }
     .success-box {
-      background: rgba(34,197,94,0.1);
-      border: 1px solid rgba(34,197,94,0.3);
-      border-radius: 8px;
-      color: var(--green);
-      font-size: 0.875rem;
-      padding: 0.75rem 1rem;
-      margin-bottom: 1.25rem;
-      display: none;
+      background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3);
+      border-radius: 8px; color: var(--green); font-size: 0.875rem;
+      padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: none;
     }
-    .links {
-      margin-top: 1.5rem;
-      text-align: center;
-    }
-    .links a {
-      color: var(--primary);
-      text-decoration: none;
-      font-size: 0.875rem;
-    }
+    .links { margin-top: 1.5rem; text-align: center; }
+    .links a { color: var(--primary); text-decoration: none; font-size: 0.875rem; }
     .links a:hover { text-decoration: underline; }
-    .divider {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 1.5rem 0;
-    }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
     .spacer { margin-top: 1.5rem; }
+
+    /* ── Billing cycle toggle ── */
+    .cycle-toggle {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; margin-bottom: 1.25rem;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      padding: 3px; width: fit-content; margin-left: auto; margin-right: auto;
+    }
+    .cycle-btn {
+      padding: 0.45rem 1.2rem; border: none; border-radius: 7px;
+      font-size: 0.82rem; font-weight: 700; cursor: pointer;
+      transition: background 0.18s, color 0.18s; color: var(--muted);
+      background: transparent; letter-spacing: 0.3px;
+    }
+    .cycle-btn.active { background: var(--primary); color: #fff; }
+    .cycle-save-badge {
+      background: rgba(34,197,94,0.15); color: var(--green);
+      border: 1px solid rgba(34,197,94,0.3); border-radius: 100px;
+      font-size: 0.68rem; font-weight: 800; padding: 0.15rem 0.55rem;
+      letter-spacing: 0.3px; margin-left: 0.5rem;
+      display: inline-block; vertical-align: middle;
+    }
+
+    /* ── Plan selector ── */
     .plan-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1.25rem; }
     .plan-opt {
-      border: 2px solid var(--border); border-radius: 8px; padding: 0.75rem 0.5rem;
-      text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s;
-      background: var(--bg);
+      border: 2px solid var(--border); border-radius: 10px; padding: 0.85rem 0.5rem;
+      text-align: center; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s; background: var(--bg);
+      position: relative;
     }
     .plan-opt:hover { border-color: var(--primary); }
     .plan-opt.selected { border-color: var(--primary); background: rgba(79,110,247,0.07); }
+    .plan-opt.best-value { border-color: var(--green); }
+    .plan-opt.best-value.selected { background: rgba(34,197,94,0.06); }
     .plan-opt-name { font-size: 0.8rem; font-weight: 800; color: var(--text); margin-bottom: 0.2rem; }
     .plan-opt-price { font-size: 0.72rem; color: var(--primary); font-weight: 700; }
-    .plan-opt-trial { font-size: 0.65rem; color: var(--muted); margin-top: 0.15rem; }
+    .plan-opt-sub { font-size: 0.63rem; color: var(--muted); margin-top: 0.15rem; line-height: 1.35; }
+    .plan-opt-save { font-size: 0.63rem; color: var(--green); font-weight: 700; margin-top: 0.2rem; }
+    .best-value-badge {
+      position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+      background: var(--green); color: #fff; font-size: 0.58rem; font-weight: 800;
+      padding: 0.1rem 0.5rem; border-radius: 100px; white-space: nowrap;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Referral code field ── */
+    .referral-row {
+      position: relative;
+    }
+    .referral-row input { padding-right: 2.5rem; text-transform: uppercase; }
+    .referral-row input::placeholder { text-transform: none; }
+    .referral-status {
+      font-size: 0.78rem; font-weight: 600; margin-top: 0.35rem;
+      min-height: 1rem; transition: opacity 0.2s;
+    }
+    .referral-status.valid { color: var(--green); }
+    .referral-status.invalid { color: var(--red); }
   </style>
 </head>
 <body>
@@ -193,23 +183,45 @@
       </div>
 
       <div class="spacer"></div>
-      <div class="section-title">Choose Your Plan</div>
+      <div class="section-title">
+        Choose Your Plan
+        <span class="cycle-save-badge" id="annualBadgeHeader" style="display:none;">Save up to $1,999/yr</span>
+      </div>
+
+      <!-- Billing cycle toggle -->
+      <div class="cycle-toggle">
+        <button type="button" class="cycle-btn active" id="cycleMonthly" onclick="setCycle('monthly')">Monthly</button>
+        <button type="button" class="cycle-btn" id="cycleAnnual" onclick="setCycle('annual')">Annual</button>
+      </div>
+
+      <!-- Plan cards -->
       <div class="plan-selector" id="planSelector">
         <div class="plan-opt selected" data-tier="starter" onclick="selectPlan('starter')">
           <div class="plan-opt-name">Starter</div>
-          <div class="plan-opt-price">$129.99/mo</div>
-          <div class="plan-opt-trial">14-day free trial</div>
+          <div class="plan-opt-price" id="price-starter">$99/mo</div>
+          <div class="plan-opt-sub" id="sub-starter">14-day free trial</div>
+          <div class="plan-opt-save" id="save-starter" style="display:none;"></div>
         </div>
         <div class="plan-opt" data-tier="pro" onclick="selectPlan('pro')">
           <div class="plan-opt-name">Pro ✦</div>
-          <div class="plan-opt-price">$399.99/mo</div>
-          <div class="plan-opt-trial">7-day free trial</div>
+          <div class="plan-opt-price" id="price-pro">$399.99/mo</div>
+          <div class="plan-opt-sub" id="sub-pro">7-day free trial</div>
+          <div class="plan-opt-save" id="save-pro" style="display:none;"></div>
         </div>
         <div class="plan-opt" data-tier="empire" onclick="selectPlan('empire')">
           <div class="plan-opt-name">Empire</div>
-          <div class="plan-opt-price">$999.99/mo</div>
-          <div class="plan-opt-trial">Book a Demo</div>
+          <div class="plan-opt-price" id="price-empire">$999.99/mo</div>
+          <div class="plan-opt-sub" id="sub-empire">Book a Demo</div>
+          <div class="plan-opt-save" id="save-empire" style="display:none;"></div>
         </div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="section-title" style="margin-bottom:0.75rem;">Have a Referral Code? <span style="font-weight:400;text-transform:none;font-size:0.75rem;letter-spacing:0;color:var(--muted);">Optional — get 7 extra days free</span></div>
+
+      <div class="form-group referral-row">
+        <input type="text" id="referralCode" placeholder="Enter code" maxlength="8" autocomplete="off" spellcheck="false" />
+        <div class="referral-status" id="referralStatus"></div>
       </div>
 
       <button type="submit" id="registerBtn" class="btn btn-primary">Start Free Trial</button>
@@ -217,7 +229,6 @@
     </form>
 
     <hr class="divider" />
-
     <div class="links">
       <a href="index.html">Already have an account? Sign in</a>
     </div>
@@ -229,81 +240,204 @@
     const { createClient } = supabase;
     const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 
-    const errorBox = document.getElementById('errorBox');
-    const successBox = document.getElementById('successBox');
+    const errorBox    = document.getElementById('errorBox');
+    const successBox  = document.getElementById('successBox');
     const registerBtn = document.getElementById('registerBtn');
     const registerForm = document.getElementById('registerForm');
 
     let selectedTier = 'starter';
+    let selectedCycle = 'monthly';
+    let referralValid = null; // null = unchecked, true = valid, false = invalid
+    let referralCodeValue = '';
+
+    // ── Plan data ──
+    const PLANS = {
+      monthly: {
+        starter: { price: '$99/mo',      sub: '14-day free trial', save: '' },
+        pro:     { price: '$399.99/mo',   sub: '7-day free trial',  save: '' },
+        empire:  { price: '$999.99/mo',   sub: 'Book a Demo',       save: '' }
+      },
+      annual: {
+        starter: { price: '$990/yr',       sub: '$82.50/mo equivalent', save: 'Save $198/yr — 2 months free' },
+        pro:     { price: '$3,999.90/yr',  sub: '$333.33/mo equivalent', save: 'Save $799.98/yr — 2 months free' },
+        empire:  { price: '$9,999.90/yr',  sub: '$833.33/mo equivalent', save: 'Save $1,999.98/yr — 2 months free' }
+      }
+    };
+
+    function setCycle(cycle) {
+      selectedCycle = cycle;
+      document.getElementById('cycleMonthly').classList.toggle('active', cycle === 'monthly');
+      document.getElementById('cycleAnnual').classList.toggle('active', cycle === 'annual');
+      document.getElementById('annualBadgeHeader').style.display = cycle === 'annual' ? '' : 'none';
+
+      const data = PLANS[cycle];
+      ['starter','pro','empire'].forEach(function(tier) {
+        document.getElementById('price-' + tier).textContent = data[tier].price;
+        document.getElementById('sub-' + tier).textContent   = data[tier].sub;
+        const saveEl = document.getElementById('save-' + tier);
+        if (data[tier].save) {
+          saveEl.textContent    = data[tier].save;
+          saveEl.style.display  = '';
+        } else {
+          saveEl.style.display  = 'none';
+        }
+      });
+
+      // BEST VALUE badge on Pro Annual only
+      const proOpt = document.querySelector('[data-tier="pro"]');
+      const existingBadge = proOpt.querySelector('.best-value-badge');
+      if (cycle === 'annual') {
+        proOpt.classList.add('best-value');
+        if (!existingBadge) {
+          const badge = document.createElement('div');
+          badge.className = 'best-value-badge';
+          badge.textContent = 'BEST VALUE';
+          proOpt.appendChild(badge);
+        }
+      } else {
+        proOpt.classList.remove('best-value');
+        if (existingBadge) existingBadge.remove();
+      }
+
+      updateRegisterBtn();
+    }
 
     function selectPlan(tier) {
       selectedTier = tier;
       document.querySelectorAll('.plan-opt').forEach(function(el) {
         el.classList.toggle('selected', el.dataset.tier === tier);
       });
-      if (tier === 'empire') {
+      updateRegisterBtn();
+    }
+
+    function updateRegisterBtn() {
+      if (selectedTier === 'empire') {
         registerBtn.textContent = 'Create Account & Book Demo';
-      } else if (tier === 'pro') {
+      } else if (selectedCycle === 'annual') {
+        registerBtn.textContent = 'Start Annual Subscription';
+      } else if (selectedTier === 'pro') {
         registerBtn.textContent = 'Start 7-Day Free Trial';
       } else {
-        registerBtn.textContent = 'Start 14-Day Free Trial';
+        const days = referralValid ? '21' : '14';
+        registerBtn.textContent = 'Start ' + days + '-Day Free Trial';
       }
     }
 
-    // Pre-select tier from query param (e.g. ?plan=pro from landing page CTAs)
+    // Pre-select tier from query param
     (function() {
       const p = new URLSearchParams(window.location.search).get('plan');
       if (p && ['starter','pro','empire'].includes(p)) selectPlan(p);
     })();
 
+    // ── Referral code validation ──
+    let referralCheckTimer = null;
+
+    document.getElementById('referralCode').addEventListener('blur', function() {
+      validateReferralCode(this.value.trim().toUpperCase());
+    });
+    document.getElementById('referralCode').addEventListener('input', function() {
+      this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      // Clear status while typing
+      const statusEl = document.getElementById('referralStatus');
+      statusEl.textContent = '';
+      statusEl.className = 'referral-status';
+      referralValid = null;
+      referralCodeValue = '';
+      updateRegisterBtn();
+    });
+
+    async function validateReferralCode(code) {
+      const statusEl = document.getElementById('referralStatus');
+      if (!code) {
+        statusEl.textContent = '';
+        statusEl.className = 'referral-status';
+        referralValid = null;
+        referralCodeValue = '';
+        updateRegisterBtn();
+        return;
+      }
+
+      statusEl.textContent = 'Checking…';
+      statusEl.className = 'referral-status';
+
+      try {
+        const email = document.getElementById('email').value.trim();
+        const res = await fetch('/api/validate-referral-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, email })
+        });
+        const data = await res.json();
+
+        if (data.valid) {
+          statusEl.textContent = 'Code applied. Your trial has been extended to 21 days.';
+          statusEl.className = 'referral-status valid';
+          referralValid = true;
+          referralCodeValue = code;
+        } else {
+          const msgs = {
+            not_found:    "That code doesn’t look right. Check with your referrer and try again.",
+            self_referral: "You cannot use your own referral code.",
+            already_used:  "This code has already been used for this account."
+          };
+          statusEl.textContent = msgs[data.reason] || "That code doesn’t look right.";
+          statusEl.className = 'referral-status invalid';
+          referralValid = false;
+          referralCodeValue = '';
+        }
+      } catch (err) {
+        statusEl.textContent = '';
+        referralValid = null;
+        referralCodeValue = '';
+      }
+
+      updateRegisterBtn();
+    }
+
     function escHtml(str) {
       return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function showError(msg) {
-      errorBox.textContent = msg;
-      errorBox.style.display = 'block';
-      successBox.style.display = 'none';
+      errorBox.textContent = msg; errorBox.style.display = 'block'; successBox.style.display = 'none';
     }
-
     function showSuccess(msg) {
-      successBox.textContent = msg;
-      successBox.style.display = 'block';
-      errorBox.style.display = 'none';
+      successBox.textContent = msg; successBox.style.display = 'block'; errorBox.style.display = 'none';
     }
-
     function hideMessages() {
-      errorBox.style.display = 'none';
-      successBox.style.display = 'none';
+      errorBox.style.display = 'none'; successBox.style.display = 'none';
     }
 
     registerForm.addEventListener('submit', async function (e) {
       e.preventDefault();
       hideMessages();
 
-      const businessName = document.getElementById('businessName').value.trim();
-      const displayName = document.getElementById('displayName').value.trim();
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
+      const businessName    = document.getElementById('businessName').value.trim();
+      const displayName     = document.getElementById('displayName').value.trim();
+      const email           = document.getElementById('email').value.trim();
+      const password        = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
+      const refCodeRaw      = document.getElementById('referralCode').value.trim().toUpperCase();
 
       if (!businessName || !displayName || !email || !password || !confirmPassword) {
-        showError('All fields are required.');
-        return;
+        showError('All fields are required.'); return;
       }
-
       if (password.length < 8) {
-        showError('Password must be at least 8 characters.');
-        return;
+        showError('Password must be at least 8 characters.'); return;
+      }
+      if (password !== confirmPassword) {
+        showError('Passwords do not match.'); return;
       }
 
-      if (password !== confirmPassword) {
-        showError('Passwords do not match.');
+      // If code is typed but not yet validated, validate now before proceeding
+      if (refCodeRaw && referralValid === null) {
+        await validateReferralCode(refCodeRaw);
+      }
+      // Reject if code was typed but turned out invalid
+      if (refCodeRaw && referralValid === false) {
+        showError('Please remove the invalid referral code or correct it before continuing.');
         return;
       }
 
@@ -314,81 +448,73 @@
 
       try {
         // Step 1: Create Supabase auth user
-        const { data: authData, error: authError } = await sb.auth.signUp({
-          email,
-          password
-        });
-
-        if (authError) {
-          showError(escHtml(authError.message));
-          return;
-        }
-
-        if (!authData.user) {
-          showError('Registration failed. Please try again.');
-          return;
-        }
-
+        const { data: authData, error: authError } = await sb.auth.signUp({ email, password });
+        if (authError) { showError(escHtml(authError.message)); return; }
+        if (!authData.user) { showError('Registration failed. Please try again.'); return; }
         userId = authData.user.id;
 
         // Step 2: Create organization
+        const orgInsert = { name: businessName, owner_id: userId };
+        if (referralValid && referralCodeValue) orgInsert.referral_code_used = referralCodeValue;
+
         const { data: orgData, error: orgError } = await sb
-          .from('organizations')
-          .insert({ name: businessName, owner_id: userId })
-          .select('id')
-          .single();
-
-        if (orgError) {
-          showError('Failed to create organization: ' + escHtml(orgError.message));
-          return;
-        }
-
+          .from('organizations').insert(orgInsert).select('id').single();
+        if (orgError) { showError('Failed to create organization: ' + escHtml(orgError.message)); return; }
         const orgId = orgData.id;
 
         // Step 3: Create owner profile
-        const { error: profileError } = await sb
-          .from('profiles')
-          .insert({
-            id: userId,
-            org_id: orgId,
-            role: 'owner',
-            display_name: displayName
-          });
+        const { error: profileError } = await sb.from('profiles').insert({
+          id: userId, org_id: orgId, role: 'owner', display_name: displayName
+        });
+        if (profileError) { showError('Failed to create profile: ' + escHtml(profileError.message)); return; }
 
-        if (profileError) {
-          showError('Failed to create profile: ' + escHtml(profileError.message));
-          return;
+        // Step 4: Record referral use (server-side via checkout metadata; also track here)
+        if (referralValid && referralCodeValue) {
+          try {
+            await fetch('/api/record-referral-use', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: referralCodeValue, referredOrgId: orgId })
+            });
+          } catch (e) { /* non-fatal */ }
         }
 
-        // Empire tier: redirect to mailto instead of checkout
+        // Empire: redirect to mailto (no self-serve checkout)
         if (selectedTier === 'empire') {
           showSuccess('Account created! Redirecting to book your demo…');
           registerBtn.textContent = 'Redirecting…';
+          const annualNote = selectedCycle === 'annual' ? '%0AAnnual+billing+option+requested.' : '';
           setTimeout(function() {
-            window.location.href = 'mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Setup&body=Hi%2C%20I%20just%20registered%20for%20Card%20Break%20Pro.%20Email%3A%20' + encodeURIComponent(email) + '%0AOrgId%3A%20' + encodeURIComponent(orgId);
+            window.location.href = 'mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Setup&body=Hi%2C%20I%20just%20registered%20for%20Card%20Break%20Pro.%20Email%3A%20' + encodeURIComponent(email) + '%0AOrgId%3A%20' + encodeURIComponent(orgId) + annualNote;
           }, 1000);
           return;
         }
 
-        showSuccess('Account created! Redirecting to start your free trial…');
+        showSuccess('Account created! Redirecting to checkout…');
         registerBtn.textContent = 'Redirecting…';
+
+        const trialOverride = referralValid ? (selectedTier === 'pro' ? 14 : 21) : undefined;
 
         const response = await fetch('/api/create-checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: authData.user.id, email: authData.user.email, orgId: orgId, tier: selectedTier })
+          body: JSON.stringify({
+            userId: authData.user.id,
+            email: authData.user.email,
+            orgId,
+            tier: selectedTier,
+            billingCycle: selectedCycle,
+            ...(trialOverride ? { trialDaysOverride: trialOverride } : {})
+          })
         });
 
         let responseData;
-        try {
-          responseData = await response.json();
-        } catch (parseErr) {
-          throw new Error('Checkout server error (status ' + response.status + '). Check Vercel logs.');
-        }
+        try { responseData = await response.json(); }
+        catch (parseErr) { throw new Error('Checkout server error (status ' + response.status + '). Check Vercel logs.'); }
 
         const { url, error: checkoutError } = responseData;
         if (checkoutError) throw new Error('Stripe error: ' + checkoutError);
-        if (!url) throw new Error('No checkout URL returned. Check Stripe env vars in Vercel.');
+        if (!url) throw new Error('No checkout URL returned.');
         window.location.href = url;
 
       } catch (err) {
@@ -396,7 +522,7 @@
         console.error('Registration error:', err);
       } finally {
         registerBtn.disabled = false;
-        registerBtn.textContent = 'Create Business Account';
+        updateRegisterBtn();
       }
     });
   </script>
