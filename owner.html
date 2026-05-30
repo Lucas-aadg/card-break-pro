@@ -681,7 +681,7 @@
       </div>
     </div>
 
-    <a href="/exports" class="nav-btn" style="text-decoration:none;">Exports</a>
+    <button class="nav-btn" onclick="window.location.href='/exports'">Exports</button>
     <a href="help-owner.html" class="nav-help-link" target="_blank">Help</a>
   </div>
 
@@ -4151,24 +4151,47 @@ async function coParseAndImportSlips(file, orgId, streamId) {
   var pdf = await pdfjs.getDocument({ data: buf }).promise;
   var byTracking = {};
 
+  console.log('[SlipImport] PDF loaded —', pdf.numPages, 'pages');
+
   for (var p = 1; p <= pdf.numPages; p++) {
     var pg = await pdf.getPage(p);
     var content = await pg.getTextContent();
-    var text = content.items.map(function(i) { return i.str; }).join(' ');
+    // Log individual items so we can see exactly how PDF.js tokenizes the text
+    var rawItems = content.items.map(function(i) { return i.str; });
+    var text = rawItems.join(' ');
+    console.log('[SlipImport] Page', p, '— raw items:', rawItems);
+    console.log('[SlipImport] Page', p, '— joined text:', text);
 
-    var trackMatch = text.match(/\b(\d{20,22})\b/);
+    // Tracking number: USPS 20-22 digit, or alphanumeric 18+ (UPS/FedEx)
+    var trackMatch = text.match(/\b([A-Z0-9]{18,22})\b/) || text.match(/\b(\d{16,22})\b/);
     var key = trackMatch ? trackMatch[1] : 'p' + p;
     if (!byTracking[key]) byTracking[key] = {};
 
     if (!byTracking[key].username) {
-      var toMatch = text.match(/To:\s+(\S+)/);
-      if (toMatch) {
-        byTracking[key].username = toMatch[1];
-        byTracking[key].isNew = /\bNEW\b/.test(text);
+      // Try multiple patterns for username
+      var uMatch =
+        text.match(/(?:Ship\s*To|Sold\s*To|To)\s*:?\s*@?(\w[\w\d_.-]{2,})/i) ||
+        text.match(/@(\w[\w\d_]{2,})/);
+      if (uMatch) {
+        byTracking[key].username = uMatch[1].replace(/^@/, '');
+        byTracking[key].isNew = /\bNEW\b/i.test(text);
+        console.log('[SlipImport] Page', p, '— username found:', byTracking[key].username, '| key:', key);
       }
     }
-    var totalMatch = text.match(/(\d+)\s+Items?\s+\$(\d+(?:\.\d{2})?)/i);
-    if (totalMatch) byTracking[key].total = parseFloat(totalMatch[2]);
+
+    // Try multiple total patterns
+    var totalMatch =
+      text.match(/(\d+)\s+Items?\s+\$\s*(\d+(?:\.\d{2})?)/i) ||
+      text.match(/(?:Order\s*Total|Subtotal|Total)[:\s]+\$\s*(\d+(?:\.\d{2})?)/i) ||
+      text.match(/\$\s*(\d+\.\d{2})\s*(?:USD)?(?:\s|$)/);
+    if (totalMatch) {
+      // group(2) for "N Items $X" pattern, group(1) for others
+      var amt = parseFloat(totalMatch[2] || totalMatch[1]);
+      if (!byTracking[key].total || amt > byTracking[key].total) {
+        byTracking[key].total = amt;
+        console.log('[SlipImport] Page', p, '— total found:', amt, '| key:', key);
+      }
+    }
   }
 
   var buyers = {};
