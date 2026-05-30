@@ -14,6 +14,7 @@
   <title>Card Break Pro — Owner Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="config.js"></script>
   <script src="analytics.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1858,6 +1859,13 @@
     <div class="form-group">
       <label for="coNotes">Notes (optional)</label>
       <textarea id="coNotes" placeholder="Any stream notes…"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Packing Slips — Buyer Intelligence (optional)</label>
+      <div id="coSlipDrop" style="border:1.5px dashed var(--border);border-radius:10px;padding:1.2rem;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;background:var(--bg);">
+        <input type="file" id="coSlipFile" accept=".pdf" style="display:none;" />
+        <div id="coSlipDropLabel" style="color:var(--muted);font-size:0.85rem;pointer-events:none;">📦 Drag &amp; drop Whatnot packing slip PDF, or <span style="color:var(--primary);">browse</span></div>
+      </div>
     </div>
     <div class="modal-btn-row">
       <button class="btn btn-outline" id="coCancelBtn">Cancel</button>
@@ -3952,6 +3960,7 @@ async function beOpenCloseOut() {
   modal.dataset.totalFees = totalFees;
   modal.dataset.totalRev = totalRev;
   modal.dataset.totalOther = beCurrentStream ? (parseFloat(beCurrentStream.total_other_costs) || 0) : 0;
+  coResetSlipDrop();
   modal.classList.add('active');
 }
 
@@ -3985,6 +3994,7 @@ function setupCloseOutModal() {
   });
 
   document.getElementById('coCancelBtn').addEventListener('click', function () {
+    coResetSlipDrop();
     document.getElementById('closeOutModal').classList.remove('active');
   });
 
@@ -4040,6 +4050,17 @@ function setupCloseOutModal() {
         status: 'pending'
       });
 
+      // Process packing slip PDF for buyer intelligence (optional)
+      if (_coSlipFile) {
+        try {
+          btn.textContent = 'Importing buyers…';
+          const imported = await coParseAndImportSlips(_coSlipFile, currentProfile.org_id, beCurrentStream.id);
+          if (imported > 0) cbpTrack('slip_imported', { org_id: currentProfile.org_id, buyer_count: imported });
+        } catch (slipErr) {
+          console.warn('Slip import failed (non-fatal):', slipErr);
+        }
+      }
+
       document.getElementById('closeOutModal').classList.remove('active');
       document.getElementById('be-streamKey').value = '';
       beSubmittedBreaks = [];
@@ -4071,8 +4092,149 @@ function setupCloseOutModal() {
   });
 
   document.getElementById('closeOutModal').addEventListener('click', function (e) {
-    if (e.target === this) this.classList.remove('active');
+    if (e.target === this) { coResetSlipDrop(); this.classList.remove('active'); }
   });
+
+  coSetupSlipDrop();
+}
+
+// ══════════════════════════════════════════════════════════
+//  PACKING SLIP IMPORT
+// ══════════════════════════════════════════════════════════
+var _coSlipFile = null;
+
+function coSetupSlipDrop() {
+  var drop = document.getElementById('coSlipDrop');
+  var fileInput = document.getElementById('coSlipFile');
+  drop.addEventListener('click', function(e) { if (e.target !== fileInput) fileInput.click(); });
+  drop.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    drop.style.borderColor = 'var(--primary)';
+    drop.style.background = 'rgba(79,110,247,0.06)';
+  });
+  drop.addEventListener('dragleave', function() {
+    drop.style.borderColor = 'var(--border)';
+    drop.style.background = 'var(--bg)';
+  });
+  drop.addEventListener('drop', function(e) {
+    e.preventDefault();
+    drop.style.borderColor = 'var(--border)';
+    drop.style.background = 'var(--bg)';
+    var f = e.dataTransfer.files[0];
+    if (f) coSetSlipFile(f);
+  });
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files[0]) coSetSlipFile(fileInput.files[0]);
+  });
+}
+
+function coSetSlipFile(file) {
+  _coSlipFile = file;
+  document.getElementById('coSlipDropLabel').innerHTML = '📄 <strong>' + escHtml(file.name) + '</strong>';
+  document.getElementById('coSlipDrop').style.borderColor = 'var(--green)';
+}
+
+function coResetSlipDrop() {
+  _coSlipFile = null;
+  var drop = document.getElementById('coSlipDrop');
+  if (!drop) return;
+  drop.style.borderColor = 'var(--border)';
+  drop.style.background = 'var(--bg)';
+  document.getElementById('coSlipDropLabel').innerHTML = '📦 Drag &amp; drop Whatnot packing slip PDF, or <span style="color:var(--primary);">browse</span>';
+  document.getElementById('coSlipFile').value = '';
+}
+
+async function coParseAndImportSlips(file, orgId, streamId) {
+  var pdfjs = window.pdfjsLib;
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  var buf = await file.arrayBuffer();
+  var pdf = await pdfjs.getDocument({ data: buf }).promise;
+  var byTracking = {};
+
+  for (var p = 1; p <= pdf.numPages; p++) {
+    var pg = await pdf.getPage(p);
+    var content = await pg.getTextContent();
+    var text = content.items.map(function(i) { return i.str; }).join(' ');
+
+    var trackMatch = text.match(/\b(\d{20,22})\b/);
+    var key = trackMatch ? trackMatch[1] : 'p' + p;
+    if (!byTracking[key]) byTracking[key] = {};
+
+    if (!byTracking[key].username) {
+      var toMatch = text.match(/To:\s+(\S+)/);
+      if (toMatch) {
+        byTracking[key].username = toMatch[1];
+        byTracking[key].isNew = /\bNEW\b/.test(text);
+      }
+    }
+    var totalMatch = text.match(/(\d+)\s+Items?\s+\$(\d+(?:\.\d{2})?)/i);
+    if (totalMatch) byTracking[key].total = parseFloat(totalMatch[2]);
+  }
+
+  var buyers = {};
+  Object.values(byTracking).forEach(function(entry) {
+    if (!entry.username) return;
+    var k = entry.username.toLowerCase();
+    if (!buyers[k]) buyers[k] = { username: entry.username, isNew: !!entry.isNew, total: 0 };
+    buyers[k].total += (entry.total || 0);
+  });
+
+  var list = Object.values(buyers);
+  if (!list.length) return 0;
+
+  var today = new Date().toISOString().split('T')[0];
+  var now = new Date().toISOString();
+
+  for (var i = 0; i < list.length; i++) {
+    var b = list[i];
+    var existing = null;
+    try {
+      var res = await sb.from('buyers')
+        .select('id,total_spent,total_breaks_purchased,total_streams_participated')
+        .eq('organization_id', orgId)
+        .eq('username', b.username)
+        .maybeSingle();
+      existing = res.data;
+    } catch (e) {}
+
+    var buyerId = null;
+    if (existing) {
+      buyerId = existing.id;
+      await sb.from('buyers').update({
+        total_spent: (parseFloat(existing.total_spent) || 0) + b.total,
+        total_breaks_purchased: (existing.total_breaks_purchased || 0) + 1,
+        total_streams_participated: (existing.total_streams_participated || 0) + 1,
+        last_purchase_date: today,
+        is_new_buyer: false,
+        updated_at: now
+      }).eq('id', buyerId);
+    } else {
+      var ins = await sb.from('buyers').insert({
+        organization_id: orgId,
+        username: b.username,
+        total_spent: b.total,
+        total_breaks_purchased: 1,
+        total_streams_participated: 1,
+        last_purchase_date: today,
+        is_new_buyer: b.isNew,
+        temperature: b.isNew ? 'cold' : 'warm',
+        created_at: now,
+        updated_at: now
+      }).select('id').single();
+      buyerId = ins.data ? ins.data.id : null;
+    }
+
+    if (buyerId) {
+      await sb.from('buyer_purchases').insert({
+        organization_id: orgId,
+        buyer_id: buyerId,
+        amount: b.total,
+        purchase_date: today
+      }).catch(function() {});
+    }
+  }
+
+  return list.length;
 }
 
 // ══════════════════════════════════════════════════════════
