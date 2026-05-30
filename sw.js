@@ -1,9 +1,9 @@
 // CardBreakPro Service Worker
-const CACHE = 'cbp-v3';
+const CACHE = 'cbp-v4';
 const PRECACHE = [
   '/config.js',
   '/analytics.js',
-  '/mobile.css',
+  '/mobile.css?v=3',
   '/logo.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js'
 ];

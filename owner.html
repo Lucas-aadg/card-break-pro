@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="CardBreakPro" />
   <meta name="theme-color" content="#4f6ef7" />
-  <link rel="stylesheet" href="/mobile.css" />
+  <link rel="stylesheet" href="/mobile.css?v=3" />
   <title>Card Break Pro — Owner Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -3284,11 +3284,11 @@ async function initAuth() {
     // Onboarding: welcome modal + checklist widget
     await checkAndShowWizard(orgInfo);
 
-    hideLoading();
   } catch (err) {
-    hideLoading();
     showGlobalError('Failed to initialize: ' + escHtml(err.message));
     console.error(err);
+  } finally {
+    hideLoading();
   }
 }
 
@@ -8169,9 +8169,6 @@ function printTable(title, subtitle, tableId) {
   <button class="btm-nav-item" id="btn-btm-team" onclick="ownerBtmNav('team')">
     <span class="btm-nav-icon">👥</span><span class="btm-nav-label">Team</span>
   </button>
-  <button class="btm-nav-item" id="btn-btm-buyers" onclick="ownerBtmNav('buyers')">
-    <span class="btm-nav-icon">🏆</span><span class="btm-nav-label">Buyers</span>
-  </button>
   <button class="btm-nav-item" id="btn-btm-more" onclick="openMoreSheet()">
     <span class="btm-nav-icon">⋯</span><span class="btm-nav-label">More</span>
   </button>
@@ -8186,6 +8183,7 @@ function printTable(title, subtitle, tableId) {
     <button class="more-sheet-item" onclick="ownerBtmNav('dashboard');closeMoreSheet()"><span class="more-sheet-icon">📊</span>Analytics</button>
     <button class="more-sheet-item" onclick="ownerBtmNav('streamSummary');closeMoreSheet()"><span class="more-sheet-icon">📺</span>Stream Summary</button>
     <button class="more-sheet-item" onclick="ownerBtmNav('history');closeMoreSheet()"><span class="more-sheet-icon">📜</span>Break History</button>
+    <button class="more-sheet-item" onclick="ownerBtmNav('buyers');closeMoreSheet()"><span class="more-sheet-icon">🏆</span>Buyers</button>
     <button class="more-sheet-item" onclick="ownerBtmNav('schedule');closeMoreSheet()"><span class="more-sheet-icon">📅</span>Scheduling</button>
     <button class="more-sheet-item" onclick="ownerBtmNav('payroll');closeMoreSheet()"><span class="more-sheet-icon">💰</span>Payroll</button>
     <button class="more-sheet-item" id="moreItemInsights" onclick="ownerBtmNav('insights');closeMoreSheet()"><span class="more-sheet-icon">✦</span>AI Insights</button>
@@ -8199,7 +8197,7 @@ function printTable(title, subtitle, tableId) {
 function ownerBtmNav(tab) {
   switchTab(tab);
   document.querySelectorAll('.btm-nav-item').forEach(function(b){ b.classList.remove('active'); });
-  const map = { home: 'btn-btm-home', breakEntry: 'btn-btm-breakEntry', inventory: 'btn-btm-inventory', team: 'btn-btm-team', buyers: 'btn-btm-buyers' };
+  const map = { home: 'btn-btm-home', breakEntry: 'btn-btm-breakEntry', inventory: 'btn-btm-inventory', team: 'btn-btm-team' };
   if (map[tab]) document.getElementById(map[tab]).classList.add('active');
 }
 function openMoreSheet() { document.getElementById('moreSheet').classList.add('open'); }
