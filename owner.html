@@ -1878,11 +1878,15 @@
 <!-- CHANNEL MODAL -->
 <!-- LOG HIT MODAL -->
 <div class="modal-overlay" id="logHitModal">
-  <div class="modal" style="max-width:380px;">
+  <div class="modal" style="max-width:420px;">
     <h2>Log Case Hit</h2>
     <div class="form-group">
       <label for="logHitUsername">Buyer Username</label>
       <input type="text" id="logHitUsername" placeholder="username (no @)" autocomplete="off" style="font-size:1.05rem;" />
+    </div>
+    <div class="form-group">
+      <label for="logHitDesc">What was the hit?</label>
+      <input type="text" id="logHitDesc" placeholder="e.g. 1/1 Prizm Auto Rookie" autocomplete="off" style="font-size:1.05rem;" />
     </div>
     <div class="modal-btn-row">
       <button class="btn btn-outline" id="logHitCancelBtn">Cancel</button>
@@ -8639,6 +8643,7 @@ function calcBuyerTemp(lastPurchaseDate) {
 function setupLogHitModal() {
   document.getElementById('be-logHitBtn').addEventListener('click', function() {
     document.getElementById('logHitUsername').value = '';
+    document.getElementById('logHitDesc').value = '';
     document.getElementById('logHitModal').classList.add('active');
     setTimeout(function() { document.getElementById('logHitUsername').focus(); }, 80);
   });
@@ -8648,25 +8653,32 @@ function setupLogHitModal() {
   document.getElementById('logHitModal').addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('active');
   });
-  document.getElementById('logHitUsername').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') document.getElementById('logHitConfirmBtn').click();
+  ['logHitUsername','logHitDesc'].forEach(function(id) {
+    document.getElementById(id).addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') document.getElementById('logHitConfirmBtn').click();
+    });
   });
   document.getElementById('logHitConfirmBtn').addEventListener('click', async function() {
     const username = document.getElementById('logHitUsername').value.trim().replace(/^@/, '');
+    const description = document.getElementById('logHitDesc').value.trim();
     if (!username) { showGlobalError('Enter a username.'); return; }
+    if (!description) { showGlobalError('Describe the hit.'); return; }
     const btn = this;
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
+      const now = new Date().toISOString();
+      // Case-insensitive username lookup
       const { data: buyer, error } = await sb.from('buyers')
         .select('id,case_hits')
         .eq('organization_id', currentProfile.org_id)
-        .eq('username', username)
+        .ilike('username', username)
         .maybeSingle();
       if (error) throw error;
+
+      var buyerId;
       if (!buyer) {
-        // First-time buyer — create placeholder now, slip import fills in spend at closeout
-        const now = new Date().toISOString();
-        const { error: insErr } = await sb.from('buyers').insert({
+        // New buyer — create placeholder; slip import fills spend at closeout
+        const { data: nb, error: insErr } = await sb.from('buyers').insert({
           organization_id: currentProfile.org_id,
           username: username,
           case_hits: 1,
@@ -8677,16 +8689,28 @@ function setupLogHitModal() {
           temperature: 'cold',
           created_at: now,
           updated_at: now
-        });
+        }).select('id').single();
         if (insErr) throw insErr;
+        buyerId = nb.id;
       } else {
+        buyerId = buyer.id;
         await sb.from('buyers').update({
           case_hits: (buyer.case_hits || 0) + 1,
-          updated_at: new Date().toISOString()
-        }).eq('id', buyer.id);
+          updated_at: now
+        }).eq('id', buyerId);
       }
+
+      // Write to buyer_hits so it shows in the profile Hit History
+      const { error: hitErr } = await sb.from('buyer_hits').insert({
+        buyer_id: buyerId,
+        hit_description: description,
+        hit_type: 'case_hit',
+        submitted_at: now
+      });
+      if (hitErr) throw hitErr;
+
       document.getElementById('logHitModal').classList.remove('active');
-      showGlobalSuccess('@' + username + ' — case hit logged!');
+      showGlobalSuccess('@' + username + ' — hit logged: ' + description);
       cbpTrack('case_hit_logged', { org_id: currentProfile.org_id });
     } catch (err) {
       showGlobalError(escHtml(err.message));
@@ -8726,7 +8750,7 @@ async function openBuyerProfile(buyerId) {
 
     // Header
     document.getElementById('bpUsername').textContent = '@' + buyer.username;
-    const temp = buyer.temperature || 'cold';
+    const temp = calcBuyerTemp(buyer.last_purchase_date);
     const tempColor = temp === 'hot' ? '#22c55e' : temp === 'warm' ? '#f59e0b' : '#64748b';
     document.getElementById('bpTempBadge').innerHTML = '<span style="background:' + tempColor + '1a;color:' + tempColor + ';border:1px solid ' + tempColor + '44;border-radius:100px;padding:0.2rem 0.7rem;font-size:0.75rem;font-weight:700;text-transform:capitalize;">' + temp + '</span>';
     if (buyer.is_new_buyer) document.getElementById('bpNewBadge').style.display = '';
