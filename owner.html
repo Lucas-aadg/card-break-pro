@@ -1874,6 +1874,20 @@
   </div>
 </div>
 
+<!-- SLIP PREVIEW MODAL -->
+<div class="modal-overlay" id="slipPreviewModal">
+  <div class="modal" style="max-width:500px;">
+    <h2>Packing Slip — Buyer Preview</h2>
+    <p id="slipPreviewMsg" style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;line-height:1.5;"></p>
+    <div id="slipPreviewList" style="max-height:300px;overflow-y:auto;margin-bottom:1.25rem;border:1px solid var(--border);border-radius:8px;"></div>
+    <div id="slipRawDebug" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;font-size:0.72rem;font-family:monospace;white-space:pre-wrap;max-height:200px;overflow-y:auto;margin-bottom:1.25rem;color:var(--muted);"></div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="slipPreviewSkipBtn">Skip Import</button>
+      <button class="btn btn-primary" id="slipPreviewConfirmBtn">Import Buyers</button>
+    </div>
+  </div>
+</div>
+
 <!-- CHANNEL MODAL -->
 <div class="modal-overlay" id="channelModal">
   <div class="modal" style="max-width:440px;">
@@ -3278,6 +3292,7 @@ async function initAuth() {
     setupGlobalButtons();
     setupConfirmModal();
     setupCloseOutModal();
+    setupSlipPreviewModal();
 
     // Load initial tab data
     await loadHome();
@@ -4050,18 +4065,21 @@ function setupCloseOutModal() {
         status: 'pending'
       });
 
+      document.getElementById('closeOutModal').classList.remove('active');
+
       // Process packing slip PDF for buyer intelligence (optional)
       if (_coSlipFile) {
         try {
-          btn.textContent = 'Importing buyersâ€¦';
-          const imported = await coParseAndImportSlips(_coSlipFile, currentProfile.org_id, beCurrentStream.id);
-          if (imported > 0) cbpTrack('slip_imported', { org_id: currentProfile.org_id, buyer_count: imported });
+          btn.textContent = 'Parsing slip…';
+          const slipFile = _coSlipFile;
+          const slipOrgId = currentProfile.org_id;
+          coResetSlipDrop();
+          const parsed = await coParseSlipPDF(slipFile);
+          coShowSlipPreview(parsed, slipOrgId);
         } catch (slipErr) {
-          console.warn('Slip import failed (non-fatal):', slipErr);
+          showGlobalError('Slip parse failed: ' + escHtml(slipErr.message));
         }
       }
-
-      document.getElementById('closeOutModal').classList.remove('active');
       document.getElementById('be-streamKey').value = '';
       beSubmittedBreaks = [];
       beBreakNumber = 1;
@@ -4144,52 +4162,60 @@ function coResetSlipDrop() {
   document.getElementById('coSlipFile').value = '';
 }
 
-async function coParseAndImportSlips(file, orgId, streamId) {
-  var pdfjs = window.pdfjsLib;
-  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// Parse only — returns array of {username, isNew, total} plus debug info
+async function coParseSlipPDF(file) {
+  if (!window.pdfjsLib) throw new Error('PDF.js not loaded. Check your internet connection and reload.');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   var buf = await file.arrayBuffer();
-  var pdf = await pdfjs.getDocument({ data: buf }).promise;
+  var pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
   var byTracking = {};
-
-  console.log('[SlipImport] PDF loaded â€”', pdf.numPages, 'pages');
+  var page1Text = '';
 
   for (var p = 1; p <= pdf.numPages; p++) {
     var pg = await pdf.getPage(p);
     var content = await pg.getTextContent();
-    // Log individual items so we can see exactly how PDF.js tokenizes the text
-    var rawItems = content.items.map(function(i) { return i.str; });
-    var text = rawItems.join(' ');
-    console.log('[SlipImport] Page', p, 'â€” raw items:', rawItems);
-    console.log('[SlipImport] Page', p, 'â€” joined text:', text);
+    var items = content.items.map(function(i) { return i.str; });
+    // Try joining with no separator and with space — some PDFs char-encode differently
+    var textSpaced = items.join(' ');
+    var textRaw    = items.join('');
+    if (p === 1) page1Text = textSpaced || textRaw;
 
-    // Tracking number: USPS 20-22 digit, or alphanumeric 18+ (UPS/FedEx)
-    var trackMatch = text.match(/\b([A-Z0-9]{18,22})\b/) || text.match(/\b(\d{16,22})\b/);
+    // Group pages by tracking number (USPS numeric or UPS alphanumeric)
+    var trackMatch = textRaw.match(/\b(1Z[A-Z0-9]{16})\b/) ||
+                     textSpaced.match(/\b(\d{20,22})\b/) ||
+                     textSpaced.match(/\b(\d{16,19})\b/);
     var key = trackMatch ? trackMatch[1] : 'p' + p;
-    if (!byTracking[key]) byTracking[key] = {};
+    if (!byTracking[key]) byTracking[key] = { rawSample: p === 1 ? textSpaced.slice(0, 400) : '' };
 
+    // Username: try @handle first, then Ship/Sold/To: label
     if (!byTracking[key].username) {
-      // Try multiple patterns for username
       var uMatch =
-        text.match(/(?:Ship\s*To|Sold\s*To|To)\s*:?\s*@?(\w[\w\d_.-]{2,})/i) ||
-        text.match(/@(\w[\w\d_]{2,})/);
+        textRaw.match(/@([A-Za-z0-9_]{3,})/) ||
+        textSpaced.match(/@([A-Za-z0-9_]{3,})/) ||
+        textSpaced.match(/(?:Ship\s*To|Sold\s*To|Buyer|To)\s*[:\-]?\s*@?([A-Za-z0-9_]{3,})/i) ||
+        textRaw.match(/(?:ShipTo|SoldTo|BuyerTo|To)\s*:?\s*@?([A-Za-z0-9_]{3,})/i);
       if (uMatch) {
-        byTracking[key].username = uMatch[1].replace(/^@/, '');
-        byTracking[key].isNew = /\bNEW\b/i.test(text);
-        console.log('[SlipImport] Page', p, 'â€” username found:', byTracking[key].username, '| key:', key);
+        byTracking[key].username = uMatch[1];
+        byTracking[key].isNew = /\bNEW\b/i.test(textSpaced + textRaw);
       }
     }
 
-    // Try multiple total patterns
+    // Total: prefer explicit total labels, fall back to largest dollar amount on page
+    var allAmounts = [];
     var totalMatch =
-      text.match(/(\d+)\s+Items?\s+\$\s*(\d+(?:\.\d{2})?)/i) ||
-      text.match(/(?:Order\s*Total|Subtotal|Total)[:\s]+\$\s*(\d+(?:\.\d{2})?)/i) ||
-      text.match(/\$\s*(\d+\.\d{2})\s*(?:USD)?(?:\s|$)/);
+      textSpaced.match(/(?:Order\s*Total|Grand\s*Total|Total\s*Due|Total\s*Charge|Subtotal)\s*[:\$]?\s*\$?\s*(\d+\.\d{2})/i) ||
+      textRaw.match(/(?:OrderTotal|GrandTotal|TotalDue|TotalCharge|Subtotal)\$?(\d+\.\d{2})/i) ||
+      textSpaced.match(/(\d+)\s+Items?\s+\$\s*(\d+\.\d{2})/i);
     if (totalMatch) {
-      // group(2) for "N Items $X" pattern, group(1) for others
       var amt = parseFloat(totalMatch[2] || totalMatch[1]);
-      if (!byTracking[key].total || amt > byTracking[key].total) {
-        byTracking[key].total = amt;
-        console.log('[SlipImport] Page', p, 'â€” total found:', amt, '| key:', key);
+      if (!byTracking[key].total || amt > byTracking[key].total) byTracking[key].total = amt;
+    } else {
+      // Last resort: collect all dollar amounts, take the largest (likely the order total)
+      var rx = /\$\s*(\d+\.\d{2})/g, m;
+      while ((m = rx.exec(textSpaced)) !== null) allAmounts.push(parseFloat(m[1]));
+      if (allAmounts.length) {
+        var biggest = Math.max.apply(null, allAmounts);
+        if (!byTracking[key].total || biggest > byTracking[key].total) byTracking[key].total = biggest;
       }
     }
   }
@@ -4202,24 +4228,78 @@ async function coParseAndImportSlips(file, orgId, streamId) {
     buyers[k].total += (entry.total || 0);
   });
 
-  var list = Object.values(buyers);
-  if (!list.length) return 0;
+  return { list: Object.values(buyers), page1Text: page1Text, totalPages: pdf.numPages };
+}
 
+// Show preview modal with parsed results — user confirms before anything saves
+var _coPreviewOrgId = null;
+var _coPreviewList  = null;
+
+function coShowSlipPreview(parsed, orgId) {
+  _coPreviewOrgId = orgId;
+  _coPreviewList  = parsed.list;
+  var msg = document.getElementById('slipPreviewMsg');
+  var listEl = document.getElementById('slipPreviewList');
+  var dbg = document.getElementById('slipRawDebug');
+  var confirmBtn = document.getElementById('slipPreviewConfirmBtn');
+
+  if (!parsed.list.length) {
+    msg.textContent = 'No buyers detected in this PDF (' + parsed.totalPages + ' pages). The raw text from page 1 is shown below — share it so the parser can be fixed.';
+    listEl.style.display = 'none';
+    dbg.style.display = 'block';
+    dbg.textContent = parsed.page1Text || '(empty — PDF may use image-only rendering)';
+    confirmBtn.style.display = 'none';
+  } else {
+    msg.textContent = 'Found ' + parsed.list.length + ' buyer' + (parsed.list.length !== 1 ? 's' : '') + ' in ' + parsed.totalPages + ' pages. Review and confirm to save.';
+    listEl.style.display = 'block';
+    dbg.style.display = 'none';
+    confirmBtn.style.display = '';
+    listEl.innerHTML = parsed.list.map(function(b) {
+      return '<div style=”display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.9rem;border-bottom:1px solid var(--border);font-size:0.85rem;”>' +
+        '<span style=”font-weight:600;color:var(--text);”>@' + escHtml(b.username) + (b.isNew ? ' <span style=”background:rgba(79,110,247,0.15);color:var(--primary);font-size:0.7rem;padding:1px 6px;border-radius:4px;font-weight:700;”>NEW</span>' : '') + '</span>' +
+        '<span style=”color:var(--green);font-weight:700;”>' + fmt(b.total) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+  document.getElementById('slipPreviewModal').classList.add('active');
+}
+
+function setupSlipPreviewModal() {
+  document.getElementById('slipPreviewSkipBtn').addEventListener('click', function() {
+    document.getElementById('slipPreviewModal').classList.remove('active');
+    _coPreviewList = null;
+    _coPreviewOrgId = null;
+  });
+  document.getElementById('slipPreviewConfirmBtn').addEventListener('click', async function() {
+    var btn = this;
+    if (!_coPreviewList || !_coPreviewOrgId) return;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await coSaveBuyers(_coPreviewList, _coPreviewOrgId);
+      cbpTrack('slip_imported', { org_id: _coPreviewOrgId, buyer_count: _coPreviewList.length });
+      document.getElementById('slipPreviewModal').classList.remove('active');
+      showGlobalSuccess(_coPreviewList.length + ' buyers imported from packing slip.');
+    } catch (e) {
+      showGlobalError('Save failed: ' + escHtml(e.message));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Import Buyers';
+      _coPreviewList = null;
+      _coPreviewOrgId = null;
+    }
+  });
+}
+
+async function coSaveBuyers(list, orgId) {
   var today = new Date().toISOString().split('T')[0];
-  var now = new Date().toISOString();
-
+  var now   = new Date().toISOString();
   for (var i = 0; i < list.length; i++) {
     var b = list[i];
-    var existing = null;
-    try {
-      var res = await sb.from('buyers')
-        .select('id,total_spent,total_breaks_purchased,total_streams_participated')
-        .eq('organization_id', orgId)
-        .eq('username', b.username)
-        .maybeSingle();
-      existing = res.data;
-    } catch (e) {}
-
+    var res = await sb.from('buyers')
+      .select('id,total_spent,total_breaks_purchased,total_streams_participated')
+      .eq('organization_id', orgId).eq('username', b.username).maybeSingle();
+    var existing = res.data;
     var buyerId = null;
     if (existing) {
       buyerId = existing.id;
@@ -4227,37 +4307,25 @@ async function coParseAndImportSlips(file, orgId, streamId) {
         total_spent: (parseFloat(existing.total_spent) || 0) + b.total,
         total_breaks_purchased: (existing.total_breaks_purchased || 0) + 1,
         total_streams_participated: (existing.total_streams_participated || 0) + 1,
-        last_purchase_date: today,
-        is_new_buyer: false,
-        updated_at: now
+        last_purchase_date: today, is_new_buyer: false, updated_at: now
       }).eq('id', buyerId);
     } else {
       var ins = await sb.from('buyers').insert({
-        organization_id: orgId,
-        username: b.username,
-        total_spent: b.total,
-        total_breaks_purchased: 1,
-        total_streams_participated: 1,
-        last_purchase_date: today,
-        is_new_buyer: b.isNew,
-        temperature: b.isNew ? 'cold' : 'warm',
-        created_at: now,
-        updated_at: now
+        organization_id: orgId, username: b.username,
+        total_spent: b.total, total_breaks_purchased: 1,
+        total_streams_participated: 1, last_purchase_date: today,
+        is_new_buyer: b.isNew, temperature: b.isNew ? 'cold' : 'warm',
+        created_at: now, updated_at: now
       }).select('id').single();
       buyerId = ins.data ? ins.data.id : null;
     }
-
     if (buyerId) {
       await sb.from('buyer_purchases').insert({
-        organization_id: orgId,
-        buyer_id: buyerId,
-        amount: b.total,
-        purchase_date: today
-      }).catch(function() {});
+        organization_id: orgId, buyer_id: buyerId,
+        amount: b.total, purchase_date: today
+      }).catch(function(){});
     }
   }
-
-  return list.length;
 }
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
