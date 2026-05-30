@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="apple-touch-icon" href="/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#4f6ef7" />
+  <link rel="stylesheet" href="/mobile.css?v=3" />
+  <title>Card Break Pro — Exports</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
+  <script src="config.js"></script>
+  <script src="analytics.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07070f; --bg2: #0c0c18; --card: rgba(16,16,30,0.85); --card-solid: #10101e;
+      --border: rgba(79,110,247,0.15); --border-bright: rgba(79,110,247,0.35);
+      --primary: #4f6ef7; --primary-glow: rgba(79,110,247,0.25);
+      --green: #22c55e; --red: #ef4444; --text: #e8eaf6; --muted: #5a6a8a;
+      --yellow: #f59e0b; --purple: #a855f7;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(79,110,247,0.10) 0%, transparent 60%);
+      color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh;
+    }
+    nav {
+      background: rgba(7,7,15,0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border); padding: 0 1.5rem;
+      display: flex; align-items: center; gap: 0;
+      position: sticky; top: 0; z-index: 200; min-height: 54px;
+    }
+    .brand { font-size: 1rem; font-weight: 900; letter-spacing: 3px; margin-right: 1.5rem; white-space: nowrap; background: linear-gradient(135deg,#e8eaf6,#a0aec0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .brand span { background: linear-gradient(135deg,#4f6ef7,#818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .nav-right { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; }
+    .nav-back { color: var(--muted); font-size: 0.82rem; text-decoration: none; display: flex; align-items: center; gap: 0.3rem; }
+    .nav-back:hover { color: var(--text); }
+    .main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .page-title { font-size: 1.6rem; font-weight: 900; margin-bottom: 0.35rem; }
+    .page-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+
+    /* Loading */
+    .loading-overlay { position: fixed; inset: 0; background: rgba(7,7,15,0.92); display: none; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; }
+    .loading-overlay.active { display: flex; }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 0.88rem; }
+
+    /* Section */
+    .export-section { margin-bottom: 2.5rem; }
+    .section-title { font-size: 1rem; font-weight: 800; letter-spacing: 0.3px; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+    .section-icon { font-size: 1.1rem; }
+
+    /* Export cards */
+    .export-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+    .export-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.25rem 1.25rem 1rem; display: flex; flex-direction: column; gap: 0.75rem;
+    }
+    .export-card-title { font-size: 0.92rem; font-weight: 700; }
+    .export-card-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.55; }
+    .export-controls { display: flex; flex-direction: column; gap: 0.55rem; }
+    .control-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    select, input[type="month"], input[type="date"] {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 0.82rem; padding: 0.45rem 0.65rem;
+      min-height: 38px; flex: 1; min-width: 120px;
+      -webkit-appearance: none; appearance: none;
+    }
+    select:focus, input:focus { outline: none; border-color: var(--primary); }
+    .btn-export {
+      background: var(--primary); color: #fff; border: none; border-radius: 10px;
+      padding: 0.65rem 1.1rem; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+      min-height: 42px; width: 100%; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+    }
+    .btn-export:hover { opacity: 0.88; }
+    .btn-export:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-export-secondary { background: rgba(79,110,247,0.12); border: 1px solid rgba(79,110,247,0.3); }
+
+    /* History table */
+    .history-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .history-table th { text-align: left; padding: 0.5rem 0.75rem; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .history-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid rgba(79,110,247,0.07); }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+
+    .btn-sm-dl { background: rgba(79,110,247,0.1); border: 1px solid rgba(79,110,247,0.2); color: var(--primary); border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .btn-sm-dl:hover { background: rgba(79,110,247,0.2); }
+
+    .notice { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.78rem; color: #e2c97e; line-height: 1.5; }
+    .empty-state { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.85rem; }
+
+    @media (max-width: 640px) {
+      .export-grid { grid-template-columns: 1fr; }
+      .main { padding: 1rem 1rem 5rem; }
+      select, input[type="month"], input[type="date"] { font-size: 16px; min-height: 48px; }
+      .btn-export { min-height: 52px; font-size: 0.95rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Loading…</div>
+</div>
+
+<nav>
+  <div class="brand">CARD <span>BREAK</span> PRO</div>
+  <div class="nav-right">
+    <a href="/dashboard" class="nav-back">← Dashboard</a>
+    <span id="ownerBadge" style="color:var(--muted);font-size:0.8rem;"></span>
+    <button onclick="sb.auth.signOut().then(()=>location.href='/login')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:0.3rem 0.7rem;font-size:0.78rem;cursor:pointer;">Sign Out</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page-title">📊 Exports &amp; Reports</div>
+  <div class="page-sub">Generate CSV files for your accountant, tax professional, or personal records.</div>
+
+  <div id="mainContent" style="display:none;">
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 1 — BUSINESS REPORTS
+  ════════════════════════════════════════════ -->
+  <div class="export-section">
+    <div class="section-title"><span class="section-icon">💼</span> Business Reports</div>
+    <div class="export-grid">
+
+      <!-- P&L -->
+      <div class="export-card">
+        <div class="export-card-title">Profit &amp; Loss</div>
+        <div class="export-card-desc">Revenue, platform fees, cost of goods, labor, and operating profit. Broken down by channel. Ready for any accounting software.</div>
+        <div class="export-controls">
+          <select id="plType" onchange="updatePLControls()">
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="annual">Annual</option>
+          </select>
+          <div id="plMonthlyControls" class="control-row">
+            <input type="month" id="plMonth" />
+          </div>
+          <div id="plQuarterlyControls" class="control-row" style="display:none;">
+            <select id="plQuarter"><option value="1">Q1 (Jan–Mar)</option><option value="2">Q2 (Apr–Jun)</option><option value="3">Q3 (Jul–Sep)</option><option value="4">Q4 (Oct–Dec)</option></select>
+            <input type="number" id="plQYear" min="2020" max="2099" style="width:90px;flex:0 0 auto;" />
+          </div>
+          <div id="plAnnualControls" class="control-row" style="display:none;">
+            <input type="number" id="plAYear" min="2020" max="2099" style="max-width:120px;" />
+          </div>
+          <button class="btn-export" onclick="runExport('pl')">⬇ Download P&amp;L CSV</button>
+        </div>
+      </div>
+
+      <!-- Monthly Revenue Detail -->
+      <div class="export-card">
+        <div class="export-card-title">Monthly Revenue Detail</div>
+        <div class="export-card-desc">Every stream that ran in a month — date, channel, breaker, gross revenue, fees, box cost, commission, and final profit. Row-per-stream with totals.</div>
+        <div class="export-controls">
+          <input type="month" id="rdMonth" />
+          <button class="btn-export" onclick="runExport('revenue_detail')">⬇ Download CSV</button>
+        </div>
+      </div>
+
+      <!-- Inventory Cost Report -->
+      <div class="export-card">
+        <div class="export-card-title">Inventory Cost Report</div>
+        <div class="export-card-desc">Purchases, usage, and ending inventory value for any period. Contains the data your accountant needs for COGS calculations.</div>
+        <div class="export-controls">
+          <div class="control-row">
+            <input type="date" id="icFrom" style="flex:1;" />
+            <input type="date" id="icTo" style="flex:1;" />
+          </div>
+          <button class="btn-export" onclick="runExport('inventory_cost')">⬇ Download CSV</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 2 — TEAM MEMBER REPORTS
+  ════════════════════════════════════════════ -->
+  <div class="export-section">
+    <div class="section-title"><span class="section-icon">👥</span> Team Member Reports</div>
+    <div class="export-grid">
+
+      <!-- Individual Earnings -->
+      <div class="export-card">
+        <div class="export-card-title">Individual Earnings Summary</div>
+        <div class="export-card-desc">Full earnings record for one team member — streams worked, commission, hours, and pay breakdown. Clean enough to use as 1099 support documentation.</div>
+        <div class="export-controls">
+          <select id="earningsMember"><option value="">Select team member…</option></select>
+          <select id="earningsPeriodType" onchange="updateEarningsControls()">
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="annual">Annual</option>
+            <option value="custom">Custom Range</option>
+          </select>
+          <div id="earningsMonthlyControls" class="control-row">
+            <input type="month" id="earningsMonth" />
+          </div>
+          <div id="earningsQuarterlyControls" class="control-row" style="display:none;">
+            <select id="earningsQuarter"><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select>
+            <input type="number" id="earningsQYear" min="2020" max="2099" style="width:90px;flex:0 0 auto;" />
+          </div>
+          <div id="earningsAnnualControls" class="control-row" style="display:none;">
+            <input type="number" id="earningsAYear" min="2020" max="2099" style="max-width:120px;" />
+          </div>
+          <div id="earningsCustomControls" class="control-row" style="display:none;">
+            <input type="date" id="earningsFrom" style="flex:1;" />
+            <input type="date" id="earningsTo" style="flex:1;" />
+          </div>
+          <button class="btn-export" onclick="runExport('member_earnings')">⬇ Download Earnings CSV</button>
+        </div>
+      </div>
+
+      <!-- Bulk Earnings -->
+      <div class="export-card">
+        <div class="export-card-title">Bulk Earnings Export</div>
+        <div class="export-card-desc">Downloads all team member earnings as a ZIP file — one CSV per person. Use this to prepare 1099s for the full team at once.</div>
+        <div class="export-controls">
+          <select id="bulkPeriodType" onchange="updateBulkControls()">
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="annual">Annual</option>
+            <option value="custom">Custom Range</option>
+          </select>
+          <div id="bulkMonthlyControls" class="control-row">
+            <input type="month" id="bulkMonth" />
+          </div>
+          <div id="bulkQuarterlyControls" class="control-row" style="display:none;">
+            <select id="bulkQuarter"><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select>
+            <input type="number" id="bulkQYear" min="2020" max="2099" style="width:90px;flex:0 0 auto;" />
+          </div>
+          <div id="bulkAnnualControls" class="control-row" style="display:none;">
+            <input type="number" id="bulkAYear" min="2020" max="2099" style="max-width:120px;" />
+          </div>
+          <div id="bulkCustomControls" class="control-row" style="display:none;">
+            <input type="date" id="bulkFrom" style="flex:1;" />
+            <input type="date" id="bulkTo" style="flex:1;" />
+          </div>
+          <button class="btn-export" onclick="runExport('bulk_earnings')">⬇ Download All (ZIP)</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 3 — TAX DOCUMENTS
+  ════════════════════════════════════════════ -->
+  <div class="export-section">
+    <div class="section-title"><span class="section-icon">🗂️</span> Tax Documents</div>
+    <div class="notice" style="margin-bottom:1rem;">⚠ These documents are generated from CardBreakPro operational data. Please review with a qualified tax professional before filing.</div>
+    <div class="export-grid">
+
+      <!-- Annual Tax Summary -->
+      <div class="export-card">
+        <div class="export-card-title">Annual Tax Summary</div>
+        <div class="export-card-desc">Full-year business summary — monthly P&amp;L breakdown, total revenue, COGS, labor, and team member annual earnings for 1099 preparation.</div>
+        <div class="export-controls">
+          <input type="number" id="taxYear" min="2020" max="2099" placeholder="Year (e.g. 2026)" style="max-width:160px;" />
+          <button class="btn-export" onclick="runExport('tax_annual')">⬇ Download Annual Summary</button>
+        </div>
+      </div>
+
+      <!-- Payroll Run Export -->
+      <div class="export-card">
+        <div class="export-card-title">Payroll Run Export</div>
+        <div class="export-card-desc">Export a specific payroll run as a CSV — team member names, roles, pay breakdown, and totals. Paper trail for every pay period.</div>
+        <div class="export-controls">
+          <select id="payrollRunSelect"><option value="">Loading payroll runs…</option></select>
+          <button class="btn-export" onclick="runExport('payroll_run')">⬇ Download Payroll Run</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       EXPORT HISTORY
+  ════════════════════════════════════════════ -->
+  <div class="export-section">
+    <div class="section-title"><span class="section-icon">🕐</span> Export History</div>
+    <div class="history-table-wrap">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Period</th>
+            <th>Generated</th>
+            <th>File</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="5" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  </div><!-- /mainContent -->
+</div>
+
+<script>
+'use strict';
+
+const { createClient } = supabase;
+const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+let currentUser = null;
+let currentProfile = null;
+let orgName = '';
+let allProfiles = [];
+
+// ── Utilities ────────────────────────────────────────────────
+
+function showLoading(msg) {
+  document.getElementById('loadingText').textContent = msg || 'Loading…';
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function n2(v) { return (parseFloat(v) || 0).toFixed(2); }
+
+function slugify(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+}
+
+function makeFilename(type, period) {
+  const org = slugify(orgName) || 'org';
+  const dt = today().replace(/-/g,'');
+  return org + '_' + type + '_' + period.replace(/[^a-z0-9]+/g,'_') + '_' + dt + '.csv';
+}
+
+// ── CSV Builder ──────────────────────────────────────────────
+
+const BOM = '﻿';
+
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+function csvRow(...cells) {
+  return cells.map(csvCell).join(',') + '\n';
+}
+
+function csvFileHeader(title, period) {
+  return csvRow(title) +
+         csvRow(orgName, period) +
+         csvRow('Generated by CardBreakPro on ' + today()) +
+         '\n';
+}
+
+function csvFooter() {
+  return csvRow('End of Report — CardBreakPro');
+}
+
+function downloadCSV(csv, filename) {
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// ── Period Helpers ───────────────────────────────────────────
+
+function periodFromMonthInput(val) {
+  // val = "YYYY-MM"
+  if (!val) return null;
+  const [y, m] = val.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return {
+    start: val + '-01',
+    end: val + '-' + String(lastDay).padStart(2,'0'),
+    label: new Date(y, m-1).toLocaleString('default',{month:'long',year:'numeric'}),
+    slug: val.replace('-','_')
+  };
+}
+
+function periodFromQuarter(q, year) {
+  const months = { 1:[1,3], 2:[4,6], 3:[7,9], 4:[10,12] };
+  const [sm, em] = months[q];
+  const lastDay = new Date(year, em, 0).getDate();
+  const start = year + '-' + String(sm).padStart(2,'0') + '-01';
+  const end = year + '-' + String(em).padStart(2,'0') + '-' + lastDay;
+  return { start, end, label: 'Q' + q + ' ' + year, slug: year + '_Q' + q };
+}
+
+function periodFromYear(year) {
+  return { start: year+'-01-01', end: year+'-12-31', label: 'Annual ' + year, slug: year+'_annual' };
+}
+
+function periodFromCustom(from, to) {
+  return { start: from, end: to, label: from + ' to ' + to, slug: from.replace(/-/g,'') + '_' + to.replace(/-/g,'') };
+}
+
+// ── UI Controls ──────────────────────────────────────────────
+
+function updatePLControls() {
+  const t = document.getElementById('plType').value;
+  document.getElementById('plMonthlyControls').style.display = t==='monthly' ? '' : 'none';
+  document.getElementById('plQuarterlyControls').style.display = t==='quarterly' ? '' : 'none';
+  document.getElementById('plAnnualControls').style.display = t==='annual' ? '' : 'none';
+}
+
+function updateEarningsControls() {
+  const t = document.getElementById('earningsPeriodType').value;
+  document.getElementById('earningsMonthlyControls').style.display = t==='monthly' ? '' : 'none';
+  document.getElementById('earningsQuarterlyControls').style.display = t==='quarterly' ? '' : 'none';
+  document.getElementById('earningsAnnualControls').style.display = t==='annual' ? '' : 'none';
+  document.getElementById('earningsCustomControls').style.display = t==='custom' ? '' : 'none';
+}
+
+function updateBulkControls() {
+  const t = document.getElementById('bulkPeriodType').value;
+  document.getElementById('bulkMonthlyControls').style.display = t==='monthly' ? '' : 'none';
+  document.getElementById('bulkQuarterlyControls').style.display = t==='quarterly' ? '' : 'none';
+  document.getElementById('bulkAnnualControls').style.display = t==='annual' ? '' : 'none';
+  document.getElementById('bulkCustomControls').style.display = t==='custom' ? '' : 'none';
+}
+
+// ── Auth ─────────────────────────────────────────────────────
+
+async function initAuth() {
+  showLoading('Checking session…');
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = '/login'; return; }
+    currentUser = session.user;
+
+    const { data: profile, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (error || !profile) { await sb.auth.signOut(); window.location.href = '/login'; return; }
+    if (profile.role !== 'owner') { window.location.href = '/dashboard'; return; }
+
+    currentProfile = profile;
+    document.getElementById('ownerBadge').textContent = escHtml(profile.display_name);
+
+    const { data: org } = await sb.from('organizations').select('name').eq('id', profile.org_id).single();
+    orgName = org?.name || 'Organization';
+
+    await Promise.all([loadTeamMembers(), loadPayrollRuns()]);
+    setDefaultDates();
+    await loadExportHistory();
+    document.getElementById('mainContent').style.display = '';
+  } catch (err) {
+    alert('Failed to load: ' + err.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function loadTeamMembers() {
+  const { data } = await sb.from('profiles').select('id,display_name,role,pay_type,commission_rate,hourly_rate,salary_amount,salary_period,per_break_rate,category_rates,commission_method')
+    .eq('org_id', currentProfile.org_id).neq('role','owner').order('display_name');
+  allProfiles = data || [];
+
+  const sel = document.getElementById('earningsMember');
+  sel.innerHTML = '<option value="">Select team member…</option>';
+  (data || []).forEach(function(p) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.display_name + ' (' + p.role + ')';
+    sel.appendChild(opt);
+  });
+}
+
+async function loadPayrollRuns() {
+  const { data } = await sb.from('payroll_runs').select('id,period_label,period_from,period_to,total_paid,created_at')
+    .eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(50);
+  const sel = document.getElementById('payrollRunSelect');
+  if (!data || !data.length) {
+    sel.innerHTML = '<option value="">No payroll runs found</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">Select a payroll run…</option>';
+  (data || []).forEach(function(r) {
+    const opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = (r.period_label || r.period_from + ' – ' + r.period_to) + ' — $' + n2(r.total_paid);
+    sel.appendChild(opt);
+  });
+}
+
+function setDefaultDates() {
+  const now = new Date();
+  const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('plMonth').value = ym;
+  document.getElementById('rdMonth').value = ym;
+  document.getElementById('earningsMonth').value = ym;
+  document.getElementById('bulkMonth').value = ym;
+  const y = now.getFullYear();
+  document.getElementById('plQYear').value = y;
+  document.getElementById('plAYear').value = y;
+  document.getElementById('earningsQYear').value = y;
+  document.getElementById('earningsAYear').value = y;
+  document.getElementById('bulkQYear').value = y;
+  document.getElementById('bulkAYear').value = y;
+  document.getElementById('taxYear').value = y;
+
+  const firstDay = y + '-01-01';
+  const lastDay = y + '-12-31';
+  document.getElementById('icFrom').value = firstDay;
+  document.getElementById('icTo').value = lastDay;
+  document.getElementById('earningsFrom').value = firstDay;
+  document.getElementById('earningsTo').value = lastDay;
+  document.getElementById('bulkFrom').value = firstDay;
+  document.getElementById('bulkTo').value = lastDay;
+
+  const q = Math.ceil((now.getMonth()+1)/3);
+  document.getElementById('plQuarter').value = q;
+  document.getElementById('earningsQuarter').value = q;
+  document.getElementById('bulkQuarter').value = q;
+}
+
+// ── Export Router ────────────────────────────────────────────
+
+async function runExport(type, params) {
+  const btn = event ? event.target.closest('button') : null;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+  try {
+    let csv = null, filename = null, period = null;
+
+    if (type === 'pl') {
+      const pt = document.getElementById('plType').value;
+      let p;
+      if (pt === 'monthly') p = periodFromMonthInput(document.getElementById('plMonth').value);
+      else if (pt === 'quarterly') p = periodFromQuarter(+document.getElementById('plQuarter').value, +document.getElementById('plQYear').value);
+      else p = periodFromYear(+document.getElementById('plAYear').value);
+      if (!p) { alert('Please select a valid period.'); return; }
+      period = p;
+      ({ csv, filename } = await buildPL(p));
+      await logAndHistory('pl_' + pt, p.start, p.end, filename, { type: 'pl', pt, month: document.getElementById('plMonth').value, quarter: document.getElementById('plQuarter').value, qYear: document.getElementById('plQYear').value, aYear: document.getElementById('plAYear').value });
+    }
+
+    else if (type === 'revenue_detail') {
+      const p = periodFromMonthInput(document.getElementById('rdMonth').value);
+      if (!p) { alert('Please select a month.'); return; }
+      ({ csv, filename } = await buildRevenueDetail(p));
+      await logAndHistory('revenue_detail', p.start, p.end, filename, { type: 'revenue_detail', month: document.getElementById('rdMonth').value });
+    }
+
+    else if (type === 'inventory_cost') {
+      const from = document.getElementById('icFrom').value;
+      const to = document.getElementById('icTo').value;
+      if (!from || !to) { alert('Please select a date range.'); return; }
+      const p = periodFromCustom(from, to);
+      ({ csv, filename } = await buildInventoryCost(p));
+      await logAndHistory('inventory_cost', p.start, p.end, filename, { type: 'inventory_cost', from, to });
+    }
+
+    else if (type === 'member_earnings') {
+      const memberId = document.getElementById('earningsMember').value;
+      if (!memberId) { alert('Please select a team member.'); return; }
+      const member = allProfiles.find(function(p){ return p.id === memberId; });
+      const pt = document.getElementById('earningsPeriodType').value;
+      let p;
+      if (pt === 'monthly') p = periodFromMonthInput(document.getElementById('earningsMonth').value);
+      else if (pt === 'quarterly') p = periodFromQuarter(+document.getElementById('earningsQuarter').value, +document.getElementById('earningsQYear').value);
+      else if (pt === 'annual') p = periodFromYear(+document.getElementById('earningsAYear').value);
+      else p = periodFromCustom(document.getElementById('earningsFrom').value, document.getElementById('earningsTo').value);
+      if (!p) { alert('Please select a valid period.'); return; }
+      ({ csv, filename } = await buildMemberEarnings(member, p));
+      await logAndHistory('member_earnings', p.start, p.end, filename, { type: 'member_earnings', memberId, pt, month: document.getElementById('earningsMonth').value, quarter: document.getElementById('earningsQuarter').value, qYear: document.getElementById('earningsQYear').value, aYear: document.getElementById('earningsAYear').value, from: document.getElementById('earningsFrom').value, to: document.getElementById('earningsTo').value });
+    }
+
+    else if (type === 'bulk_earnings') {
+      const pt = document.getElementById('bulkPeriodType').value;
+      let p;
+      if (pt === 'monthly') p = periodFromMonthInput(document.getElementById('bulkMonth').value);
+      else if (pt === 'quarterly') p = periodFromQuarter(+document.getElementById('bulkQuarter').value, +document.getElementById('bulkQYear').value);
+      else if (pt === 'annual') p = periodFromYear(+document.getElementById('bulkAYear').value);
+      else p = periodFromCustom(document.getElementById('bulkFrom').value, document.getElementById('bulkTo').value);
+      if (!p) { alert('Please select a valid period.'); return; }
+      await buildBulkEarnings(p);
+      return;
+    }
+
+    else if (type === 'tax_annual') {
+      const year = +document.getElementById('taxYear').value;
+      if (!year || year < 2020) { alert('Please enter a valid year.'); return; }
+      const p = periodFromYear(year);
+      ({ csv, filename } = await buildTaxSummary(year, p));
+      await logAndHistory('tax_annual', p.start, p.end, filename, { type: 'tax_annual', year });
+    }
+
+    else if (type === 'payroll_run') {
+      const runId = document.getElementById('payrollRunSelect').value;
+      if (!runId) { alert('Please select a payroll run.'); return; }
+      ({ csv, filename } = await buildPayrollRun(runId));
+      const sel = document.getElementById('payrollRunSelect');
+      const opt = sel.options[sel.selectedIndex];
+      await logAndHistory('payroll_run', null, null, filename, { type: 'payroll_run', runId, label: opt?.textContent || '' });
+    }
+
+    else if (type === 'redownload' && params) {
+      ({ csv, filename } = await regenExport(params));
+    }
+
+    if (csv && filename) downloadCSV(csv, filename);
+
+  } catch (err) {
+    alert('Export failed: ' + err.message);
+    console.error(err);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btn.textContent.replace('⏳ Generating…', '') || '⬇ Download'; }
+  }
+}
+
+// ── P&L Builder ──────────────────────────────────────────────
+
+async function buildPL(period) {
+  const [streamsRes, payrollRes, channelsRes] = await Promise.all([
+    sb.from('streams').select('id,channel_id,break_date,final_sales,total_product_cost,total_fees,total_other_costs,commission_payout,break_count')
+      .eq('org_id', currentProfile.org_id).eq('status','closed')
+      .gte('break_date', period.start).lte('break_date', period.end),
+    sb.from('payroll_runs').select('period_from,period_to,total_paid,staff_count')
+      .eq('org_id', currentProfile.org_id)
+      .gte('period_from', period.start).lte('period_to', period.end),
+    sb.from('channels').select('id,name').eq('org_id', currentProfile.org_id)
+  ]);
+
+  const streams = streamsRes.data || [];
+  const payrollRuns = payrollRes.data || [];
+  const channelMap = {};
+  (channelsRes.data || []).forEach(function(c){ channelMap[c.id] = c.name; });
+
+  const totRev = streams.reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
+  const totFees = streams.reduce(function(s,x){ return s+(parseFloat(x.total_fees)||0); }, 0);
+  const totCOGS = streams.reduce(function(s,x){ return s+(parseFloat(x.total_product_cost)||0); }, 0);
+  const totOther = streams.reduce(function(s,x){ return s+(parseFloat(x.total_other_costs)||0); }, 0);
+  const totPayroll = payrollRuns.reduce(function(s,r){ return s+(parseFloat(r.total_paid)||0); }, 0);
+  const totBreaks = streams.reduce(function(s,x){ return s+(parseInt(x.break_count)||0); }, 0);
+
+  const netRev = totRev - totFees;
+  const grossProfit = netRev - totCOGS;
+  const operatingProfit = grossProfit - totOther - totPayroll;
+
+  // By channel
+  const byChannel = {};
+  streams.forEach(function(s) {
+    const ch = s.channel_id ? (channelMap[s.channel_id] || 'Channel') : 'Direct';
+    if (!byChannel[ch]) byChannel[ch] = { rev: 0, fees: 0, cogs: 0, streams: 0 };
+    byChannel[ch].rev += parseFloat(s.final_sales) || 0;
+    byChannel[ch].fees += parseFloat(s.total_fees) || 0;
+    byChannel[ch].cogs += parseFloat(s.total_product_cost) || 0;
+    byChannel[ch].streams++;
+  });
+
+  let csv = csvFileHeader('Profit & Loss Report', period.label);
+
+  csv += csvRow('REVENUE');
+  csv += csvRow('Description', 'USD');
+  csv += csvRow('Gross Revenue', n2(totRev));
+  const chEntries = Object.entries(byChannel);
+  if (chEntries.length > 1) {
+    chEntries.forEach(function([ch, d]) {
+      csv += csvRow('  Revenue — ' + ch + ' (' + d.streams + ' streams)', n2(d.rev));
+    });
+  }
+  csv += csvRow('Platform Fees', n2(totFees));
+  csv += csvRow('Net Revenue (after platform fees)', n2(netRev));
+  csv += '\n';
+
+  csv += csvRow('COST OF GOODS SOLD');
+  csv += csvRow('Description', 'USD');
+  csv += csvRow('Total Box Cost', n2(totCOGS));
+  if (chEntries.length > 1) {
+    chEntries.forEach(function([ch, d]) {
+      csv += csvRow('  Box Cost — ' + ch, n2(d.cogs));
+    });
+  }
+  csv += '\n';
+
+  csv += csvRow('GROSS PROFIT', n2(grossProfit));
+  csv += '\n';
+
+  csv += csvRow('OTHER OPERATING COSTS');
+  csv += csvRow('Description', 'USD');
+  csv += csvRow('Other Costs', n2(totOther));
+  csv += '\n';
+
+  csv += csvRow('LABOR & PAYROLL');
+  csv += csvRow('Description', 'USD', 'Runs');
+  csv += csvRow('Total Payroll (paid runs in period)', n2(totPayroll), payrollRuns.length);
+  csv += '\n';
+
+  csv += csvRow('OPERATING PROFIT', n2(operatingProfit));
+  csv += '\n';
+
+  csv += csvRow('SUMMARY');
+  csv += csvRow('Metric', 'Value');
+  csv += csvRow('Total Streams', streams.length);
+  csv += csvRow('Total Breaks', totBreaks);
+  csv += csvRow('Avg Revenue per Stream (USD)', streams.length ? n2(totRev/streams.length) : '0.00');
+  csv += csvRow('Avg Gross Profit per Stream (USD)', streams.length ? n2(grossProfit/streams.length) : '0.00');
+  csv += csvRow('Avg Operating Profit per Stream (USD)', streams.length ? n2(operatingProfit/streams.length) : '0.00');
+  csv += '\n';
+  csv += csvFooter();
+
+  const filename = makeFilename('pl', period.slug);
+  return { csv, filename };
+}
+
+// ── Revenue Detail Builder ───────────────────────────────────
+
+async function buildRevenueDetail(period) {
+  const [streamsRes, channelsRes, profilesRes] = await Promise.all([
+    sb.from('streams').select('id,break_date,channel_id,breaker_id,final_sales,total_fees,total_product_cost,total_other_costs,commission_payout,break_count,net_profit')
+      .eq('org_id', currentProfile.org_id).eq('status','closed')
+      .gte('break_date', period.start).lte('break_date', period.end)
+      .order('break_date'),
+    sb.from('channels').select('id,name').eq('org_id', currentProfile.org_id),
+    sb.from('profiles').select('id,display_name').eq('org_id', currentProfile.org_id)
+  ]);
+
+  const streams = streamsRes.data || [];
+  const channelMap = {};
+  (channelsRes.data || []).forEach(function(c){ channelMap[c.id] = c.name; });
+  const profileMap = {};
+  (profilesRes.data || []).forEach(function(p){ profileMap[p.id] = p.display_name; });
+
+  let csv = csvFileHeader('Monthly Revenue Detail', period.label);
+
+  csv += csvRow('Stream Date','Channel','Breaker','Gross Revenue (USD)','Platform Fees (USD)','Box Cost (USD)','Other Costs (USD)','Commission Paid (USD)','Net Profit (USD)','Breaks');
+
+  let tRev=0, tFees=0, tCOGS=0, tOther=0, tComm=0, tNet=0, tBreaks=0;
+
+  streams.forEach(function(s) {
+    const rev = parseFloat(s.final_sales)||0;
+    const fees = parseFloat(s.total_fees)||0;
+    const cogs = parseFloat(s.total_product_cost)||0;
+    const other = parseFloat(s.total_other_costs)||0;
+    const comm = parseFloat(s.commission_payout)||0;
+    const net = rev - fees - cogs - other - comm;
+    const brks = parseInt(s.break_count)||0;
+
+    tRev+=rev; tFees+=fees; tCOGS+=cogs; tOther+=other; tComm+=comm; tNet+=net; tBreaks+=brks;
+
+    csv += csvRow(
+      s.break_date,
+      s.channel_id ? (channelMap[s.channel_id]||'Channel') : 'Direct',
+      s.breaker_id ? (profileMap[s.breaker_id]||'Unknown') : '—',
+      n2(rev), n2(fees), n2(cogs), n2(other), n2(comm), n2(net), brks
+    );
+  });
+
+  csv += csvRow('TOTALS','','', n2(tRev), n2(tFees), n2(tCOGS), n2(tOther), n2(tComm), n2(tNet), tBreaks);
+  csv += '\n';
+  csv += csvFooter();
+
+  return { csv, filename: makeFilename('revenue_detail', period.slug) };
+}
+
+// ── Member Earnings Builder ──────────────────────────────────
+
+async function buildMemberEarnings(member, period) {
+  if (!member) throw new Error('Team member not found');
+
+  const fromTs = period.start + 'T00:00:00';
+  const toTs = period.end + 'T23:59:59';
+
+  let csv = csvFileHeader('Earnings Summary — ' + member.display_name, period.label);
+  csv += csvRow('Name', member.display_name);
+  csv += csvRow('Role', member.role);
+  csv += csvRow('Pay Type', member.pay_type || 'Not configured');
+  csv += '\n';
+
+  // Pull streams this breaker worked
+  if (member.role === 'breaker' || member.role === 'breaker/manager') {
+    const { data: streams } = await sb.from('streams')
+      .select('break_date,final_sales,total_product_cost,total_other_costs,commission_payout,break_count')
+      .eq('breaker_id', member.id).eq('org_id', currentProfile.org_id).eq('status','closed')
+      .gte('closed_at', fromTs).lte('closed_at', toTs)
+      .order('break_date');
+
+    const type = member.pay_type;
+    let totalEarned = 0;
+
+    if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
+      csv += csvRow('COMMISSION EARNINGS');
+      csv += csvRow('Stream Date','Gross Revenue (USD)','Box Cost (USD)','Other Costs (USD)','Net Profit Base (USD)','Commission Rate','Commission Earned (USD)');
+
+      const rate = (parseFloat(member.commission_rate)||0)/100;
+      let tBase=0, tComm=0;
+
+      (streams||[]).forEach(function(s) {
+        const rev = parseFloat(s.final_sales)||0;
+        const cogs = parseFloat(s.total_product_cost)||0;
+        const other = parseFloat(s.total_other_costs)||0;
+        const profit = Math.max(0, rev - cogs - other);
+        const comm = profit * rate;
+        tBase += profit; tComm += comm;
+        csv += csvRow(s.break_date, n2(rev), n2(cogs), n2(other), n2(profit), (parseFloat(member.commission_rate)||0)+'%', n2(comm));
+      });
+
+      csv += csvRow('Subtotal','','','', n2(tBase), '', n2(tComm));
+      totalEarned += tComm;
+      csv += '\n';
+    }
+
+    if (type === 'hourly' || type === 'hourly_commission') {
+      csv += csvRow('HOURLY EARNINGS');
+      csv += csvRow('Date','Hours Worked','Hourly Rate (USD)','Earned (USD)');
+      const { data: shifts } = await sb.from('schedules')
+        .select('scheduled_date,clocked_in_at,clocked_out_at')
+        .eq('breaker_id', member.id).eq('org_id', currentProfile.org_id)
+        .not('clocked_in_at','is',null).not('clocked_out_at','is',null)
+        .gte('clocked_in_at', fromTs).lte('clocked_out_at', toTs);
+
+      const rate = parseFloat(member.hourly_rate)||0;
+      let tHours=0, tHourly=0;
+      (shifts||[]).forEach(function(sh) {
+        const hrs = (new Date(sh.clocked_out_at) - new Date(sh.clocked_in_at)) / 3600000;
+        const earned = hrs * rate;
+        tHours += hrs; tHourly += earned;
+        csv += csvRow(sh.scheduled_date||sh.clocked_in_at.split('T')[0], hrs.toFixed(2), n2(rate), n2(earned));
+      });
+      csv += csvRow('Subtotal', tHours.toFixed(2), n2(rate), n2(tHourly));
+      totalEarned += tHourly;
+      csv += '\n';
+    }
+
+    if (type === 'per_break') {
+      csv += csvRow('PER-BREAK EARNINGS');
+      csv += csvRow('Stream Date','Breaks Count','Rate per Break (USD)','Earned (USD)');
+      const perRate = parseFloat(member.per_break_rate)||0;
+      let tPB = 0;
+      (streams||[]).forEach(function(s) {
+        const brks = parseInt(s.break_count)||0;
+        const earned = brks * perRate;
+        tPB += earned;
+        csv += csvRow(s.break_date, brks, n2(perRate), n2(earned));
+      });
+      csv += csvRow('Subtotal', '', '', n2(tPB));
+      totalEarned += tPB;
+      csv += '\n';
+    }
+
+    if (type === 'salary' || type === 'salary_commission') {
+      const sal = parseFloat(member.salary_amount)||0;
+      csv += csvRow('SALARY');
+      csv += csvRow('Salary Amount (USD)', 'Period', n2(sal), member.salary_period||'period');
+      totalEarned += sal;
+      csv += '\n';
+    }
+
+    // Tips
+    const { data: tips } = await sb.from('tips').select('amount,created_at')
+      .eq('breaker_id', member.id).eq('org_id', currentProfile.org_id)
+      .gte('created_at', fromTs).lte('created_at', toTs);
+    if (tips && tips.length) {
+      const tTips = tips.reduce(function(s,t){ return s+(parseFloat(t.amount)||0); }, 0);
+      csv += csvRow('TIPS');
+      csv += csvRow('Date','Amount (USD)');
+      tips.forEach(function(t){ csv += csvRow(t.created_at.split('T')[0], n2(t.amount)); });
+      csv += csvRow('Tips Total', '', n2(tTips));
+      totalEarned += tTips;
+      csv += '\n';
+    }
+
+    csv += csvRow('TOTAL EARNINGS (USD)', n2(totalEarned));
+    csv += csvRow('Streams Worked', (streams||[]).length);
+  }
+
+  else if (member.role === 'sorter') {
+    const { data: tasks } = await sb.from('sort_tasks')
+      .select('id,completed_at,created_at,stream_id')
+      .eq('sorter_id', member.id).eq('org_id', currentProfile.org_id).eq('status','completed');
+
+    const filteredTasks = (tasks||[]).filter(function(t) {
+      const d = t.completed_at||t.created_at;
+      return d >= fromTs && d <= toTs;
+    });
+
+    const type = member.pay_type;
+    let totalEarned = 0;
+
+    if (type === 'hourly' || type === 'hourly_per_break') {
+      csv += csvRow('HOURLY EARNINGS');
+      csv += csvRow('Date','Hours Worked','Hourly Rate (USD)','Earned (USD)');
+      const { data: shifts } = await sb.from('schedules')
+        .select('scheduled_date,clocked_in_at,clocked_out_at')
+        .eq('sorter_id', member.id).eq('org_id', currentProfile.org_id)
+        .not('clocked_in_at','is',null).not('clocked_out_at','is',null)
+        .gte('clocked_in_at', fromTs).lte('clocked_out_at', toTs);
+
+      const rate = parseFloat(member.hourly_rate)||0;
+      let tHours=0, tHourly=0;
+      (shifts||[]).forEach(function(sh) {
+        const hrs = (new Date(sh.clocked_out_at) - new Date(sh.clocked_in_at)) / 3600000;
+        const earned = hrs * rate;
+        tHours += hrs; tHourly += earned;
+        csv += csvRow(sh.scheduled_date||sh.clocked_in_at.split('T')[0], hrs.toFixed(2), n2(rate), n2(earned));
+      });
+      csv += csvRow('Subtotal', tHours.toFixed(2), '', n2(tHourly));
+      totalEarned += tHourly;
+      csv += '\n';
+    }
+
+    if (type === 'per_break' || type === 'hourly_per_break') {
+      csv += csvRow('PER-BREAK SORT EARNINGS');
+      csv += csvRow('Date','Breaks Sorted','Rate per Break (USD)','Earned (USD)');
+      const rate = parseFloat(member.per_break_rate)||0;
+      let tEarned = 0;
+
+      const streamIds = [...new Set(filteredTasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
+      let breaksByStream = {};
+      if (streamIds.length) {
+        const { data: bks } = await sb.from('breaks').select('stream_id').in('stream_id', streamIds);
+        (bks||[]).forEach(function(b){ breaksByStream[b.stream_id] = (breaksByStream[b.stream_id]||0)+1; });
+      }
+
+      filteredTasks.forEach(function(t) {
+        const d = (t.completed_at||t.created_at).split('T')[0];
+        const brks = breaksByStream[t.stream_id]||1;
+        const earned = brks * rate;
+        tEarned += earned;
+        csv += csvRow(d, brks, n2(rate), n2(earned));
+      });
+      csv += csvRow('Subtotal', '', '', n2(tEarned));
+      totalEarned += tEarned;
+      csv += '\n';
+    }
+
+    csv += csvRow('TOTAL EARNINGS (USD)', n2(totalEarned));
+    csv += csvRow('Sort Tasks Completed', filteredTasks.length);
+  }
+
+  csv += '\n';
+  csv += csvFooter();
+
+  const safeName = slugify(member.display_name);
+  return { csv, filename: makeFilename('earnings_' + safeName, period.slug) };
+}
+
+// ── Bulk Earnings (ZIP) ──────────────────────────────────────
+
+async function buildBulkEarnings(period) {
+  if (!allProfiles.length) { alert('No team members found.'); return; }
+
+  const zip = new JSZip();
+  showLoading('Generating bulk export…');
+
+  try {
+    for (const member of allProfiles) {
+      const { csv, filename } = await buildMemberEarnings(member, period);
+      zip.file(filename, BOM + csv);
+    }
+
+    const org = slugify(orgName) || 'org';
+    const zipName = org + '_bulk_earnings_' + period.slug + '_' + today().replace(/-/g,'') + '.zip';
+
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url; a.download = zipName; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    await logAndHistory('bulk_earnings', period.start, period.end, zipName, { type: 'bulk_earnings', periodStart: period.start, periodEnd: period.end, label: period.label });
+  } finally {
+    hideLoading();
+  }
+}
+
+// ── Annual Tax Summary ────────────────────────────────────────
+
+async function buildTaxSummary(year, period) {
+  const months = [];
+  for (let m = 1; m <= 12; m++) {
+    const p = periodFromMonthInput(year + '-' + String(m).padStart(2,'0'));
+    months.push(p);
+  }
+
+  // Fetch all streams and payroll for the year
+  const [streamsRes, payrollRes] = await Promise.all([
+    sb.from('streams').select('break_date,final_sales,total_fees,total_product_cost,total_other_costs,commission_payout,break_count')
+      .eq('org_id', currentProfile.org_id).eq('status','closed')
+      .gte('break_date', period.start).lte('break_date', period.end),
+    sb.from('payroll_runs').select('period_from,period_to,total_paid,details')
+      .eq('org_id', currentProfile.org_id)
+      .gte('period_from', period.start).lte('period_to', period.end)
+  ]);
+
+  const allStreams = streamsRes.data || [];
+  const allPayroll = payrollRes.data || [];
+
+  // Year totals
+  const yRev = allStreams.reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
+  const yFees = allStreams.reduce(function(s,x){ return s+(parseFloat(x.total_fees)||0); }, 0);
+  const yCOGS = allStreams.reduce(function(s,x){ return s+(parseFloat(x.total_product_cost)||0); }, 0);
+  const yOther = allStreams.reduce(function(s,x){ return s+(parseFloat(x.total_other_costs)||0); }, 0);
+  const yPayroll = allPayroll.reduce(function(s,r){ return s+(parseFloat(r.total_paid)||0); }, 0);
+  const yNet = yRev - yFees - yCOGS - yOther - yPayroll;
+  const yGross = yRev - yFees - yCOGS;
+
+  // Month-by-month
+  const monthStats = months.map(function(p) {
+    const ms = allStreams.filter(function(s){ return s.break_date >= p.start && s.break_date <= p.end; });
+    const mp = allPayroll.filter(function(r){ return r.period_from >= p.start && r.period_from <= p.end; });
+    const rev = ms.reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
+    const fees = ms.reduce(function(s,x){ return s+(parseFloat(x.total_fees)||0); }, 0);
+    const cogs = ms.reduce(function(s,x){ return s+(parseFloat(x.total_product_cost)||0); }, 0);
+    const other = ms.reduce(function(s,x){ return s+(parseFloat(x.total_other_costs)||0); }, 0);
+    const payroll = mp.reduce(function(s,r){ return s+(parseFloat(r.total_paid)||0); }, 0);
+    const gross = rev - fees - cogs;
+    const net = gross - other - payroll;
+    return { label: p.label.split(' ')[0], rev, fees, cogs, other, payroll, gross, net, streams: ms.length };
+  });
+
+  const bestMonth = monthStats.reduce(function(best,m){ return m.net > best.net ? m : best; }, monthStats[0]);
+  const worstMonth = monthStats.reduce(function(worst,m){ return m.net < worst.net ? m : worst; }, monthStats[0]);
+
+  // Team member annual earnings from payroll runs
+  const memberTotals = {};
+  allPayroll.forEach(function(run) {
+    let details = [];
+    try { details = typeof run.details === 'string' ? JSON.parse(run.details) : (run.details || []); } catch(e){}
+    details.forEach(function(d) {
+      if (!memberTotals[d.name]) memberTotals[d.name] = { name: d.name, role: d.role||'', pay_type: d.pay_type||'', total: 0, runs: 0 };
+      memberTotals[d.name].total += parseFloat(d.total)||0;
+      memberTotals[d.name].runs++;
+    });
+  });
+
+  let csv = csvFileHeader('Annual Tax Summary — ' + year, 'Calendar Year ' + year);
+  csv += csvRow('This document is generated from CardBreakPro operational data. Please review with a qualified tax professional before filing.');
+  csv += '\n';
+
+  csv += csvRow('BUSINESS SUMMARY — ' + year);
+  csv += csvRow('Description', 'USD');
+  csv += csvRow('Total Annual Gross Revenue', n2(yRev));
+  csv += csvRow('Total Annual Platform Fees', n2(yFees));
+  csv += csvRow('Net Revenue (after fees)', n2(yRev - yFees));
+  csv += csvRow('Total Annual Cost of Goods Sold', n2(yCOGS));
+  csv += csvRow('Annual Gross Profit', n2(yGross));
+  csv += csvRow('Other Operating Costs', n2(yOther));
+  csv += csvRow('Total Annual Labor & Payroll', n2(yPayroll));
+  csv += csvRow('Annual Operating Profit', n2(yNet));
+  csv += csvRow('Total Streams Run', allStreams.reduce(function(s,x){ return s+1; }, 0));
+  csv += csvRow('Total Breaks', allStreams.reduce(function(s,x){ return s+(parseInt(x.break_count)||0); }, 0));
+  csv += csvRow('Most Profitable Month', bestMonth ? bestMonth.label + ' (' + n2(bestMonth.net) + ')' : '—');
+  csv += csvRow('Least Profitable Month', worstMonth ? worstMonth.label + ' (' + n2(worstMonth.net) + ')' : '—');
+  csv += '\n';
+
+  csv += csvRow('MONTH-BY-MONTH BREAKDOWN');
+  csv += csvRow('Month','Streams','Revenue (USD)','Platform Fees (USD)','COGS (USD)','Gross Profit (USD)','Payroll (USD)','Operating Profit (USD)');
+  monthStats.forEach(function(m) {
+    csv += csvRow(m.label, m.streams, n2(m.rev), n2(m.fees), n2(m.cogs), n2(m.gross), n2(m.payroll), n2(m.net));
+  });
+  csv += csvRow('ANNUAL TOTALS', allStreams.length, n2(yRev), n2(yFees), n2(yCOGS), n2(yGross), n2(yPayroll), n2(yNet));
+  csv += '\n';
+
+  csv += csvRow('TEAM MEMBER ANNUAL EARNINGS (for 1099 preparation)');
+  csv += csvRow('Name','Role','Pay Type','Total Annual Earnings (USD)','Payroll Runs');
+  const memberList = Object.values(memberTotals).sort(function(a,b){ return b.total - a.total; });
+  if (memberList.length) {
+    memberList.forEach(function(m) {
+      csv += csvRow(m.name, m.role, m.pay_type, n2(m.total), m.runs);
+    });
+  } else {
+    csv += csvRow('No payroll runs recorded for ' + year);
+  }
+  csv += '\n';
+  csv += csvFooter();
+
+  return { csv, filename: makeFilename('tax_summary', year + '_annual') };
+}
+
+// ── Inventory Cost Report ────────────────────────────────────
+
+async function buildInventoryCost(period) {
+  const { data: logs } = await sb.from('inventory_log')
+    .select('product_id,product_name,action,quantity,unit_cost,created_at')
+    .eq('org_id', currentProfile.org_id)
+    .gte('created_at', period.start + 'T00:00:00')
+    .lte('created_at', period.end + 'T23:59:59')
+    .order('created_at');
+
+  const { data: products } = await sb.from('products')
+    .select('id,name,category,current_stock,unit_cost')
+    .eq('org_id', currentProfile.org_id);
+
+  const entries = logs || [];
+  const prods = products || [];
+
+  // Purchases
+  const purchased = entries.filter(function(e){ return e.action === 'restock' || e.action === 'initial'; });
+  // Usage
+  const used = entries.filter(function(e){ return e.action === 'used'; });
+
+  // Aggregate by product
+  const purchByProd = {};
+  purchased.forEach(function(e) {
+    const k = e.product_id || e.product_name;
+    if (!purchByProd[k]) purchByProd[k] = { name: e.product_name||'Unknown', qty: 0, cost: 0, unitCost: 0 };
+    const qty = parseFloat(e.quantity)||0;
+    const uc = parseFloat(e.unit_cost)||0;
+    purchByProd[k].qty += qty;
+    purchByProd[k].cost += qty * uc;
+    purchByProd[k].unitCost = uc;
+  });
+
+  const usedByProd = {};
+  used.forEach(function(e) {
+    const k = e.product_id || e.product_name;
+    if (!usedByProd[k]) usedByProd[k] = { name: e.product_name||'Unknown', qty: 0, cost: 0 };
+    const qty = parseFloat(e.quantity)||0;
+    const uc = parseFloat(e.unit_cost)||0;
+    usedByProd[k].qty += qty;
+    usedByProd[k].cost += qty * uc;
+  });
+
+  let csv = csvFileHeader('Inventory Cost Report', period.label);
+
+  csv += csvRow('INVENTORY PURCHASES');
+  csv += csvRow('Product','Boxes Purchased','Weighted Avg Cost per Box (USD)','Total Cost (USD)');
+  let tPurchCost = 0;
+  Object.values(purchByProd).forEach(function(p) {
+    const avg = p.qty > 0 ? p.cost/p.qty : 0;
+    tPurchCost += p.cost;
+    csv += csvRow(p.name, p.qty, n2(avg), n2(p.cost));
+  });
+  if (!Object.keys(purchByProd).length) csv += csvRow('No purchases recorded for this period');
+  csv += csvRow('TOTAL PURCHASES', '', '', n2(tPurchCost));
+  csv += '\n';
+
+  csv += csvRow('INVENTORY USED (COST OF GOODS SOLD)');
+  csv += csvRow('Product','Boxes Used','Avg Cost per Box (USD)','Total COGS (USD)');
+  let tUsedCost = 0;
+  Object.values(usedByProd).forEach(function(p) {
+    const avg = p.qty > 0 ? p.cost/p.qty : 0;
+    tUsedCost += p.cost;
+    csv += csvRow(p.name, p.qty, n2(avg), n2(p.cost));
+  });
+  if (!Object.keys(usedByProd).length) csv += csvRow('No usage recorded for this period');
+  csv += csvRow('TOTAL COGS', '', '', n2(tUsedCost));
+  csv += '\n';
+
+  csv += csvRow('ENDING INVENTORY VALUE (current as of export date)');
+  csv += csvRow('Product','Category','Boxes on Hand','Current Unit Cost (USD)','Inventory Value (USD)');
+  let tEndValue = 0;
+  prods.forEach(function(p) {
+    const stock = parseFloat(p.current_stock)||0;
+    const uc = parseFloat(p.unit_cost)||0;
+    const val = stock * uc;
+    tEndValue += val;
+    csv += csvRow(p.name, p.category||'Uncategorized', stock, n2(uc), n2(val));
+  });
+  csv += csvRow('TOTAL ENDING INVENTORY VALUE', '', '', '', n2(tEndValue));
+  csv += '\n';
+  csv += csvFooter();
+
+  return { csv, filename: makeFilename('inventory_cost', period.slug) };
+}
+
+// ── Payroll Run Export ────────────────────────────────────────
+
+async function buildPayrollRun(runId) {
+  const { data: run, error } = await sb.from('payroll_runs').select('*').eq('id', runId).single();
+  if (error || !run) throw new Error('Payroll run not found');
+
+  let details = [];
+  try { details = typeof run.details === 'string' ? JSON.parse(run.details) : (run.details || []); } catch(e){}
+
+  const periodLabel = run.period_label || (run.period_from + ' to ' + run.period_to);
+
+  let csv = csvFileHeader('Payroll Run Export', periodLabel);
+  csv += csvRow('Pay Period', run.period_from + ' to ' + run.period_to);
+  csv += csvRow('Staff Count', run.staff_count||details.length);
+  csv += '\n';
+
+  csv += csvRow('Name','Role','Pay Type','Breakdown','Total Earned (USD)','Payment Method','Notes');
+  let tTotal = 0;
+  details.forEach(function(d) {
+    tTotal += parseFloat(d.total)||0;
+    csv += csvRow(d.name||'', d.role||'', d.pay_type||'', d.breakdown||'', n2(d.total), '', '');
+  });
+  csv += csvRow('TOTAL PAYROLL', '', '', '', n2(tTotal), '', '');
+  csv += '\n';
+  csv += csvRow('Note: Payment method and notes columns are blank — fill in as needed for your records.');
+  csv += '\n';
+  csv += csvFooter();
+
+  const safeLabel = slugify(periodLabel);
+  return { csv, filename: makeFilename('payroll_run', safeLabel) };
+}
+
+// ── Export Log ───────────────────────────────────────────────
+
+async function logAndHistory(exportType, periodStart, periodEnd, filename, params) {
+  try {
+    await sb.from('export_logs').insert({
+      organization_id: currentProfile.org_id,
+      exported_by: currentUser.id,
+      export_type: exportType,
+      period_start: periodStart || null,
+      period_end: periodEnd || null,
+      filename,
+      params
+    });
+    await loadExportHistory();
+  } catch(e) { /* non-critical */ }
+}
+
+async function loadExportHistory() {
+  const tbody = document.getElementById('historyBody');
+  try {
+    const { data, error } = await sb.from('export_logs')
+      .select('id,export_type,period_start,period_end,generated_at,filename,params')
+      .eq('organization_id', currentProfile.org_id)
+      .order('generated_at', { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+    if (!data || !data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No exports yet — generate one above to see it here.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    data.forEach(function(log) {
+      const tr = document.createElement('tr');
+      const typeLabel = (log.export_type||'').replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+      const period = log.period_start && log.period_end ? log.period_start + ' — ' + log.period_end : log.period_start || '—';
+      const genDate = log.generated_at ? log.generated_at.split('T')[0] : '—';
+      const paramsJson = typeof log.params === 'string' ? log.params : JSON.stringify(log.params||{});
+
+      tr.innerHTML =
+        '<td>' + escHtml(typeLabel) + '</td>' +
+        '<td style="font-size:0.78rem;color:var(--muted);">' + escHtml(period) + '</td>' +
+        '<td style="color:var(--muted);">' + escHtml(genDate) + '</td>' +
+        '<td style="font-size:0.73rem;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(log.filename||'') + '">' + escHtml(log.filename||'—') + '</td>' +
+        '<td><button class="btn-sm-dl" onclick="redownloadLog(' + escHtml(JSON.stringify(log.params)) + ')">Re-download</button></td>';
+      tbody.appendChild(tr);
+    });
+  } catch(e) {
+    // export_logs table may not exist yet — show setup notice
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--yellow);font-size:0.78rem;">Export history unavailable. Run the SQL migration to enable it — see the Setup section in your Supabase project.</td></tr>';
+  }
+}
+
+async function redownloadLog(params) {
+  if (!params) return;
+  const p = typeof params === 'string' ? JSON.parse(params) : params;
+  try {
+    let csv, filename;
+
+    if (p.type === 'pl') {
+      let period;
+      if (p.pt === 'monthly') period = periodFromMonthInput(p.month);
+      else if (p.pt === 'quarterly') period = periodFromQuarter(+p.quarter, +p.qYear);
+      else period = periodFromYear(+p.aYear);
+      ({ csv, filename } = await buildPL(period));
+    } else if (p.type === 'revenue_detail') {
+      ({ csv, filename } = await buildRevenueDetail(periodFromMonthInput(p.month)));
+    } else if (p.type === 'inventory_cost') {
+      ({ csv, filename } = await buildInventoryCost(periodFromCustom(p.from, p.to)));
+    } else if (p.type === 'member_earnings') {
+      const member = allProfiles.find(function(x){ return x.id === p.memberId; });
+      let period;
+      if (p.pt === 'monthly') period = periodFromMonthInput(p.month);
+      else if (p.pt === 'quarterly') period = periodFromQuarter(+p.quarter, +p.qYear);
+      else if (p.pt === 'annual') period = periodFromYear(+p.aYear);
+      else period = periodFromCustom(p.from, p.to);
+      ({ csv, filename } = await buildMemberEarnings(member, period));
+    } else if (p.type === 'tax_annual') {
+      const period = periodFromYear(+p.year);
+      ({ csv, filename } = await buildTaxSummary(+p.year, period));
+    } else if (p.type === 'payroll_run') {
+      ({ csv, filename } = await buildPayrollRun(p.runId));
+    } else {
+      alert('Re-download not supported for this export type. Select the options above to regenerate.');
+      return;
+    }
+    if (csv && filename) downloadCSV(csv, filename);
+  } catch(err) {
+    alert('Re-download failed: ' + err.message);
+  }
+}
+
+// ── Boot ─────────────────────────────────────────────────────
+initAuth();
+</script>
+
+<script src="/pwa.js"></script>
+</body>
+</html>
