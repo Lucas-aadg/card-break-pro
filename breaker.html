@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="CardBreakPro" />
   <meta name="theme-color" content="#4f6ef7" />
   <link rel="stylesheet" href="/mobile.css?v=4" />
-  <title>Card Break Pro â€” Break Entry</title>
+  <title>Card Break Pro — Break Entry</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="analytics.js"></script>
@@ -360,7 +360,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .loading-text { color: var(--muted); font-size: 0.9rem; }
 
-    /* â”€â”€ MY SCHEDULE WEEK GRID â”€â”€ */
+    /* ── MY SCHEDULE WEEK GRID ── */
     .wg-wrap{overflow-x:auto;}
     .wg-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:560px;}
     .wg-table th{text-align:center;font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);padding:0.65rem 0.3rem;border-bottom:2px solid var(--border);}
@@ -399,7 +399,7 @@
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
-  <div class="loading-text">Loadingâ€¦</div>
+  <div class="loading-text">Loading…</div>
 </div>
 
 <nav>
@@ -481,13 +481,13 @@
     <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
       <span>Products Used This Break</span>
       <div style="display:flex;align-items:center;gap:0.6rem;">
-        <button id="repeatBreakBtn" style="display:none;padding:0.3rem 0.85rem;border-radius:100px;border:1px solid var(--primary);background:rgba(79,110,247,0.12);color:var(--primary);font-size:0.78rem;font-weight:700;cursor:pointer;transition:opacity 0.2s;" title="Re-select the same products from the last break">â†© Repeat Last Break</button>
-        <button id="toggleProductsBtn" style="padding:0.3rem 0.75rem;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;transition:color 0.2s,border-color 0.2s;">â–¼ Hide</button>
+        <button id="repeatBreakBtn" style="display:none;padding:0.3rem 0.85rem;border-radius:100px;border:1px solid var(--primary);background:rgba(79,110,247,0.12);color:var(--primary);font-size:0.78rem;font-weight:700;cursor:pointer;transition:opacity 0.2s;" title="Re-select the same products from the last break">↩ Repeat Last Break</button>
+        <button id="toggleProductsBtn" style="padding:0.3rem 0.75rem;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;transition:color 0.2s,border-color 0.2s;">▼ Hide</button>
       </div>
     </div>
     <div id="productsSummaryBar" style="display:none;font-size:0.83rem;color:var(--muted);padding:0.35rem 0;"></div>
     <div id="categoryFilter" style="display:none;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;"></div>
-    <div id="productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading productsâ€¦</div>
+    <div id="productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
     <div id="productsWrap" style="display:none;overflow-x:auto;">
       <table class="product-table">
         <thead>
@@ -530,7 +530,7 @@
   <!-- REVENUE + CALCULATOR -->
   <div class="panel">
     <div class="panel-title">Current Platform Total
-      <span style="font-size:0.75rem;font-weight:400;color:var(--muted);margin-left:8px;">â€” type the running total shown on your platform, we calculate each break's revenue automatically</span>
+      <span style="font-size:0.75rem;font-weight:400;color:var(--muted);margin-left:8px;">— type the running total shown on your platform, we calculate each break's revenue automatically</span>
     </div>
     <div class="revenue-input-wrap" style="margin-bottom:0.5rem;">
       <span>$</span>
@@ -538,7 +538,7 @@
     </div>
     <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.25rem;">
       <div style="font-size:0.8rem;color:var(--muted);" id="breakRevenuePreview">This break's revenue: <strong style="color:var(--text);">$0.00</strong></div>
-      <div style="font-size:0.8rem;color:var(--muted);" id="costPerSpotPreview" style="display:none;">Cost per spot: <strong style="color:var(--text);">â€”</strong></div>
+      <div style="font-size:0.8rem;color:var(--muted);" id="costPerSpotPreview" style="display:none;">Cost per spot: <strong style="color:var(--text);">—</strong></div>
     </div>
     <div class="calc-grid">
       <div>
@@ -560,16 +560,16 @@
   <div id="breakEvenBanner" style="background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.4);border-radius:10px;padding:0.9rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
     <div>
       <div style="font-size:0.7rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.2rem;">Break Even Target</div>
-      <div style="font-size:0.78rem;color:var(--muted);">Box Cost + Platform Fees â€” must earn this to break even</div>
+      <div style="font-size:0.78rem;color:var(--muted);">Box Cost + Platform Fees — must earn this to break even</div>
     </div>
     <div style="display:flex;gap:2rem;flex-wrap:wrap;text-align:right;">
       <div>
         <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Total Needed</div>
-        <div style="font-size:1.4rem;font-weight:800;color:var(--primary);" id="statBreakEven">â€”</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--primary);" id="statBreakEven">—</div>
       </div>
       <div>
         <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Per Spot</div>
-        <div style="font-size:1.4rem;font-weight:800;color:var(--primary);" id="statBreakEvenSpot">â€”</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--primary);" id="statBreakEvenSpot">—</div>
       </div>
     </div>
   </div>
@@ -590,7 +590,7 @@
     </div>
     <div class="stat-card">
       <div class="stat-label">Profit / Spot</div>
-      <div class="stat-value" id="statPPS">â€”</div>
+      <div class="stat-value" id="statPPS">—</div>
     </div>
   </div>
 
@@ -674,7 +674,7 @@
 
       <!-- Not configured notice -->
       <div id="payoutNotConfigured" style="display:none;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:0.85rem 1rem;font-size:0.85rem;color:#e2e8f0;">
-        âš  Your pay hasn't been configured yet. Ask your owner to set up your pay type in the Team tab.
+        ⚠ Your pay hasn't been configured yet. Ask your owner to set up your pay type in the Team tab.
       </div>
 
       <!-- Log a tip -->
@@ -713,7 +713,7 @@
       </div>
     </div>
 
-    <div id="shiftsLoading" style="color:var(--muted);font-size:0.85rem;padding:2rem;text-align:center;">Loading shiftsâ€¦</div>
+    <div id="shiftsLoading" style="color:var(--muted);font-size:0.85rem;padding:2rem;text-align:center;">Loading shifts…</div>
     <div id="shiftsRoot" style="display:none;">
       <!-- Upcoming -->
       <div style="margin-bottom:0.5rem;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);">Upcoming Shifts</div>
@@ -754,20 +754,20 @@
     <div id="siUploadStep">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
         <h2 style="margin:0;font-size:1.2rem;">Import Buyer Slips</h2>
-        <button onclick="skipSlipImport()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:0.25rem 0.5rem;" title="Skip">âœ•</button>
+        <button onclick="skipSlipImport()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:0.25rem 0.5rem;" title="Skip">✕</button>
       </div>
       <div id="siDropZone" style="border:2px dashed rgba(79,110,247,0.4);border-radius:12px;padding:2rem 1.5rem;text-align:center;cursor:pointer;background:rgba(79,110,247,0.04);transition:.2s;" onclick="document.getElementById('siFileInput').click()">
-        <div style="font-size:2.5rem;margin-bottom:0.6rem;">ðŸ“„</div>
+        <div style="font-size:2.5rem;margin-bottom:0.6rem;">📄</div>
         <div style="font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:0.4rem;">Drop your Whatnot packing slip PDF here</div>
         <div style="font-size:0.8rem;color:var(--muted);">or tap to select file</div>
-        <div style="font-size:0.75rem;color:var(--muted);margin-top:0.6rem;">PDF only Â· Max 50MB</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:0.6rem;">PDF only · Max 50MB</div>
       </div>
       <input type="file" id="siFileInput" accept="application/pdf,.pdf" style="display:none;" />
       <div style="text-align:center;margin-top:0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.5;">
         Export your packing slips from Whatnot after your stream ends and upload here.<br>Takes 10 seconds and unlocks your buyer intelligence.
       </div>
       <div id="siParsingStatus" style="display:none;text-align:center;padding:1rem;color:var(--muted);font-size:0.88rem;">
-        Parsing your slipsâ€¦
+        Parsing your slips…
       </div>
       <div id="siUploadError" style="display:none;margin-top:0.75rem;padding:0.75rem 1rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;color:var(--red);font-size:0.85rem;"></div>
       <div class="modal-btn-row" style="margin-top:1.25rem;">
@@ -796,11 +796,11 @@
   <div class="modal" style="max-width:520px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
       <h2 style="margin:0;font-size:1.2rem;">Log Big Hits</h2>
-      <button onclick="skipHitLogging()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:0.25rem 0.5rem;" title="Skip">âœ•</button>
+      <button onclick="skipHitLogging()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:0.25rem 0.5rem;" title="Skip">✕</button>
     </div>
     <!-- Top Spenders Panel -->
     <div id="hlTopSpenders" style="display:none;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.18);border-radius:10px;padding:0.85rem 1rem;margin-bottom:1rem;">
-      <div style="font-size:0.72rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Top Spenders â€” This Stream</div>
+      <div style="font-size:0.72rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Top Spenders — This Stream</div>
       <div id="hlSpenderList"></div>
     </div>
     <div style="font-size:0.85rem;color:var(--muted);margin-bottom:0.85rem;">Did anyone pull a big hit tonight?</div>
@@ -840,7 +840,7 @@
     <div class="form-group" style="background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.3);border-radius:8px;padding:14px;">
       <label for="finalSalesInput" style="color:var(--primary);font-size:0.85rem;font-weight:700;text-transform:none;letter-spacing:0;">
         Final Platform Total <span style="color:var(--red);">*</span>
-        <span style="color:var(--muted);font-weight:400;font-size:0.75rem;margin-left:6px;">â€” the final payout number shown on your platform after all deductions</span>
+        <span style="color:var(--muted);font-weight:400;font-size:0.75rem;margin-left:6px;">— the final payout number shown on your platform after all deductions</span>
       </label>
       <input type="number" id="finalSalesInput" placeholder="0.00" min="0" step="0.01" style="font-size:1.3rem;font-weight:700;font-family:'Consolas',monospace;margin-top:8px;border-color:var(--primary);" />
     </div>
@@ -852,12 +852,12 @@
 
     <div class="net-preview">
       <span class="net-label">Final Net Profit</span>
-      <span class="net-val" id="netProfitPreview">â€”</span>
+      <span class="net-val" id="netProfitPreview">—</span>
     </div>
 
     <div class="form-group">
       <label for="closeNotes">Notes (optional)</label>
-      <textarea id="closeNotes" placeholder="Any notes about this streamâ€¦"></textarea>
+      <textarea id="closeNotes" placeholder="Any notes about this stream…"></textarea>
     </div>
 
     <div class="modal-btn-row">
@@ -873,7 +873,7 @@
 const { createClient } = supabase;
 const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 
-// â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── State ────────────────────────────────────────────────
 let currentUser = null;
 let currentProfile = null;
 let products = [];
@@ -882,7 +882,7 @@ let submittedBreaks = [];
 let breakNumber = 1;
 let lastBreakProducts = [];
 
-// â”€â”€ Utility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Utility ──────────────────────────────────────────────
 function escHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -902,7 +902,7 @@ function today() {
 }
 
 function showLoading(text) {
-  document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = text || 'Loadingâ€¦';
+  document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = text || 'Loading…';
   document.getElementById('loadingOverlay').classList.add('active');
 }
 
@@ -931,9 +931,9 @@ function hideMessages() {
   document.getElementById('successBox').style.display = 'none';
 }
 
-// â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Auth ─────────────────────────────────────────────────
 async function initAuth() {
-  showLoading('Checking sessionâ€¦');
+  showLoading('Checking session…');
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) {
@@ -985,7 +985,7 @@ async function initAuth() {
   }
 }
 
-// â”€â”€ Session persistence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Session persistence ───────────────────────────────────
 function sessionKey() {
   return 'cbp_session_' + (currentUser ? currentUser.id : 'anon');
 }
@@ -1002,7 +1002,7 @@ function clearSessionState() {
   localStorage.removeItem(sessionKey());
 }
 
-// â”€â”€ Session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Session ───────────────────────────────────────────────
 async function initSession() {
   const dateEl = document.getElementById('breakDate');
   dateEl.value = today();
@@ -1023,7 +1023,7 @@ function updateBreakDisplay() {
   document.getElementById('breakNumDisplay').textContent = breakNumber;
 }
 
-// â”€â”€ Products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Products ──────────────────────────────────────────────
 async function loadProducts() {
   const loadingEl = document.getElementById('productsLoading');
   const wrapEl = document.getElementById('productsWrap');
@@ -1099,11 +1099,11 @@ function renderProductTable() {
     const idx = products.indexOf(p);
     const tr = document.createElement('tr');
     const stockClass = p.current_stock === 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
-    const stockLabel = p.current_stock === 0 ? '0 â€” OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' â€” LOW' : p.current_stock;
+    const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
 
     tr.innerHTML =
       '<td data-label="Product">' + escHtml(p.name) + '</td>' +
-      '<td data-label="Category" style="color:var(--muted);">' + escHtml(p.category || 'â€”') + '</td>' +
+      '<td data-label="Category" style="color:var(--muted);">' + escHtml(p.category || '—') + '</td>' +
       '<td data-label="Unit Cost">' + fmt(p.unit_cost) + '</td>' +
       '<td data-label="Qty Used"><input type="number" class="qty-input" data-idx="' + idx + '" data-unit-cost="' + p.unit_cost + '" data-stock="' + p.current_stock + '" min="0" max="' + p.current_stock + '" value="0" placeholder="0" /></td>' +
       '<td data-label="Ext. Cost" class="ext-cost" id="extCost_' + idx + '">$0.00</td>' +
@@ -1133,7 +1133,7 @@ function updateProductRow(input) {
 
   const remaining = stock - qty;
   const stockCell = document.getElementById('stockAfter_' + idx);
-  stockCell.textContent = remaining === 0 ? '0 â€” OUT' : remaining <= products[idx].min_stock_alert ? remaining + ' â€” LOW' : remaining;
+  stockCell.textContent = remaining === 0 ? '0 — OUT' : remaining <= products[idx].min_stock_alert ? remaining + ' — LOW' : remaining;
   stockCell.className = remaining === 0 ? 'stock-out' : remaining <= products[idx].min_stock_alert ? 'stock-low' : 'stock-ok';
 }
 
@@ -1173,13 +1173,13 @@ function getTotalUnitsUsed() {
   return total;
 }
 
-// â”€â”€ Helper: get the previous stream cumulative total â”€â”€â”€â”€â”€â”€â”€
+// ── Helper: get the previous stream cumulative total ───────
 function getPreviousCumulativeTotal() {
   // Sum of all previously submitted break revenues in this stream
   return submittedBreaks.reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
 }
 
-// â”€â”€ Helper: get this break's individual revenue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helper: get this break's individual revenue ─────────────
 // Breaker enters the new running total; we subtract the old total
 function getThisBreakRevenue() {
   const currentWhatnotTotal = parseFloat(document.getElementById('revenueInput').value) || 0;
@@ -1187,7 +1187,7 @@ function getThisBreakRevenue() {
   return Math.max(0, currentWhatnotTotal - prevTotal);
 }
 
-// â”€â”€ Calculations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Calculations ──────────────────────────────────────────
 function recalcTotals() {
   const currentWhatnotTotal = parseFloat(document.getElementById('revenueInput').value) || 0;
   const thisBreakRevenue = getThisBreakRevenue();
@@ -1212,7 +1212,7 @@ function recalcTotals() {
     ppsEl.textContent = fmt(pps);
     ppsEl.className = 'stat-value ' + (pps >= 0 ? 'green' : 'red');
   } else {
-    ppsEl.textContent = 'â€”';
+    ppsEl.textContent = '—';
     ppsEl.className = 'stat-value';
   }
 
@@ -1220,7 +1220,7 @@ function recalcTotals() {
   const previewEl = document.getElementById('breakRevenuePreview');
   if (previewEl) {
     previewEl.innerHTML = 'This break\'s revenue: <strong style="color:' + (thisBreakRevenue > 0 ? 'var(--green)' : 'var(--text)') + ';">' + fmt(thisBreakRevenue) + '</strong>'
-      + (submittedBreaks.length > 0 ? ' <span style="color:var(--muted);font-size:0.75rem;">(' + fmt(currentWhatnotTotal) + ' total âˆ’ ' + fmt(getPreviousCumulativeTotal()) + ' prev)</span>' : '');
+      + (submittedBreaks.length > 0 ? ' <span style="color:var(--muted);font-size:0.75rem;">(' + fmt(currentWhatnotTotal) + ' total − ' + fmt(getPreviousCumulativeTotal()) + ' prev)</span>' : '');
   }
 
   // Cost per spot
@@ -1235,18 +1235,18 @@ function recalcTotals() {
     }
   }
 
-  // Break Even: box cost + (box cost Ã— fee rate) â€” what you need to earn to not lose money
+  // Break Even: box cost + (box cost × fee rate) — what you need to earn to not lose money
   const breakEvenTotal = boxCost + (boxCost * feeRate);
   const breakEvenSpot = spots > 0 ? breakEvenTotal / spots : null;
   const beEl = document.getElementById('statBreakEven');
   const beSpotEl = document.getElementById('statBreakEvenSpot');
-  if (beEl) beEl.textContent = boxCost > 0 ? fmt(breakEvenTotal) : 'â€”';
-  if (beSpotEl) beSpotEl.textContent = (boxCost > 0 && breakEvenSpot !== null) ? fmt(breakEvenSpot) : 'â€”';
+  if (beEl) beEl.textContent = boxCost > 0 ? fmt(breakEvenTotal) : '—';
+  if (beSpotEl) beSpotEl.textContent = (boxCost > 0 && breakEvenSpot !== null) ? fmt(breakEvenSpot) : '—';
 
   updateRunningTotalLivePreview(currentWhatnotTotal);
 }
 
-// â”€â”€ Running Total Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Running Total Panel ────────────────────────────────────
 // submittedBreaks stores { break_number, revenue (individual break revenue), cumulativeTotal (what was typed) }
 function renderRunningTotal() {
   const list = document.getElementById('breakList');
@@ -1270,7 +1270,7 @@ function renderRunningTotal() {
     });
   }
 
-  // Live preview row â€” shows what the breaker is currently typing
+  // Live preview row — shows what the breaker is currently typing
   const currentWhatnotTotal = parseFloat(document.getElementById('revenueInput').value) || 0;
   const previewLi = document.createElement('li');
   previewLi.className = 'live-preview';
@@ -1293,7 +1293,7 @@ function updateRunningTotalLivePreview(currentWhatnotTotal) {
   document.getElementById('streamTotalDisplay').textContent = fmt(displayTotal);
 }
 
-// â”€â”€ Stream Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Stream Management ─────────────────────────────────────
 async function getOrCreateStream() {
   const streamKey = document.getElementById('streamKey').value.trim();
   const breakDate = document.getElementById('breakDate').value;
@@ -1411,7 +1411,7 @@ async function onStreamKeyChange() {
   }
 }
 
-// â”€â”€ Submit Break â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Submit Break ──────────────────────────────────────────
 async function handleSubmitBreak() {
   hideMessages();
 
@@ -1445,8 +1445,8 @@ async function handleSubmitBreak() {
 
   const submitBtn = document.getElementById('submitBreakBtn');
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Submittingâ€¦';
-  showLoading('Saving breakâ€¦');
+  submitBtn.textContent = 'Submitting…';
+  showLoading('Saving break…');
 
   try {
     // Get or create stream
@@ -1496,7 +1496,7 @@ async function handleSubmitBreak() {
           action: 'used',
           quantity: used.qty,
           unit_cost: product.unit_cost,
-          notes: 'Break #' + breakNumber + (currentStream ? ' â€” stream ' + currentStream.stream_key : '')
+          notes: 'Break #' + breakNumber + (currentStream ? ' — stream ' + currentStream.stream_key : '')
         });
       } catch (logErr) {
         console.warn('Inventory log insert failed:', logErr);
@@ -1536,7 +1536,7 @@ async function handleSubmitBreak() {
 
     if (streamErr) console.warn('Stream update error:', streamErr);
 
-    // Update local state â€” store individual revenue, cumulative total, and products used for repeat
+    // Update local state — store individual revenue, cumulative total, and products used for repeat
     submittedBreaks.push({ break_number: breakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed });
     lastBreakProducts = productsUsed;
     document.getElementById('repeatBreakBtn').style.display = '';
@@ -1572,7 +1572,7 @@ async function handleSubmitBreak() {
   }
 }
 
-// â”€â”€ Close Out Stream â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Close Out Stream ──────────────────────────────────────
 async function openCloseOutModal() {
   hideMessages();
 
@@ -1623,7 +1623,7 @@ async function openCloseOutModal() {
 
   document.getElementById('finalSalesInput').value = '';
   document.getElementById('closeNotes').value = '';
-  document.getElementById('netProfitPreview').textContent = 'â€”';
+  document.getElementById('netProfitPreview').textContent = '—';
   document.getElementById('netProfitPreview').className = 'net-val';
 
   // Store totals for net calc
@@ -1665,18 +1665,18 @@ async function handleConfirmClose() {
   const totalFees = parseFloat(modal.dataset.totalFees) || 0;
   const totalOther = parseFloat(modal.dataset.totalOther) || 0;
   const finalFee = Math.max(0, totalSubmitted - finalSales);
-  // finalSales is already post-platform-fee â€” don't subtract totalFees again
+  // finalSales is already post-platform-fee — don't subtract totalFees again
   const netProfit = finalSales - totalBox - totalOther;
 
-  // Commission payout: (final_sales - box_cost - other_costs) * rate â€” matches owner payroll formula
+  // Commission payout: (final_sales - box_cost - other_costs) * rate — matches owner payroll formula
   const commissionRate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
   const streamProfit = finalSales - totalBox - totalOther;
   const commissionPayout = streamProfit > 0 ? streamProfit * commissionRate : 0;
 
   const confirmBtn = document.getElementById('confirmCloseBtn');
   confirmBtn.disabled = true;
-  confirmBtn.textContent = 'Closingâ€¦';
-  showLoading('Closing streamâ€¦');
+  confirmBtn.textContent = 'Closing…';
+  showLoading('Closing stream…');
 
   try {
     if (!currentStream) throw new Error('No active stream found.');
@@ -1716,7 +1716,7 @@ async function handleConfirmClose() {
       }
     } catch (syncErr) { console.warn('Break profit sync failed:', syncErr); }
 
-    // Clock out active shift â€” prefer specific ID, fall back to broad query
+    // Clock out active shift — prefer specific ID, fall back to broad query
     const clockOutTime = new Date().toISOString();
     if (activeShiftId) {
       await sb.from('schedules').update({ status: 'completed', clocked_out_at: clockOutTime }).eq('id', activeShiftId);
@@ -1752,7 +1752,7 @@ async function handleConfirmClose() {
 
     showSuccess('Stream closed out! Final Fee: ' + fmt(finalFee) + ' | Net Profit: ' + fmt(netProfit));
 
-    // Create sort task â€” in its own block so a failure here doesn't hide the success
+    // Create sort task — in its own block so a failure here doesn't hide the success
     try {
       const { data: existingTask } = await sb.from('sort_tasks').select('id').eq('stream_id', closedStreamId).maybeSingle();
       if (!existingTask) {
@@ -1783,7 +1783,7 @@ async function handleConfirmClose() {
   }
 }
 
-// â”€â”€ Event Listeners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Event Listeners ───────────────────────────────────────
 function setupEventListeners() {
   document.getElementById('signOutBtn').addEventListener('click', async function () {
     await sb.auth.signOut();
@@ -1839,9 +1839,9 @@ function setupEventListeners() {
       noProductsMsg.style.display = 'none';
       const boxCost = getTotalBoxCost();
       const totalUnits = getTotalUnitsUsed();
-      summaryBar.textContent = totalUnits + ' box' + (totalUnits !== 1 ? 'es' : '') + ' selected Â· ' + fmt(boxCost) + ' box cost';
+      summaryBar.textContent = totalUnits + ' box' + (totalUnits !== 1 ? 'es' : '') + ' selected · ' + fmt(boxCost) + ' box cost';
       summaryBar.style.display = '';
-      this.textContent = 'â–¶ Show';
+      this.textContent = '▶ Show';
     } else {
       summaryBar.style.display = 'none';
       // Restore whichever sections were visible before
@@ -1853,7 +1853,7 @@ function setupEventListeners() {
       } else {
         noProductsMsg.style.display = '';
       }
-      this.textContent = 'â–¼ Hide';
+      this.textContent = '▼ Hide';
     }
   });
 
@@ -1895,7 +1895,7 @@ function setupEventListeners() {
       finalFeeRow.style.display = 'none';
     }
 
-    // finalSales is already post-platform-fee â€” don't subtract totalFees again
+    // finalSales is already post-platform-fee — don't subtract totalFees again
     const net = finalSales - totalBox - totalOther;
     const el = document.getElementById('netProfitPreview');
     el.textContent = fmt(net);
@@ -1908,7 +1908,7 @@ function setupEventListeners() {
   });
 }
 
-// â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Tabs ─────────────────────────────────────────────────
 function setupBreakerTabs() {
   document.querySelectorAll('.breaker-tab-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1922,7 +1922,7 @@ function setupBreakerTabs() {
   });
 }
 
-// â”€â”€ My Schedule Week View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── My Schedule Week View ─────────────────────────────────
 let mySchedWeekRef = new Date();
 let brkAllProfiles = [];
 
@@ -1954,7 +1954,7 @@ function renderMyWeekGrid() {
   const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const s0=days[0], s6=days[6];
   const labelEl = document.getElementById('mySchedWeekLabel');
-  if (labelEl) labelEl.textContent = MON_NAMES[s0.getMonth()]+' '+s0.getDate()+(s0.getMonth()!==s6.getMonth()?' â€“ '+MON_NAMES[s6.getMonth()]:'â€“')+s6.getDate()+', '+s6.getFullYear();
+  if (labelEl) labelEl.textContent = MON_NAMES[s0.getMonth()]+' '+s0.getDate()+(s0.getMonth()!==s6.getMonth()?' – '+MON_NAMES[s6.getMonth()]:'–')+s6.getDate()+', '+s6.getFullYear();
 
   const dateStrs = days.map(function(d){return brkLocalDate(d);});
   const weekStart=dateStrs[0], weekEnd=dateStrs[6];
@@ -2006,7 +2006,7 @@ function setupMySchedNav() {
   if (todayBtn) todayBtn.addEventListener('click', function(){ mySchedWeekRef = new Date(); renderMyWeekGrid(); });
 }
 
-// â”€â”€ Swap Request â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Swap Request ──────────────────────────────────────────
 let swapShiftId=null, swapShiftDate=null;
 function openSwapRequest(shiftId, dateStr) {
   swapShiftId=shiftId; swapShiftDate=dateStr;
@@ -2026,7 +2026,7 @@ async function confirmSwapRequest() {
   if(!withPersonId){showError('Select a person.');return;}
   const withPerson=brkAllProfiles.find(function(p){return p.id===withPersonId;});
   const myName=currentProfile.display_name||'Someone';
-  const msg=myName+' wants to swap their '+swapShiftDate+' shift'+(withPerson?' with '+withPerson.display_name:'')+(note?' â€” Note: '+note:'');
+  const msg=myName+' wants to swap their '+swapShiftDate+' shift'+(withPerson?' with '+withPerson.display_name:'')+(note?' — Note: '+note:'');
   try {
     const {data:owners}=await sb.from('profiles').select('id').eq('org_id',currentProfile.org_id).in('role',['owner','manager']);
     if(owners&&owners.length){
@@ -2037,7 +2037,7 @@ async function confirmSwapRequest() {
   } catch(err){showError('Failed to send request: '+escHtml(err.message));}
 }
 
-// â”€â”€ Shifts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Shifts ────────────────────────────────────────────────
 async function loadShifts() {
   const loading = document.getElementById('shiftsLoading');
   const root = document.getElementById('shiftsRoot');
@@ -2146,7 +2146,7 @@ async function checkTodayShiftAndNotify() {
 
   if (!data || data.length === 0) return;
 
-  // Prioritize in_progress shift â€” breaker may have multiple shifts today
+  // Prioritize in_progress shift — breaker may have multiple shifts today
   const inProgress = data.find(function(s){ return s.status === 'in_progress'; });
   const shift = inProgress || data[0];
 
@@ -2203,7 +2203,7 @@ async function checkTodayShiftAndNotify() {
       }
     }
     this.disabled = true;
-    this.textContent = 'Clocking inâ€¦';
+    this.textContent = 'Clocking in…';
     const { error: cinErr } = await sb.from('schedules').update({
       status: 'in_progress',
       clocked_in_at: new Date().toISOString()
@@ -2230,12 +2230,12 @@ function showClockedInBanner(shift) {
   banner.innerHTML =
     '<span style="color:var(--green);font-size:1rem;">&#9200;</span>' +
     '<span style="font-size:0.85rem;color:var(--green);font-weight:700;">Clocked In</span>' +
-    (shift.stream_key ? '<span style="font-size:0.82rem;color:var(--muted);">â€” ' + escHtml(shift.stream_key) + '</span>' : '');
+    (shift.stream_key ? '<span style="font-size:0.82rem;color:var(--muted);">— ' + escHtml(shift.stream_key) + '</span>' : '');
   const errorBox = document.getElementById('errorBox');
   errorBox.parentNode.insertBefore(banner, errorBox);
 }
 
-// â”€â”€ My Pay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── My Pay ────────────────────────────────────────────────
 let currentPeriod = 'daily';
 
 function getPeriodRange(period) {
@@ -2249,7 +2249,7 @@ function getPeriodRange(period) {
 }
 
 function checkCommissionEnabled() {
-  // No-op â€” payouts tab is always shown, pay type drives what's displayed
+  // No-op — payouts tab is always shown, pay type drives what's displayed
   setupPayoutListeners();
 }
 
@@ -2265,15 +2265,15 @@ async function loadPayouts() {
 
   if (!type) {
     document.getElementById('payoutNotConfigured').style.display = 'block';
-    document.getElementById('payoutTotal').textContent = 'â€”';
-    document.getElementById('myPayTypeLabel').textContent = 'Pay type not configured â€” ask your owner.';
+    document.getElementById('payoutTotal').textContent = '—';
+    document.getElementById('myPayTypeLabel').textContent = 'Pay type not configured — ask your owner.';
     return;
   }
 
   const typeLabels = {
-    commission: 'Commission â€” % of net profit per stream',
-    hourly: 'Hourly â€” rate Ã— hours clocked',
-    salary: 'Salary â€” fixed per pay period',
+    commission: 'Commission — % of net profit per stream',
+    hourly: 'Hourly — rate × hours clocked',
+    salary: 'Salary — fixed per pay period',
     hourly_commission: 'Hourly + Commission',
     salary_commission: 'Salary + Commission'
   };
@@ -2282,7 +2282,7 @@ async function loadPayouts() {
   let grandTotal = 0;
   const statsHTML = [];
 
-  // â”€â”€ Commission component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Commission component ───────────────────────────────
   if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
     const rate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
     const { data: streamsData } = await sb
@@ -2303,7 +2303,7 @@ async function loadPayouts() {
       const sales = parseFloat(s.final_sales) || 0;
       const cost = parseFloat(s.total_product_cost) || 0;
       const other = parseFloat(s.total_other_costs) || 0;
-      // final_sales already reflects platform fee deduction â€” no double-subtract
+      // final_sales already reflects platform fee deduction — no double-subtract
       const profit = sales - cost - other;
       const commission = Math.max(0, profit) * rate;
       totalProfit += profit;
@@ -2327,7 +2327,7 @@ async function loadPayouts() {
     grandTotal += totalCommission;
   }
 
-  // â”€â”€ Hourly component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Hourly component ───────────────────────────────────
   if (type === 'hourly' || type === 'hourly_commission') {
     const rate = parseFloat(currentProfile.hourly_rate) || 0;
     const { data: shifts } = await sb
@@ -2365,7 +2365,7 @@ async function loadPayouts() {
     grandTotal += totalHourlyPay;
   }
 
-  // â”€â”€ Salary component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Salary component ───────────────────────────────────
   if (type === 'salary' || type === 'salary_commission') {
     const amount = parseFloat(currentProfile.salary_amount) || 0;
     const period = currentProfile.salary_period || 'period';
@@ -2373,7 +2373,7 @@ async function loadPayouts() {
     grandTotal += amount;
   }
 
-  // â”€â”€ Tips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Tips ───────────────────────────────────────────────
   const { data: tipsData } = await sb.from('tips').select('amount').eq('breaker_id', currentUser.id).eq('org_id', currentProfile.org_id).gte('created_at', from);
   const totalTips = (tipsData || []).reduce(function (s, t) { return s + (parseFloat(t.amount) || 0); }, 0);
   statsHTML.push('<div class="stat-card"><div class="stat-label">Tips Received</div><div class="stat-value green">' + fmt(totalTips) + '</div></div>');
@@ -2400,7 +2400,7 @@ function setupPayoutListeners() {
     const amount = parseFloat(document.getElementById('tipAmountInput').value) || 0;
     const note = document.getElementById('tipNoteInput').value.trim();
     if (!amount || amount <= 0) { showError('Enter a valid tip amount.'); return; }
-    this.disabled = true; this.textContent = 'Savingâ€¦';
+    this.disabled = true; this.textContent = 'Saving…';
     try {
       const { error } = await sb.from('tips').insert({
         org_id: currentProfile.org_id,
@@ -2422,7 +2422,7 @@ function setupPayoutListeners() {
   });
 }
 
-// â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Notifications ─────────────────────────────────────────
 let notifPanelOpen = false;
 let _notifRealtimeChannel = null;
 
@@ -2446,12 +2446,12 @@ async function loadNotifCount() {
   } catch (e) {}
 }
 function notifTypeIcon(type) {
-  const icons = { stream_closed:'ðŸ“¦', shift_reminder:'â°', inventory_low:'âš ï¸', payment_failed:'ðŸ’³', renewal_reminder:'ðŸ”„', trial_ending:'â³' };
-  return icons[type] || 'ðŸ””';
+  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳' };
+  return icons[type] || '🔔';
 }
 async function renderNotifPanel() {
   const list = document.getElementById('notifList');
-  list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Loadingâ€¦</div>';
+  list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Loading…</div>';
   try {
     const { data } = await sb.from('notifications').select('*')
       .eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
@@ -2503,7 +2503,7 @@ document.addEventListener('click', function(e) {
   if (notifPanelOpen && !document.getElementById('notifBellWrap').contains(e.target)) closeNotifPanel();
 });
 
-// â”€â”€ Breaker Guide â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Breaker Guide ────────────────────────────────────────
 let bgCurrentScreen = 0;
 const BG_TOTAL = 7;
 
@@ -2536,7 +2536,7 @@ async function checkBreakerOnboarding() {
     if (typeof cbpTrack === 'function') cbpTrack('breaker_first_login', { organization_id: orgId });
   }
 
-  // Mark as seen immediately â€” prevents re-showing if user closes tab mid-guide
+  // Mark as seen immediately — prevents re-showing if user closes tab mid-guide
   // bgFinish() will also mark done when guide is completed/skipped
   localStorage.setItem(doneKey, '1');
   sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id).catch(() => {});
@@ -2574,10 +2574,10 @@ function bgBack() {
 }
 
 function bgFinish() {
-  // Always force-close the guide first â€” never leave it stuck
+  // Always force-close the guide first — never leave it stuck
   const g = document.getElementById('breakerGuide');
   if (g) { g.classList.remove('bg-open'); g.style.display = 'none'; }
-  // Set localStorage gate (guard against null currentUser â€” should never happen but safety net)
+  // Set localStorage gate (guard against null currentUser — should never happen but safety net)
   try {
     if (currentUser && currentUser.id) {
       localStorage.setItem('cbp_breaker_guide_done_' + currentUser.id, '1');
@@ -2589,63 +2589,63 @@ function bgFinish() {
   }
 }
 
-// â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Boot ──────────────────────────────────────────────────
 initAuth();
 </script>
 
 <!-- Breaker First-Time Guide -->
 <div id="breakerGuide" onclick="if(event.target===this)bgFinish()">
   <div class="bg-box">
-    <button onclick="bgFinish()" style="position:absolute;top:10px;right:10px;background:rgba(45,45,61,0.9);border:1px solid rgba(79,110,247,0.2);color:#e2e8f0;font-size:1rem;cursor:pointer;line-height:1;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:2;" title="Skip guide">âœ•</button>
+    <button onclick="bgFinish()" style="position:absolute;top:10px;right:10px;background:rgba(45,45,61,0.9);border:1px solid rgba(79,110,247,0.2);color:#e2e8f0;font-size:1rem;cursor:pointer;line-height:1;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:2;" title="Skip guide">✕</button>
 
     <!-- Screen 1: Welcome -->
     <div class="bg-screen bg-active">
-      <div class="bg-icon">ðŸ‘‹</div>
+      <div class="bg-icon">👋</div>
       <div class="bg-step">Step 1 of 7</div>
       <div class="bg-title">Welcome to Card Break Pro</div>
       <div class="bg-body">
-        Your owner has set up your account and you're ready to start breaking. This quick guide will walk you through everything you need to know â€” it only takes 2 minutes.
+        Your owner has set up your account and you're ready to start breaking. This quick guide will walk you through everything you need to know — it only takes 2 minutes.
         <div class="bg-highlight">This guide will only show once. Take 2 minutes to read it carefully.</div>
       </div>
       <div class="bg-actions">
-        <button class="bg-btn-next" onclick="bgNext()">Let's Go â†’</button>
+        <button class="bg-btn-next" onclick="bgNext()">Let's Go →</button>
       </div>
     </div>
 
     <!-- Screen 2: Your Schedule -->
     <div class="bg-screen">
-      <div class="bg-icon">ðŸ“…</div>
+      <div class="bg-icon">📅</div>
       <div class="bg-step">Step 2 of 7</div>
       <div class="bg-title">Your Schedule</div>
       <div class="bg-body">
         Your owner assigns shifts to you directly. Check the <strong>My Schedule</strong> tab to see your upcoming shifts, times, and any notes from your owner.
-        <div class="bg-highlight">Your owner controls the schedule. If a shift looks wrong, reach out to them â€” not through this app.</div>
+        <div class="bg-highlight">Your owner controls the schedule. If a shift looks wrong, reach out to them — not through this app.</div>
       </div>
       <div class="bg-actions">
         <button class="bg-btn-back" onclick="bgBack()">Back</button>
-        <button class="bg-btn-next" onclick="bgNext()">Next â†’</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
       </div>
     </div>
 
     <!-- Screen 3: Clocking In -->
     <div class="bg-screen">
-      <div class="bg-icon">â±ï¸</div>
+      <div class="bg-icon">⏱️</div>
       <div class="bg-step">Step 3 of 7</div>
       <div class="bg-title">Clocking In</div>
       <div class="bg-body">
         When your shift starts, clock in using the <strong>Clock In / Out</strong> button in the app. The system automatically tracks your hours from that moment.
         <div class="bg-highlight">Always clock in before you start breaking. Hours are only tracked when you're clocked in.</div>
-        Don't forget to clock out when your shift ends â€” your payout depends on accurate hours.
+        Don't forget to clock out when your shift ends — your payout depends on accurate hours.
       </div>
       <div class="bg-actions">
         <button class="bg-btn-back" onclick="bgBack()">Back</button>
-        <button class="bg-btn-next" onclick="bgNext()">Next â†’</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
       </div>
     </div>
 
     <!-- Screen 4: Logging Breaks -->
     <div class="bg-screen">
-      <div class="bg-icon">ðŸ“¦</div>
+      <div class="bg-icon">📦</div>
       <div class="bg-step">Step 4 of 7</div>
       <div class="bg-title">Logging Breaks</div>
       <div class="bg-body">
@@ -2656,17 +2656,17 @@ initAuth();
           3. Enter the quantity sold for each<br>
           4. Hit <strong>Submit Break</strong>
         </div>
-        Submit every break as it closes. Don't batch them â€” the running total needs to stay live for your owner.
+        Submit every break as it closes. Don't batch them — the running total needs to stay live for your owner.
       </div>
       <div class="bg-actions">
         <button class="bg-btn-back" onclick="bgBack()">Back</button>
-        <button class="bg-btn-next" onclick="bgNext()">Next â†’</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
       </div>
     </div>
 
     <!-- Screen 5: Closing Out -->
     <div class="bg-screen">
-      <div class="bg-icon">âœ…</div>
+      <div class="bg-icon">✅</div>
       <div class="bg-step">Step 5 of 7</div>
       <div class="bg-title">Closing Out</div>
       <div class="bg-body">
@@ -2676,17 +2676,17 @@ initAuth();
           <li>Records your payout</li>
           <li>Closes the stream in the system</li>
         </ul>
-        <div class="bg-highlight">Nothing is manual. Don't calculate your own pay â€” the system handles it based on what you submitted.</div>
+        <div class="bg-highlight">Nothing is manual. Don't calculate your own pay — the system handles it based on what you submitted.</div>
       </div>
       <div class="bg-actions">
         <button class="bg-btn-back" onclick="bgBack()">Back</button>
-        <button class="bg-btn-next" onclick="bgNext()">Next â†’</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
       </div>
     </div>
 
     <!-- Screen 6: Your Payouts -->
     <div class="bg-screen">
-      <div class="bg-icon">ðŸ’°</div>
+      <div class="bg-icon">💰</div>
       <div class="bg-step">Step 6 of 7</div>
       <div class="bg-title">Your Payouts</div>
       <div class="bg-body">
@@ -2696,13 +2696,13 @@ initAuth();
       </div>
       <div class="bg-actions">
         <button class="bg-btn-back" onclick="bgBack()">Back</button>
-        <button class="bg-btn-next" onclick="bgNext()">Next â†’</button>
+        <button class="bg-btn-next" onclick="bgNext()">Next →</button>
       </div>
     </div>
 
     <!-- Screen 7: Ready -->
     <div class="bg-screen">
-      <div class="bg-icon">ðŸš€</div>
+      <div class="bg-icon">🚀</div>
       <div class="bg-step">Step 7 of 7</div>
       <div class="bg-title">You Are Ready</div>
       <div class="bg-body">
@@ -2718,7 +2718,7 @@ initAuth();
       </div>
       <div class="bg-actions">
         <button class="bg-btn-back" onclick="bgBack()">Back</button>
-        <button class="bg-btn-next" onclick="bgFinish()">Go to My Dashboard âœ“</button>
+        <button class="bg-btn-next" onclick="bgFinish()">Go to My Dashboard ✓</button>
       </div>
     </div>
 
@@ -2735,20 +2735,20 @@ initAuth();
   </div>
 </div>
 
-<!-- â”€â”€ Breaker Bottom Navigation (mobile only) â”€â”€ -->
+<!-- ── Breaker Bottom Navigation (mobile only) ── -->
 <nav class="btm-nav" id="breakerBtmNav">
   <button class="btm-nav-item active" id="btn-btm-entry" onclick="breakerBtmNav('entry')">
-    <span class="btm-nav-icon">ðŸ“¦</span><span class="btm-nav-label">My Stream</span>
+    <span class="btm-nav-icon">📦</span><span class="btm-nav-label">My Stream</span>
   </button>
   <button class="btm-nav-item" id="btn-btm-shifts" onclick="breakerBtmNav('shifts')">
-    <span class="btm-nav-icon">ðŸ“…</span><span class="btm-nav-label">Schedule</span>
+    <span class="btm-nav-icon">📅</span><span class="btm-nav-label">Schedule</span>
   </button>
   <button class="btm-nav-item" id="btn-btm-payouts" onclick="breakerBtmNav('payouts')">
-    <span class="btm-nav-icon">ðŸ’°</span><span class="btm-nav-label">Payouts</span>
+    <span class="btm-nav-icon">💰</span><span class="btm-nav-label">Payouts</span>
   </button>
 </nav>
 
-<!-- â”€â”€ Close-Stream Confirmation (mobile-first) â”€â”€ -->
+<!-- ── Close-Stream Confirmation (mobile-first) ── -->
 <div id="mobileCloseConfirm">
   <div id="mobileCloseConfirmPanel">
     <h3>Close This Stream?</h3>
@@ -2819,7 +2819,7 @@ if (typeof _origShowSuccess === 'function') {
 setTimeout(updateMobileBreakHeader, 1500);
 </script>
 
-<!-- â”€â”€ Buyer Intelligence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Buyer Intelligence ─────────────────────────────────── -->
 <script>
 'use strict';
 
@@ -2827,7 +2827,7 @@ var _parsedSlipData = null;   // result from /api/import-slip
 var _importedBuyers = [];     // buyers after confirmed import
 var _currentImportId = null;
 
-// â”€â”€ Drag-and-drop wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Drag-and-drop wiring ──────────────────────────────────
 function initSlipImportModal() {
   _parsedSlipData = null;
   _importedBuyers = [];
@@ -2911,7 +2911,7 @@ async function confirmSlipImport() {
   if (!_parsedSlipData || !currentProfile) { skipSlipImport(); return; }
   var btn = document.getElementById('siConfirmBtn');
   btn.disabled = true;
-  btn.textContent = 'Importingâ€¦';
+  btn.textContent = 'Importing…';
   try {
     var resp = await fetch('/api/process-import', {
       method: 'POST',
@@ -2946,7 +2946,7 @@ function skipSlipImport() {
   openHitLoggingModal();
 }
 
-// â”€â”€ Hit Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Hit Logging ───────────────────────────────────────────
 var _hitBuyerOptions = [];
 
 function openHitLoggingModal() {
@@ -2978,9 +2978,9 @@ function addHitRow() {
   row.className = 'hit-row';
   row.style.cssText = 'background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem;position:relative;';
   row.innerHTML =
-    '<button onclick="this.closest(\'.hit-row\').remove()" style="position:absolute;top:0.4rem;right:0.4rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;">âœ•</button>' +
+    '<button onclick="this.closest(\'.hit-row\').remove()" style="position:absolute;top:0.4rem;right:0.4rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;">✕</button>' +
     '<select class="hit-buyer" style="' + fld + '">' +
-      '<option value="">Select buyerâ€¦</option>' +
+      '<option value="">Select buyer…</option>' +
       (_hitBuyerOptions.length > 0
         ? _hitBuyerOptions.map(function(u){ return '<option value="' + escHtml(u) + '">@' + escHtml(u) + '</option>'; }).join('')
         : '') +
@@ -3008,7 +3008,7 @@ async function submitAllHits() {
 
   var btn = document.getElementById('submitHitsBtn');
   btn.disabled = true;
-  btn.textContent = 'Savingâ€¦';
+  btn.textContent = 'Saving…';
 
   try {
     for (var hit of hits) {
