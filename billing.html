@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -10,8 +10,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="CardBreakPro" />
   <meta name="theme-color" content="#4f6ef7" />
-  <link rel="stylesheet" href="/mobile.css?v=3" />
-  <title>Card Break Pro — Billing</title>
+  <link rel="stylesheet" href="/mobile.css?v=4" />
+  <title>Card Break Pro â€” Billing</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <style>
@@ -251,7 +251,7 @@
             <div class="plan-name" id="planName">Card Break Pro</div>
             <div class="plan-period" id="planPeriod">Billed monthly</div>
           </div>
-          <div class="plan-price" id="planPrice">—</div>
+          <div class="plan-price" id="planPrice">â€”</div>
         </div>
 
         <!-- Active: manage via Stripe portal -->
@@ -353,7 +353,7 @@
           pro:     { name: 'Pro',     price: '$399.99<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span>', period: 'Billed monthly &bull; 7-day free trial' },
           empire:  { name: 'Empire',  price: '$999.99<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span>', period: 'Billed monthly' },
           legacy:  { name: 'Card Break Pro', price: '$250<span style="font-size:0.9rem;font-weight:600;color:var(--muted)">/mo</span>', period: 'Legacy plan &bull; Billed monthly' },
-          exempt:  { name: 'Complimentary',  price: '<span style="font-size:1rem;color:var(--muted)">—</span>', period: 'Provided complimentary access' }
+          exempt:  { name: 'Complimentary',  price: '<span style="font-size:1rem;color:var(--muted)">â€”</span>', period: 'Provided complimentary access' }
         };
         const tier = sub ? (sub.tier || 'legacy') : 'legacy';
         const tierInfo = TIER_DISPLAY[tier] || TIER_DISPLAY.legacy;
@@ -374,11 +374,11 @@
             const upgradeHint = document.createElement('p');
             upgradeHint.style.cssText = 'text-align:center;font-size:0.8rem;color:var(--muted);margin-top:0.75rem;';
             if (tier === 'starter') {
-              upgradeHint.innerHTML = 'Want AI Insights? <a href="/register?plan=pro" style="color:var(--primary);font-weight:600;">Upgrade to Pro →</a>';
+              upgradeHint.innerHTML = 'Want AI Insights? <a href="/register?plan=pro" style="color:var(--primary);font-weight:600;">Upgrade to Pro â†’</a>';
             } else if (tier === 'pro') {
-              upgradeHint.innerHTML = 'Want the Empire Dashboard? <a href="mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Inquiry" style="color:var(--primary);font-weight:600;">Contact us for Empire →</a>';
+              upgradeHint.innerHTML = 'Want the Empire Dashboard? <a href="mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Inquiry" style="color:var(--primary);font-weight:600;">Contact us for Empire â†’</a>';
             } else {
-              upgradeHint.innerHTML = 'See our new plans: <a href="/register" style="color:var(--primary);font-weight:600;">View Plans →</a>';
+              upgradeHint.innerHTML = 'See our new plans: <a href="/register" style="color:var(--primary);font-weight:600;">View Plans â†’</a>';
             }
             manageBtn.parentNode.appendChild(upgradeHint);
           }

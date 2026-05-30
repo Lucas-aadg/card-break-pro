@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -10,8 +10,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="CardBreakPro" />
   <meta name="theme-color" content="#4f6ef7" />
-  <link rel="stylesheet" href="/mobile.css?v=3" />
-  <title>Card Break Pro — Sorter</title>
+  <link rel="stylesheet" href="/mobile.css?v=4" />
+  <title>Card Break Pro â€” Sorter</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="analytics.js"></script>
@@ -112,7 +112,7 @@
     /* TODAY BADGE */
     .today-badge { background: var(--primary); color: #fff; font-size: 0.65rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 0.5rem; }
 
-    /* ── MY SCHEDULE WEEK GRID ── */
+    /* â”€â”€ MY SCHEDULE WEEK GRID â”€â”€ */
     .wg-wrap{overflow-x:auto;}
     .wg-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:560px;}
     .wg-table th{text-align:center;font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);padding:0.65rem 0.3rem;border-bottom:2px solid var(--border);}
@@ -161,7 +161,7 @@
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="loading-spinner"></div>
-  <div class="loading-text" id="loadingText">Loading…</div>
+  <div class="loading-text" id="loadingText">Loadingâ€¦</div>
 </div>
 
 <nav>
@@ -199,21 +199,21 @@
   <div id="errorBox" class="error-box"></div>
   <div id="successBox" class="success-box"></div>
 
-  <!-- ── SORT QUEUE TAB ── -->
+  <!-- â”€â”€ SORT QUEUE TAB â”€â”€ -->
   <div class="tab-content active" id="tab-queue">
     <div class="panel">
       <div class="panel-header">
-        <div class="panel-title">Sort Queue — Oldest First</div>
+        <div class="panel-title">Sort Queue â€” Oldest First</div>
         <button class="btn btn-outline" id="refreshQueueBtn" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
       </div>
       <div class="ptr-hint">Pull down to refresh</div>
       <div id="sortQueueList" class="sort-queue">
-        <div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading queue…</div>
+        <div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading queueâ€¦</div>
       </div>
     </div>
   </div>
 
-  <!-- ── MY SHIFTS TAB ── -->
+  <!-- â”€â”€ MY SHIFTS TAB â”€â”€ -->
   <div class="tab-content" id="tab-shifts">
     <!-- MY SCHEDULE WEEK VIEW -->
     <div class="panel" style="padding:0;overflow:hidden;margin-bottom:1.25rem;">
@@ -231,7 +231,7 @@
       </div>
     </div>
 
-    <div id="shiftsLoading" style="color:var(--muted);font-size:0.85rem;padding:2rem;text-align:center;">Loading shifts…</div>
+    <div id="shiftsLoading" style="color:var(--muted);font-size:0.85rem;padding:2rem;text-align:center;">Loading shiftsâ€¦</div>
     <div id="shiftsRoot" style="display:none;">
       <!-- Upcoming -->
       <div style="margin-bottom:0.5rem;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);">Upcoming Shifts</div>
@@ -243,7 +243,7 @@
     </div>
   </div>
 
-  <!-- ── MY PAY TAB ── -->
+  <!-- â”€â”€ MY PAY TAB â”€â”€ -->
   <div class="tab-content" id="tab-pay">
     <div class="panel">
       <div class="panel-title">My Pay</div>
@@ -296,11 +296,11 @@
 
       <div style="padding:0.75rem;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-weight:700;color:var(--muted);">Total Earnings This Period</span>
-        <span style="font-size:1.4rem;font-weight:800;color:#22c55e;" id="sorterPayTotal">—</span>
+        <span style="font-size:1.4rem;font-weight:800;color:#22c55e;" id="sorterPayTotal">â€”</span>
       </div>
 
       <div id="sorterPayNotConfigured" style="display:none;margin-top:1rem;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:0.85rem 1rem;font-size:0.85rem;color:#e2e8f0;">
-        ⚠ Your pay hasn't been configured yet. Ask your owner to set up your pay type in the Team tab.
+        âš  Your pay hasn't been configured yet. Ask your owner to set up your pay type in the Team tab.
       </div>
     </div>
   </div>
@@ -322,10 +322,10 @@ function escHtml(str) {
 function showError(msg) { const el = document.getElementById('errorBox'); el.textContent = msg; el.style.display = 'block'; }
 function showSuccess(msg) { const el = document.getElementById('successBox'); el.textContent = msg; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 4000); }
 function hideMessages() { document.getElementById('errorBox').style.display = 'none'; document.getElementById('successBox').style.display = 'none'; }
-function showLoading(msg) { document.getElementById('loadingOverlay').classList.add('active'); document.getElementById('loadingText').textContent = msg || 'Loading…'; }
+function showLoading(msg) { document.getElementById('loadingOverlay').classList.add('active'); document.getElementById('loadingText').textContent = msg || 'Loadingâ€¦'; }
 function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
 
-// ── Tabs ──────────────────────────────────────────────────
+// â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.querySelectorAll('.tab-btn').forEach(function (btn) {
   btn.addEventListener('click', function () {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -339,10 +339,10 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
   });
 });
 
-// ── Sort Queue ────────────────────────────────────────────
+// â”€â”€ Sort Queue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadSortQueue() {
   const list = document.getElementById('sortQueueList');
-  list.innerHTML = '<div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading…</div>';
+  list.innerHTML = '<div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loadingâ€¦</div>';
 
   try {
     const { data: rawTasks, error } = await sb
@@ -369,7 +369,7 @@ async function loadSortQueue() {
     }
 
     if (!tasks.length) {
-      list.innerHTML = '<div class="sort-empty"><div class="sort-empty-icon">✅</div><div class="sort-empty-title">Queue is clear. Nice work.</div><div style="font-size:0.85rem;color:var(--muted);">No streams waiting to be sorted.</div></div>';
+      list.innerHTML = '<div class="sort-empty"><div class="sort-empty-icon">âœ…</div><div class="sort-empty-title">Queue is clear. Nice work.</div><div style="font-size:0.85rem;color:var(--muted);">No streams waiting to be sorted.</div></div>';
       return;
     }
 
@@ -388,9 +388,9 @@ async function loadSortQueue() {
 
       let actionsHtml = '';
       if (task.status === 'pending') {
-        actionsHtml = '<button class="btn btn-yellow" data-action="start" data-id="' + task.id + '">▶ Start Sorting</button>';
+        actionsHtml = '<button class="btn btn-yellow" data-action="start" data-id="' + task.id + '">â–¶ Start Sorting</button>';
       } else if (isInProgress) {
-        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">✓ Mark Complete</button>';
+        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">âœ“ Mark Complete</button>';
       } else if (isOtherProgress) {
         actionsHtml = '<span style="font-size:0.82rem;color:var(--muted);padding:0.5rem 0;display:block;">In progress by another sorter</span>';
       }
@@ -401,8 +401,8 @@ async function loadSortQueue() {
         '<div class="sort-card-info">' +
           '<div class="sort-card-key">' + escHtml(s.stream_key || 'Unknown Stream') + ' ' + statusBadge + '</div>' +
           '<div class="sort-card-meta">' +
-            '<span>📅 ' + (s.break_date || '—') + '</span>' +
-            '<span>📦 ' + breakCount + ' break' + (breakCount !== 1 ? 's' : '') + '</span>' +
+            '<span>ðŸ“… ' + (s.break_date || 'â€”') + '</span>' +
+            '<span>ðŸ“¦ ' + breakCount + ' break' + (breakCount !== 1 ? 's' : '') + '</span>' +
           '</div>' +
         '</div>' +
         '<div class="sort-card-actions">' + actionsHtml + '</div>';
@@ -437,7 +437,7 @@ async function loadSortQueue() {
               completed_at: new Date().toISOString()
             }).eq('id', taskId).eq('org_id', currentProfile.org_id).select();
             if (doneErr) throw doneErr;
-            if (!updatedRows || updatedRows.length === 0) throw new Error('Update blocked — ask your owner to run the sort_tasks RLS fix in Supabase.');
+            if (!updatedRows || updatedRows.length === 0) throw new Error('Update blocked â€” ask your owner to run the sort_tasks RLS fix in Supabase.');
             showSuccess('Stream marked as sorted and shipped!');
           }
           await loadSortQueue();
@@ -454,7 +454,7 @@ async function loadSortQueue() {
   }
 }
 
-// ── My Shifts ─────────────────────────────────────────────
+// â”€â”€ My Shifts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function formatShiftDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -534,7 +534,7 @@ async function loadShifts() {
       // Wire clock in/out
       wrap.querySelectorAll('.shift-clock-in').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-          btn.disabled = true; btn.textContent = 'Clocking in…';
+          btn.disabled = true; btn.textContent = 'Clocking inâ€¦';
           try {
             await sb.from('schedules').update({ status: 'in_progress', clocked_in_at: new Date().toISOString() }).eq('id', btn.dataset.shiftid).eq('org_id', currentProfile.org_id);
             activeShiftId = btn.dataset.shiftid;
@@ -546,7 +546,7 @@ async function loadShifts() {
       });
       wrap.querySelectorAll('.shift-clock-out').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-          btn.disabled = true; btn.textContent = 'Clocking out…';
+          btn.disabled = true; btn.textContent = 'Clocking outâ€¦';
           try {
             await sb.from('schedules').update({ status: 'completed', clocked_out_at: new Date().toISOString() }).eq('id', btn.dataset.shiftid).eq('org_id', currentProfile.org_id);
             activeShiftId = null;
@@ -592,7 +592,7 @@ async function loadShifts() {
   }
 }
 
-// ── Today Shift Banner ────────────────────────────────────
+// â”€â”€ Today Shift Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function checkTodayShift() {
   const today = new Date().toISOString().split('T')[0];
   const { data: shifts } = await sb
@@ -619,19 +619,19 @@ async function checkTodayShift() {
   banner.style.cssText = 'background:rgba(79,110,247,0.1);border:1px solid rgba(79,110,247,0.3);border-radius:8px;padding:0.85rem 1.1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;';
   banner.innerHTML =
     '<div>' +
-      '<div style="font-weight:700;color:var(--primary);margin-bottom:0.2rem;">📅 You have a sorting shift today!</div>' +
+      '<div style="font-weight:700;color:var(--primary);margin-bottom:0.2rem;">ðŸ“… You have a sorting shift today!</div>' +
       '<div style="font-size:0.82rem;color:var(--muted);">' +
         (shift.scheduled_time ? 'Start time: ' + shift.scheduled_time.slice(0,5) : 'Check your schedule') +
       '</div>' +
     '</div>' +
-    '<button id="sorterClockInBtn" class="btn btn-green" style="padding:0.5rem 1.1rem;font-size:0.875rem;">⏱ Clock In</button>';
+    '<button id="sorterClockInBtn" class="btn btn-green" style="padding:0.5rem 1.1rem;font-size:0.875rem;">â± Clock In</button>';
 
   const main = document.querySelector('.main');
   main.insertBefore(banner, main.firstChild);
 
   document.getElementById('sorterClockInBtn').addEventListener('click', async function () {
     this.disabled = true;
-    this.textContent = 'Clocking in…';
+    this.textContent = 'Clocking inâ€¦';
     try {
       await sb.from('schedules').update({
         status: 'in_progress',
@@ -642,7 +642,7 @@ async function checkTodayShift() {
       showClockedInBanner(shift);
     } catch (err) {
       this.disabled = false;
-      this.textContent = '⏱ Clock In';
+      this.textContent = 'â± Clock In';
       showError('Failed to clock in.');
     }
   });
@@ -656,7 +656,7 @@ function showClockedInBanner(shift) {
   banner.style.cssText = 'background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:0.85rem 1.1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;';
   banner.innerHTML =
     '<div style="display:flex;align-items:center;gap:0.75rem;">' +
-      '<span style="color:var(--green);font-weight:700;">✓ Clocked In</span>' +
+      '<span style="color:var(--green);font-weight:700;">âœ“ Clocked In</span>' +
       '<span style="color:var(--muted);font-size:0.83rem;">Your shift is active.</span>' +
     '</div>' +
     '<button id="sorterClockOutBtn" class="btn btn-outline" style="font-size:0.8rem;padding:0.4rem 0.9rem;border-color:var(--green);color:var(--green);">Clock Out</button>';
@@ -665,7 +665,7 @@ function showClockedInBanner(shift) {
 
   document.getElementById('sorterClockOutBtn').addEventListener('click', async function () {
     this.disabled = true;
-    this.textContent = 'Clocking out…';
+    this.textContent = 'Clocking outâ€¦';
     try {
       await sb.from('schedules').update({
         status: 'completed',
@@ -683,7 +683,7 @@ function showClockedInBanner(shift) {
   });
 }
 
-// ── Buttons ───────────────────────────────────────────────
+// â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.getElementById('signOutBtn').addEventListener('click', async function () {
   await sb.auth.signOut();
   window.location.href = 'index.html';
@@ -691,9 +691,9 @@ document.getElementById('signOutBtn').addEventListener('click', async function (
 
 document.getElementById('refreshQueueBtn').addEventListener('click', loadSortQueue);
 
-// ── Auth ──────────────────────────────────────────────────
+// â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function initAuth() {
-  showLoading('Loading…');
+  showLoading('Loadingâ€¦');
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { window.location.href = 'index.html'; return; }
@@ -727,7 +727,7 @@ async function initAuth() {
   }
 }
 
-// ── Notifications ─────────────────────────────────────────
+// â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let notifPanelOpen = false;
 let _notifRealtimeChannel = null;
 function toggleNotifPanel() {
@@ -740,8 +740,8 @@ function closeNotifPanel() {
   document.getElementById('notifPanel').style.display = 'none';
 }
 function notifTypeIcon(type) {
-  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳' };
-  return icons[type] || '🔔';
+  const icons = { stream_closed:'ðŸ“¦', shift_reminder:'â°', inventory_low:'âš ï¸', payment_failed:'ðŸ’³', renewal_reminder:'ðŸ”„', trial_ending:'â³' };
+  return icons[type] || 'ðŸ””';
 }
 async function loadNotifCount() {
   if (!currentUser) return;
@@ -754,7 +754,7 @@ async function loadNotifCount() {
 }
 async function renderNotifPanel() {
   const list = document.getElementById('notifList');
-  list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Loading…</div>';
+  list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">Loadingâ€¦</div>';
   try {
     const { data } = await sb.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
     if (!data || data.length === 0) { list.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.85rem;">You are all caught up.</div>'; return; }
@@ -798,7 +798,7 @@ document.addEventListener('click', function(e) {
 
 initAuth();
 
-// ── My Pay ────────────────────────────────────────────────
+// â”€â”€ My Pay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let sorterPayPeriod = 'daily';
 
 function fmt(n) { return '$' + (parseFloat(n) || 0).toFixed(2); }
@@ -837,8 +837,8 @@ async function loadSorterPay() {
   document.getElementById('sorterPayStatsRow').innerHTML = '';
 
   const typeLabels = {
-    hourly: 'Hourly — rate × hours clocked',
-    per_break: 'Per Break Sorted — flat rate per break',
+    hourly: 'Hourly â€” rate Ã— hours clocked',
+    per_break: 'Per Break Sorted â€” flat rate per break',
     hourly_per_break: 'Hourly + Per Break Sorted'
   };
   document.getElementById('sorterPayTypeLabel').textContent = type
@@ -847,14 +847,14 @@ async function loadSorterPay() {
 
   if (!type) {
     document.getElementById('sorterPayNotConfigured').style.display = 'block';
-    document.getElementById('sorterPayTotal').textContent = '—';
+    document.getElementById('sorterPayTotal').textContent = 'â€”';
     return;
   }
 
   let grandTotal = 0;
   const statsHTML = [];
 
-  // ── Hourly component ───────────────────────────────────
+  // â”€â”€ Hourly component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (type === 'hourly' || type === 'hourly_per_break') {
     const rate = parseFloat(currentProfile.hourly_rate) || 0;
     const { data: shifts } = await sb
@@ -891,12 +891,12 @@ async function loadSorterPay() {
     grandTotal += totalPay;
   }
 
-  // ── Per break component ────────────────────────────────
+  // â”€â”€ Per break component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (type === 'per_break' || type === 'hourly_per_break') {
     const defaultRate = parseFloat(currentProfile.per_break_rate) || 0;
     const categoryRates = currentProfile.category_rates || {};
     const hasCategoryRates = Object.keys(categoryRates).some(function(k){ return parseFloat(categoryRates[k]) > 0; });
-    // Fetch all completed tasks then filter client-side — avoids NULL completed_at being dropped by SQL comparison
+    // Fetch all completed tasks then filter client-side â€” avoids NULL completed_at being dropped by SQL comparison
     const { data: allSortTasks } = await sb
       .from('sort_tasks')
       .select('id, completed_at, created_at, stream_id')
@@ -909,7 +909,7 @@ async function loadSorterPay() {
       return d >= from;
     });
 
-    // Get all breaks within those sorted streams — pay is per break, not per stream
+    // Get all breaks within those sorted streams â€” pay is per break, not per stream
     const taskStreamIds = [...new Set(tasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
     let allBreaks = [];
     if (taskStreamIds.length) {
@@ -917,7 +917,7 @@ async function loadSorterPay() {
       allBreaks = bks || [];
     }
 
-    // Build product_id → category map if category rates configured
+    // Build product_id â†’ category map if category rates configured
     const pidCat = {};
     if (hasCategoryRates && allBreaks.length) {
       const pids = [];
@@ -935,7 +935,7 @@ async function loadSorterPay() {
       return (cat && parseFloat(categoryRates[cat]) > 0) ? parseFloat(categoryRates[cat]) : defaultRate;
     }
 
-    // Build stream → stream_key map for display
+    // Build stream â†’ stream_key map for display
     const streamKeyMap = {};
 
     if (taskStreamIds.length) {
@@ -952,10 +952,10 @@ async function loadSorterPay() {
       totalBreakPay += bRate;
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
-      const cat = (b.products_used||[])[0] && pidCat[((b.products_used||[])[0]).product_id] ? pidCat[((b.products_used||[])[0]).product_id] : '—';
+      const cat = (b.products_used||[])[0] && pidCat[((b.products_used||[])[0]).product_id] ? pidCat[((b.products_used||[])[0]).product_id] : 'â€”';
       tr.innerHTML =
         '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + escHtml(cat) + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;">' + escHtml(streamKeyMap[b.stream_id] || '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + escHtml(streamKeyMap[b.stream_id] || 'â€”') + '</td>' +
         '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(bRate) + '</td>';
       tbody.appendChild(tr);
     });
@@ -970,12 +970,12 @@ async function loadSorterPay() {
   document.getElementById('sorterPayTotal').textContent = fmt(grandTotal);
   } catch(err) {
     console.error('loadSorterPay error:', err);
-    document.getElementById('sorterPayTotal').textContent = '—';
+    document.getElementById('sorterPayTotal').textContent = 'â€”';
     showError('Failed to load pay summary. Please refresh and try again.');
   }
 }
 
-// ── My Schedule Week View ─────────────────────────────────
+// â”€â”€ My Schedule Week View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let mySchedWeekRef = new Date();
 let srtAllProfiles = [];
 
@@ -1007,7 +1007,7 @@ function renderMyWeekGrid() {
   const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const s0=days[0], s6=days[6];
   const labelEl = document.getElementById('mySchedWeekLabel');
-  if (labelEl) labelEl.textContent = MON_NAMES[s0.getMonth()]+' '+s0.getDate()+(s0.getMonth()!==s6.getMonth()?' – '+MON_NAMES[s6.getMonth()]:'–')+s6.getDate()+', '+s6.getFullYear();
+  if (labelEl) labelEl.textContent = MON_NAMES[s0.getMonth()]+' '+s0.getDate()+(s0.getMonth()!==s6.getMonth()?' â€“ '+MON_NAMES[s6.getMonth()]:'â€“')+s6.getDate()+', '+s6.getFullYear();
 
   const dateStrs = days.map(function(d){return srtLocalDate(d);});
   const weekStart=dateStrs[0], weekEnd=dateStrs[6];
@@ -1058,7 +1058,7 @@ function setupMySchedNav() {
   if (todayBtn) todayBtn.addEventListener('click', function(){ mySchedWeekRef = new Date(); renderMyWeekGrid(); });
 }
 
-// ── Swap Request ──────────────────────────────────────────
+// â”€â”€ Swap Request â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let swapShiftId=null, swapShiftDate=null;
 function openSwapRequest(shiftId, dateStr) {
   swapShiftId=shiftId; swapShiftDate=dateStr;
@@ -1078,7 +1078,7 @@ async function confirmSwapRequest() {
   if(!withPersonId){showError('Select a person.');return;}
   const withPerson=srtAllProfiles.find(function(p){return p.id===withPersonId;});
   const myName=currentProfile.display_name||'Someone';
-  const msg=myName+' wants to swap their '+swapShiftDate+' shift'+(withPerson?' with '+withPerson.display_name:'')+(note?' — Note: '+note:'');
+  const msg=myName+' wants to swap their '+swapShiftDate+' shift'+(withPerson?' with '+withPerson.display_name:'')+(note?' â€” Note: '+note:'');
   try {
     const {data:owners}=await sb.from('profiles').select('id').eq('org_id',currentProfile.org_id).in('role',['owner','manager']);
     if(owners&&owners.length){
@@ -1089,7 +1089,7 @@ async function confirmSwapRequest() {
   } catch(err){showError('Failed to send request: '+escHtml(err.message));}
 }
 
-// ── Sorter Guide ─────────────────────────────────────────
+// â”€â”€ Sorter Guide â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let sgCurrentScreen = 0;
 const SG_TOTAL = 6;
 
@@ -1192,11 +1192,11 @@ function sgFinish() {
 <!-- Sorter First-Time Guide -->
 <div id="sorterGuide" onclick="if(event.target===this)sgFinish()">
   <div class="sg-box">
-    <button onclick="sgFinish()" style="position:absolute;top:10px;right:10px;background:rgba(45,45,61,0.9);border:1px solid rgba(79,110,247,0.2);color:#e2e8f0;font-size:1rem;cursor:pointer;line-height:1;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:2;" title="Skip guide">✕</button>
+    <button onclick="sgFinish()" style="position:absolute;top:10px;right:10px;background:rgba(45,45,61,0.9);border:1px solid rgba(79,110,247,0.2);color:#e2e8f0;font-size:1rem;cursor:pointer;line-height:1;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:2;" title="Skip guide">âœ•</button>
 
     <!-- Screen 1: Welcome -->
     <div class="sg-screen sg-active">
-      <div class="sg-icon">👋</div>
+      <div class="sg-icon">ðŸ‘‹</div>
       <div class="sg-step">Step 1 of 6</div>
       <div class="sg-title">Welcome to Card Break Pro</div>
       <div class="sg-body">
@@ -1204,13 +1204,13 @@ function sgFinish() {
         <div class="sg-highlight">This guide only shows once. Take 2 minutes to read it.</div>
       </div>
       <div class="sg-actions">
-        <button class="sg-btn-next" onclick="sgNext()">Let's Go →</button>
+        <button class="sg-btn-next" onclick="sgNext()">Let's Go â†’</button>
       </div>
     </div>
 
     <!-- Screen 2: Your Queue -->
     <div class="sg-screen">
-      <div class="sg-icon">📋</div>
+      <div class="sg-icon">ðŸ“‹</div>
       <div class="sg-step">Step 2 of 6</div>
       <div class="sg-title">Your Sort Queue</div>
       <div class="sg-body">
@@ -1220,29 +1220,29 @@ function sgFinish() {
       </div>
       <div class="sg-actions">
         <button class="sg-btn-back" onclick="sgBack()">Back</button>
-        <button class="sg-btn-next" onclick="sgNext()">Next →</button>
+        <button class="sg-btn-next" onclick="sgNext()">Next â†’</button>
       </div>
     </div>
 
     <!-- Screen 3: Clocking In -->
     <div class="sg-screen">
-      <div class="sg-icon">⏱️</div>
+      <div class="sg-icon">â±ï¸</div>
       <div class="sg-step">Step 3 of 6</div>
       <div class="sg-title">Clocking In</div>
       <div class="sg-body">
         Before you start working, clock in using the <strong>Clock In</strong> button. Your hours are tracked from that moment until you clock out.
         <div class="sg-highlight">Always clock in first. Your hourly pay depends on accurate clock times.</div>
-        Clock out as soon as your shift ends — do not leave it running.
+        Clock out as soon as your shift ends â€” do not leave it running.
       </div>
       <div class="sg-actions">
         <button class="sg-btn-back" onclick="sgBack()">Back</button>
-        <button class="sg-btn-next" onclick="sgNext()">Next →</button>
+        <button class="sg-btn-next" onclick="sgNext()">Next â†’</button>
       </div>
     </div>
 
     <!-- Screen 4: Starting a Sort -->
     <div class="sg-screen">
-      <div class="sg-icon">📦</div>
+      <div class="sg-icon">ðŸ“¦</div>
       <div class="sg-step">Step 4 of 6</div>
       <div class="sg-title">Starting and Completing a Sort</div>
       <div class="sg-body">
@@ -1256,13 +1256,13 @@ function sgFinish() {
       </div>
       <div class="sg-actions">
         <button class="sg-btn-back" onclick="sgBack()">Back</button>
-        <button class="sg-btn-next" onclick="sgNext()">Next →</button>
+        <button class="sg-btn-next" onclick="sgNext()">Next â†’</button>
       </div>
     </div>
 
     <!-- Screen 5: Your Pay -->
     <div class="sg-screen">
-      <div class="sg-icon">💰</div>
+      <div class="sg-icon">ðŸ’°</div>
       <div class="sg-step">Step 5 of 6</div>
       <div class="sg-title">Your Pay</div>
       <div class="sg-body">
@@ -1271,13 +1271,13 @@ function sgFinish() {
       </div>
       <div class="sg-actions">
         <button class="sg-btn-back" onclick="sgBack()">Back</button>
-        <button class="sg-btn-next" onclick="sgNext()">Next →</button>
+        <button class="sg-btn-next" onclick="sgNext()">Next â†’</button>
       </div>
     </div>
 
     <!-- Screen 6: Ready -->
     <div class="sg-screen">
-      <div class="sg-icon">🚀</div>
+      <div class="sg-icon">ðŸš€</div>
       <div class="sg-step">Step 6 of 6</div>
       <div class="sg-title">You Are Ready</div>
       <div class="sg-body">
@@ -1292,7 +1292,7 @@ function sgFinish() {
       </div>
       <div class="sg-actions">
         <button class="sg-btn-back" onclick="sgBack()">Back</button>
-        <button class="sg-btn-next" onclick="sgFinish()">Go to My Dashboard ✓</button>
+        <button class="sg-btn-next" onclick="sgFinish()">Go to My Dashboard âœ“</button>
       </div>
     </div>
 
@@ -1308,16 +1308,16 @@ function sgFinish() {
   </div>
 </div>
 
-<!-- ── Sorter Bottom Navigation (mobile only) ── -->
+<!-- â”€â”€ Sorter Bottom Navigation (mobile only) â”€â”€ -->
 <nav class="btm-nav" id="sorterBtmNav">
   <button class="btm-nav-item active" id="btn-btm-queue" onclick="sorterBtmNav('queue')">
-    <span class="btm-nav-icon">📋</span><span class="btm-nav-label">My Queue</span>
+    <span class="btm-nav-icon">ðŸ“‹</span><span class="btm-nav-label">My Queue</span>
   </button>
   <button class="btm-nav-item" id="btn-btm-sched" onclick="sorterBtmNav('shifts')">
-    <span class="btm-nav-icon">📅</span><span class="btm-nav-label">Schedule</span>
+    <span class="btm-nav-icon">ðŸ“…</span><span class="btm-nav-label">Schedule</span>
   </button>
   <button class="btm-nav-item" id="btn-btm-pay" onclick="sorterBtmNav('pay')">
-    <span class="btm-nav-icon">💰</span><span class="btm-nav-label">My Pay</span>
+    <span class="btm-nav-icon">ðŸ’°</span><span class="btm-nav-label">My Pay</span>
   </button>
 </nav>
 

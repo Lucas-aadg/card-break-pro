@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -9,8 +9,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#4f6ef7" />
-  <link rel="stylesheet" href="/mobile.css?v=3" />
-  <title>Card Break Pro — Exports</title>
+  <link rel="stylesheet" href="/mobile.css?v=4" />
+  <title>Card Break Pro â€” Exports</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
   <script src="config.js"></script>
@@ -109,29 +109,29 @@
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
-  <div class="loading-text" id="loadingText">Loading…</div>
+  <div class="loading-text" id="loadingText">Loadingâ€¦</div>
 </div>
 
 <nav>
   <div class="brand">CARD <span>BREAK</span> PRO</div>
   <div class="nav-right">
-    <a href="/dashboard" class="nav-back">← Dashboard</a>
+    <a href="/dashboard" class="nav-back">â† Dashboard</a>
     <span id="ownerBadge" style="color:var(--muted);font-size:0.8rem;"></span>
     <button onclick="sb.auth.signOut().then(()=>location.href='/login')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:0.3rem 0.7rem;font-size:0.78rem;cursor:pointer;">Sign Out</button>
   </div>
 </nav>
 
 <div class="main">
-  <div class="page-title">📊 Exports &amp; Reports</div>
+  <div class="page-title">ðŸ“Š Exports &amp; Reports</div>
   <div class="page-sub">Generate CSV files for your accountant, tax professional, or personal records.</div>
 
   <div id="mainContent" style="display:none;">
 
-  <!-- ═══════════════════════════════════════════
-       SECTION 1 — BUSINESS REPORTS
-  ════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+       SECTION 1 â€” BUSINESS REPORTS
+  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <div class="export-section">
-    <div class="section-title"><span class="section-icon">💼</span> Business Reports</div>
+    <div class="section-title"><span class="section-icon">ðŸ’¼</span> Business Reports</div>
     <div class="export-grid">
 
       <!-- P&L -->
@@ -148,23 +148,23 @@
             <input type="month" id="plMonth" />
           </div>
           <div id="plQuarterlyControls" class="control-row" style="display:none;">
-            <select id="plQuarter"><option value="1">Q1 (Jan–Mar)</option><option value="2">Q2 (Apr–Jun)</option><option value="3">Q3 (Jul–Sep)</option><option value="4">Q4 (Oct–Dec)</option></select>
+            <select id="plQuarter"><option value="1">Q1 (Janâ€“Mar)</option><option value="2">Q2 (Aprâ€“Jun)</option><option value="3">Q3 (Julâ€“Sep)</option><option value="4">Q4 (Octâ€“Dec)</option></select>
             <input type="number" id="plQYear" min="2020" max="2099" style="width:90px;flex:0 0 auto;" />
           </div>
           <div id="plAnnualControls" class="control-row" style="display:none;">
             <input type="number" id="plAYear" min="2020" max="2099" style="max-width:120px;" />
           </div>
-          <button class="btn-export" onclick="runExport('pl')">⬇ Download P&amp;L CSV</button>
+          <button class="btn-export" onclick="runExport('pl')">â¬‡ Download P&amp;L CSV</button>
         </div>
       </div>
 
       <!-- Monthly Revenue Detail -->
       <div class="export-card">
         <div class="export-card-title">Monthly Revenue Detail</div>
-        <div class="export-card-desc">Every stream that ran in a month — date, channel, breaker, gross revenue, fees, box cost, commission, and final profit. Row-per-stream with totals.</div>
+        <div class="export-card-desc">Every stream that ran in a month â€” date, channel, breaker, gross revenue, fees, box cost, commission, and final profit. Row-per-stream with totals.</div>
         <div class="export-controls">
           <input type="month" id="rdMonth" />
-          <button class="btn-export" onclick="runExport('revenue_detail')">⬇ Download CSV</button>
+          <button class="btn-export" onclick="runExport('revenue_detail')">â¬‡ Download CSV</button>
         </div>
       </div>
 
@@ -177,26 +177,26 @@
             <input type="date" id="icFrom" style="flex:1;" />
             <input type="date" id="icTo" style="flex:1;" />
           </div>
-          <button class="btn-export" onclick="runExport('inventory_cost')">⬇ Download CSV</button>
+          <button class="btn-export" onclick="runExport('inventory_cost')">â¬‡ Download CSV</button>
         </div>
       </div>
 
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════
-       SECTION 2 — TEAM MEMBER REPORTS
-  ════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+       SECTION 2 â€” TEAM MEMBER REPORTS
+  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <div class="export-section">
-    <div class="section-title"><span class="section-icon">👥</span> Team Member Reports</div>
+    <div class="section-title"><span class="section-icon">ðŸ‘¥</span> Team Member Reports</div>
     <div class="export-grid">
 
       <!-- Individual Earnings -->
       <div class="export-card">
         <div class="export-card-title">Individual Earnings Summary</div>
-        <div class="export-card-desc">Full earnings record for one team member — streams worked, commission, hours, and pay breakdown. Clean enough to use as 1099 support documentation.</div>
+        <div class="export-card-desc">Full earnings record for one team member â€” streams worked, commission, hours, and pay breakdown. Clean enough to use as 1099 support documentation.</div>
         <div class="export-controls">
-          <select id="earningsMember"><option value="">Select team member…</option></select>
+          <select id="earningsMember"><option value="">Select team memberâ€¦</option></select>
           <select id="earningsPeriodType" onchange="updateEarningsControls()">
             <option value="monthly">Monthly</option>
             <option value="quarterly">Quarterly</option>
@@ -217,14 +217,14 @@
             <input type="date" id="earningsFrom" style="flex:1;" />
             <input type="date" id="earningsTo" style="flex:1;" />
           </div>
-          <button class="btn-export" onclick="runExport('member_earnings')">⬇ Download Earnings CSV</button>
+          <button class="btn-export" onclick="runExport('member_earnings')">â¬‡ Download Earnings CSV</button>
         </div>
       </div>
 
       <!-- Bulk Earnings -->
       <div class="export-card">
         <div class="export-card-title">Bulk Earnings Export</div>
-        <div class="export-card-desc">Downloads all team member earnings as a ZIP file — one CSV per person. Use this to prepare 1099s for the full team at once.</div>
+        <div class="export-card-desc">Downloads all team member earnings as a ZIP file â€” one CSV per person. Use this to prepare 1099s for the full team at once.</div>
         <div class="export-controls">
           <select id="bulkPeriodType" onchange="updateBulkControls()">
             <option value="monthly">Monthly</option>
@@ -246,49 +246,49 @@
             <input type="date" id="bulkFrom" style="flex:1;" />
             <input type="date" id="bulkTo" style="flex:1;" />
           </div>
-          <button class="btn-export" onclick="runExport('bulk_earnings')">⬇ Download All (ZIP)</button>
+          <button class="btn-export" onclick="runExport('bulk_earnings')">â¬‡ Download All (ZIP)</button>
         </div>
       </div>
 
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════
-       SECTION 3 — TAX DOCUMENTS
-  ════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+       SECTION 3 â€” TAX DOCUMENTS
+  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <div class="export-section">
-    <div class="section-title"><span class="section-icon">🗂️</span> Tax Documents</div>
-    <div class="notice" style="margin-bottom:1rem;">⚠ These documents are generated from CardBreakPro operational data. Please review with a qualified tax professional before filing.</div>
+    <div class="section-title"><span class="section-icon">ðŸ—‚ï¸</span> Tax Documents</div>
+    <div class="notice" style="margin-bottom:1rem;">âš  These documents are generated from CardBreakPro operational data. Please review with a qualified tax professional before filing.</div>
     <div class="export-grid">
 
       <!-- Annual Tax Summary -->
       <div class="export-card">
         <div class="export-card-title">Annual Tax Summary</div>
-        <div class="export-card-desc">Full-year business summary — monthly P&amp;L breakdown, total revenue, COGS, labor, and team member annual earnings for 1099 preparation.</div>
+        <div class="export-card-desc">Full-year business summary â€” monthly P&amp;L breakdown, total revenue, COGS, labor, and team member annual earnings for 1099 preparation.</div>
         <div class="export-controls">
           <input type="number" id="taxYear" min="2020" max="2099" placeholder="Year (e.g. 2026)" style="max-width:160px;" />
-          <button class="btn-export" onclick="runExport('tax_annual')">⬇ Download Annual Summary</button>
+          <button class="btn-export" onclick="runExport('tax_annual')">â¬‡ Download Annual Summary</button>
         </div>
       </div>
 
       <!-- Payroll Run Export -->
       <div class="export-card">
         <div class="export-card-title">Payroll Run Export</div>
-        <div class="export-card-desc">Export a specific payroll run as a CSV — team member names, roles, pay breakdown, and totals. Paper trail for every pay period.</div>
+        <div class="export-card-desc">Export a specific payroll run as a CSV â€” team member names, roles, pay breakdown, and totals. Paper trail for every pay period.</div>
         <div class="export-controls">
-          <select id="payrollRunSelect"><option value="">Loading payroll runs…</option></select>
-          <button class="btn-export" onclick="runExport('payroll_run')">⬇ Download Payroll Run</button>
+          <select id="payrollRunSelect"><option value="">Loading payroll runsâ€¦</option></select>
+          <button class="btn-export" onclick="runExport('payroll_run')">â¬‡ Download Payroll Run</button>
         </div>
       </div>
 
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
        EXPORT HISTORY
-  ════════════════════════════════════════════ -->
+  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <div class="export-section">
-    <div class="section-title"><span class="section-icon">🕐</span> Export History</div>
+    <div class="section-title"><span class="section-icon">ðŸ•</span> Export History</div>
     <div class="history-table-wrap">
       <table class="history-table">
         <thead>
@@ -301,7 +301,7 @@
           </tr>
         </thead>
         <tbody id="historyBody">
-          <tr><td colspan="5" class="empty-state">Loading…</td></tr>
+          <tr><td colspan="5" class="empty-state">Loadingâ€¦</td></tr>
         </tbody>
       </table>
     </div>
@@ -321,10 +321,10 @@ let currentProfile = null;
 let orgName = '';
 let allProfiles = [];
 
-// ── Utilities ────────────────────────────────────────────────
+// â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function showLoading(msg) {
-  document.getElementById('loadingText').textContent = msg || 'Loading…';
+  document.getElementById('loadingText').textContent = msg || 'Loadingâ€¦';
   document.getElementById('loadingOverlay').classList.add('active');
 }
 function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
@@ -350,9 +350,9 @@ function makeFilename(type, period) {
   return org + '_' + type + '_' + period.replace(/[^a-z0-9]+/g,'_') + '_' + dt + '.csv';
 }
 
-// ── CSV Builder ──────────────────────────────────────────────
+// â”€â”€ CSV Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const BOM = '﻿';
+const BOM = 'ï»¿';
 
 function csvCell(v) {
   const s = String(v == null ? '' : v);
@@ -372,7 +372,7 @@ function csvFileHeader(title, period) {
 }
 
 function csvFooter() {
-  return csvRow('End of Report — CardBreakPro');
+  return csvRow('End of Report â€” CardBreakPro');
 }
 
 function downloadCSV(csv, filename) {
@@ -383,7 +383,7 @@ function downloadCSV(csv, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-// ── Period Helpers ───────────────────────────────────────────
+// â”€â”€ Period Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function periodFromMonthInput(val) {
   // val = "YYYY-MM"
@@ -415,7 +415,7 @@ function periodFromCustom(from, to) {
   return { start: from, end: to, label: from + ' to ' + to, slug: from.replace(/-/g,'') + '_' + to.replace(/-/g,'') };
 }
 
-// ── UI Controls ──────────────────────────────────────────────
+// â”€â”€ UI Controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function updatePLControls() {
   const t = document.getElementById('plType').value;
@@ -440,10 +440,10 @@ function updateBulkControls() {
   document.getElementById('bulkCustomControls').style.display = t==='custom' ? '' : 'none';
 }
 
-// ── Auth ─────────────────────────────────────────────────────
+// â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function initAuth() {
-  showLoading('Checking session…');
+  showLoading('Checking sessionâ€¦');
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { window.location.href = '/login'; return; }
@@ -476,7 +476,7 @@ async function loadTeamMembers() {
   allProfiles = data || [];
 
   const sel = document.getElementById('earningsMember');
-  sel.innerHTML = '<option value="">Select team member…</option>';
+  sel.innerHTML = '<option value="">Select team memberâ€¦</option>';
   (data || []).forEach(function(p) {
     const opt = document.createElement('option');
     opt.value = p.id;
@@ -493,11 +493,11 @@ async function loadPayrollRuns() {
     sel.innerHTML = '<option value="">No payroll runs found</option>';
     return;
   }
-  sel.innerHTML = '<option value="">Select a payroll run…</option>';
+  sel.innerHTML = '<option value="">Select a payroll runâ€¦</option>';
   (data || []).forEach(function(r) {
     const opt = document.createElement('option');
     opt.value = r.id;
-    opt.textContent = (r.period_label || r.period_from + ' – ' + r.period_to) + ' — $' + n2(r.total_paid);
+    opt.textContent = (r.period_label || r.period_from + ' â€“ ' + r.period_to) + ' â€” $' + n2(r.total_paid);
     sel.appendChild(opt);
   });
 }
@@ -533,11 +533,11 @@ function setDefaultDates() {
   document.getElementById('bulkQuarter').value = q;
 }
 
-// ── Export Router ────────────────────────────────────────────
+// â”€â”€ Export Router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function runExport(type, params) {
   const btn = event ? event.target.closest('button') : null;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'â³ Generatingâ€¦'; }
   try {
     let csv = null, filename = null, period = null;
 
@@ -623,11 +623,11 @@ async function runExport(type, params) {
     alert('Export failed: ' + err.message);
     console.error(err);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = btn.textContent.replace('⏳ Generating…', '') || '⬇ Download'; }
+    if (btn) { btn.disabled = false; btn.textContent = btn.textContent.replace('â³ Generatingâ€¦', '') || 'â¬‡ Download'; }
   }
 }
 
-// ── P&L Builder ──────────────────────────────────────────────
+// â”€â”€ P&L Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function buildPL(period) {
   const [streamsRes, payrollRes, channelsRes] = await Promise.all([
@@ -675,7 +675,7 @@ async function buildPL(period) {
   const chEntries = Object.entries(byChannel);
   if (chEntries.length > 1) {
     chEntries.forEach(function([ch, d]) {
-      csv += csvRow('  Revenue — ' + ch + ' (' + d.streams + ' streams)', n2(d.rev));
+      csv += csvRow('  Revenue â€” ' + ch + ' (' + d.streams + ' streams)', n2(d.rev));
     });
   }
   csv += csvRow('Platform Fees', n2(totFees));
@@ -687,7 +687,7 @@ async function buildPL(period) {
   csv += csvRow('Total Box Cost', n2(totCOGS));
   if (chEntries.length > 1) {
     chEntries.forEach(function([ch, d]) {
-      csv += csvRow('  Box Cost — ' + ch, n2(d.cogs));
+      csv += csvRow('  Box Cost â€” ' + ch, n2(d.cogs));
     });
   }
   csv += '\n';
@@ -722,7 +722,7 @@ async function buildPL(period) {
   return { csv, filename };
 }
 
-// ── Revenue Detail Builder ───────────────────────────────────
+// â”€â”€ Revenue Detail Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function buildRevenueDetail(period) {
   const [streamsRes, channelsRes, profilesRes] = await Promise.all([
@@ -760,7 +760,7 @@ async function buildRevenueDetail(period) {
     csv += csvRow(
       s.break_date,
       s.channel_id ? (channelMap[s.channel_id]||'Channel') : 'Direct',
-      s.breaker_id ? (profileMap[s.breaker_id]||'Unknown') : '—',
+      s.breaker_id ? (profileMap[s.breaker_id]||'Unknown') : 'â€”',
       n2(rev), n2(fees), n2(cogs), n2(other), n2(comm), n2(net), brks
     );
   });
@@ -772,7 +772,7 @@ async function buildRevenueDetail(period) {
   return { csv, filename: makeFilename('revenue_detail', period.slug) };
 }
 
-// ── Member Earnings Builder ──────────────────────────────────
+// â”€â”€ Member Earnings Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function buildMemberEarnings(member, period) {
   if (!member) throw new Error('Team member not found');
@@ -780,7 +780,7 @@ async function buildMemberEarnings(member, period) {
   const fromTs = period.start + 'T00:00:00';
   const toTs = period.end + 'T23:59:59';
 
-  let csv = csvFileHeader('Earnings Summary — ' + member.display_name, period.label);
+  let csv = csvFileHeader('Earnings Summary â€” ' + member.display_name, period.label);
   csv += csvRow('Name', member.display_name);
   csv += csvRow('Role', member.role);
   csv += csvRow('Pay Type', member.pay_type || 'Not configured');
@@ -954,13 +954,13 @@ async function buildMemberEarnings(member, period) {
   return { csv, filename: makeFilename('earnings_' + safeName, period.slug) };
 }
 
-// ── Bulk Earnings (ZIP) ──────────────────────────────────────
+// â”€â”€ Bulk Earnings (ZIP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function buildBulkEarnings(period) {
   if (!allProfiles.length) { alert('No team members found.'); return; }
 
   const zip = new JSZip();
-  showLoading('Generating bulk export…');
+  showLoading('Generating bulk exportâ€¦');
 
   try {
     for (const member of allProfiles) {
@@ -983,7 +983,7 @@ async function buildBulkEarnings(period) {
   }
 }
 
-// ── Annual Tax Summary ────────────────────────────────────────
+// â”€â”€ Annual Tax Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function buildTaxSummary(year, period) {
   const months = [];
@@ -1043,11 +1043,11 @@ async function buildTaxSummary(year, period) {
     });
   });
 
-  let csv = csvFileHeader('Annual Tax Summary — ' + year, 'Calendar Year ' + year);
+  let csv = csvFileHeader('Annual Tax Summary â€” ' + year, 'Calendar Year ' + year);
   csv += csvRow('This document is generated from CardBreakPro operational data. Please review with a qualified tax professional before filing.');
   csv += '\n';
 
-  csv += csvRow('BUSINESS SUMMARY — ' + year);
+  csv += csvRow('BUSINESS SUMMARY â€” ' + year);
   csv += csvRow('Description', 'USD');
   csv += csvRow('Total Annual Gross Revenue', n2(yRev));
   csv += csvRow('Total Annual Platform Fees', n2(yFees));
@@ -1059,8 +1059,8 @@ async function buildTaxSummary(year, period) {
   csv += csvRow('Annual Operating Profit', n2(yNet));
   csv += csvRow('Total Streams Run', allStreams.reduce(function(s,x){ return s+1; }, 0));
   csv += csvRow('Total Breaks', allStreams.reduce(function(s,x){ return s+(parseInt(x.break_count)||0); }, 0));
-  csv += csvRow('Most Profitable Month', bestMonth ? bestMonth.label + ' (' + n2(bestMonth.net) + ')' : '—');
-  csv += csvRow('Least Profitable Month', worstMonth ? worstMonth.label + ' (' + n2(worstMonth.net) + ')' : '—');
+  csv += csvRow('Most Profitable Month', bestMonth ? bestMonth.label + ' (' + n2(bestMonth.net) + ')' : 'â€”');
+  csv += csvRow('Least Profitable Month', worstMonth ? worstMonth.label + ' (' + n2(worstMonth.net) + ')' : 'â€”');
   csv += '\n';
 
   csv += csvRow('MONTH-BY-MONTH BREAKDOWN');
@@ -1087,7 +1087,7 @@ async function buildTaxSummary(year, period) {
   return { csv, filename: makeFilename('tax_summary', year + '_annual') };
 }
 
-// ── Inventory Cost Report ────────────────────────────────────
+// â”€â”€ Inventory Cost Report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function buildInventoryCost(period) {
   const { data: logs } = await sb.from('inventory_log')
@@ -1174,7 +1174,7 @@ async function buildInventoryCost(period) {
   return { csv, filename: makeFilename('inventory_cost', period.slug) };
 }
 
-// ── Payroll Run Export ────────────────────────────────────────
+// â”€â”€ Payroll Run Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function buildPayrollRun(runId) {
   const { data: run, error } = await sb.from('payroll_runs').select('*').eq('id', runId).single();
@@ -1198,7 +1198,7 @@ async function buildPayrollRun(runId) {
   });
   csv += csvRow('TOTAL PAYROLL', '', '', '', n2(tTotal), '', '');
   csv += '\n';
-  csv += csvRow('Note: Payment method and notes columns are blank — fill in as needed for your records.');
+  csv += csvRow('Note: Payment method and notes columns are blank â€” fill in as needed for your records.');
   csv += '\n';
   csv += csvFooter();
 
@@ -1206,7 +1206,7 @@ async function buildPayrollRun(runId) {
   return { csv, filename: makeFilename('payroll_run', safeLabel) };
 }
 
-// ── Export Log ───────────────────────────────────────────────
+// â”€â”€ Export Log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function logAndHistory(exportType, periodStart, periodEnd, filename, params) {
   try {
@@ -1234,7 +1234,7 @@ async function loadExportHistory() {
 
     if (error) throw error;
     if (!data || !data.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No exports yet — generate one above to see it here.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No exports yet â€” generate one above to see it here.</td></tr>';
       return;
     }
 
@@ -1242,21 +1242,21 @@ async function loadExportHistory() {
     data.forEach(function(log) {
       const tr = document.createElement('tr');
       const typeLabel = (log.export_type||'').replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
-      const period = log.period_start && log.period_end ? log.period_start + ' — ' + log.period_end : log.period_start || '—';
-      const genDate = log.generated_at ? log.generated_at.split('T')[0] : '—';
+      const period = log.period_start && log.period_end ? log.period_start + ' â€” ' + log.period_end : log.period_start || 'â€”';
+      const genDate = log.generated_at ? log.generated_at.split('T')[0] : 'â€”';
       const paramsJson = typeof log.params === 'string' ? log.params : JSON.stringify(log.params||{});
 
       tr.innerHTML =
         '<td>' + escHtml(typeLabel) + '</td>' +
         '<td style="font-size:0.78rem;color:var(--muted);">' + escHtml(period) + '</td>' +
         '<td style="color:var(--muted);">' + escHtml(genDate) + '</td>' +
-        '<td style="font-size:0.73rem;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(log.filename||'') + '">' + escHtml(log.filename||'—') + '</td>' +
+        '<td style="font-size:0.73rem;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(log.filename||'') + '">' + escHtml(log.filename||'â€”') + '</td>' +
         '<td><button class="btn-sm-dl" onclick="redownloadLog(' + escHtml(JSON.stringify(log.params)) + ')">Re-download</button></td>';
       tbody.appendChild(tr);
     });
   } catch(e) {
-    // export_logs table may not exist yet — show setup notice
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--yellow);font-size:0.78rem;">Export history unavailable. Run the SQL migration to enable it — see the Setup section in your Supabase project.</td></tr>';
+    // export_logs table may not exist yet â€” show setup notice
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--yellow);font-size:0.78rem;">Export history unavailable. Run the SQL migration to enable it â€” see the Setup section in your Supabase project.</td></tr>';
   }
 }
 
@@ -1299,7 +1299,7 @@ async function redownloadLog(params) {
   }
 }
 
-// ── Boot ─────────────────────────────────────────────────────
+// â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 initAuth();
 </script>
 
