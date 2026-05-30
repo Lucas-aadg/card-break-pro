@@ -8663,11 +8663,28 @@ function setupLogHitModal() {
         .eq('username', username)
         .maybeSingle();
       if (error) throw error;
-      if (!buyer) throw new Error('@' + username + ' not found — make sure the username matches exactly.');
-      await sb.from('buyers').update({
-        case_hits: (buyer.case_hits || 0) + 1,
-        updated_at: new Date().toISOString()
-      }).eq('id', buyer.id);
+      if (!buyer) {
+        // First-time buyer — create placeholder now, slip import fills in spend at closeout
+        const now = new Date().toISOString();
+        const { error: insErr } = await sb.from('buyers').insert({
+          organization_id: currentProfile.org_id,
+          username: username,
+          case_hits: 1,
+          total_spent: 0,
+          total_breaks_purchased: 0,
+          total_streams_participated: 0,
+          is_new_buyer: true,
+          temperature: 'cold',
+          created_at: now,
+          updated_at: now
+        });
+        if (insErr) throw insErr;
+      } else {
+        await sb.from('buyers').update({
+          case_hits: (buyer.case_hits || 0) + 1,
+          updated_at: new Date().toISOString()
+        }).eq('id', buyer.id);
+      }
       document.getElementById('logHitModal').classList.remove('active');
       showGlobalSuccess('@' + username + ' — case hit logged!');
       cbpTrack('case_hit_logged', { org_id: currentProfile.org_id });
