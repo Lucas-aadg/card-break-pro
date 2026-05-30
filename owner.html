@@ -4312,10 +4312,12 @@ async function coSaveBuyers(list, orgId) {
       buyerId = ins.data ? ins.data.id : null;
     }
     if (buyerId) {
-      await sb.from('buyer_purchases').insert({
-        organization_id: orgId, buyer_id: buyerId,
-        amount: b.total, purchase_date: today
-      }).catch(function(){});
+      try {
+        await sb.from('buyer_purchases').insert({
+          organization_id: orgId, buyer_id: buyerId,
+          amount: b.total, purchase_date: today
+        });
+      } catch(e) {}
     }
   }
 }
