@@ -252,6 +252,7 @@
     .btn-primary { background: var(--primary); color: #fff; }
     .btn-green { background: var(--green); color: #fff; }
     .btn-red { background: var(--red); color: #fff; }
+    .btn-amber { background: #f59e0b; color: #000; }
     .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
     .btn:hover:not(:disabled) { opacity: 0.85; }
     .btn-submit { flex: 1; min-width: 160px; font-size: 1rem; padding: 1rem; }
@@ -598,6 +599,7 @@
   <div class="panel">
     <div class="btn-row">
       <button class="btn btn-green btn-submit" id="submitBreakBtn">SUBMIT BREAK</button>
+      <button class="btn btn-amber" id="liveHitBtn">🎯 LOG HIT</button>
       <button class="btn btn-red" id="closeStreamBtn">CLOSE OUT STREAM</button>
       <button class="btn btn-outline" id="resetEntryBtn">RESET ENTRY</button>
       <button class="btn btn-outline" id="refreshProductsBtn">REFRESH PRODUCTS</button>
@@ -809,6 +811,35 @@
     <div class="modal-btn-row">
       <button class="btn btn-outline" onclick="skipHitLogging()">Skip</button>
       <button class="btn" id="submitHitsBtn" onclick="submitAllHits()">Submit Hits</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIVE HIT MODAL -->
+<div class="modal-overlay" id="liveHitModal">
+  <div class="modal" style="max-width:440px;">
+    <h2>🎯 Log Hit</h2>
+    <div class="form-group">
+      <label for="lhUsername">Buyer Username</label>
+      <input type="text" id="lhUsername" placeholder="username (no @)" autocomplete="off" style="font-size:1.05rem;" />
+    </div>
+    <div class="form-group">
+      <label for="lhDesc">What was the hit?</label>
+      <input type="text" id="lhDesc" placeholder="e.g. Luka 1/1 Logoman Auto" autocomplete="off" style="font-size:1.05rem;" />
+    </div>
+    <div class="form-group">
+      <label for="lhType">Hit Type</label>
+      <select id="lhType" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.6rem 0.75rem;font-size:0.95rem;width:100%;">
+        <option value="case_hit">Case Hit</option>
+        <option value="auto">Auto</option>
+        <option value="patch">Patch</option>
+        <option value="rookie">Rookie</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="lhCancelBtn">Cancel</button>
+      <button class="btn btn-amber" id="lhConfirmBtn">Log Hit</button>
     </div>
   </div>
 </div>
@@ -2785,7 +2816,107 @@ function updateMobileBreakHeader() {
 }
 
 // Patch close-stream button on mobile to show confirmation first
+function setupLiveHitModal() {
+  const modal      = document.getElementById('liveHitModal');
+  const openBtn    = document.getElementById('liveHitBtn');
+  const cancelBtn  = document.getElementById('lhCancelBtn');
+  const confirmBtn = document.getElementById('lhConfirmBtn');
+
+  function openModal() {
+    document.getElementById('lhUsername').value = '';
+    document.getElementById('lhDesc').value = '';
+    document.getElementById('lhType').value = 'case_hit';
+    modal.classList.add('active');
+    setTimeout(function() { document.getElementById('lhUsername').focus(); }, 80);
+  }
+  function closeModal() { modal.classList.remove('active'); }
+
+  openBtn.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+
+  ['lhUsername','lhDesc'].forEach(function(id) {
+    document.getElementById(id).addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') confirmBtn.click();
+    });
+  });
+
+  confirmBtn.addEventListener('click', async function() {
+    const username = document.getElementById('lhUsername').value.trim().replace(/^@/, '');
+    const desc     = document.getElementById('lhDesc').value.trim();
+    const hitType  = document.getElementById('lhType').value;
+
+    if (!username) { showGlobalError('Enter a buyer username.'); return; }
+    if (!desc)     { showGlobalError('Describe the hit.'); return; }
+
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Saving…';
+
+    try {
+      const now = new Date().toISOString();
+
+      // Case-insensitive buyer lookup
+      const { data: buyer, error: lookupErr } = await sb.from('buyers')
+        .select('id, case_hits')
+        .eq('organization_id', currentProfile.org_id)
+        .ilike('username', username)
+        .maybeSingle();
+      if (lookupErr) throw lookupErr;
+
+      let buyerId;
+      if (!buyer) {
+        // Create placeholder — slip import will fill in spend later
+        const { data: nb, error: insErr } = await sb.from('buyers').insert({
+          organization_id:           currentProfile.org_id,
+          username:                  username,
+          case_hits:                 hitType === 'case_hit' ? 1 : 0,
+          total_spent:               0,
+          total_breaks_purchased:    0,
+          total_streams_participated: 0,
+          is_new_buyer:              true,
+          temperature:               'cold',
+          created_at:                now,
+          updated_at:                now
+        }).select('id').single();
+        if (insErr) throw insErr;
+        buyerId = nb.id;
+      } else {
+        buyerId = buyer.id;
+        if (hitType === 'case_hit') {
+          await sb.from('buyers').update({
+            case_hits:  (buyer.case_hits || 0) + 1,
+            updated_at: now
+          }).eq('id', buyerId);
+        }
+      }
+
+      // Write hit record
+      const { error: hitErr } = await sb.from('buyer_hits').insert({
+        organization_id: currentProfile.org_id,
+        buyer_id:        buyerId,
+        stream_id:       currentStream ? currentStream.id : null,
+        hit_description: desc,
+        hit_type:        hitType,
+        submitted_by:    currentUser.id,
+        submitted_at:    now
+      });
+      if (hitErr) throw hitErr;
+
+      closeModal();
+      showGlobalSuccess('@' + username + ' — hit logged!');
+      if (typeof cbpTrack === 'function') cbpTrack('live_hit_logged', { org_id: currentProfile.org_id, hit_type: hitType });
+    } catch (err) {
+      showGlobalError(err.message || 'Failed to log hit.');
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Log Hit';
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+  setupLiveHitModal();
+
   const closeBtn = document.getElementById('closeStreamBtn');
   if (!closeBtn) return;
   closeBtn.addEventListener('click', function(e) {
