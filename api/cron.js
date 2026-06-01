@@ -98,16 +98,25 @@ async function runShiftReminders(sb, res) {
   const windowEnd   = new Date(now.getTime() + 35 * 60 * 1000);
   const results = { sent: [], skipped: [], errors: [] };
 
-  const { data: shifts, error: shiftErr } = await sb
+  // schedules stores scheduled_date (date) + scheduled_time (time) separately
+  // Fetch today's unreminded shifts then filter by 25–35 min window in JS
+  const todayStr = now.toISOString().split('T')[0];
+  const { data: allShifts, error: shiftErr } = await sb
     .from('schedules')
-    .select('id, org_id, breaker_id, sorter_id, stream_key, scheduled_start, channel_id')
+    .select('id, org_id, breaker_id, sorter_id, stream_key, scheduled_date, scheduled_time, channel_id')
     .eq('reminder_sent', false)
     .neq('status', 'completed').neq('status', 'cancelled')
-    .gte('scheduled_start', windowStart.toISOString())
-    .lte('scheduled_start', windowEnd.toISOString());
+    .eq('scheduled_date', todayStr);
 
   if (shiftErr) throw new Error('Schedules query failed: ' + shiftErr.message);
-  if (!shifts || shifts.length === 0) return res.status(200).json({ message: 'No upcoming shifts', results });
+
+  const shifts = (allShifts || []).filter(function(s) {
+    if (!s.scheduled_time) return false;
+    const combined = new Date(s.scheduled_date + 'T' + s.scheduled_time + 'Z');
+    return combined >= windowStart && combined <= windowEnd;
+  });
+
+  if (shifts.length === 0) return res.status(200).json({ message: 'No upcoming shifts', results });
 
   for (const shift of shifts) {
     try {
@@ -130,7 +139,7 @@ async function runShiftReminders(sb, res) {
         results.skipped.push(shift.id + ':pref-off'); continue;
       }
 
-      const shiftTime  = new Date(shift.scheduled_start);
+      const shiftTime  = new Date(shift.scheduled_date + 'T' + shift.scheduled_time + 'Z');
       const timeStr    = shiftTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       const streamName = shift.stream_key || 'your scheduled stream';
       const { data: profile } = await sb.from('profiles').select('display_name').eq('id', userId).maybeSingle();

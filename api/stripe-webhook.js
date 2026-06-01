@@ -123,7 +123,12 @@ module.exports = async (req, res) => {
       case 'customer.subscription.updated': {
         const sub = event.data.object;
         const status = sub.status === 'trialing' ? 'active' : sub.status;
-        const updateFields = { status, updated_at: new Date().toISOString() };
+        const updateFields = {
+          status,
+          cancel_at_period_end: sub.cancel_at_period_end || false,
+          current_period_end:   sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+          updated_at:           new Date().toISOString()
+        };
 
         const priceId = sub.items?.data?.[0]?.price?.id;
         const newTier = PRICE_TIER_MAP[priceId];
@@ -210,7 +215,13 @@ module.exports = async (req, res) => {
         const sub = event.data.object;
         const status = sub.status === 'trialing' ? 'active' : sub.status;
         const { error } = await sb.from('subscriptions')
-          .update({ stripe_subscription_id: sub.id, status, updated_at: new Date().toISOString() })
+          .update({
+            stripe_subscription_id: sub.id,
+            status,
+            cancel_at_period_end: sub.cancel_at_period_end || false,
+            current_period_end:   sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+            updated_at:           new Date().toISOString()
+          })
           .eq('stripe_customer_id', sub.customer);
         if (error) console.error('Supabase update error (customer.subscription.created):', error);
         break;
@@ -359,9 +370,9 @@ async function processReferralConversion(sb, referredOrgId) {
   if (referrerSub.billing_cycle === 'monthly' && referrerSub.stripe_subscription_id) {
     // Monthly: extend current period by 30 days
     try {
-      const stripeSub = await require('stripe')(process.env.STRIPE_SECRET_KEY).subscriptions.retrieve(referrerSub.stripe_subscription_id);
+      const stripeSub = await stripe.subscriptions.retrieve(referrerSub.stripe_subscription_id);
       const newPeriodEnd = stripeSub.current_period_end + (30 * 24 * 60 * 60);
-      await require('stripe')(process.env.STRIPE_SECRET_KEY).subscriptions.update(referrerSub.stripe_subscription_id, {
+      await stripe.subscriptions.update(referrerSub.stripe_subscription_id, {
         trial_end: newPeriodEnd,
         proration_behavior: 'none'
       });

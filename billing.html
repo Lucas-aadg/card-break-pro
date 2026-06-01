@@ -464,7 +464,7 @@
           const data = await resp.json();
           if (!resp.ok || data.error) throw new Error(data.error || 'Preview failed');
 
-          const ANNUAL_DISPLAY = { starter: '$990.00', pro: '$3,999.90', empire: '$9,999.90' };
+          const ANNUAL_DISPLAY = { starter: '$1,299.90', pro: '$3,999.90', empire: '$9,999.90' };
           document.getElementById('annualModalPrice').textContent   = ANNUAL_DISPLAY[tier] || '—';
           document.getElementById('annualModalCredit').textContent  = '−' + fmtMoney(data.proration_credit);
           document.getElementById('annualModalCharge').textContent  = fmtMoney(data.charge_today);
