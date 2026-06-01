@@ -362,7 +362,7 @@
 
       try {
         const email = document.getElementById('email').value.trim();
-        const res = await fetch('/api/validate-referral-code', {
+        const res = await fetch('/api/referral?action=validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code, email })
@@ -471,7 +471,7 @@
         // Step 4: Record referral use (server-side via checkout metadata; also track here)
         if (referralValid && referralCodeValue) {
           try {
-            await fetch('/api/record-referral-use', {
+            await fetch('/api/referral?action=record', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ code: referralCodeValue, referredOrgId: orgId })

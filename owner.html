@@ -8830,7 +8830,7 @@ async function loadReferEarn() {
     if (!token) return;
 
     // Fetch or create referral code
-    const codeRes = await fetch('/api/generate-referral-code', {
+    const codeRes = await fetch('/api/referral?action=generate', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     const codeData = await codeRes.json();

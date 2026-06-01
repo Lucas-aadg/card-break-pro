@@ -16,19 +16,19 @@
   ],
   "crons": [
     {
-      "path": "/api/trial-cron",
+      "path": "/api/cron?type=trial",
       "schedule": "0 14 * * *"
     },
     {
-      "path": "/api/cron-shift-reminder",
+      "path": "/api/cron?type=shift-reminder",
       "schedule": "0 8 * * *"
     },
     {
-      "path": "/api/cron-daily-digest",
+      "path": "/api/cron?type=daily-digest",
       "schedule": "0 7 * * *"
     },
     {
-      "path": "/api/cron-annual-renewal-reminders",
+      "path": "/api/cron?type=annual-renewal",
       "schedule": "0 12 * * *"
     }
   ]
