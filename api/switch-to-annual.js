@@ -8,8 +8,8 @@ const ANNUAL_PRICE_IDS = {
 };
 
 // Monthly prices in cents for proration calculation
-const MONTHLY_PRICES_CENTS = { starter: 9900, pro: 39999, empire: 99999 };
-const ANNUAL_PRICES_CENTS  = { starter: 99000, pro: 399990, empire: 999990 };
+const MONTHLY_PRICES_CENTS = { starter: 12999, pro: 39999, empire: 99999 };
+const ANNUAL_PRICES_CENTS  = { starter: 129990, pro: 399990, empire: 999990 };
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');

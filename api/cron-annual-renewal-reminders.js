@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
     if (subErr) throw new Error('Subscriptions query failed: ' + subErr.message);
     if (!subs || subs.length === 0) return res.status(200).json({ message: 'No upcoming annual renewals today', results });
 
-    const ANNUAL_PRICES = { starter: 990.00, pro: 3999.90, empire: 9999.90 };
+    const ANNUAL_PRICES = { starter: 1299.90, pro: 3999.90, empire: 9999.90 };
 
     for (const sub of subs) {
       try {
