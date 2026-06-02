@@ -60,7 +60,7 @@
     },
     {
       "path": "/api/cron?type=split-expiry",
-      "schedule": "0 * * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron?type=goal-prompt",
