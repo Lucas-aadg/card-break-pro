@@ -600,10 +600,12 @@
       font-size: 13px;
       color: var(--red);
       letter-spacing: 0.1em;
-      padding: 28px 0;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 28px 28px 28px 0;
       border-right: 1px solid var(--border);
-      text-align: right;
-      padding-right: 28px;
     }
     .pain-item {
       padding: 28px 0 28px 40px;
@@ -1119,6 +1121,34 @@
     .price-features li.pf-unlimited::before { color: var(--green); }
     .price-features li .pf-green { color: var(--green); font-weight: 600; }
 
+    .price-limits {
+      background: var(--s3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pl-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+    .pl-key { color: var(--w40); }
+    .pl-val { color: var(--w80); font-weight: 600; }
+    .pl-val-green { color: var(--green); font-weight: 600; }
+
+    .pain-body {
+      font-size: 15px;
+      color: var(--w60);
+      line-height: 1.7;
+      margin-top: 14px;
+      max-width: 680px;
+    }
+
     .btn-price-green {
       background: var(--green);
       color: #000;
@@ -1444,9 +1474,9 @@
 
           <div class="db-payroll">
             <div class="db-payroll-title">Payroll — Auto Calculated</div>
-            <div class="db-payroll-row"><span>@MikeBreaks</span><span>$320.00</span></div>
-            <div class="db-payroll-row"><span>@CardKing</span><span>$195.00</span></div>
-            <div class="db-payroll-row"><span>@TigerBreaks</span><span>$145.00</span></div>
+            <div class="db-payroll-row"><span>Breaker 1</span><span>$320.00</span></div>
+            <div class="db-payroll-row"><span>Breaker 2</span><span>$195.00</span></div>
+            <div class="db-payroll-row"><span>Breaker 3</span><span>$145.00</span></div>
           </div>
 
           <div class="db-ticker">
@@ -1476,7 +1506,7 @@
     </div>
     <div class="stat-item fu">
       <div class="stat-num" id="s2">0</div>
-      <div class="stat-label">Active Buyers</div>
+      <div class="stat-label">Streams Tracked</div>
     </div>
     <div class="stat-item fu">
       <div class="stat-num">$0</div>
@@ -1524,12 +1554,15 @@
       <div class="pain-items">
         <div class="pain-item fu">
           <h2 class="pain-headline">YOUR STREAMS ENDED AN HOUR AGO. YOU STILL DON'T KNOW IF YOU MADE MONEY.</h2>
+          <p class="pain-body">You're doing the math in your head. Guessing what the platform took. Trying to remember what you paid for those boxes two weeks ago. The real number won't exist until someone opens a spreadsheet and does the work. CardBreakPro gives it to you the second the stream closes.</p>
         </div>
         <div class="pain-item fu">
           <h2 class="pain-headline">YOUR BREAKERS DON'T KNOW WHAT THEY'RE OWED. AND NEITHER DO YOU.</h2>
+          <p class="pain-body">Every pay period you're pulling up numbers from multiple places, doing math, texting everyone their cut, and hoping nobody disputes it. CardBreakPro calculates every breaker's commission automatically — to the penny — the moment a stream closes. They see it in their account. You mark it paid. Done.</p>
         </div>
         <div class="pain-item fu">
           <h2 class="pain-headline">YOU'RE BUYING BOXES BASED ON GUT FEELING AND HOPING IT WORKS OUT.</h2>
+          <p class="pain-body">Some products crush it. Some lose money. You might know which ones feel good but you don't know the actual numbers — cost versus revenue versus ROI across dozens of breaks. CardBreakPro tracks every product across every break and tells you exactly what to run more of and what to kill.</p>
         </div>
       </div>
     </div>
@@ -1796,8 +1829,13 @@
         <div class="price-annual-note" id="note-starter"></div>
         <div class="price-trial">&#10003; 14-day free trial</div>
         <div class="price-divider"></div>
+        <div class="price-limits">
+          <div class="pl-row"><span class="pl-key">Organizations</span><span class="pl-val">1</span></div>
+          <div class="pl-row"><span class="pl-key">Breakers</span><span class="pl-val">5 max</span></div>
+          <div class="pl-row"><span class="pl-key">Sorters</span><span class="pl-val">3 max</span></div>
+          <div class="pl-row"><span class="pl-key">Managers</span><span class="pl-val">1 max</span></div>
+        </div>
         <ul class="price-features">
-          <li>Up to 3 team members</li>
           <li>Instant profit tracking</li>
           <li>Auto commission calculation</li>
           <li>Break even calculator</li>
@@ -1818,8 +1856,13 @@
         <div class="price-annual-note" id="note-pro"></div>
         <div class="price-trial">&#10003; 7-day free trial</div>
         <div class="price-divider"></div>
+        <div class="price-limits">
+          <div class="pl-row"><span class="pl-key">Organizations</span><span class="pl-val">3</span></div>
+          <div class="pl-row"><span class="pl-key">Breakers</span><span class="pl-val">15 max</span></div>
+          <div class="pl-row"><span class="pl-key">Sorters</span><span class="pl-val">12 max</span></div>
+          <div class="pl-row"><span class="pl-key">Managers</span><span class="pl-val">3 max</span></div>
+        </div>
         <ul class="price-features">
-          <li>Up to 10 team members</li>
           <li>Everything in Starter</li>
           <li>Product ROI reporting</li>
           <li>Advanced buyer intelligence</li>
@@ -1839,8 +1882,13 @@
         <div class="price-annual-note" id="note-empire"></div>
         <div class="price-trial" style="color:var(--purple2);">Custom onboarding included</div>
         <div class="price-divider"></div>
+        <div class="price-limits">
+          <div class="pl-row"><span class="pl-key">Organizations</span><span class="pl-val-green">Unlimited</span></div>
+          <div class="pl-row"><span class="pl-key">Breakers</span><span class="pl-val-green">Unlimited</span></div>
+          <div class="pl-row"><span class="pl-key">Sorters</span><span class="pl-val-green">Unlimited</span></div>
+          <div class="pl-row"><span class="pl-key">Managers</span><span class="pl-val-green">Unlimited</span></div>
+        </div>
         <ul class="price-features">
-          <li class="pf-unlimited">Unlimited team members</li>
           <li>Everything in Pro</li>
           <li class="pf-unlimited">AI Insights &amp; analytics</li>
           <li class="pf-unlimited">Unlimited inventory</li>
@@ -1882,7 +1930,7 @@
       </div>
       <div class="faq-item fu">
         <div class="faq-q">How many team members can I add?</div>
-        <div class="faq-a">Starter supports up to 3. Pro supports up to 10. Empire is fully unlimited. You can always upgrade at any time and your data carries over instantly.</div>
+        <div class="faq-a">Starter supports up to 5 breakers, 3 sorters, and 1 manager. Pro supports up to 15 breakers, 12 sorters, and 3 managers. Empire has no limits on team size. You can upgrade at any time and your data carries over instantly.</div>
       </div>
       <div class="faq-item fu">
         <div class="faq-q">What happens to my data if I cancel?</div>
