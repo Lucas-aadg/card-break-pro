@@ -181,17 +181,26 @@
     .chat-input:focus{border-color:var(--primary);}
     .chat-send-btn{background:var(--primary);color:#fff;border:none;border-radius:8px;padding:0.55rem 1rem;font-weight:700;font-size:0.82rem;cursor:pointer;}
 
-    /* ── LEADERBOARD ── */
+    /* ── LEADERBOARD V2 ── */
     .lb-cats{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
     .lb-cat-btn{padding:0.35rem 0.85rem;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
     .lb-cat-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;}
-    .lb-row{display:flex;align-items:center;gap:0.85rem;padding:0.75rem 1rem;border-bottom:1px solid rgba(45,45,61,0.5);}
+    .lb-v2-header{display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;margin-bottom:1rem;}
+    .lb-month-nav-btn{background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.25);color:var(--text);border-radius:8px;padding:0.3rem 0.7rem;font-size:0.82rem;cursor:pointer;font-weight:700;transition:opacity 0.15s;}
+    .lb-month-nav-btn:disabled{opacity:0.35;cursor:default;}
+    .lb-month-label{font-size:0.85rem;font-weight:700;color:var(--text);min-width:90px;text-align:center;}
+    .lb-row{display:flex;align-items:center;gap:0.6rem;padding:0.75rem 1rem;border-bottom:1px solid rgba(45,45,61,0.5);}
     .lb-row:last-child{border-bottom:none;}
     .lb-row.lb-me{background:rgba(79,110,247,0.08);border-radius:8px;border:1px solid rgba(79,110,247,0.2);}
+    .lb-medal{font-size:1rem;width:28px;text-align:center;flex-shrink:0;}
     .lb-rank{font-size:0.82rem;font-weight:800;color:var(--muted);width:28px;text-align:center;flex-shrink:0;}
     .lb-rank.gold{color:#f59e0b;} .lb-rank.silver{color:#94a3b8;} .lb-rank.bronze{color:#cd7f32;}
     .lb-name{flex:1;font-size:0.88rem;font-weight:600;color:var(--text);}
-    .lb-val{font-size:0.88rem;font-weight:700;color:var(--primary);}
+    .lb-val{font-size:0.88rem;font-weight:700;color:var(--primary);white-space:nowrap;}
+    .lb-bar-wrap{flex:1;max-width:110px;}
+    .lb-bar-track{height:6px;border-radius:100px;background:rgba(79,110,247,0.12);overflow:hidden;}
+    .lb-bar-fill{height:100%;border-radius:100px;background:var(--primary);transition:width 0.55s ease;}
+    @media(max-width:375px){.lb-bar-wrap{display:none;}}
 
     /* ── SPLITS ── */
     .split-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.85rem;}
@@ -427,7 +436,11 @@
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">Team Leaderboard</div>
-        <button class="btn btn-outline" onclick="loadLeaderboard()" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
+      </div>
+      <div class="lb-v2-header">
+        <button class="lb-month-nav-btn" id="srtLbPrev" onclick="srtLbNavMonth(-1)">‹</button>
+        <span class="lb-month-label" id="srtLbMonthLabel">—</span>
+        <button class="lb-month-nav-btn" id="srtLbNext" onclick="srtLbNavMonth(1)">›</button>
       </div>
       <div class="lb-cats" id="lbCats"></div>
       <div id="lbList"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div></div>
@@ -1510,17 +1523,40 @@ function subscribeChatRealtime(channelId) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEADERBOARD
+// LEADERBOARD V2
 // ═══════════════════════════════════════════════════════════
 const LB_CATEGORY_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue', commission_earned: 'Commission', consistency_score: 'Consistency', longest_streak: 'Streak' };
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let activeLbCategory = 'breaks_completed';
+let srtLbYear = new Date().getFullYear();
+let srtLbMonth = new Date().getMonth() + 1;
+
+function srtLbUpdateMonthLabel() {
+  document.getElementById('srtLbMonthLabel').textContent = MONTHS[srtLbMonth - 1] + ' ' + srtLbYear;
+  const now = new Date();
+  const isCurrentOrFuture = (srtLbYear > now.getFullYear()) || (srtLbYear === now.getFullYear() && srtLbMonth >= now.getMonth() + 1);
+  document.getElementById('srtLbNext').disabled = isCurrentOrFuture;
+}
+
+function srtLbNavMonth(dir) {
+  srtLbMonth += dir;
+  if (srtLbMonth < 1) { srtLbMonth = 12; srtLbYear--; }
+  if (srtLbMonth > 12) { srtLbMonth = 1; srtLbYear++; }
+  const now = new Date();
+  if (srtLbYear > now.getFullYear() || (srtLbYear === now.getFullYear() && srtLbMonth > now.getMonth() + 1)) {
+    srtLbYear = now.getFullYear(); srtLbMonth = now.getMonth() + 1;
+  }
+  srtLbUpdateMonthLabel();
+  loadLeaderboard();
+}
 
 async function loadLeaderboard() {
+  srtLbUpdateMonthLabel();
   const list = document.getElementById('lbList');
   list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
   try {
     const token = await authToken();
-    const res = await fetch('/api/leaderboard?category=' + activeLbCategory, { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/leaderboard?category=' + activeLbCategory + '&year=' + srtLbYear + '&month=' + srtLbMonth, { headers: { Authorization: 'Bearer ' + token } });
     const data = await res.json();
     renderLbCats(data.visible_categories || Object.keys(LB_CATEGORY_LABELS));
     renderLbList(data.entries || [], data.my_rank || null);
@@ -1537,25 +1573,30 @@ function renderLbCats(cats) {
 function setLbCategory(cat) { activeLbCategory = cat; loadLeaderboard(); }
 
 function renderLbList(entries, myRank) {
+  const MEDALS = ['🥇','🥈','🥉'];
   const list = document.getElementById('lbList');
   if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data yet.</div>'; return; }
   const isRevenue = ['revenue_generated','commission_earned'].includes(activeLbCategory);
+  const maxVal = Math.max.apply(null, entries.map(function(e){ return parseFloat(e.value) || 0; })) || 1;
   const rows = entries.map(function(e, i) {
     const rank = e.rank || (i + 1);
+    const medal = MEDALS[rank - 1] || null;
     const rankClass = rank === 1 ? ' gold' : rank === 2 ? ' silver' : rank === 3 ? ' bronze' : '';
     const isMe = e.staff_id === currentUser?.id;
     const val = isRevenue ? '$' + (parseFloat(e.value) || 0).toFixed(0) : Math.round(e.value || 0).toString();
+    const barPct = Math.round((parseFloat(e.value) || 0) / maxVal * 100);
     return '<div class="lb-row' + (isMe ? ' lb-me' : '') + '">' +
-      '<div class="lb-rank' + rankClass + '">' + rank + '</div>' +
+      '<div class="lb-medal">' + (medal || '<span class="lb-rank' + rankClass + '">' + rank + '</span>') + '</div>' +
       '<div class="lb-name">' + escHtml(e.display_name || '?') + (isMe ? ' <span style="color:var(--primary);font-size:0.7rem;">(you)</span>' : '') + '</div>' +
+      '<div class="lb-bar-wrap"><div class="lb-bar-track"><div class="lb-bar-fill" style="width:' + barPct + '%"></div></div></div>' +
       '<div class="lb-val">' + val + '</div>' +
     '</div>';
   }).join('');
   let myRankHtml = '';
-  if (myRank && myRank.rank > 20) {
+  if (myRank && myRank.rank > 10) {
     const val = isRevenue ? '$' + (parseFloat(myRank.value) || 0).toFixed(0) : Math.round(myRank.value || 0).toString();
     myRankHtml = '<div style="border-top:1px dashed var(--border);margin-top:0.5rem;padding-top:0.5rem;">' +
-      '<div class="lb-row lb-me"><div class="lb-rank">' + myRank.rank + '</div><div class="lb-name">You</div><div class="lb-val">' + val + '</div></div>' +
+      '<div class="lb-row lb-me"><div class="lb-medal"><span class="lb-rank">' + myRank.rank + '</span></div><div class="lb-name">You</div><div class="lb-bar-wrap"></div><div class="lb-val">' + val + '</div></div>' +
     '</div>';
   }
   list.innerHTML = rows + myRankHtml;

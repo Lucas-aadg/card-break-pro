@@ -632,8 +632,12 @@
     .ocl-complete-banner{padding:1.25rem 1rem;text-align:center;}
 
     /* ── CHAT ── */
-    .owner-chat-layout{display:grid;grid-template-columns:180px 1fr;gap:0;height:calc(100vh - 200px);min-height:400px;}
-    @media(max-width:700px){.owner-chat-layout{grid-template-columns:1fr;height:auto;}}
+    .owner-chat-grid{display:grid;grid-template-columns:240px 1fr;gap:0;height:calc(100vh - 210px);min-height:420px;border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+    @media(max-width:700px){
+      .owner-chat-grid{grid-template-columns:1fr;height:auto;}
+      .chat-sidebar-col{display:none;}
+      #ownerChatMobileTabs{display:flex !important;gap:0.35rem;overflow-x:auto;white-space:nowrap;border-bottom:1px solid var(--border);padding:0.4rem 0.75rem;margin-bottom:0;}
+    }
     .chat-ch-btn-o{display:block;width:100%;background:none;border:none;text-align:left;padding:0.55rem 1rem;color:var(--muted);font-size:0.83rem;font-weight:600;cursor:pointer;transition:background 0.15s,color 0.15s;border-left:3px solid transparent;}
     .chat-ch-btn-o.active{color:var(--text);background:rgba(79,110,247,0.1);border-left-color:var(--primary);}
     .chat-ch-btn-o:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--text);}
@@ -676,6 +680,94 @@
     .tmpl-card-name{font-size:0.95rem;font-weight:700;color:var(--text);}
     .tmpl-card-meta{font-size:0.78rem;color:var(--muted);}
     .tmpl-card-actions{display:flex;gap:0.5rem;margin-top:0.75rem;}
+
+    /* ── MEDAL CABINET ── */
+    .cabinet-title{font-size:1.25rem;font-weight:900;color:var(--text);margin-bottom:0.25rem;letter-spacing:-0.3px;}
+    .cabinet-sub{font-size:0.82rem;color:var(--muted);margin-bottom:1.5rem;}
+    .cabinet-shelf{display:flex;flex-wrap:wrap;gap:0.85rem;margin-bottom:1.25rem;}
+    .badge-tile{width:64px;height:64px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:transform 0.15s,box-shadow 0.15s;flex-shrink:0;}
+    .badge-tile:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+    .badge-tile-icon{font-size:26px;line-height:1;}
+    .badge-tile-name{font-size:9px;font-weight:700;color:rgba(255,255,255,0.85);text-align:center;margin-top:3px;line-height:1.2;padding:0 2px;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .badge-tile-tooltip{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:rgba(7,7,15,0.97);backdrop-filter:blur(12px);border:1px solid rgba(79,110,247,0.25);border-radius:10px;padding:0.65rem 0.85rem;z-index:200;min-width:170px;max-width:230px;pointer-events:none;white-space:normal;box-shadow:0 8px 28px rgba(0,0,0,0.5);}
+    .badge-tile:hover .badge-tile-tooltip{display:block;}
+    .badge-tile-tooltip-name{font-size:0.8rem;font-weight:800;color:var(--text);margin-bottom:0.2rem;}
+    .badge-tile-tooltip-desc{font-size:0.73rem;color:var(--muted);line-height:1.4;}
+    .badge-tile-tooltip-date{font-size:0.68rem;color:var(--primary);margin-top:0.3rem;font-weight:600;}
+    .badge-tile-locked{width:64px;height:64px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;opacity:0.35;filter:grayscale(1);}
+    .cabinet-locked-row{display:flex;flex-wrap:wrap;gap:0.85rem;align-items:center;}
+    .cabinet-more-hint{font-size:0.78rem;color:var(--muted);font-style:italic;}
+    .cabinet-empty{text-align:center;padding:3rem 1rem;}
+    .cabinet-empty-icon{font-size:3rem;margin-bottom:0.75rem;opacity:0.3;}
+    .cabinet-empty-text{font-size:0.85rem;color:var(--muted);line-height:1.6;}
+    .cabinet-section-label{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:0.75rem;margin-top:0.25rem;}
+
+    /* ── EARN OVERLAY ── */
+    #earnOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);backdrop-filter:blur(16px);display:none;align-items:center;justify-content:center;z-index:9100;flex-direction:column;gap:0.75rem;text-align:center;padding:2rem;}
+    #earnOverlay.active{display:flex;}
+    #earnBadgeDisplay{width:120px;height:120px;border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:54px;animation:earnPop 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;box-shadow:0 0 60px rgba(79,110,247,0.35);}
+    @keyframes earnPop{from{transform:scale(0.2) rotate(-25deg);opacity:0;}to{transform:scale(1) rotate(0deg);opacity:1;}}
+    #earnTitle{font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:2.5px;color:var(--primary);margin-top:0.75rem;}
+    #earnName{font-size:1.7rem;font-weight:900;color:var(--text);letter-spacing:-0.5px;}
+    #earnDesc{font-size:0.88rem;color:var(--muted);max-width:300px;line-height:1.55;}
+    #earnDismiss{font-size:0.78rem;color:rgba(90,106,138,0.7);cursor:pointer;margin-top:0.5rem;text-decoration:underline;}
+    #confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:9099;}
+
+    /* ── HOME GOAL BARS ── */
+    .home-goal-section{margin-bottom:2.25rem;}
+    .home-goal-bar-wrap{margin-bottom:0.85rem;}
+    .home-goal-bar-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0.4rem;}
+    .home-goal-bar-name{font-size:0.82rem;font-weight:700;color:var(--text);}
+    .home-goal-bar-vals{font-size:0.78rem;color:var(--muted);}
+    .home-goal-bar-pct{font-size:0.78rem;font-weight:800;}
+    .home-goal-track{height:8px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+    .home-goal-fill{height:100%;border-radius:100px;width:0;transition:width 0.9s cubic-bezier(0.4,0,0.2,1);}
+    .goal-fill-normal{background:var(--primary);}
+    .goal-fill-warn{background:var(--yellow);}
+    .goal-fill-done{background:var(--green);box-shadow:0 0 12px rgba(34,197,94,0.45);}
+    .home-goal-reached-banner{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:0.75rem 1rem;font-size:0.88rem;font-weight:700;color:var(--green);display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem;}
+
+    /* ── LEADERBOARD V2 ── */
+    .lb-v2-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;}
+    .lb-month-nav{display:flex;align-items:center;gap:0.5rem;}
+    .lb-month-btn{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:0.28rem 0.7rem;cursor:pointer;font-size:0.78rem;font-weight:600;transition:border-color 0.15s;}
+    .lb-month-btn:hover{border-color:var(--primary);}
+    .lb-month-btn:disabled{opacity:0.35;cursor:default;}
+    .lb-month-label{font-size:0.85rem;font-weight:700;color:var(--text);min-width:115px;text-align:center;}
+    .lb-bar-wrap{flex:1;max-width:130px;}
+    .lb-bar-track{height:5px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+    .lb-bar-fill{height:100%;border-radius:100px;background:var(--primary);transition:width 0.55s ease;}
+    @media(max-width:580px){.lb-bar-wrap{display:none;}}
+    .lb-medal{font-size:1rem;width:28px;text-align:center;flex-shrink:0;}
+
+    /* ── CHAT V2 ── */
+    .chat-header-o{padding:0.65rem 1rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.2);display:flex;align-items:center;gap:0.5rem;min-height:44px;flex-shrink:0;}
+    .chat-header-o-name{font-size:0.88rem;font-weight:700;color:var(--text);}
+    .chat-counter-o{font-size:0.68rem;color:var(--muted);margin-left:auto;transition:color 0.2s;}
+    .chat-counter-o.warn{color:var(--yellow);}
+    .chat-online-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;position:absolute;bottom:1px;right:1px;border:1.5px solid var(--bg);}
+    .chat-avatar-o{position:relative;}
+    .role-badge-o{display:inline-block;font-size:0.6rem;font-weight:700;padding:0 0.35rem;border-radius:4px;margin-left:0.3rem;vertical-align:middle;}
+    .role-badge-owner{background:rgba(79,110,247,0.2);color:var(--primary);}
+    .role-badge-sorter{background:rgba(245,158,11,0.2);color:var(--yellow);}
+    .role-badge-breaker{background:rgba(34,197,94,0.2);color:var(--green);}
+    .chat-announce-notice{font-size:0.75rem;color:var(--muted);padding:0.4rem 0.75rem;background:rgba(245,158,11,0.06);border-radius:6px;margin:0 0.5rem;}
+
+    /* CHAT NAV UNREAD BADGE */
+    .chat-nav-badge{display:none;background:#ef4444;color:#fff;font-size:0.58rem;font-weight:800;border-radius:100px;min-width:15px;height:15px;line-height:15px;text-align:center;padding:0 3px;margin-left:0.3rem;vertical-align:middle;}
+
+    /* ── SETTINGS MILESTONES SUBTAB ── */
+    .sett-sub-tabs{display:flex;gap:0;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:1.25rem;}
+    .sett-sub-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:0.82rem;font-weight:600;padding:0.6rem 1rem;cursor:pointer;transition:color 0.2s,border-color 0.2s;white-space:nowrap;}
+    .sett-sub-btn.active{color:var(--primary);border-bottom-color:var(--primary);}
+    @media(max-width:420px){.sett-sub-btn{font-size:0.75rem;padding:0.5rem 0.65rem;}}
+    .sett-sub-pane{display:none;}
+    .sett-sub-pane.active{display:block;}
+    .ms-syst-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.85rem;}
+    .ms-syst-icon{font-size:1.5rem;flex-shrink:0;}
+    .ms-syst-name{font-size:0.85rem;font-weight:700;color:var(--text);}
+    .ms-syst-desc{font-size:0.75rem;color:var(--muted);margin-top:0.1rem;}
+    .ms-custom-card{background:rgba(79,110,247,0.05);border:1px solid rgba(79,110,247,0.18);border-radius:10px;padding:0.85rem 1rem;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.85rem;}
   </style>
 </head>
 <body>
@@ -721,8 +813,8 @@
         <button class="nav-dd-item" data-tab="sorting">Sorting</button>
         <button class="nav-dd-item" data-tab="templates">Templates</button>
         <div class="dd-section-label">Engagement</div>
-        <button class="nav-dd-item" data-tab="chat">Chat</button>
-        <button class="nav-dd-item" data-tab="milestones">Milestones</button>
+        <button class="nav-dd-item" data-tab="chat">Chat <span class="chat-nav-badge" id="chatNavBadge"></span></button>
+        <button class="nav-dd-item" data-tab="milestones">Medal Cabinet</button>
         <button class="nav-dd-item" data-tab="goals">Goals</button>
         <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
         <div class="dd-section-label">Products</div>
@@ -794,6 +886,25 @@
       <div class="empire-kpi" style="--kpi-color:var(--green)"><div class="empire-kpi-label">Today's Profit</div><div class="empire-kpi-value">—</div></div>
       <div class="empire-kpi" style="--kpi-color:var(--primary)"><div class="empire-kpi-label">Month Revenue</div><div class="empire-kpi-value">—</div></div>
       <div class="empire-kpi" style="--kpi-color:var(--green)"><div class="empire-kpi-label">Live Streams</div><div class="empire-kpi-value">—</div></div>
+    </div>
+
+    <!-- ── HOME: MONTHLY GOAL BARS ── -->
+    <div id="homeGoalSection" class="home-goal-section" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);">Monthly Goals</div>
+        <button class="btn-sm" style="background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);color:var(--primary);font-size:0.72rem;" onclick="switchTab('goals')">Manage</button>
+      </div>
+      <div id="homeGoalBars"></div>
+      <div class="home-goal-reached-banner" id="homeGoalReachedBanner">Goal Reached! Your team hit the target this month.</div>
+    </div>
+
+    <!-- ── HOME: MEDAL CABINET PREVIEW ── -->
+    <div id="homeCabinetSection" style="display:none;margin-bottom:2.25rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);">Medal Cabinet</div>
+        <button class="btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:0.72rem;" onclick="switchTab('milestones')">View All</button>
+      </div>
+      <div id="homeCabinetShelf" class="cabinet-shelf"></div>
     </div>
 
     <!-- Account Cards -->
@@ -1865,6 +1976,46 @@
       </div>
     </div>
 
+    <!-- Milestones Management -->
+    <div class="panel" id="settMilestonesPanel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <div class="panel-title" style="margin:0;">Milestones</div>
+      </div>
+      <div class="sett-sub-tabs">
+        <button class="sett-sub-btn active" onclick="settMsSubTab('system',this)">System Milestones</button>
+        <button class="sett-sub-btn" onclick="settMsSubTab('custom',this)">Custom Milestones</button>
+        <button class="sett-sub-btn" onclick="settMsSubTab('award',this)">Manual Award</button>
+      </div>
+      <!-- System -->
+      <div class="sett-sub-pane active" id="settMsPane-system">
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem;line-height:1.5;">System milestones are automatically awarded based on staff performance thresholds. They cannot be deleted.</div>
+        <div id="settMsSystList"><div style="color:var(--muted);font-size:0.85rem;padding:1rem 0;">Loading…</div></div>
+      </div>
+      <!-- Custom -->
+      <div class="sett-sub-pane" id="settMsPane-custom">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+          <button class="btn btn-primary" style="font-size:0.82rem;" onclick="document.getElementById('newMilestoneModal').classList.add('active')">+ New Milestone</button>
+        </div>
+        <div id="settMsCustomList"><div style="color:var(--muted);font-size:0.85rem;padding:1rem 0;">Loading…</div></div>
+      </div>
+      <!-- Award -->
+      <div class="sett-sub-pane" id="settMsPane-award">
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:1.25rem;line-height:1.5;">Manually award a milestone to any staff member.</div>
+        <div class="form-row form-row-2" style="margin-bottom:0.85rem;">
+          <div class="form-group">
+            <label>Staff Member</label>
+            <select id="settMsAwardStaff"><option value="">— select —</option></select>
+          </div>
+          <div class="form-group">
+            <label>Milestone</label>
+            <select id="settMsAwardMilestone"><option value="">— select —</option></select>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="font-size:0.85rem;" onclick="settAwardMilestone()">Award Milestone</button>
+        <div id="settAwardStatus" style="font-size:0.82rem;color:var(--muted);margin-top:0.75rem;display:none;"></div>
+      </div>
+    </div>
+
     <!-- Danger Zone -->
     <div class="panel" style="border-color:rgba(239,68,68,0.25);">
       <div class="panel-title" style="color:var(--red);">Danger Zone</div>
@@ -1973,47 +2124,40 @@
 
   <!-- ══ CHAT TAB ═══════════════════════════════════════════ -->
   <div class="tab-content" id="tab-chat">
-    <div style="display:grid;grid-template-columns:180px 1fr;gap:0;height:calc(100vh - 200px);min-height:400px;border:1px solid var(--border);border-radius:14px;overflow:hidden;">
-      <div style="background:rgba(0,0,0,0.2);border-right:1px solid var(--border);overflow-y:auto;padding:0.75rem 0;" id="ownerChatSidebar">
-        <div style="font-size:0.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:0 1rem 0.5rem;">Channels</div>
-        <div id="ownerChatChannelList"></div>
+    <!-- Mobile channel tabs -->
+    <div id="ownerChatMobileTabs" style="display:none;overflow-x:auto;white-space:nowrap;border-bottom:1px solid var(--border);background:var(--card-solid);padding:0 0.25rem;"></div>
+    <div class="owner-chat-grid">
+      <!-- Sidebar -->
+      <div class="chat-sidebar-col" style="background:rgba(0,0,0,0.25);border-right:1px solid var(--border);display:flex;flex-direction:column;">
+        <div style="font-size:0.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;padding:0.75rem 1rem 0.4rem;flex-shrink:0;">Channels</div>
+        <div id="ownerChatChannelList" style="flex:1;overflow-y:auto;"></div>
       </div>
-      <div style="display:flex;flex-direction:column;">
-        <div id="ownerChatMsgsWrap" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.6rem;"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Select a channel.</div></div>
-        <div style="display:flex;gap:0.5rem;padding:0.75rem;border-top:1px solid var(--border);">
-          <input style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.88rem;padding:0.55rem 0.85rem;outline:none;font-family:inherit;" id="ownerChatInput" placeholder="Message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ownerSendChatMsg();}" maxlength="2000" />
-          <button class="btn btn-primary" style="font-size:0.82rem;padding:0.55rem 1rem;" onclick="ownerSendChatMsg()">Send</button>
+      <!-- Message area -->
+      <div style="display:flex;flex-direction:column;min-width:0;">
+        <div class="chat-header-o" id="ownerChatHeaderO">
+          <span class="chat-header-o-name" id="ownerChatHeaderName" style="color:var(--muted);font-size:0.82rem;font-style:italic;">Select a channel</span>
+        </div>
+        <div id="ownerChatMsgsWrap" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.65rem;"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Select a channel to start.</div></div>
+        <div id="ownerChatAnnounceNotice" class="chat-announce-notice" style="display:none;">Announcements — read only</div>
+        <div style="display:flex;flex-direction:column;gap:0.25rem;padding:0.75rem;border-top:1px solid var(--border);flex-shrink:0;">
+          <div style="display:flex;gap:0.5rem;">
+            <textarea id="ownerChatInput" rows="1" placeholder="Message… (Enter to send, Shift+Enter for newline)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.88rem;padding:0.55rem 0.85rem;outline:none;font-family:inherit;resize:none;max-height:120px;overflow-y:auto;line-height:1.45;" maxlength="2000" onkeydown="ownerChatKeydown(event)" oninput="ownerChatInputHandler(this)"></textarea>
+            <button class="btn btn-primary" style="font-size:0.82rem;padding:0.55rem 1rem;align-self:flex-end;" onclick="ownerSendChatMsg()">Send</button>
+          </div>
+          <div style="display:flex;justify-content:flex-end;"><span class="chat-counter-o" id="ownerChatCounter">0 / 2000</span></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ══ MILESTONES TAB ═════════════════════════════════════ -->
+  <!-- ══ MEDAL CABINET TAB ═════════════════════════════════ -->
   <div class="tab-content" id="tab-milestones">
     <div class="panel">
-      <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-        <div class="panel-title" style="margin:0;">Milestone Definitions</div>
-        <button class="btn btn-primary" style="font-size:0.82rem;" onclick="document.getElementById('newMilestoneModal').classList.add('active')">+ Custom Milestone</button>
+      <div class="cabinet-title">Medal Cabinet</div>
+      <div class="cabinet-sub" id="ownerCabinetSub">Your earned achievements. Complete breaks and hit targets to unlock more.</div>
+      <div id="ownerCabinetEarned">
+        <div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>
       </div>
-      <div id="ownerMsDefsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.85rem;margin-bottom:1.5rem;"></div>
-    </div>
-    <div class="panel">
-      <div class="panel-title">Award a Milestone</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.75rem;align-items:end;">
-        <div>
-          <label>Staff Member</label>
-          <select id="ownerMsAwardStaff"><option value="">— select —</option></select>
-        </div>
-        <div>
-          <label>Milestone</label>
-          <select id="ownerMsAwardMilestone"><option value="">— select —</option></select>
-        </div>
-        <button class="btn btn-primary" style="font-size:0.82rem;" onclick="ownerAwardMilestone()">Award</button>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title">Staff Milestone Progress</div>
-      <div id="ownerMsStaffList"><div style="color:var(--muted);font-size:0.85rem;padding:1rem 0;">Select a staff member above to view their milestones.</div></div>
     </div>
   </div>
 
@@ -2035,10 +2179,13 @@
   <!-- ══ LEADERBOARD TAB ════════════════════════════════════ -->
   <div class="tab-content" id="tab-leaderboard">
     <div class="panel">
-      <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-        <div class="panel-title" style="margin:0;">Team Leaderboard</div>
+      <div class="lb-v2-header">
+        <div class="lb-month-nav">
+          <button class="lb-month-btn" id="ownerLbPrev" onclick="ownerLbNavMonth(-1)">&#8249;</button>
+          <span class="lb-month-label" id="ownerLbMonthLabel">—</span>
+          <button class="lb-month-btn" id="ownerLbNext" onclick="ownerLbNavMonth(1)">&#8250;</button>
+        </div>
         <div style="display:flex;gap:0.5rem;">
-          <button class="btn btn-outline" style="font-size:0.78rem;padding:0.35rem 0.8rem;" onclick="ownerLoadLeaderboard()">Refresh</button>
           <button class="btn btn-outline" style="font-size:0.78rem;padding:0.35rem 0.8rem;" onclick="document.getElementById('lbSettingsModal').classList.add('active')">Settings</button>
         </div>
       </div>
@@ -3066,7 +3213,7 @@ async function loadHome() {
   await loadChannels();
   populateChannelDropdowns();
   await Promise.all([loadEmpireKpis(), renderChannelGrid()]);
-  await Promise.all([loadLiveActivity(), loadInsights()]);
+  await Promise.all([loadLiveActivity(), loadInsights(), ownerLoadHomeGoalBars(), ownerLoadMilestones()]);
 }
 
 async function loadEmpireKpis() {
@@ -3613,7 +3760,7 @@ async function switchTab(tab) {
     else if (tab === 'team') await loadTeam();
     else if (tab === 'schedule') { await loadAllProfiles(); await setupSchedule(); }
     else if (tab === 'sorting') { await loadAllProfiles(); await loadSorting(); }
-    else if (tab === 'settings') { await loadSettings(); await renderSettingsChannelList(); }
+    else if (tab === 'settings') { await loadSettings(); await renderSettingsChannelList(); await settLoadMilestonesTab(); }
     else if (tab === 'buyers') await loadBuyersTab();
     else if (tab === 'referEarn') await loadReferEarn();
     else if (tab === 'templates') await ownerLoadTemplates();
@@ -9235,8 +9382,10 @@ async function ownerAuthToken() {
 // ═══════════════════════════════════════════════════════════
 let ownerChatChannels = [];
 let ownerActiveChatChannel = null;
+let ownerActiveChatIsAnnouncement = false;
 let ownerChatRealtimeSub = null;
 const OWNER_CHAT_EMOJIS = ['👍','🔥','💰','✅'];
+let ownerChatUnreadInterval = null;
 
 async function ownerLoadChatChannels() {
   try {
@@ -9246,20 +9395,47 @@ async function ownerLoadChatChannels() {
     ownerChatChannels = data.channels || [];
     ownerRenderChatSidebar();
     if (ownerChatChannels.length) ownerSelectChatChannel(ownerChatChannels[0].id);
+    ownerStartChatUnreadPoll();
   } catch (e) { console.error('ownerLoadChatChannels', e); }
 }
 
 function ownerRenderChatSidebar() {
   const list = document.getElementById('ownerChatChannelList');
-  if (!ownerChatChannels.length) { list.innerHTML = '<div style="padding:0.75rem 1rem;font-size:0.82rem;color:var(--muted);">No channels.</div>'; return; }
-  list.innerHTML = ownerChatChannels.map(function(ch) {
-    return '<button class="chat-ch-btn-o' + (ownerActiveChatChannel === ch.id ? ' active' : '') + '" onclick="ownerSelectChatChannel(\'' + ch.id + '\')">' + escHtml(ch.name || ch.slug) + '</button>';
+  const mobileTabs = document.getElementById('ownerChatMobileTabs');
+  if (!ownerChatChannels.length) {
+    list.innerHTML = '<div style="padding:0.75rem 1rem;font-size:0.82rem;color:var(--muted);">No channels yet.</div>';
+    if (mobileTabs) mobileTabs.innerHTML = '';
+    return;
+  }
+  const btns = ownerChatChannels.map(function(ch) {
+    const isAnn = ch.channel_type === 'announcement';
+    const annTag = isAnn ? ' <span style="font-size:0.6rem;background:rgba(245,158,11,0.15);color:var(--yellow);border-radius:4px;padding:0 3px;vertical-align:middle;">ANN</span>' : '';
+    return { ch: ch, isAnn: isAnn, annTag: annTag };
+  });
+  list.innerHTML = btns.map(function(b) {
+    return '<button class="chat-ch-btn-o' + (ownerActiveChatChannel === b.ch.id ? ' active' : '') + '" onclick="ownerSelectChatChannel(\'' + b.ch.id + '\')" style="display:flex;align-items:center;gap:0.4rem;">' +
+      '<span>' + escHtml(b.ch.name || b.ch.slug) + '</span>' + b.annTag + '</button>';
   }).join('');
+  if (mobileTabs) {
+    mobileTabs.innerHTML = btns.map(function(b) {
+      const active = ownerActiveChatChannel === b.ch.id;
+      return '<button onclick="ownerSelectChatChannel(\'' + b.ch.id + '\')" style="flex-shrink:0;padding:0.35rem 0.85rem;border-radius:100px;border:1px solid ' + (active ? 'var(--primary)' : 'var(--border)') + ';background:' + (active ? 'rgba(79,110,247,0.15)' : 'transparent') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">' +
+        escHtml(b.ch.name || b.ch.slug) + (b.isAnn ? ' 📢' : '') + '</button>';
+    }).join('');
+  }
 }
 
 async function ownerSelectChatChannel(channelId) {
   ownerActiveChatChannel = channelId;
+  const ch = (ownerChatChannels || []).find(function(c){ return c.id === channelId; });
+  ownerActiveChatIsAnnouncement = ch && ch.channel_type === 'announcement';
   ownerRenderChatSidebar();
+  const headerName = document.getElementById('ownerChatHeaderName');
+  if (headerName && ch) headerName.textContent = (ch.name || ch.slug) + (ownerActiveChatIsAnnouncement ? ' 📢' : '');
+  const annNotice = document.getElementById('ownerChatAnnounceNotice');
+  if (annNotice) annNotice.style.display = ownerActiveChatIsAnnouncement ? 'block' : 'none';
+  const inputEl = document.getElementById('ownerChatInput');
+  if (inputEl) inputEl.disabled = false;
   const wrap = document.getElementById('ownerChatMsgsWrap');
   wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
   try {
@@ -9273,10 +9449,16 @@ async function ownerSelectChatChannel(channelId) {
 
 function ownerRenderChatMessages(msgs) {
   const wrap = document.getElementById('ownerChatMsgsWrap');
-  if (!msgs.length) { wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No messages yet.</div>'; return; }
+  if (!msgs.length) { wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No messages yet. Say something!</div>'; return; }
+  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
   const reversed = msgs.slice().reverse();
   wrap.innerHTML = reversed.map(function(m) {
-    const initials = ((m.sender?.display_name || '?').split(' ').map(function(w){ return w[0]; }).join('').toUpperCase().slice(0,2));
+    const name = m.sender?.display_name || '?';
+    const role = m.sender?.role || '';
+    const initials = name.split(' ').map(function(w){ return w[0]; }).join('').toUpperCase().slice(0,2);
+    const isOnline = m.sender?.last_seen && new Date(m.sender.last_seen).getTime() > fiveMinAgo;
+    const roleBadge = role ? '<span class="role-badge-o role-badge-' + escHtml(role) + '">' + escHtml(role) + '</span>' : '';
+    const onlineDot = isOnline ? '<span class="chat-online-dot" title="Online"></span>' : '';
     const rxnHtml = OWNER_CHAT_EMOJIS.map(function(e) {
       const info = m.reactions && m.reactions[e];
       const count = info ? info.count : 0;
@@ -9284,22 +9466,39 @@ function ownerRenderChatMessages(msgs) {
       return '<button class="chat-rxn-btn-o' + active + '" onclick="ownerToggleReaction(\'' + m.id + '\',\'' + e + '\')">' + e + (count > 0 ? ' ' + count : '') + '</button>';
     }).join('');
     return '<div class="chat-msg-o">' +
-      '<div class="chat-avatar-o">' + initials + '</div>' +
-      '<div style="flex:1;">' +
-        '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;"><span style="font-weight:700;color:var(--text);margin-right:0.4rem;">' + escHtml(m.sender?.display_name || '?') + '</span>' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) + '</div>' +
-        '<div style="font-size:0.88rem;color:var(--text);line-height:1.5;word-break:break-word;' + (m.is_deleted ? 'font-style:italic;color:var(--muted);' : '') + '">' + escHtml(m.content) + '</div>' +
-        '<div style="display:flex;gap:0.3rem;margin-top:0.3rem;flex-wrap:wrap;">' + rxnHtml + '</div>' +
+      '<div class="chat-avatar-o" style="position:relative;">' + escHtml(initials) + onlineDot + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;display:flex;align-items:center;flex-wrap:wrap;gap:0.15rem;">' +
+          '<span style="font-weight:700;color:var(--text);">' + escHtml(name) + '</span>' + roleBadge +
+          '<span style="margin-left:0.3rem;">' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) + '</span>' +
+        '</div>' +
+        '<div style="font-size:0.88rem;color:' + (m.is_deleted ? 'var(--muted)' : 'var(--text)') + ';line-height:1.5;word-break:break-word;' + (m.is_deleted ? 'font-style:italic;' : '') + '">' + escHtml(m.is_deleted ? '[deleted]' : m.content) + '</div>' +
+        '<div style="display:flex;gap:0.3rem;margin-top:0.35rem;flex-wrap:wrap;">' + rxnHtml + '</div>' +
       '</div>' +
     '</div>';
   }).join('');
   wrap.scrollTop = wrap.scrollHeight;
 }
 
+function ownerChatKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ownerSendChatMsg(); }
+}
+
+function ownerChatInputHandler(el) {
+  const len = el.value.length;
+  const counter = document.getElementById('ownerChatCounter');
+  if (counter) { counter.textContent = len + ' / 2000'; counter.classList.toggle('warn', len >= 1800); }
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
 async function ownerSendChatMsg() {
   const input = document.getElementById('ownerChatInput');
-  const content = input.value.trim();
+  const content = (input.value || '').trim();
   if (!content || !ownerActiveChatChannel) return;
   input.value = '';
+  input.style.height = 'auto';
+  ownerChatInputHandler(input);
   try {
     const token = await ownerAuthToken();
     await fetch('/api/chat/channels/' + ownerActiveChatChannel + '/messages?channelId=' + ownerActiveChatChannel, {
@@ -9328,7 +9527,26 @@ function ownerSubscribeChatRealtime(channelId) {
   ownerChatRealtimeSub = sb.channel('owner-chat-' + channelId)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'channel_id=eq.' + channelId }, function() {
       if (ownerActiveChatChannel === channelId) ownerSelectChatChannel(channelId);
+    }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_reactions' }, function() {
+      if (ownerActiveChatChannel === channelId) ownerSelectChatChannel(channelId);
     }).subscribe();
+}
+
+function ownerStartChatUnreadPoll() {
+  if (ownerChatUnreadInterval) return;
+  ownerPollChatUnread();
+  ownerChatUnreadInterval = setInterval(ownerPollChatUnread, 30000);
+}
+
+async function ownerPollChatUnread() {
+  try {
+    const token = await ownerAuthToken();
+    const res = await fetch('/api/chat/unread', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    const count = data.unread_count || 0;
+    const badge = document.getElementById('chatNavBadge');
+    if (badge) { badge.textContent = count > 99 ? '99+' : String(count); badge.style.display = count > 0 ? 'inline-block' : 'none'; }
+  } catch (e) { /* silently ignore */ }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9336,13 +9554,36 @@ function ownerSubscribeChatRealtime(channelId) {
 // ═══════════════════════════════════════════════════════════
 const OWNER_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue', commission_earned: 'Commission', consistency_score: 'Consistency', longest_streak: 'Streak' };
 let ownerActiveLbCat = 'breaks_completed';
+let ownerLbYear = new Date().getFullYear();
+let ownerLbMonth = new Date().getMonth() + 1;
+
+function ownerLbUpdateMonthLabel() {
+  const d = new Date(ownerLbYear, ownerLbMonth - 1, 1);
+  const label = document.getElementById('ownerLbMonthLabel');
+  if (label) label.textContent = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const nextBtn = document.getElementById('ownerLbNext');
+  if (nextBtn) {
+    const now = new Date();
+    const isCurrentOrFuture = ownerLbYear > now.getFullYear() || (ownerLbYear === now.getFullYear() && ownerLbMonth >= now.getMonth() + 1);
+    nextBtn.disabled = isCurrentOrFuture;
+  }
+}
+
+function ownerLbNavMonth(dir) {
+  ownerLbMonth += dir;
+  if (ownerLbMonth < 1) { ownerLbMonth = 12; ownerLbYear--; }
+  if (ownerLbMonth > 12) { ownerLbMonth = 1; ownerLbYear++; }
+  ownerLbUpdateMonthLabel();
+  ownerLoadLeaderboard();
+}
 
 async function ownerLoadLeaderboard() {
+  ownerLbUpdateMonthLabel();
   const list = document.getElementById('ownerLbList');
   list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
   try {
     const token = await ownerAuthToken();
-    const res = await fetch('/api/leaderboard?category=' + ownerActiveLbCat, { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/leaderboard?category=' + ownerActiveLbCat + '&year=' + ownerLbYear + '&month=' + ownerLbMonth, { headers: { Authorization: 'Bearer ' + token } });
     const data = await res.json();
     ownerRenderLbCats(data.visible_categories || Object.keys(OWNER_LB_LABELS));
     ownerRenderLbList(data.entries || [], data.my_rank || null);
@@ -9359,96 +9600,187 @@ function ownerSetLbCat(cat) { ownerActiveLbCat = cat; ownerLoadLeaderboard(); }
 
 function ownerRenderLbList(entries, myRank) {
   const list = document.getElementById('ownerLbList');
-  if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data yet. Leaderboard populates when streams are closed.</div>'; return; }
+  if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data for this period.</div>'; return; }
   const isRevenue = ['revenue_generated','commission_earned'].includes(ownerActiveLbCat);
-  const rows = entries.map(function(e, i) {
+  const MEDALS = ['🥇','🥈','🥉'];
+  const maxVal = Math.max.apply(null, entries.map(function(e){ return parseFloat(e.value) || 0; })) || 1;
+  const rows = entries.slice(0, 10).map(function(e, i) {
     const rank = e.rank || (i + 1);
+    const medal = rank <= 3 ? MEDALS[rank - 1] : null;
     const rankClass = rank === 1 ? ' gold' : rank === 2 ? ' silver' : rank === 3 ? ' bronze' : '';
     const val = isRevenue ? '$' + (parseFloat(e.value) || 0).toFixed(0) : Math.round(e.value || 0).toString();
-    return '<div class="lb-row-o">' +
-      '<div class="lb-rank-o' + rankClass + '">' + rank + '</div>' +
-      '<div class="lb-name-o">' + escHtml(e.display_name || '?') + '</div>' +
+    const barPct = maxVal > 0 ? Math.round((parseFloat(e.value) || 0) / maxVal * 100) : 0;
+    const isMe = e.staff_id === currentUser?.id;
+    return '<div class="lb-row-o' + (isMe ? ' lb-me-o' : '') + '">' +
+      '<div class="lb-medal">' + (medal || '<span class="lb-rank-o' + rankClass + '">' + rank + '</span>') + '</div>' +
+      '<div class="lb-name-o">' + escHtml(e.display_name || '?') + (isMe ? ' <span style="font-size:0.68rem;color:var(--primary);">(you)</span>' : '') + '</div>' +
+      '<div class="lb-bar-wrap"><div class="lb-bar-track"><div class="lb-bar-fill" style="width:' + barPct + '%"></div></div></div>' +
       '<div class="lb-val-o">' + val + '</div>' +
     '</div>';
   }).join('');
-  list.innerHTML = rows;
+  let myRankHtml = '';
+  if (myRank && myRank.rank > 10) {
+    const val = isRevenue ? '$' + (parseFloat(myRank.value) || 0).toFixed(0) : Math.round(myRank.value || 0).toString();
+    myRankHtml = '<div style="border-top:1px dashed rgba(255,255,255,0.08);margin-top:0.75rem;padding-top:0.75rem;">' +
+      '<div class="lb-row-o lb-me-o"><div class="lb-medal"><span class="lb-rank-o">' + myRank.rank + '</span></div><div class="lb-name-o">You</div><div class="lb-bar-wrap"></div><div class="lb-val-o">' + val + '</div></div></div>';
+  }
+  list.innerHTML = rows + myRankHtml;
 }
 
 // ═══════════════════════════════════════════════════════════
-// OWNER — MILESTONES
+// OWNER — MEDAL CABINET
 // ═══════════════════════════════════════════════════════════
-let ownerMilestones = [];
+let ownerAllMilestones = [];
+
+function ownerRenderCabinet(milestones, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const earned = milestones.filter(function(m){ return m.earned; });
+  const locked = milestones.filter(function(m){ return !m.earned; });
+  if (!earned.length && !locked.length) {
+    el.innerHTML = '<div class="cabinet-empty"><div class="cabinet-empty-icon">🏅</div><div class="cabinet-empty-text">Your cabinet is empty. Complete breaks and hit targets to earn your first badge.</div></div>';
+    return;
+  }
+  let html = '';
+  if (earned.length) {
+    html += '<div class="cabinet-section-label">Earned (' + earned.length + ')</div>';
+    html += '<div class="cabinet-shelf">';
+    html += earned.map(function(m) {
+      const color = m.badge_color || '#4f6ef7';
+      const dateStr = m.earned_at ? 'Earned ' + new Date(m.earned_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+      return '<div class="badge-tile" style="background:' + escHtml(color) + '22;border:1px solid ' + escHtml(color) + '55;" title="' + escHtml(m.name) + '">' +
+        '<span class="badge-tile-icon">' + escHtml(m.badge_icon) + '</span>' +
+        '<span class="badge-tile-name">' + escHtml(m.name) + '</span>' +
+        '<div class="badge-tile-tooltip">' +
+          '<div class="badge-tile-tooltip-name">' + escHtml(m.badge_icon + ' ' + m.name) + '</div>' +
+          '<div class="badge-tile-tooltip-desc">' + escHtml(m.description) + '</div>' +
+          (dateStr ? '<div class="badge-tile-tooltip-date">' + escHtml(dateStr) + '</div>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+    html += '</div>';
+  }
+  if (locked.length) {
+    const show = locked.slice(0, 5);
+    const more = locked.length - show.length;
+    html += '<div class="cabinet-section-label" style="margin-top:1.25rem;">Locked</div>';
+    html += '<div class="cabinet-locked-row">';
+    html += show.map(function(m) {
+      return '<div class="badge-tile-locked" title="' + escHtml(m.name) + ': ' + escHtml(m.description) + '">' + escHtml(m.badge_icon) + '</div>';
+    }).join('');
+    if (more > 0) html += '<span class="cabinet-more-hint">and ' + more + ' more to unlock</span>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
 
 async function ownerLoadMilestones() {
-  const grid = document.getElementById('ownerMsDefsGrid');
-  grid.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:1rem;grid-column:1/-1;">Loading…</div>';
+  const earnedEl = document.getElementById('ownerCabinetEarned');
+  if (earnedEl) earnedEl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
   try {
     const token = await ownerAuthToken();
-    const [msRes, teamData] = await Promise.all([
-      fetch('/api/milestones', { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json()),
-      Promise.resolve({ profiles: allProfiles || [] })
-    ]);
-    ownerMilestones = msRes.milestones || [];
-    grid.innerHTML = ownerMilestones.map(function(m) {
-      const badge = m.org_id ? '' : '<span style="font-size:0.65rem;background:rgba(79,110,247,0.15);color:var(--primary);border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.4rem;">System</span>';
-      return '<div class="ms-card-o' + (m.earned ? ' earned' : ' ms-locked-o') + '">' +
-        '<div style="font-size:2rem;margin-bottom:0.4rem;">' + escHtml(m.badge_icon) + '</div>' +
-        '<div style="font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:0.2rem;">' + escHtml(m.name) + badge + '</div>' +
-        '<div style="font-size:0.72rem;color:var(--muted);line-height:1.4;">' + escHtml(m.description) + '</div>' +
-      '</div>';
-    }).join('') || '<div style="color:var(--muted);font-size:0.85rem;grid-column:1/-1;padding:1rem;">No milestones defined.</div>';
-
-    // Populate award selects
-    const staffSel = document.getElementById('ownerMsAwardStaff');
-    const msSel = document.getElementById('ownerMsAwardMilestone');
-    staffSel.innerHTML = '<option value="">— select —</option>' + (allProfiles || []).map(function(p) { return '<option value="' + p.id + '">' + escHtml(p.display_name) + ' (' + p.role + ')</option>'; }).join('');
-    msSel.innerHTML = '<option value="">— select —</option>' + ownerMilestones.filter(function(m){ return m.trigger_type === 'manual'; }).map(function(m) { return '<option value="' + m.id + '">' + escHtml(m.badge_icon + ' ' + m.name) + '</option>'; }).join('');
-
-    // Watch for staff selection to load their milestone progress
-    staffSel.onchange = function() { if (staffSel.value) ownerLoadStaffMilestones(staffSel.value); };
-  } catch (e) { grid.innerHTML = '<div style="color:var(--red);font-size:0.85rem;grid-column:1/-1;padding:1rem;">Failed: ' + escHtml(e.message) + '</div>'; }
-}
-
-async function ownerLoadStaffMilestones(staffId) {
-  const list = document.getElementById('ownerMsStaffList');
-  list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:1rem;">Loading…</div>';
-  try {
-    const token = await ownerAuthToken();
-    const res = await fetch('/api/milestones/staff?staffId=' + staffId, { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/milestones', { headers: { Authorization: 'Bearer ' + token } });
     const data = await res.json();
-    const profile = (allProfiles || []).find(function(p){ return p.id === staffId; });
-    const ms = data.milestones || [];
-    list.innerHTML = '<div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin-bottom:0.75rem;">' + escHtml(profile?.display_name || staffId) + ' — ' + ms.filter(function(m){return m.earned;}).length + ' of ' + ms.length + ' earned</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.75rem;">' +
-      ms.map(function(m) {
-        const earnedDate = m.earned_at ? new Date(m.earned_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
-        return '<div style="background:var(--card);border:1px solid ' + (m.earned ? 'rgba(79,110,247,0.45)' : 'var(--border)') + ';border-radius:10px;padding:0.85rem;text-align:center;' + (!m.earned ? 'opacity:0.4;filter:grayscale(0.7);' : '') + '">' +
-          '<div style="font-size:1.6rem;margin-bottom:0.3rem;">' + escHtml(m.badge_icon) + '</div>' +
-          '<div style="font-size:0.75rem;font-weight:700;color:var(--text);">' + escHtml(m.name) + '</div>' +
-          (earnedDate ? '<div style="font-size:0.65rem;color:var(--primary);margin-top:0.25rem;font-weight:600;">' + earnedDate + '</div>' : '') +
-        '</div>';
-      }).join('') +
-      '</div>';
-  } catch (e) { list.innerHTML = '<div style="color:var(--red);font-size:0.85rem;padding:1rem;">Failed: ' + escHtml(e.message) + '</div>'; }
+    ownerAllMilestones = data.milestones || [];
+    ownerRenderCabinet(ownerAllMilestones, 'ownerCabinetEarned');
+    ownerRenderHomeCabinet();
+  } catch (e) {
+    if (earnedEl) earnedEl.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed: ' + escHtml(e.message) + '</div>';
+  }
 }
 
-async function ownerAwardMilestone() {
-  const staffId = document.getElementById('ownerMsAwardStaff').value;
-  const milestoneId = document.getElementById('ownerMsAwardMilestone').value;
-  if (!staffId || !milestoneId) { showGlobalError('Select a staff member and milestone.'); return; }
+function ownerRenderHomeCabinet() {
+  const earned = ownerAllMilestones.filter(function(m){ return m.earned; });
+  const section = document.getElementById('homeCabinetSection');
+  const shelf = document.getElementById('homeCabinetShelf');
+  if (!section || !shelf) return;
+  if (!earned.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  const show = earned.slice(0, 8);
+  shelf.innerHTML = show.map(function(m) {
+    const color = m.badge_color || '#4f6ef7';
+    return '<div class="badge-tile" style="background:' + escHtml(color) + '22;border:1px solid ' + escHtml(color) + '55;" title="' + escHtml(m.name) + '">' +
+      '<span class="badge-tile-icon">' + escHtml(m.badge_icon) + '</span>' +
+      '<span class="badge-tile-name">' + escHtml(m.name) + '</span>' +
+    '</div>';
+  }).join('');
+  if (earned.length > 8) shelf.innerHTML += '<span style="font-size:0.78rem;color:var(--muted);align-self:center;font-style:italic;">+' + (earned.length - 8) + ' more</span>';
+}
+
+// Settings Milestones Management
+async function settLoadMilestonesTab() {
+  try {
+    const token = await ownerAuthToken();
+    const res = await fetch('/api/milestones', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    const milestones = data.milestones || [];
+    const systemMs = milestones.filter(function(m){ return !m.org_id; });
+    const customMs = milestones.filter(function(m){ return !!m.org_id; });
+    const manualMs = milestones.filter(function(m){ return m.trigger_type === 'manual'; });
+
+    const systEl = document.getElementById('settMsSystList');
+    if (systEl) systEl.innerHTML = systemMs.map(function(m) {
+      return '<div class="ms-syst-card"><span class="ms-syst-icon">' + escHtml(m.badge_icon) + '</span><div><div class="ms-syst-name">' + escHtml(m.name) + '</div><div class="ms-syst-desc">' + escHtml(m.description) + '</div></div></div>';
+    }).join('') || '<div style="color:var(--muted);font-size:0.85rem;padding:1rem 0;">No system milestones.</div>';
+
+    const custEl = document.getElementById('settMsCustomList');
+    if (custEl) custEl.innerHTML = customMs.map(function(m) {
+      const color = m.badge_color || '#4f6ef7';
+      return '<div class="ms-custom-card"><span style="font-size:1.5rem;flex-shrink:0;">' + escHtml(m.badge_icon) + '</span>' +
+        '<div style="flex:1;"><div style="font-size:0.85rem;font-weight:700;color:var(--text);">' + escHtml(m.name) + '</div>' +
+        '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.1rem;">' + escHtml(m.description) + '</div></div>' +
+        '<button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:0.25rem;" onclick="settDeleteMilestone(\'' + m.id + '\')" title="Delete">✕</button>' +
+      '</div>';
+    }).join('') || '<div style="color:var(--muted);font-size:0.85rem;padding:1rem 0;">No custom milestones yet. Create one to get started.</div>';
+
+    const staffSel = document.getElementById('settMsAwardStaff');
+    const msSel = document.getElementById('settMsAwardMilestone');
+    if (staffSel) staffSel.innerHTML = '<option value="">— select —</option>' + (allProfiles || []).map(function(p){ return '<option value="' + p.id + '">' + escHtml(p.display_name) + ' (' + p.role + ')</option>'; }).join('');
+    if (msSel) msSel.innerHTML = '<option value="">— select —</option>' + manualMs.map(function(m){ return '<option value="' + m.id + '">' + escHtml(m.badge_icon + ' ' + m.name) + '</option>'; }).join('');
+  } catch (e) { console.error('settLoadMilestonesTab', e); }
+}
+
+function settMsSubTab(pane, btn) {
+  document.querySelectorAll('.sett-sub-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.sett-sub-pane').forEach(function(p){ p.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  const paneEl = document.getElementById('settMsPane-' + pane);
+  if (paneEl) paneEl.classList.add('active');
+  if (pane !== 'system') settLoadMilestonesTab();
+}
+
+async function settDeleteMilestone(id) {
+  if (!confirm('Delete this custom milestone?')) return;
+  try {
+    const token = await ownerAuthToken();
+    const res = await fetch('/api/milestones?id=' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed'); }
+    await settLoadMilestonesTab();
+    showGlobalSuccess('Milestone deleted.');
+  } catch (e) { showGlobalError(e.message); }
+}
+
+async function settAwardMilestone() {
+  const staffId = document.getElementById('settMsAwardStaff')?.value;
+  const msId = document.getElementById('settMsAwardMilestone')?.value;
+  const status = document.getElementById('settAwardStatus');
+  if (!staffId || !msId) { showGlobalError('Select a staff member and milestone.'); return; }
   try {
     const token = await ownerAuthToken();
     const res = await fetch('/api/milestones/award', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ staff_id: staffId, milestone_id: milestoneId })
+      body: JSON.stringify({ staff_id: staffId, milestone_id: msId })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to award');
+    if (status) { status.style.display = ''; status.style.color = 'var(--green)'; status.textContent = 'Milestone awarded!'; setTimeout(function(){ if(status) status.style.display = 'none'; }, 3000); }
     showGlobalSuccess('Milestone awarded!');
-    await ownerLoadStaffMilestones(staffId);
   } catch (e) { showGlobalError(e.message); }
 }
+
+// Legacy stub (no longer used but modal still calls it)
+async function ownerAwardMilestone() { await settAwardMilestone(); }
 
 // ═══════════════════════════════════════════════════════════
 // OWNER — TEMPLATES
@@ -9589,6 +9921,124 @@ async function ownerCreateGoal(goalType, targetValue, staffId, year, month) {
   if (!res.ok) throw new Error(data.error || 'Failed');
   return data.goal;
 }
+
+// ═══════════════════════════════════════════════════════════
+// OWNER — HOME GOAL BARS
+// ═══════════════════════════════════════════════════════════
+let ownerGoalBarSub = null;
+
+async function ownerLoadHomeGoalBars() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  try {
+    const token = await ownerAuthToken();
+    const res = await fetch('/api/goals?year=' + year + '&month=' + month, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    ownerRenderHomeGoalBars(data.goals || []);
+    ownerSubscribeGoalBarRealtime(year, month);
+  } catch (e) { console.error('ownerLoadHomeGoalBars', e); }
+}
+
+function ownerRenderHomeGoalBars(goals) {
+  const section = document.getElementById('homeGoalSection');
+  const barsEl = document.getElementById('homeGoalBars');
+  const banner = document.getElementById('homeGoalReachedBanner');
+  if (!section || !barsEl) return;
+  const orgGoals = goals.filter(function(g){ return !g.staff_id; });
+  if (!orgGoals.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  let anyComplete = false;
+  barsEl.innerHTML = orgGoals.map(function(g) {
+    const pct = g.target_value > 0 ? Math.min(100, Math.round((g.current_value || 0) / g.target_value * 100)) : 0;
+    const isRevenue = g.goal_type === 'revenue';
+    const curFmt = isRevenue ? '$' + Math.round(g.current_value || 0).toLocaleString() : Math.round(g.current_value || 0).toString();
+    const tgtFmt = isRevenue ? '$' + Math.round(g.target_value).toLocaleString() : Math.round(g.target_value).toString();
+    const fillClass = pct >= 100 ? 'goal-fill-done' : pct >= 75 ? 'goal-fill-warn' : 'goal-fill-normal';
+    const pctColor = pct >= 100 ? 'var(--green)' : pct >= 75 ? 'var(--yellow)' : 'var(--primary)';
+    if (pct >= 100) anyComplete = true;
+    return '<div class="home-goal-bar-wrap">' +
+      '<div class="home-goal-bar-header">' +
+        '<span class="home-goal-bar-name">' + escHtml(GOAL_TYPE_LABELS[g.goal_type] || g.goal_type) + ' Goal</span>' +
+        '<span class="home-goal-bar-vals">' + curFmt + ' / ' + tgtFmt + '</span>' +
+        '<span class="home-goal-bar-pct" style="color:' + pctColor + ';margin-left:0.5rem;">' + pct + '%</span>' +
+      '</div>' +
+      '<div class="home-goal-track"><div class="home-goal-fill ' + fillClass + '" id="hgb-' + g.id + '" style="width:0%"></div></div>' +
+    '</div>';
+  }).join('');
+  if (banner) banner.style.display = anyComplete ? 'flex' : 'none';
+  if (anyComplete) launchConfetti(3000);
+  requestAnimationFrame(function() {
+    orgGoals.forEach(function(g) {
+      const pct = g.target_value > 0 ? Math.min(100, Math.round((g.current_value || 0) / g.target_value * 100)) : 0;
+      const fill = document.getElementById('hgb-' + g.id);
+      if (fill) setTimeout(function(){ fill.style.width = pct + '%'; }, 80);
+    });
+  });
+}
+
+function ownerSubscribeGoalBarRealtime(year, month) {
+  if (ownerGoalBarSub) { sb.removeChannel(ownerGoalBarSub); ownerGoalBarSub = null; }
+  ownerGoalBarSub = sb.channel('owner-goal-bar')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_goals' }, function() {
+      ownerLoadHomeGoalBars();
+    }).subscribe();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONFETTI + EARN OVERLAY
+// ═══════════════════════════════════════════════════════════
+function launchConfetti(durationMs) {
+  const canvas = document.getElementById('confettiCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const pieces = Array.from({length: 120}, function() {
+    return { x: Math.random() * canvas.width, y: -10, r: Math.random() * 6 + 3, color: ['#4f6ef7','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4'][Math.floor(Math.random()*6)], speed: Math.random() * 3 + 1.5, spin: Math.random() * 0.2 - 0.1, angle: Math.random() * Math.PI * 2 };
+  });
+  const end = Date.now() + durationMs;
+  function frame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const now = Date.now();
+    if (now > end) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+    pieces.forEach(function(p) {
+      p.y += p.speed; p.angle += p.spin;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+      ctx.fillStyle = p.color; ctx.globalAlpha = Math.min(1, (end - now) / 600);
+      ctx.fillRect(-p.r, -p.r, p.r * 2, p.r * 2);
+      ctx.restore();
+      if (p.y > canvas.height + 10) { p.y = -10; p.x = Math.random() * canvas.width; }
+    });
+    requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+function showEarnOverlay(badge) {
+  const overlay = document.getElementById('earnOverlay');
+  const display = document.getElementById('earnBadgeDisplay');
+  const nameEl = document.getElementById('earnName');
+  const descEl = document.getElementById('earnDesc');
+  if (!overlay || !display) return;
+  const color = badge.badge_color || '#4f6ef7';
+  display.style.background = color + '22';
+  display.style.border = '2px solid ' + color + '55';
+  display.innerHTML = badge.badge_icon;
+  nameEl.textContent = badge.name;
+  descEl.textContent = badge.description;
+  overlay.classList.add('active');
+  launchConfetti(3000);
+  setTimeout(dismissEarnOverlay, 6000);
+}
+
+function dismissEarnOverlay() {
+  const overlay = document.getElementById('earnOverlay');
+  if (overlay) overlay.classList.remove('active');
+}
+document.getElementById('earnOverlay')?.addEventListener('click', function(e) {
+  if (e.target === this || e.target.id === 'earnDismiss') dismissEarnOverlay();
+});
 </script>
 
 <!-- ══ NEW TEMPLATE MODAL ════════════════════════════════════ -->
@@ -9680,6 +10130,16 @@ async function ownerCreateGoal(goalType, targetValue, staffId, year, month) {
       <button class="btn btn-primary" style="flex:1;" onclick="saveLbSettings()">Save</button>
     </div>
   </div>
+</div>
+
+<!-- ══ MEDAL EARN OVERLAY ═══════════════════════════════════ -->
+<canvas id="confettiCanvas"></canvas>
+<div id="earnOverlay">
+  <div id="earnBadgeDisplay"></div>
+  <div id="earnTitle">Achievement Unlocked</div>
+  <div id="earnName"></div>
+  <div id="earnDesc"></div>
+  <div id="earnDismiss" onclick="dismissEarnOverlay()">Tap to dismiss</div>
 </div>
 
 <script>
