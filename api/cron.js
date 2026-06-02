@@ -24,10 +24,13 @@ module.exports = async (req, res) => {
   );
 
   try {
-    if (type === 'trial')          return await runTrialEmails(sb, res);
-    if (type === 'shift-reminder') return await runShiftReminders(sb, res);
-    if (type === 'daily-digest')   return await runDailyDigest(sb, res);
-    if (type === 'annual-renewal') return await runAnnualRenewalReminders(sb, res);
+    if (type === 'trial')             return await runTrialEmails(sb, res);
+    if (type === 'shift-reminder')    return await runShiftReminders(sb, res);
+    if (type === 'daily-digest')      return await runDailyDigest(sb, res);
+    if (type === 'annual-renewal')    return await runAnnualRenewalReminders(sb, res);
+    if (type === 'split-expiry')      return await runSplitExpiry(sb, res);
+    if (type === 'goal-prompt')       return await runGoalPrompt(sb, res);
+    if (type === 'leaderboard-reset') return await runLeaderboardReset(sb, res);
     return res.status(400).json({ error: 'Unknown type: ' + type });
   } catch (err) {
     console.error('Cron fatal error [' + type + ']:', err);
@@ -334,6 +337,167 @@ async function runAnnualRenewalReminders(sb, res) {
       results.errors.push({ org_id: sub.org_id, error: innerErr.message });
     }
   }
+  return res.status(200).json({ message: 'Done', results });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SORTER SPLIT EXPIRY  (runs hourly)
+// ─────────────────────────────────────────────────────────────────────────────
+async function runSplitExpiry(sb, res) {
+  const results = { expired: [], errors: [] };
+
+  const { data: expiredSplits, error } = await sb
+    .from('sorter_splits')
+    .select('id, stream_id, initiating_sorter_id, initiating_sorter_percentage, receiving_sorter_percentage, org_id')
+    .eq('status', 'pending')
+    .lt('expires_at', new Date().toISOString());
+
+  if (error) throw new Error('sorter_splits query failed: ' + error.message);
+  if (!expiredSplits || expiredSplits.length === 0) {
+    return res.status(200).json({ message: 'No expired splits', results });
+  }
+
+  for (const split of expiredSplits) {
+    try {
+      // Mark split as expired
+      await sb.from('sorter_splits').update({ status: 'expired' }).eq('id', split.id);
+
+      // Log to activity_log — initiating sorter keeps 100% since split was not confirmed
+      const { data: stream } = await sb.from('streams')
+        .select('stream_key').eq('id', split.stream_id).maybeSingle();
+
+      await sb.from('activity_log').insert({
+        org_id: split.org_id || null,
+        user_id: split.initiating_sorter_id,
+        action: 'sorter_split_expired',
+        details: JSON.stringify({
+          split_id: split.id,
+          stream_id: split.stream_id,
+          stream_key: stream?.stream_key || null,
+          initiating_pct: split.initiating_sorter_percentage,
+          receiving_pct: split.receiving_sorter_percentage,
+          reason: 'Receiving sorter did not respond within 24 hours'
+        })
+      }).catch(() => {}); // non-fatal if activity_log insert fails
+
+      results.expired.push({ split_id: split.id, stream_id: split.stream_id });
+    } catch (innerErr) {
+      results.errors.push({ split_id: split.id, error: innerErr.message });
+    }
+  }
+
+  return res.status(200).json({ message: 'Done', results });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MONTHLY GOAL PROMPT  (runs 25th of month at 9am Eastern)
+// ─────────────────────────────────────────────────────────────────────────────
+async function runGoalPrompt(sb, res) {
+  const results = { notified: [], skipped: [], errors: [] };
+
+  // Next month's year/month
+  const now = new Date();
+  const nextMonth = now.getUTCMonth() + 2; // getUTCMonth is 0-indexed; +2 = next month 1-indexed
+  const nextYear  = nextMonth > 12 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();
+  const normalizedNextMonth = nextMonth > 12 ? 1 : nextMonth;
+
+  // All active owners across all organizations (exempt orgs excluded)
+  const { data: owners, error: ownersErr } = await sb
+    .from('profiles')
+    .select('id, org_id, display_name')
+    .eq('role', 'owner');
+
+  if (ownersErr) throw new Error('Profiles query failed: ' + ownersErr.message);
+  if (!owners || owners.length === 0) return res.status(200).json({ message: 'No owners found', results });
+
+  // Filter out exempt orgs
+  const orgIds = [...new Set(owners.map(o => o.org_id).filter(Boolean))];
+  const { data: subs } = await sb.from('subscriptions').select('org_id, tier').in('org_id', orgIds);
+  const exemptOrgs = new Set((subs || []).filter(s => s.tier === 'exempt').map(s => s.org_id));
+
+  for (const owner of owners) {
+    if (!owner.org_id || exemptOrgs.has(owner.org_id)) {
+      results.skipped.push((owner.id) + ':exempt-or-no-org');
+      continue;
+    }
+    try {
+      // Check if any goals already set for next month
+      const { count } = await sb.from('monthly_goals')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', owner.org_id)
+        .eq('goal_year', nextYear)
+        .eq('goal_month', normalizedNextMonth);
+
+      if (count > 0) {
+        results.skipped.push(owner.id + ':goals-already-set');
+        continue;
+      }
+
+      const monthName = new Date(nextYear, normalizedNextMonth - 1, 1)
+        .toLocaleString('en-US', { month: 'long' });
+
+      await sb.from('notifications').insert({
+        organization_id: owner.org_id,
+        user_id: owner.id,
+        type: 'goal_prompt',
+        title: 'Set your goals for ' + monthName,
+        body: 'You haven\'t set goals for ' + monthName + ' yet. Head to Goals to set revenue, break, and streak targets for your team.',
+        action_url: APP_URL + '/dashboard'
+      });
+
+      results.notified.push({ user_id: owner.id, org_id: owner.org_id, next_month: normalizedNextMonth + '/' + nextYear });
+    } catch (innerErr) {
+      results.errors.push({ user_id: owner.id, error: innerErr.message });
+    }
+  }
+
+  return res.status(200).json({ message: 'Done', results });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEADERBOARD MONTH RESET  (runs 1st of month at 12:01am Eastern)
+// ─────────────────────────────────────────────────────────────────────────────
+async function runLeaderboardReset(sb, res) {
+  // Historical data in leaderboard_snapshots is kept permanently — no delete.
+  // This job logs an archive checkpoint so owners have an audit trail.
+  const results = { archived: [], errors: [] };
+
+  const now = new Date();
+  // Previous month
+  const prevMonth = now.getUTCMonth(); // 0-indexed, so this is last month (1-indexed)
+  const prevYear  = prevMonth === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  const normalizedPrevMonth = prevMonth === 0 ? 12 : prevMonth;
+
+  // Count snapshots that exist for the previous month across all orgs
+  const { data: orgsWithData, error } = await sb
+    .from('leaderboard_snapshots')
+    .select('org_id')
+    .eq('period_year', prevYear)
+    .eq('period_month', normalizedPrevMonth);
+
+  if (error) throw new Error('leaderboard_snapshots query failed: ' + error.message);
+
+  const uniqueOrgs = [...new Set((orgsWithData || []).map(r => r.org_id))];
+
+  for (const orgId of uniqueOrgs) {
+    try {
+      await sb.from('activity_log').insert({
+        org_id: orgId,
+        user_id: null,
+        action: 'leaderboard_month_archived',
+        details: JSON.stringify({
+          period_year: prevYear,
+          period_month: normalizedPrevMonth,
+          archived_at: now.toISOString()
+        })
+      }).catch(() => {}); // non-fatal
+
+      results.archived.push({ org_id: orgId, period: normalizedPrevMonth + '/' + prevYear });
+    } catch (innerErr) {
+      results.errors.push({ org_id: orgId, error: innerErr.message });
+    }
+  }
+
   return res.status(200).json({ message: 'Done', results });
 }
 

@@ -12,7 +12,34 @@
     { "source": "/sorter", "destination": "/sorter.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/exports", "destination": "/exports.html" }
+    { "source": "/exports", "destination": "/exports.html" },
+
+    { "source": "/api/chat/channels", "destination": "/api/features?feature=chat&action=channels" },
+    { "source": "/api/chat/channels/:channelId/messages", "destination": "/api/features?feature=chat&action=messages&channelId=:channelId" },
+    { "source": "/api/chat/reactions", "destination": "/api/features?feature=chat&action=reactions" },
+    { "source": "/api/chat/unread", "destination": "/api/features?feature=chat&action=unread" },
+
+    { "source": "/api/leaderboard", "destination": "/api/features?feature=leaderboard&action=get" },
+    { "source": "/api/leaderboard/settings", "destination": "/api/features?feature=leaderboard&action=settings" },
+
+    { "source": "/api/milestones", "destination": "/api/features?feature=milestones&action=milestones" },
+    { "source": "/api/milestones/staff", "destination": "/api/features?feature=milestones&action=staff" },
+    { "source": "/api/milestones/award", "destination": "/api/features?feature=milestones&action=award" },
+
+    { "source": "/api/templates", "destination": "/api/features?feature=templates&action=templates" },
+    { "source": "/api/templates/use", "destination": "/api/features?feature=templates&action=use" },
+    { "source": "/api/templates/manage", "destination": "/api/features?feature=templates&action=manage" },
+
+    { "source": "/api/sorter-splits/pending", "destination": "/api/features?feature=sorter-splits&action=pending" },
+    { "source": "/api/sorter-splits/confirm", "destination": "/api/features?feature=sorter-splits&action=confirm" },
+    { "source": "/api/sorter-splits/decline", "destination": "/api/features?feature=sorter-splits&action=decline" },
+    { "source": "/api/sorter-splits", "destination": "/api/features?feature=sorter-splits&action=splits" },
+
+    { "source": "/api/goals", "destination": "/api/features?feature=goals&action=goals" },
+    { "source": "/api/goals/manage", "destination": "/api/features?feature=goals&action=manage" },
+
+    { "source": "/api/notify-stream-closed", "destination": "/api/features?feature=notify&action=stream-closed" },
+    { "source": "/api/notify-inventory-low", "destination": "/api/features?feature=notify&action=inventory-low" }
   ],
   "crons": [
     {
@@ -30,6 +57,18 @@
     {
       "path": "/api/cron?type=annual-renewal",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron?type=split-expiry",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron?type=goal-prompt",
+      "schedule": "0 14 25 * *"
+    },
+    {
+      "path": "/api/cron?type=leaderboard-reset",
+      "schedule": "1 5 1 * *"
     }
   ]
 }
