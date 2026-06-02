@@ -155,6 +155,52 @@
     .sg-dot{width:7px;height:7px;border-radius:50%;background:var(--border);transition:background 0.2s;}
     .sg-dot.sg-dot-active{background:var(--primary);}
     .sg-highlight{background:rgba(79,110,247,0.12);border-left:3px solid var(--primary);border-radius:6px;padding:0.6rem 0.9rem;margin:0.75rem 0;font-size:0.88rem;color:var(--text);}
+
+    /* ── CHAT ── */
+    .chat-layout{display:grid;grid-template-columns:180px 1fr;gap:0;height:calc(100vh - 220px);min-height:400px;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+    @media(max-width:600px){.chat-layout{grid-template-columns:1fr;height:auto;}}
+    .chat-sidebar{background:rgba(0,0,0,0.2);border-right:1px solid var(--border);overflow-y:auto;padding:0.75rem 0;}
+    .chat-ch-btn{display:block;width:100%;background:none;border:none;text-align:left;padding:0.55rem 1rem;color:var(--muted);font-size:0.83rem;font-weight:600;cursor:pointer;transition:background 0.15s,color 0.15s;border-left:3px solid transparent;}
+    .chat-ch-btn.active{color:var(--text);background:rgba(79,110,247,0.1);border-left-color:var(--primary);}
+    .chat-ch-btn:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--text);}
+    .chat-ch-unread{float:right;background:var(--primary);color:#fff;font-size:0.6rem;font-weight:800;border-radius:100px;padding:0 5px;line-height:1.6;}
+    .chat-main{display:flex;flex-direction:column;}
+    .chat-msgs{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.6rem;}
+    .chat-msg{display:flex;gap:0.6rem;align-items:flex-start;}
+    .chat-avatar{width:30px;height:30px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:800;color:#fff;flex-shrink:0;}
+    .chat-msg-body{flex:1;}
+    .chat-msg-meta{font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;}
+    .chat-msg-name{font-weight:700;color:var(--text);margin-right:0.4rem;}
+    .chat-msg-text{font-size:0.88rem;color:var(--text);line-height:1.5;word-break:break-word;}
+    .chat-msg-text.deleted{color:var(--muted);font-style:italic;}
+    .chat-reactions{display:flex;gap:0.3rem;margin-top:0.3rem;flex-wrap:wrap;}
+    .chat-rxn-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:100px;padding:0.15rem 0.5rem;font-size:0.8rem;cursor:pointer;transition:background 0.15s;color:var(--text);}
+    .chat-rxn-btn.reacted{background:rgba(79,110,247,0.2);border-color:var(--primary);}
+    .chat-input-row{display:flex;gap:0.5rem;padding:0.75rem;border-top:1px solid var(--border);}
+    .chat-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.88rem;padding:0.55rem 0.85rem;outline:none;font-family:inherit;}
+    .chat-input:focus{border-color:var(--primary);}
+    .chat-send-btn{background:var(--primary);color:#fff;border:none;border-radius:8px;padding:0.55rem 1rem;font-weight:700;font-size:0.82rem;cursor:pointer;}
+
+    /* ── LEADERBOARD ── */
+    .lb-cats{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
+    .lb-cat-btn{padding:0.35rem 0.85rem;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
+    .lb-cat-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+    .lb-row{display:flex;align-items:center;gap:0.85rem;padding:0.75rem 1rem;border-bottom:1px solid rgba(45,45,61,0.5);}
+    .lb-row:last-child{border-bottom:none;}
+    .lb-row.lb-me{background:rgba(79,110,247,0.08);border-radius:8px;border:1px solid rgba(79,110,247,0.2);}
+    .lb-rank{font-size:0.82rem;font-weight:800;color:var(--muted);width:28px;text-align:center;flex-shrink:0;}
+    .lb-rank.gold{color:#f59e0b;} .lb-rank.silver{color:#94a3b8;} .lb-rank.bronze{color:#cd7f32;}
+    .lb-name{flex:1;font-size:0.88rem;font-weight:600;color:var(--text);}
+    .lb-val{font-size:0.88rem;font-weight:700;color:var(--primary);}
+
+    /* ── SPLITS ── */
+    .split-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.85rem;}
+    .split-card-meta{font-size:0.8rem;color:var(--muted);margin-top:0.3rem;}
+    .split-pct-row{display:flex;align-items:center;gap:1rem;margin:0.85rem 0;flex-wrap:wrap;}
+    .split-pct-box{flex:1;min-width:130px;background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.25);border-radius:8px;padding:0.65rem;text-align:center;}
+    .split-pct-label{font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.2rem;}
+    .split-pct-val{font-size:1.3rem;font-weight:800;color:var(--primary);}
+    .split-actions{display:flex;gap:0.6rem;margin-top:0.75rem;flex-wrap:wrap;}
   </style>
 </head>
 <body>
@@ -193,6 +239,9 @@
   <button class="tab-btn active" data-tab="queue">Sort Queue</button>
   <button class="tab-btn" data-tab="shifts">My Shifts</button>
   <button class="tab-btn" data-tab="pay">My Pay</button>
+  <button class="tab-btn" data-tab="splits">Splits</button>
+  <button class="tab-btn" data-tab="chat">Chat</button>
+  <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
 </div>
 
 <div class="main">
@@ -304,6 +353,87 @@
       </div>
     </div>
   </div>
+
+  <!-- ── SPLITS TAB ── -->
+  <div class="tab-content" id="tab-splits">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Pending Split Requests</div>
+        <button class="btn btn-outline" onclick="loadSplitsPending()" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
+      </div>
+      <div id="splitsPendingList"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No pending requests.</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Create Split Request</div>
+      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:1rem;">Propose a commission split with another sorter for a stream. They must accept within 24 hours.</p>
+      <div class="form-group">
+        <label for="splitStreamSel">Stream</label>
+        <select id="splitStreamSel"><option value="">— select stream —</option></select>
+      </div>
+      <div class="form-group">
+        <label for="splitPartnerSel">Receiving Sorter</label>
+        <select id="splitPartnerSel"><option value="">— select sorter —</option></select>
+      </div>
+      <div class="form-group">
+        <label for="splitType">Split Type</label>
+        <select id="splitType" onchange="onSplitTypeChange()">
+          <option value="equal">Equal (50/50)</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div id="splitCustomRow" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+          <div class="form-group" style="margin:0;">
+            <label>My % (you)</label>
+            <input type="number" id="splitMyPct" min="1" max="99" value="50" oninput="updateSplitPreview()" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Their %</label>
+            <input type="number" id="splitTheirPct" min="1" max="99" value="50" readonly style="color:var(--muted);" />
+          </div>
+        </div>
+      </div>
+      <div id="splitPreview" style="display:none;margin:0.85rem 0;">
+        <div class="split-pct-row">
+          <div class="split-pct-box"><div class="split-pct-label">You</div><div class="split-pct-val" id="splitPreviewMy">50%</div></div>
+          <div style="font-size:1.2rem;color:var(--muted);">↔</div>
+          <div class="split-pct-box"><div class="split-pct-label">Them</div><div class="split-pct-val" id="splitPreviewTheir">50%</div></div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="createSplitBtn" onclick="createSplitRequest()">Send Split Request</button>
+    </div>
+  </div>
+
+  <!-- ── CHAT TAB ── -->
+  <div class="tab-content" id="tab-chat">
+    <div class="chat-layout">
+      <div class="chat-sidebar" id="chatSidebar">
+        <div style="font-size:0.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:0 1rem 0.5rem;">Channels</div>
+        <div id="chatChannelList"></div>
+      </div>
+      <div class="chat-main">
+        <div id="chatMsgsWrap" class="chat-msgs"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Select a channel to start.</div></div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chatMsgInput" placeholder="Message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}" maxlength="2000" />
+          <button class="chat-send-btn" onclick="sendChatMsg()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LEADERBOARD TAB ── -->
+  <div class="tab-content" id="tab-leaderboard">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Team Leaderboard</div>
+        <button class="btn btn-outline" onclick="loadLeaderboard()" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
+      </div>
+      <div class="lb-cats" id="lbCats"></div>
+      <div id="lbList"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -336,6 +466,9 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
     if (btn.dataset.tab === 'queue') loadSortQueue();
     if (btn.dataset.tab === 'shifts') { loadShifts(); loadMyScheduleView(); }
     if (btn.dataset.tab === 'pay') loadSorterPay();
+    if (btn.dataset.tab === 'splits') { loadSplitsPending(); loadSplitsFormData(); }
+    if (btn.dataset.tab === 'chat') loadChatChannels();
+    if (btn.dataset.tab === 'leaderboard') loadLeaderboard();
   });
 });
 
@@ -1166,6 +1299,266 @@ function sgFinish() {
     if (typeof cbpTrack === 'function') cbpTrack('sorter_onboarding_complete', { organization_id: currentProfile?.org_id });
     sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id).then().catch(() => {});
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SPLITS
+// ═══════════════════════════════════════════════════════════
+async function authToken() {
+  const { data: { session } } = await sb.auth.getSession();
+  return session?.access_token;
+}
+
+async function loadSplitsPending() {
+  const list = document.getElementById('splitsPendingList');
+  list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:1rem;font-size:0.85rem;">Loading…</div>';
+  try {
+    const token = await authToken();
+    const res = await fetch('/api/sorter-splits/pending', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    const splits = data.pending_splits || [];
+    if (!splits.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No pending requests.</div>'; return; }
+    list.innerHTML = splits.map(function(s) {
+      const exp = new Date(s.expires_at);
+      const hoursLeft = Math.max(0, Math.round((exp - Date.now()) / 36e5));
+      return '<div class="split-card">' +
+        '<div style="font-size:0.9rem;font-weight:700;">' + escHtml(s.stream?.stream_key || 'Unknown Stream') + '</div>' +
+        '<div class="split-card-meta">From: ' + escHtml(s.initiating_sorter?.display_name || '?') + ' · Expires in ' + hoursLeft + 'h</div>' +
+        '<div class="split-pct-row">' +
+          '<div class="split-pct-box"><div class="split-pct-label">Them</div><div class="split-pct-val">' + s.initiating_sorter_percentage + '%</div></div>' +
+          '<div style="font-size:1.2rem;color:var(--muted);">↔</div>' +
+          '<div class="split-pct-box"><div class="split-pct-label">You</div><div class="split-pct-val">' + s.receiving_sorter_percentage + '%</div></div>' +
+        '</div>' +
+        '<div class="split-actions">' +
+          '<button class="btn btn-green" style="font-size:0.82rem;" onclick="respondSplit(\'' + s.id + '\',\'confirm\')">Accept</button>' +
+          '<button class="btn" style="font-size:0.82rem;background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);" onclick="respondSplit(\'' + s.id + '\',\'decline\')">Decline</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) { list.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed to load: ' + escHtml(e.message) + '</div>'; }
+}
+
+async function loadSplitsFormData() {
+  try {
+    const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).neq('status', 'closed').order('created_at', { ascending: false }).limit(50);
+    const streamSel = document.getElementById('splitStreamSel');
+    streamSel.innerHTML = '<option value="">— select stream —</option>' + (streams || []).map(function(s) { return '<option value="' + s.id + '">' + escHtml(s.stream_key) + '</option>'; }).join('');
+
+    const { data: sorters } = await sb.from('profiles').select('id, display_name').eq('org_id', currentProfile.org_id).eq('role', 'sorter').neq('id', currentUser.id);
+    const partnerSel = document.getElementById('splitPartnerSel');
+    partnerSel.innerHTML = '<option value="">— select sorter —</option>' + (sorters || []).map(function(s) { return '<option value="' + s.id + '">' + escHtml(s.display_name) + '</option>'; }).join('');
+
+    document.getElementById('splitPreview').style.display = 'flex';
+    updateSplitPreview();
+  } catch (e) { console.error('loadSplitsFormData', e); }
+}
+
+function onSplitTypeChange() {
+  const type = document.getElementById('splitType').value;
+  document.getElementById('splitCustomRow').style.display = type === 'custom' ? '' : 'none';
+  if (type === 'equal') { document.getElementById('splitMyPct').value = 50; document.getElementById('splitTheirPct').value = 50; }
+  updateSplitPreview();
+}
+
+function updateSplitPreview() {
+  const my = parseFloat(document.getElementById('splitMyPct').value) || 50;
+  const their = 100 - my;
+  document.getElementById('splitTheirPct').value = their;
+  document.getElementById('splitPreviewMy').textContent = my + '%';
+  document.getElementById('splitPreviewTheir').textContent = their + '%';
+}
+
+async function createSplitRequest() {
+  const streamId = document.getElementById('splitStreamSel').value;
+  const receivingId = document.getElementById('splitPartnerSel').value;
+  const splitType = document.getElementById('splitType').value;
+  const initPct = parseFloat(document.getElementById('splitMyPct').value) || 50;
+  const recvPct = 100 - initPct;
+  if (!streamId || !receivingId) { showError('Select a stream and receiving sorter.'); return; }
+  const btn = document.getElementById('createSplitBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const token = await authToken();
+    const res = await fetch('/api/sorter-splits', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stream_id: streamId, receiving_sorter_id: receivingId, split_type: splitType, initiating_sorter_percentage: initPct, receiving_sorter_percentage: recvPct })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create split');
+    showSuccess('Split request sent. They have 24 hours to respond.');
+    await loadSplitsPending();
+  } catch (e) { showError(e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Send Split Request'; }
+}
+
+async function respondSplit(splitId, action) {
+  try {
+    const token = await authToken();
+    const url = action === 'confirm' ? '/api/sorter-splits/confirm' : '/api/sorter-splits/decline';
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ split_id: splitId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to respond');
+    showSuccess(action === 'confirm' ? 'Split accepted.' : 'Split declined.');
+    await loadSplitsPending();
+  } catch (e) { showError(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHAT
+// ═══════════════════════════════════════════════════════════
+let chatChannels = [];
+let activeChatChannel = null;
+let chatRealtimeSub = null;
+
+async function loadChatChannels() {
+  try {
+    const token = await authToken();
+    const res = await fetch('/api/chat/channels', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    chatChannels = data.channels || [];
+    renderChatSidebar();
+    if (chatChannels.length) selectChatChannel(chatChannels[0].id);
+  } catch (e) { console.error('loadChatChannels', e); }
+}
+
+function renderChatSidebar() {
+  const list = document.getElementById('chatChannelList');
+  if (!chatChannels.length) { list.innerHTML = '<div style="padding:0.75rem 1rem;font-size:0.82rem;color:var(--muted);">No channels.</div>'; return; }
+  list.innerHTML = chatChannels.map(function(ch) {
+    return '<button class="chat-ch-btn' + (activeChatChannel === ch.id ? ' active' : '') + '" onclick="selectChatChannel(\'' + ch.id + '\')">' + escHtml(ch.name || ch.slug) + '</button>';
+  }).join('');
+}
+
+async function selectChatChannel(channelId) {
+  activeChatChannel = channelId;
+  renderChatSidebar();
+  const wrap = document.getElementById('chatMsgsWrap');
+  wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
+  try {
+    const token = await authToken();
+    const res = await fetch('/api/chat/channels/' + channelId + '/messages?channelId=' + channelId, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    renderChatMessages(data.messages || []);
+    subscribeChatRealtime(channelId);
+  } catch (e) { wrap.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed: ' + escHtml(e.message) + '</div>'; }
+}
+
+function renderChatMessages(msgs) {
+  const wrap = document.getElementById('chatMsgsWrap');
+  if (!msgs.length) { wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No messages yet. Say hi!</div>'; return; }
+  const reversed = msgs.slice().reverse();
+  const EMOJIS = ['👍','🔥','💰','✅'];
+  wrap.innerHTML = reversed.map(function(m) {
+    const initials = ((m.sender?.display_name || '?').split(' ').map(function(w){ return w[0]; }).join('').toUpperCase().slice(0,2));
+    const rxnHtml = EMOJIS.map(function(e) {
+      const info = m.reactions && m.reactions[e];
+      const count = info ? info.count : 0;
+      const active = info && info.reacted ? ' reacted' : '';
+      return '<button class="chat-rxn-btn' + active + '" onclick="toggleReaction(\'' + m.id + '\',\'' + e + '\')">' + e + (count > 0 ? ' ' + count : '') + '</button>';
+    }).join('');
+    return '<div class="chat-msg">' +
+      '<div class="chat-avatar">' + initials + '</div>' +
+      '<div class="chat-msg-body">' +
+        '<div class="chat-msg-meta"><span class="chat-msg-name">' + escHtml(m.sender?.display_name || '?') + '</span>' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) + '</div>' +
+        '<div class="chat-msg-text' + (m.is_deleted ? ' deleted' : '') + '">' + escHtml(m.content) + '</div>' +
+        '<div class="chat-reactions">' + rxnHtml + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function sendChatMsg() {
+  const input = document.getElementById('chatMsgInput');
+  const content = input.value.trim();
+  if (!content || !activeChatChannel) return;
+  input.value = '';
+  try {
+    const token = await authToken();
+    await fetch('/api/chat/channels/' + activeChatChannel + '/messages?channelId=' + activeChatChannel, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    await selectChatChannel(activeChatChannel);
+  } catch (e) { input.value = content; showError('Failed to send: ' + e.message); }
+}
+
+async function toggleReaction(msgId, emoji) {
+  try {
+    const token = await authToken();
+    await fetch('/api/chat/reactions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: msgId, emoji })
+    });
+    await selectChatChannel(activeChatChannel);
+  } catch (e) { console.error('toggleReaction', e); }
+}
+
+function subscribeChatRealtime(channelId) {
+  if (chatRealtimeSub) { sb.removeChannel(chatRealtimeSub); chatRealtimeSub = null; }
+  chatRealtimeSub = sb.channel('chat-' + channelId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'channel_id=eq.' + channelId }, function() {
+      if (activeChatChannel === channelId) selectChatChannel(channelId);
+    }).subscribe();
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEADERBOARD
+// ═══════════════════════════════════════════════════════════
+const LB_CATEGORY_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue', commission_earned: 'Commission', consistency_score: 'Consistency', longest_streak: 'Streak' };
+let activeLbCategory = 'breaks_completed';
+
+async function loadLeaderboard() {
+  const list = document.getElementById('lbList');
+  list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
+  try {
+    const token = await authToken();
+    const res = await fetch('/api/leaderboard?category=' + activeLbCategory, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    renderLbCats(data.visible_categories || Object.keys(LB_CATEGORY_LABELS));
+    renderLbList(data.entries || [], data.my_rank || null);
+  } catch (e) { list.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed: ' + escHtml(e.message) + '</div>'; }
+}
+
+function renderLbCats(cats) {
+  const wrap = document.getElementById('lbCats');
+  wrap.innerHTML = cats.map(function(c) {
+    return '<button class="lb-cat-btn' + (c === activeLbCategory ? ' active' : '') + '" onclick="setLbCategory(\'' + c + '\')">' + (LB_CATEGORY_LABELS[c] || c) + '</button>';
+  }).join('');
+}
+
+function setLbCategory(cat) { activeLbCategory = cat; loadLeaderboard(); }
+
+function renderLbList(entries, myRank) {
+  const list = document.getElementById('lbList');
+  if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data yet.</div>'; return; }
+  const isRevenue = ['revenue_generated','commission_earned'].includes(activeLbCategory);
+  const rows = entries.map(function(e, i) {
+    const rank = e.rank || (i + 1);
+    const rankClass = rank === 1 ? ' gold' : rank === 2 ? ' silver' : rank === 3 ? ' bronze' : '';
+    const isMe = e.staff_id === currentUser?.id;
+    const val = isRevenue ? '$' + (parseFloat(e.value) || 0).toFixed(0) : Math.round(e.value || 0).toString();
+    return '<div class="lb-row' + (isMe ? ' lb-me' : '') + '">' +
+      '<div class="lb-rank' + rankClass + '">' + rank + '</div>' +
+      '<div class="lb-name">' + escHtml(e.display_name || '?') + (isMe ? ' <span style="color:var(--primary);font-size:0.7rem;">(you)</span>' : '') + '</div>' +
+      '<div class="lb-val">' + val + '</div>' +
+    '</div>';
+  }).join('');
+  let myRankHtml = '';
+  if (myRank && myRank.rank > 20) {
+    const val = isRevenue ? '$' + (parseFloat(myRank.value) || 0).toFixed(0) : Math.round(myRank.value || 0).toString();
+    myRankHtml = '<div style="border-top:1px dashed var(--border);margin-top:0.5rem;padding-top:0.5rem;">' +
+      '<div class="lb-row lb-me"><div class="lb-rank">' + myRank.rank + '</div><div class="lb-name">You</div><div class="lb-val">' + val + '</div></div>' +
+    '</div>';
+  }
+  list.innerHTML = rows + myRankHtml;
 }
 </script>
 
