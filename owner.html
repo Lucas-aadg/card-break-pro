@@ -9540,7 +9540,7 @@ async function ownerPollChatUnread() {
 // ═══════════════════════════════════════════════════════════
 // OWNER — LEADERBOARD
 // ═══════════════════════════════════════════════════════════
-const OWNER_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue', commission_earned: 'Commission', consistency_score: 'Consistency', longest_streak: 'Streak' };
+const OWNER_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue' };
 let ownerActiveLbCat = 'breaks_completed';
 let ownerLbYear = new Date().getFullYear();
 let ownerLbMonth = new Date().getMonth() + 1;
@@ -9589,7 +9589,7 @@ function ownerSetLbCat(cat) { ownerActiveLbCat = cat; ownerLoadLeaderboard(); }
 function ownerRenderLbList(entries, myRank) {
   const list = document.getElementById('ownerLbList');
   if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data for this period.</div>'; return; }
-  const isRevenue = ['revenue_generated','commission_earned'].includes(ownerActiveLbCat);
+  const isRevenue = ownerActiveLbCat === 'revenue_generated';
   const MEDALS = ['🥇','🥈','🥉'];
   const maxVal = Math.max.apply(null, entries.map(function(e){ return parseFloat(e.value) || 0; })) || 1;
   const rows = entries.slice(0, 10).map(function(e, i) {
@@ -10015,9 +10015,6 @@ document.getElementById('earnOverlay')?.addEventListener('click', function(e) {
     <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.25rem;" id="lbSettingsCats">
       <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;color:var(--text);text-transform:none;letter-spacing:0;"><input type="checkbox" value="breaks_completed" style="width:auto;" checked /> Breaks</label>
       <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;color:var(--text);text-transform:none;letter-spacing:0;"><input type="checkbox" value="revenue_generated" style="width:auto;" checked /> Revenue</label>
-      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;color:var(--text);text-transform:none;letter-spacing:0;"><input type="checkbox" value="commission_earned" style="width:auto;" checked /> Commission</label>
-      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;color:var(--text);text-transform:none;letter-spacing:0;"><input type="checkbox" value="consistency_score" style="width:auto;" checked /> Consistency</label>
-      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;color:var(--text);text-transform:none;letter-spacing:0;"><input type="checkbox" value="longest_streak" style="width:auto;" checked /> Streak</label>
     </div>
     <div style="display:flex;gap:0.75rem;">
       <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('lbSettingsModal').classList.remove('active')">Cancel</button>

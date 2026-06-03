@@ -3424,7 +3424,7 @@ function brkSubscribeChatRealtime(channelId) {
 // ═══════════════════════════════════════════════════════════
 // BREAKER — LEADERBOARD V2
 // ═══════════════════════════════════════════════════════════
-const BRK_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue', commission_earned: 'Commission', consistency_score: 'Consistency', longest_streak: 'Streak' };
+const BRK_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue' };
 let brkActiveLbCat = 'breaks_completed';
 let brkLbYear = new Date().getFullYear();
 let brkLbMonth = new Date().getMonth() + 1;
@@ -3472,7 +3472,7 @@ function brkSetLbCat(cat) { brkActiveLbCat = cat; brkLoadLeaderboard(); }
 function brkRenderLbList(entries, myRank) {
   const list = document.getElementById('brkLbList');
   if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data for this period.</div>'; return; }
-  const isRevenue = ['revenue_generated','commission_earned'].includes(brkActiveLbCat);
+  const isRevenue = brkActiveLbCat === 'revenue_generated';
   const MEDALS = ['🥇','🥈','🥉'];
   const maxVal = Math.max.apply(null, entries.map(function(e){ return parseFloat(e.value) || 0; })) || 1;
   const rows = entries.slice(0, 10).map(function(e, i) {

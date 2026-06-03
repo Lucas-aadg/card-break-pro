@@ -279,7 +279,7 @@ async function leaderboardHandler(req, res, sb, action) {
     const month = parseInt(req.query.month || req.query.period_month || (now.getMonth() + 1), 10);
     const category = req.query.category || 'breaks_completed';
 
-    const visibleCategories = settings?.visible_categories || ['breaks_completed','revenue_generated','commission_earned','consistency_score','longest_streak'];
+    const visibleCategories = settings?.visible_categories || ['breaks_completed','revenue_generated'];
     if (!visibleCategories.includes(category)) return fail(res, 400, 'Category not available');
 
     let { data: rows, error } = await sb.from('leaderboard_snapshots')
@@ -915,44 +915,10 @@ async function updateLeaderboardOnStreamClose(sb, streamId, orgId) {
       .gte('created_at', monthStart).lte('created_at', monthEnd);
     const revenueGenerated = (revData || []).reduce((s, b) => s + (parseFloat(b.revenue) || 0), 0);
 
-    // commission_earned: try commission_amount column, fall back to 0
-    const { data: commData } = await sb.from('breaks')
-      .select('commission_amount').eq('breaker_id', staffId).eq('org_id', orgId)
-      .gte('created_at', monthStart).lte('created_at', monthEnd);
-    const commissionEarned = (commData || []).reduce((s, b) => s + (parseFloat(b.commission_amount) || 0), 0);
-
-    // consistency_score: days with breaks / days in month * 100
-    const { data: daysData } = await sb.from('breaks')
-      .select('created_at').eq('breaker_id', staffId).eq('org_id', orgId)
-      .gte('created_at', monthStart).lte('created_at', monthEnd);
-    const uniqueDays = new Set((daysData || []).map(b => b.created_at.slice(0, 10)));
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const consistencyScore = Math.round((uniqueDays.size / daysInMonth) * 100 * 10) / 10;
-
-    // longest_streak: consecutive days with at least 1 break (all-time, not just this month)
-    const { data: allBreakDays } = await sb.from('breaks')
-      .select('created_at').eq('breaker_id', staffId).eq('org_id', orgId)
-      .order('created_at', { ascending: true });
-    const allDays = [...new Set((allBreakDays || []).map(b => b.created_at.slice(0, 10)))].sort();
-    let longestStreak = 0, currentStreak = 0, prevDay = null;
-    for (const day of allDays) {
-      if (prevDay) {
-        const diff = (new Date(day) - new Date(prevDay)) / (1000 * 60 * 60 * 24);
-        currentStreak = diff === 1 ? currentStreak + 1 : 1;
-      } else {
-        currentStreak = 1;
-      }
-      longestStreak = Math.max(longestStreak, currentStreak);
-      prevDay = day;
-    }
-
-    // Upsert all 5 categories
+    // Upsert 2 categories
     const categories = [
       { category: 'breaks_completed',  value: breaksCompleted  || 0 },
       { category: 'revenue_generated', value: revenueGenerated },
-      { category: 'commission_earned', value: commissionEarned },
-      { category: 'consistency_score', value: consistencyScore },
-      { category: 'longest_streak',    value: longestStreak    },
     ];
 
     for (const cat of categories) {

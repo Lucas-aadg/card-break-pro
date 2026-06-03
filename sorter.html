@@ -1525,7 +1525,7 @@ function subscribeChatRealtime(channelId) {
 // ═══════════════════════════════════════════════════════════
 // LEADERBOARD V2
 // ═══════════════════════════════════════════════════════════
-const LB_CATEGORY_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue', commission_earned: 'Commission', consistency_score: 'Consistency', longest_streak: 'Streak' };
+const LB_CATEGORY_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue' };
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let activeLbCategory = 'breaks_completed';
 let srtLbYear = new Date().getFullYear();
@@ -1576,7 +1576,7 @@ function renderLbList(entries, myRank) {
   const MEDALS = ['🥇','🥈','🥉'];
   const list = document.getElementById('lbList');
   if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data yet.</div>'; return; }
-  const isRevenue = ['revenue_generated','commission_earned'].includes(activeLbCategory);
+  const isRevenue = activeLbCategory === 'revenue_generated';
   const maxVal = Math.max.apply(null, entries.map(function(e){ return parseFloat(e.value) || 0; })) || 1;
   const rows = entries.map(function(e, i) {
     const rank = e.rank || (i + 1);
