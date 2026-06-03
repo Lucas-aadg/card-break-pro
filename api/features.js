@@ -266,26 +266,24 @@ async function leaderboardHandler(req, res, sb, action) {
 
   // ── GET /api/leaderboard ───────────────────────────────────────────────────
   if (action === 'get' && req.method === 'GET') {
-    // Check visibility settings
     const { data: settings } = await sb.from('leaderboard_settings')
       .select('*').eq('org_id', profile.org_id).maybeSingle();
 
-    if (profile.role === 'breaker' && settings && !settings.visible_to_breakers) {
+    if (profile.role === 'breaker' && settings && !settings.visible_to_breakers)
       return fail(res, 403, 'Leaderboard not visible to breakers');
-    }
-    if (profile.role === 'sorter' && (!settings || !settings.visible_to_sorters)) {
+    if (profile.role === 'sorter' && (!settings || !settings.visible_to_sorters))
       return fail(res, 403, 'Leaderboard not visible to sorters');
-    }
 
     const now = new Date();
-    const year  = parseInt(req.query.period_year  || now.getFullYear(), 10);
-    const month = parseInt(req.query.period_month || (now.getMonth() + 1), 10);
+    // Accept both year/month (frontend) and period_year/period_month (legacy)
+    const year  = parseInt(req.query.year  || req.query.period_year  || now.getFullYear(), 10);
+    const month = parseInt(req.query.month || req.query.period_month || (now.getMonth() + 1), 10);
     const category = req.query.category || 'breaks_completed';
 
     const visibleCategories = settings?.visible_categories || ['breaks_completed','revenue_generated','commission_earned','consistency_score','longest_streak'];
     if (!visibleCategories.includes(category)) return fail(res, 400, 'Category not available');
 
-    const { data: rows, error } = await sb.from('leaderboard_snapshots')
+    let { data: rows, error } = await sb.from('leaderboard_snapshots')
       .select('staff_id, value, rank, staff:profiles!staff_id(id, display_name, role)')
       .eq('org_id', profile.org_id)
       .eq('period_year', year)
@@ -296,31 +294,86 @@ async function leaderboardHandler(req, res, sb, action) {
 
     if (error) return fail(res, 500, error.message);
 
-    // Find requesting user's entry even if outside top 20
-    const myEntry = (rows || []).find(r => r.staff_id === profile.id);
-    let myRank = null;
-    if (!myEntry) {
-      const { count } = await sb.from('leaderboard_snapshots')
-        .select('id', { count: 'exact', head: true })
+    // ── Live fallback: if no snapshots, compute from breaks table ─────────────
+    if (!rows || rows.length === 0) {
+      const monthStart = new Date(year, month - 1, 1).toISOString();
+      const monthEnd   = new Date(year, month,     0, 23, 59, 59).toISOString();
+
+      const { data: breakers } = await sb.from('profiles')
+        .select('id, display_name, role')
         .eq('org_id', profile.org_id)
-        .eq('period_year', year)
-        .eq('period_month', month)
-        .eq('category', category)
-        .gt('value', (await sb.from('leaderboard_snapshots').select('value')
-          .eq('org_id', profile.org_id)
-          .eq('staff_id', profile.id)
-          .eq('period_year', year)
-          .eq('period_month', month)
-          .eq('category', category)
-          .maybeSingle()).data?.value || 0);
-      myRank = (count || 0) + 1;
+        .in('role', ['breaker', 'breaker/manager']);
+
+      const computed = [];
+      for (const breaker of (breakers || [])) {
+        let value = 0;
+        if (category === 'breaks_completed') {
+          const { count } = await sb.from('breaks').select('id', { count: 'exact', head: true })
+            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
+            .gte('created_at', monthStart).lte('created_at', monthEnd);
+          value = count || 0;
+        } else if (category === 'revenue_generated') {
+          const { data: revData } = await sb.from('breaks').select('revenue')
+            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
+            .gte('created_at', monthStart).lte('created_at', monthEnd);
+          value = (revData || []).reduce((s, b) => s + (parseFloat(b.revenue) || 0), 0);
+        } else if (category === 'commission_earned') {
+          const { data: commData } = await sb.from('breaks').select('commission_amount')
+            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
+            .gte('created_at', monthStart).lte('created_at', monthEnd);
+          value = (commData || []).reduce((s, b) => s + (parseFloat(b.commission_amount) || 0), 0);
+        } else if (category === 'consistency_score') {
+          const { data: daysData } = await sb.from('breaks').select('created_at')
+            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
+            .gte('created_at', monthStart).lte('created_at', monthEnd);
+          const uniqueDays = new Set((daysData || []).map(b => b.created_at.slice(0, 10)));
+          const daysInMonth = new Date(year, month, 0).getDate();
+          value = Math.round((uniqueDays.size / daysInMonth) * 100 * 10) / 10;
+        } else if (category === 'longest_streak') {
+          const { data: allBreakDays } = await sb.from('breaks').select('created_at')
+            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
+            .order('created_at', { ascending: true });
+          const allDays = [...new Set((allBreakDays || []).map(b => b.created_at.slice(0, 10)))].sort();
+          let longest = 0, current = 0, prev = null;
+          for (const day of allDays) {
+            if (prev && (new Date(day) - new Date(prev)) / 86400000 === 1) current++;
+            else current = 1;
+            longest = Math.max(longest, current);
+            prev = day;
+          }
+          value = longest;
+        }
+        if (value > 0) computed.push({ staff_id: breaker.id, display_name: breaker.display_name, role: breaker.role, value });
+      }
+
+      computed.sort((a, b) => b.value - a.value);
+      const entries = computed.slice(0, 20).map((e, i) => ({ ...e, rank: i + 1 }));
+      const myEntry = entries.find(e => e.staff_id === profile.id);
+      return res.status(200).json({
+        entries,
+        visible_categories: visibleCategories,
+        period: { year, month },
+        category,
+        my_rank: myEntry || null
+      });
     }
 
+    // Flatten staff join and assign rank
+    const entries = (rows || []).map((r, i) => ({
+      staff_id: r.staff_id,
+      display_name: r.staff?.display_name || '?',
+      role: r.staff?.role || '',
+      value: r.value,
+      rank: r.rank || (i + 1)
+    }));
+
+    const myEntry = entries.find(e => e.staff_id === profile.id);
     return res.status(200).json({
-      leaderboard: rows || [],
+      entries,
+      visible_categories: visibleCategories,
       period: { year, month },
       category,
-      my_rank: myEntry ? myEntry.rank : myRank
+      my_rank: myEntry || null
     });
   }
 

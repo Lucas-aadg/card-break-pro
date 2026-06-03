@@ -812,17 +812,23 @@
         <button class="nav-dd-item" data-tab="payroll">Payroll</button>
         <button class="nav-dd-item" data-tab="sorting">Sorting</button>
         <button class="nav-dd-item" data-tab="templates">Templates</button>
-        <div class="dd-section-label">Engagement</div>
-        <button class="nav-dd-item" data-tab="chat">Chat <span class="chat-nav-badge" id="chatNavBadge"></span></button>
-        <button class="nav-dd-item" data-tab="milestones">Medal Cabinet</button>
-        <button class="nav-dd-item" data-tab="goals">Goals</button>
-        <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
         <div class="dd-section-label">Products</div>
         <button class="nav-dd-item" data-tab="inventory">Inventory</button>
         <button class="nav-dd-item" data-tab="invLog">Inventory Log</button>
         <div class="dd-section-label">Account</div>
         <button class="nav-dd-item" data-tab="settings">Settings</button>
         <button class="nav-dd-item" data-tab="referEarn">Refer &amp; Earn</button>
+      </div>
+    </div>
+
+    <!-- Engage -->
+    <div class="nav-group" id="ng-engage">
+      <button class="nav-group-btn" id="ngb-engage">Engage ▾</button>
+      <div class="nav-dropdown">
+        <button class="nav-dd-item" data-tab="chat">Chat <span class="chat-nav-badge" id="chatNavBadge"></span></button>
+        <button class="nav-dd-item" data-tab="milestones">Medal Cabinet</button>
+        <button class="nav-dd-item" data-tab="goals">Goals</button>
+        <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
       </div>
     </div>
 
@@ -3712,11 +3718,12 @@ const TAB_GROUP_MAP = {
   home: 'ng-home',
   breakEntry: 'ng-breakEntry',
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', performance: 'ng-reports', buyers: 'ng-reports',
-  schedule: 'ng-manage', inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage', settings: 'ng-manage',
-  templates: 'ng-manage', chat: 'ng-manage', milestones: 'ng-manage', goals: 'ng-manage', leaderboard: 'ng-manage', referEarn: 'ng-manage'
+  schedule: 'ng-manage', inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage',
+  templates: 'ng-manage', settings: 'ng-manage', referEarn: 'ng-manage',
+  chat: 'ng-engage', milestones: 'ng-engage', goals: 'ng-engage', leaderboard: 'ng-engage'
 };
 const GROUP_BTN_MAP = {
-  'ng-reports': 'ngb-reports', 'ng-manage': 'ngb-manage'
+  'ng-reports': 'ngb-reports', 'ng-manage': 'ngb-manage', 'ng-engage': 'ngb-engage'
 };
 
 function updateNavActiveState(activeTab) {
@@ -9856,7 +9863,7 @@ async function ownerCreateTemplate(name, description, breaks) {
 // ═══════════════════════════════════════════════════════════
 // OWNER — GOALS
 // ═══════════════════════════════════════════════════════════
-const GOAL_TYPE_LABELS = { revenue: 'Revenue', breaks: 'Breaks', streams: 'Streams', streak: 'Streak' };
+const GOAL_TYPE_LABELS = { organization_revenue: 'Team Revenue', individual_breaks: 'Indiv. Breaks', individual_revenue: 'Indiv. Revenue' };
 
 function ownerInitGoalsMonthSelect() {
   const sel = document.getElementById('ownerGoalsMonth');
@@ -9886,7 +9893,7 @@ async function ownerLoadGoals() {
     if (!goals.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:3rem;font-size:0.85rem;">No goals set for this month.</div>'; return; }
     list.innerHTML = '<div class="goals-grid">' + goals.map(function(g) {
       const pct = g.target_value > 0 ? Math.min(100, Math.round((g.current_value || 0) / g.target_value * 100)) : 0;
-      const isRevenue = g.goal_type === 'revenue';
+      const isRevenue = g.goal_type === 'organization_revenue' || g.goal_type === 'individual_revenue';
       const currentFmt = isRevenue ? '$' + (parseFloat(g.current_value || 0)).toFixed(0) : Math.round(g.current_value || 0).toString();
       const targetFmt = isRevenue ? '$' + (parseFloat(g.target_value)).toFixed(0) : Math.round(g.target_value).toString();
       const staffName = g.staff_id ? ((allProfiles || []).find(function(p){ return p.id === g.staff_id; })?.display_name || 'Staff') : 'Team';
@@ -9951,7 +9958,7 @@ function ownerRenderHomeGoalBars(goals) {
   let anyComplete = false;
   barsEl.innerHTML = orgGoals.map(function(g) {
     const pct = g.target_value > 0 ? Math.min(100, Math.round((g.current_value || 0) / g.target_value * 100)) : 0;
-    const isRevenue = g.goal_type === 'revenue';
+    const isRevenue = g.goal_type === 'organization_revenue' || g.goal_type === 'individual_revenue';
     const curFmt = isRevenue ? '$' + Math.round(g.current_value || 0).toLocaleString() : Math.round(g.current_value || 0).toString();
     const tgtFmt = isRevenue ? '$' + Math.round(g.target_value).toLocaleString() : Math.round(g.target_value).toString();
     const fillClass = pct >= 100 ? 'goal-fill-done' : pct >= 75 ? 'goal-fill-warn' : 'goal-fill-normal';
@@ -10092,10 +10099,9 @@ document.getElementById('earnOverlay')?.addEventListener('click', function(e) {
     <h2 style="font-size:1rem;margin-bottom:1.25rem;">Set Goal</h2>
     <div style="margin-bottom:0.85rem;"><label>Goal Type</label>
       <select id="newGoalType">
-        <option value="revenue">Revenue ($)</option>
-        <option value="breaks">Breaks (count)</option>
-        <option value="streams">Streams (count)</option>
-        <option value="streak">Streak (days)</option>
+        <option value="organization_revenue">Team Revenue ($)</option>
+        <option value="individual_breaks">Individual Breaks (count)</option>
+        <option value="individual_revenue">Individual Revenue ($)</option>
       </select>
     </div>
     <div style="margin-bottom:0.85rem;"><label>Target Value</label><input type="number" id="newGoalTarget" placeholder="e.g. 5000" min="1" /></div>
