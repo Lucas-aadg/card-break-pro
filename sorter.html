@@ -210,6 +210,25 @@
     .split-pct-label{font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.2rem;}
     .split-pct-val{font-size:1.3rem;font-weight:800;color:var(--primary);}
     .split-actions{display:flex;gap:0.6rem;margin-top:0.75rem;flex-wrap:wrap;}
+
+    /* ── SPLIT EARNINGS MODAL ── */
+    .split-modal-step{display:none;}
+    .split-modal-step.active{display:block;}
+    .split-sorter-row{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;transition:border-color 0.15s;}
+    .split-sorter-row:hover{border-color:rgba(79,110,247,0.5);}
+    .split-opt-card{border:2px solid var(--border);border-radius:10px;padding:0.9rem 1rem;margin-bottom:0.65rem;cursor:pointer;transition:border-color 0.2s,background 0.2s;}
+    .split-opt-card.soc-active{border-color:var(--primary);background:rgba(79,110,247,0.06);}
+    .split-earnings-preview{background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.83rem;margin:0.85rem 0;line-height:1.65;}
+    .queue-split-alert{background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:0.85rem 1.1rem;margin-bottom:0.75rem;position:relative;}
+    .queue-split-alert-dismiss{position:absolute;top:0.55rem;right:0.7rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1;min-width:32px;min-height:32px;display:flex;align-items:center;justify-content:center;}
+    .queue-split-alert-actions{display:flex;gap:0.55rem;margin-top:0.6rem;flex-wrap:wrap;}
+    .tab-split-dot{display:none;width:7px;height:7px;background:var(--red);border-radius:50%;margin-left:5px;vertical-align:middle;flex-shrink:0;position:relative;top:-1px;}
+    .pay-split-parent-td{font-weight:700;color:var(--yellow);background:rgba(245,158,11,0.04);}
+    .pay-split-child-td{padding-left:1.85rem!important;font-size:0.8rem;color:var(--muted);background:rgba(245,158,11,0.02);}
+    .pay-split-child-td.amt{font-weight:700;color:var(--green)!important;}
+    .btn-split{background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);color:var(--primary);font-size:0.78rem;font-weight:700;padding:0.42rem 0.85rem;border-radius:7px;cursor:pointer;transition:opacity 0.2s;min-height:44px;}
+    .btn-split:hover{opacity:0.8;}
+    @media(max-width:375px){.split-opt-card{padding:0.7rem 0.8rem;}.split-modal-step{font-size:0.9rem;}}
   </style>
 </head>
 <body>
@@ -245,7 +264,7 @@
 </nav>
 
 <div class="tabs">
-  <button class="tab-btn active" data-tab="queue">Sort Queue</button>
+  <button class="tab-btn active" data-tab="queue">Sort Queue<span class="tab-split-dot" id="queueSplitDot"></span></button>
   <button class="tab-btn" data-tab="shifts">My Shifts</button>
   <button class="tab-btn" data-tab="pay">My Pay</button>
   <button class="tab-btn" data-tab="splits">Splits</button>
@@ -264,6 +283,7 @@
         <div class="panel-title">Sort Queue — Oldest First</div>
         <button class="btn btn-outline" id="refreshQueueBtn" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
       </div>
+      <div id="queueSplitAlerts"></div>
       <div class="ptr-hint">Pull down to refresh</div>
       <div id="sortQueueList" class="sort-queue">
         <div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading queue…</div>
@@ -449,6 +469,64 @@
 
 </div>
 
+<!-- ── SPLIT EARNINGS MODAL ── -->
+<div class="modal-overlay" id="splitEarningsModal">
+  <div class="modal" style="max-width:500px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+      <h2 style="margin:0;font-size:1rem;" id="splitModalTitle">Split Earnings</h2>
+      <button onclick="closeSplitModal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.25rem;min-width:36px;min-height:36px;">✕</button>
+    </div>
+
+    <!-- Step 1: Select Sorter -->
+    <div class="split-modal-step active" id="splitStep1">
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Select a sorter to split earnings with for this stream.</p>
+      <div id="splitSorterList"><div style="color:var(--muted);text-align:center;padding:1.5rem;font-size:0.85rem;">Loading…</div></div>
+    </div>
+
+    <!-- Step 2: Choose Split -->
+    <div class="split-modal-step" id="splitStep2">
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Splitting with <strong id="splitWithName">—</strong></p>
+
+      <div class="split-opt-card soc-active" id="splitOptEqual" onclick="splitSetType('equal')">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+          <span>⚖️</span>
+          <span style="font-weight:700;font-size:0.9rem;">Equal Split — 50% / 50%</span>
+        </div>
+        <div id="splitEqualNames" style="font-size:0.82rem;color:var(--muted);"></div>
+      </div>
+
+      <div class="split-opt-card" id="splitOptCustom" onclick="splitSetType('custom')">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;">
+          <span>✏️</span>
+          <span style="font-weight:700;font-size:0.9rem;">Custom Split</span>
+        </div>
+        <div id="splitCustomInputs" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.6rem;align-items:center;margin-top:0.5rem;">
+            <div>
+              <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;">Your %</div>
+              <input type="number" id="splitModalMyPct" min="1" max="99" value="60" oninput="splitUpdatePcts()" style="text-align:center;" />
+            </div>
+            <span style="color:var(--muted);font-size:1.1rem;text-align:center;">↔</span>
+            <div>
+              <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;" id="splitModalTheirLabel">Their %</div>
+              <input type="number" id="splitModalTheirPct" value="40" readonly style="color:var(--muted);text-align:center;" />
+            </div>
+          </div>
+          <div id="splitCustomSummary" style="font-size:0.82rem;color:var(--muted);margin-top:0.5rem;"></div>
+        </div>
+      </div>
+
+      <div class="split-earnings-preview" id="splitEarningsPreview"></div>
+      <div id="splitModalError" style="color:var(--red);font-size:0.83rem;margin-bottom:0.75rem;display:none;"></div>
+    </div>
+
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" id="splitModalBackBtn" onclick="splitGoBack()" style="display:none;">← Back</button>
+      <button class="btn btn-primary" id="splitModalNextBtn" onclick="splitModalNext()">Select Sorter →</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -458,6 +536,16 @@ const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonK
 let currentUser = null;
 let currentProfile = null;
 let activeShiftId = null;
+
+// Split modal state
+let splitModalStreamId = null;
+let splitModalStreamKey = '';
+let splitModalBreakCount = 0;
+let splitModalSorters = [];
+let splitModalSelectedId = null;
+let splitModalSelectedName = '';
+let splitModalActiveType = 'equal';
+let splitModalStep = 1;
 
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -476,7 +564,7 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     hideMessages();
-    if (btn.dataset.tab === 'queue') loadSortQueue();
+    if (btn.dataset.tab === 'queue') { loadSortQueue(); loadQueueSplitAlerts(); }
     if (btn.dataset.tab === 'shifts') { loadShifts(); loadMyScheduleView(); }
     if (btn.dataset.tab === 'pay') loadSorterPay();
     if (btn.dataset.tab === 'splits') { loadSplitsPending(); loadSplitsFormData(); }
@@ -514,6 +602,21 @@ async function loadSortQueue() {
       if (streams) streams.forEach(s => { streamMap[s.id] = s; });
     }
 
+    // Fetch active splits for these streams (only if per_break sorter)
+    const isPerBreak = currentProfile.pay_type === 'per_break';
+    const splitByStream = {};
+    if (isPerBreak && streamIds.length > 0) {
+      const { data: activeSplits } = await sb.from('sorter_splits')
+        .select('id, stream_id, status, initiating_sorter_id, receiving_sorter_id')
+        .in('stream_id', streamIds)
+        .in('status', ['pending', 'confirmed']);
+      (activeSplits || []).forEach(function(sp) {
+        if (sp.initiating_sorter_id === currentUser.id || sp.receiving_sorter_id === currentUser.id) {
+          splitByStream[sp.stream_id] = sp;
+        }
+      });
+    }
+
     if (!tasks.length) {
       list.innerHTML = '<div class="sort-empty"><div class="sort-empty-icon">✅</div><div class="sort-empty-title">Queue is clear. Nice work.</div><div style="font-size:0.85rem;color:var(--muted);">No streams waiting to be sorted.</div></div>';
       return;
@@ -532,11 +635,26 @@ async function loadSortQueue() {
       if (task.status === 'pending') statusBadge = '<span class="badge badge-gray">Pending</span>';
       else if (task.status === 'in_progress') statusBadge = '<span class="badge badge-yellow">In Progress</span>';
 
+      // Split status badge
+      const streamSplit = splitByStream[task.stream_id];
+      let splitBadge = '';
+      if (streamSplit && streamSplit.status === 'pending') {
+        splitBadge = ' <span class="badge badge-yellow">Split Pending</span>';
+      } else if (streamSplit && streamSplit.status === 'confirmed') {
+        splitBadge = ' <span class="badge badge-green">⚡ Split Active</span>';
+      }
+
+      // Split Earnings button: show only if per_break, this sorter is in progress on this task, and no active split
+      let splitBtn = '';
+      if (isPerBreak && isInProgress && !streamSplit) {
+        splitBtn = '<button class="btn-split" data-action="split" data-stream-id="' + task.stream_id + '" data-stream-key="' + escHtml(s.stream_key || '') + '" data-break-count="' + (s.break_count || 0) + '">⚡ Split Earnings</button>';
+      }
+
       let actionsHtml = '';
       if (task.status === 'pending') {
         actionsHtml = '<button class="btn btn-yellow" data-action="start" data-id="' + task.id + '">▶ Start Sorting</button>';
       } else if (isInProgress) {
-        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">✓ Mark Complete</button>';
+        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">✓ Mark Complete</button>' + splitBtn;
       } else if (isOtherProgress) {
         actionsHtml = '<span style="font-size:0.82rem;color:var(--muted);padding:0.5rem 0;display:block;">In progress by another sorter</span>';
       }
@@ -545,7 +663,7 @@ async function loadSortQueue() {
 
       card.innerHTML =
         '<div class="sort-card-info">' +
-          '<div class="sort-card-key">' + escHtml(s.stream_key || 'Unknown Stream') + ' ' + statusBadge + '</div>' +
+          '<div class="sort-card-key">' + escHtml(s.stream_key || 'Unknown Stream') + ' ' + statusBadge + splitBadge + '</div>' +
           '<div class="sort-card-meta">' +
             '<span>📅 ' + (s.break_date || '—') + '</span>' +
             '<span>📦 ' + breakCount + ' break' + (breakCount !== 1 ? 's' : '') + '</span>' +
@@ -561,6 +679,12 @@ async function loadSortQueue() {
       btn.addEventListener('click', async function () {
         const action = btn.dataset.action;
         const taskId = btn.dataset.id;
+
+        if (action === 'split') {
+          openSplitModal(btn.dataset.streamId, btn.dataset.streamKey, parseInt(btn.dataset.breakCount) || 0);
+          return;
+        }
+
         btn.disabled = true;
 
         try {
@@ -858,6 +982,7 @@ async function initAuth() {
     document.getElementById('sorterBadge').textContent = escHtml(profile.display_name);
 
     await loadSortQueue();
+    await loadQueueSplitAlerts();
     await checkTodayShift();
     loadNotifCount();
     setInterval(loadNotifCount, 60000);
@@ -1083,28 +1208,109 @@ async function loadSorterPay() {
 
     // Build stream → stream_key map for display
     const streamKeyMap = {};
-
     if (taskStreamIds.length) {
       const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', taskStreamIds);
       (streams||[]).forEach(function(s){ streamKeyMap[s.id] = s.stream_key; });
     }
 
+    // Fetch confirmed splits for these streams where I am involved
+    const paySplitByStream = {};
+    if (taskStreamIds.length) {
+      const { data: confirmedSplits } = await sb.from('sorter_splits')
+        .select('id, stream_id, initiating_sorter_id, receiving_sorter_id, initiating_sorter_percentage, receiving_sorter_percentage')
+        .in('stream_id', taskStreamIds)
+        .eq('status', 'confirmed');
+      if (confirmedSplits) {
+        const partnerIds = [];
+        confirmedSplits.forEach(function(sp) {
+          if (sp.initiating_sorter_id === currentUser.id || sp.receiving_sorter_id === currentUser.id) {
+            paySplitByStream[sp.stream_id] = sp;
+            const partnerId = sp.initiating_sorter_id === currentUser.id ? sp.receiving_sorter_id : sp.initiating_sorter_id;
+            partnerIds.push(partnerId);
+          }
+        });
+        // Fetch partner names
+        const uniquePartnerIds = [...new Set(partnerIds)];
+        if (uniquePartnerIds.length) {
+          const { data: partnerProfiles } = await sb.from('profiles').select('id, display_name').in('id', uniquePartnerIds);
+          (partnerProfiles || []).forEach(function(p) {
+            Object.values(paySplitByStream).forEach(function(sp) {
+              const pid = sp.initiating_sorter_id === currentUser.id ? sp.receiving_sorter_id : sp.initiating_sorter_id;
+              if (pid === p.id) sp._partnerName = p.display_name;
+            });
+          });
+        }
+      }
+    }
+
+    // Group breaks by stream for split rendering
+    const breaksByStream = {};
+    allBreaks.forEach(function(b) {
+      if (!breaksByStream[b.stream_id]) breaksByStream[b.stream_id] = [];
+      breaksByStream[b.stream_id].push(b);
+    });
+
     const breakCount = allBreaks.length;
     let totalBreakPay = 0;
     const tbody = document.getElementById('sorterBreakBody');
     tbody.innerHTML = '';
-    allBreaks.forEach(function(b) {
-      const bRate = rateForBreak(b);
-      totalBreakPay += bRate;
-      const tr = document.createElement('tr');
-      tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
-      const cat = (b.products_used||[])[0] && pidCat[((b.products_used||[])[0]).product_id] ? pidCat[((b.products_used||[])[0]).product_id] : '—';
-      tr.innerHTML =
-        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + escHtml(cat) + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;">' + escHtml(streamKeyMap[b.stream_id] || '—') + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(bRate) + '</td>';
-      tbody.appendChild(tr);
+
+    // Render: for split streams show parent+child rows; for others show individual rows
+    taskStreamIds.forEach(function(sid) {
+      const streamBreaks = breaksByStream[sid] || [];
+      if (!streamBreaks.length) return;
+      const streamTotal = streamBreaks.reduce(function(s, b) { return s + rateForBreak(b); }, 0);
+      const split = paySplitByStream[sid];
+
+      if (split) {
+        const myPct = split.initiating_sorter_id === currentUser.id ? split.initiating_sorter_percentage : split.receiving_sorter_percentage;
+        const theirPct = 100 - myPct;
+        const myAmt = streamTotal * myPct / 100;
+        const theirAmt = streamTotal * theirPct / 100;
+        const partnerName = split._partnerName || 'Partner';
+        const myName = currentProfile.display_name || 'You';
+        totalBreakPay += myAmt;
+
+        // Parent row
+        const trP = document.createElement('tr');
+        trP.innerHTML =
+          '<td class="pay-split-parent-td" style="padding:0.4rem 0.5rem;">⚡</td>' +
+          '<td class="pay-split-parent-td" style="padding:0.4rem 0.5rem;">' + escHtml(streamKeyMap[sid] || sid) + ' <span style="font-size:0.72rem;color:var(--muted);font-weight:400;">(split)</span></td>' +
+          '<td class="pay-split-parent-td" style="padding:0.4rem 0.5rem;">' + fmt(streamTotal) + ' total</td>';
+        tbody.appendChild(trP);
+
+        // My child row
+        const trM = document.createElement('tr');
+        trM.innerHTML =
+          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;"></td>' +
+          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;">→ ' + escHtml(myName) + ' (' + myPct + '%)</td>' +
+          '<td class="pay-split-child-td amt" style="padding:0.3rem 0.5rem;">' + fmt(myAmt) + '</td>';
+        tbody.appendChild(trM);
+
+        // Partner child row
+        const trT = document.createElement('tr');
+        trT.innerHTML =
+          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;"></td>' +
+          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;">→ ' + escHtml(partnerName) + ' (' + theirPct + '%)</td>' +
+          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;color:var(--muted);">' + fmt(theirAmt) + '</td>';
+        tbody.appendChild(trT);
+      } else {
+        // Normal individual break rows
+        streamBreaks.forEach(function(b) {
+          const bRate = rateForBreak(b);
+          totalBreakPay += bRate;
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
+          const cat = (b.products_used||[])[0] && pidCat[((b.products_used||[])[0]).product_id] ? pidCat[((b.products_used||[])[0]).product_id] : '—';
+          tr.innerHTML =
+            '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + escHtml(cat) + '</td>' +
+            '<td style="padding:0.4rem 0.5rem;">' + escHtml(streamKeyMap[b.stream_id] || '—') + '</td>' +
+            '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(bRate) + '</td>';
+          tbody.appendChild(tr);
+        });
+      }
     });
+
     if (!breakCount) tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No breaks sorted this period.</td></tr>';
     document.getElementById('sorterBreakSection').style.display = '';
     statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Breaks Sorted</div><div style="font-size:1.4rem;font-weight:900;color:#e2e8f0;">' + breakCount + '</div></div>');
@@ -1416,9 +1622,244 @@ async function respondSplit(splitId, action) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to respond');
-    showSuccess(action === 'confirm' ? 'Split accepted.' : 'Split declined.');
+    showSuccess(action === 'confirm' ? 'Split confirmed. Earnings will be divided automatically on stream completion.' : 'Split declined. Full earnings will go to the initiating sorter.');
     await loadSplitsPending();
+    await loadQueueSplitAlerts();
+    await loadSortQueue();
   } catch (e) { showError(e.message); }
+}
+
+// ── Queue Split Alerts ─────────────────────────────────────
+async function loadQueueSplitAlerts() {
+  const container = document.getElementById('queueSplitAlerts');
+  const dot = document.getElementById('queueSplitDot');
+  if (!container) return;
+  try {
+    const token = await authToken();
+    const res = await fetch('/api/sorter-splits/pending', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    // Only show alerts where I am the receiving sorter (incoming requests)
+    const incoming = (data.pending_splits || []).filter(function(s) {
+      return s.receiving_sorter_id === currentUser.id;
+    });
+    if (dot) dot.style.display = incoming.length ? 'inline-block' : 'none';
+    if (!incoming.length) { container.innerHTML = ''; return; }
+    container.innerHTML = incoming.map(function(s) {
+      const exp = new Date(s.expires_at);
+      const hoursLeft = Math.max(0, Math.round((exp - Date.now()) / 36e5));
+      const pctLabel = s.initiating_sorter_percentage + '/' + s.receiving_sorter_percentage + ' split';
+      return '<div class="queue-split-alert" id="qsa-' + s.id + '">' +
+        '<button class="queue-split-alert-dismiss" onclick="document.getElementById(\'qsa-' + s.id + '\').remove()">✕</button>' +
+        '<div style="font-weight:700;color:var(--yellow);margin-bottom:0.25rem;">⚡ Split Request</div>' +
+        '<div style="font-size:0.85rem;color:var(--text);margin-bottom:0.15rem;">' +
+          '<strong>' + escHtml(s.initiating_sorter?.display_name || 'A sorter') + '</strong> wants to split earnings on <strong>' + escHtml(s.stream?.stream_key || 'a stream') + '</strong>.' +
+        '</div>' +
+        '<div style="font-size:0.8rem;color:var(--muted);">' + pctLabel + ' · Expires in ' + hoursLeft + 'h</div>' +
+        '<div class="queue-split-alert-actions">' +
+          '<button class="btn btn-green" style="font-size:0.82rem;min-height:44px;" onclick="respondSplitAlert(\'' + s.id + '\',\'confirm\')">Accept</button>' +
+          '<button class="btn" style="font-size:0.82rem;min-height:44px;background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);" onclick="respondSplitAlert(\'' + s.id + '\',\'decline\')">Decline</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) { console.error('loadQueueSplitAlerts', e); }
+}
+
+async function respondSplitAlert(splitId, action) {
+  try {
+    const token = await authToken();
+    const url = action === 'confirm' ? '/api/sorter-splits/confirm' : '/api/sorter-splits/decline';
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ split_id: splitId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to respond');
+    if (action === 'confirm') {
+      showSuccess('Split confirmed. Earnings will be divided automatically on stream completion.');
+    } else {
+      showSuccess('Split declined.');
+    }
+    await loadQueueSplitAlerts();
+    await loadSortQueue();
+  } catch (e) { showError(e.message); }
+}
+
+// ── Split Earnings Modal ───────────────────────────────────
+function openSplitModal(streamId, streamKey, breakCount) {
+  splitModalStreamId = streamId;
+  splitModalStreamKey = streamKey;
+  splitModalBreakCount = breakCount;
+  splitModalSelectedId = null;
+  splitModalSelectedName = '';
+  splitModalActiveType = 'equal';
+  splitModalStep = 1;
+
+  document.getElementById('splitModalTitle').textContent = 'Split Earnings — ' + streamKey;
+  document.getElementById('splitStep1').classList.add('active');
+  document.getElementById('splitStep2').classList.remove('active');
+  document.getElementById('splitModalBackBtn').style.display = 'none';
+  document.getElementById('splitModalNextBtn').textContent = 'Select Sorter →';
+  document.getElementById('splitModalNextBtn').disabled = true;
+
+  // Load sorters
+  const listEl = document.getElementById('splitSorterList');
+  listEl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:1.5rem;font-size:0.85rem;">Loading…</div>';
+
+  sb.from('profiles')
+    .select('id, display_name, role, pay_type')
+    .eq('org_id', currentProfile.org_id)
+    .eq('role', 'sorter')
+    .neq('id', currentUser.id)
+    .then(function(res) {
+      // Only show sorters under the same pay structure (per_break)
+      const sorters = (res.data || []).filter(function(p) { return p.pay_type === 'per_break'; });
+      splitModalSorters = sorters;
+      if (!sorters.length) {
+        listEl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:1.5rem;font-size:0.85rem;">No other sorters available to split with.</div>';
+        return;
+      }
+      listEl.innerHTML = sorters.map(function(p) {
+        return '<div class="split-sorter-row" id="srow-' + p.id + '">' +
+          '<div>' +
+            '<span style="font-weight:700;font-size:0.88rem;">' + escHtml(p.display_name || '?') + '</span>' +
+            ' <span class="badge badge-gray" style="font-size:0.68rem;">Sorter</span>' +
+          '</div>' +
+          '<button class="btn btn-outline" style="font-size:0.78rem;padding:0.35rem 0.8rem;min-height:44px;" onclick="splitSelectSorter(\'' + p.id + '\',\'' + escHtml(p.display_name || '') + '\')">Select</button>' +
+        '</div>';
+      }).join('');
+    });
+
+  document.getElementById('splitEarningsModal').classList.add('active');
+}
+
+function splitSelectSorter(id, name) {
+  splitModalSelectedId = id;
+  splitModalSelectedName = name;
+  // Highlight selected row
+  document.querySelectorAll('.split-sorter-row').forEach(function(r) { r.style.borderColor = ''; });
+  const row = document.getElementById('srow-' + id);
+  if (row) row.style.borderColor = 'var(--primary)';
+  document.getElementById('splitModalNextBtn').disabled = false;
+}
+
+function splitGoToStep2() {
+  splitModalStep = 2;
+  document.getElementById('splitStep1').classList.remove('active');
+  document.getElementById('splitStep2').classList.add('active');
+  document.getElementById('splitModalBackBtn').style.display = '';
+  document.getElementById('splitModalNextBtn').textContent = 'Confirm and Send Request';
+  document.getElementById('splitModalNextBtn').disabled = false;
+  document.getElementById('splitModalError').style.display = 'none';
+
+  document.getElementById('splitWithName').textContent = splitModalSelectedName;
+  const myName = currentProfile.display_name || 'You';
+  document.getElementById('splitEqualNames').textContent = myName + ' — 50%  ·  ' + splitModalSelectedName + ' — 50%';
+  document.getElementById('splitModalTheirLabel').textContent = splitModalSelectedName + '\'s %';
+
+  splitSetType('equal');
+  splitUpdateEarningsPreview();
+}
+
+function splitGoBack() {
+  splitModalStep = 1;
+  document.getElementById('splitStep1').classList.add('active');
+  document.getElementById('splitStep2').classList.remove('active');
+  document.getElementById('splitModalBackBtn').style.display = 'none';
+  document.getElementById('splitModalNextBtn').textContent = 'Select Sorter →';
+  document.getElementById('splitModalNextBtn').disabled = splitModalSelectedId === null;
+}
+
+function splitSetType(type) {
+  splitModalActiveType = type;
+  const eqCard = document.getElementById('splitOptEqual');
+  const cuCard = document.getElementById('splitOptCustom');
+  const inputs = document.getElementById('splitCustomInputs');
+  eqCard.classList.toggle('soc-active', type === 'equal');
+  cuCard.classList.toggle('soc-active', type === 'custom');
+  inputs.style.display = type === 'custom' ? '' : 'none';
+  if (type === 'equal') {
+    document.getElementById('splitModalMyPct').value = 50;
+    document.getElementById('splitModalTheirPct').value = 50;
+  }
+  splitUpdateEarningsPreview();
+}
+
+function splitUpdatePcts() {
+  const my = Math.min(99, Math.max(1, parseInt(document.getElementById('splitModalMyPct').value) || 50));
+  const their = 100 - my;
+  document.getElementById('splitModalTheirPct').value = their;
+  splitUpdateEarningsPreview();
+}
+
+function splitUpdateEarningsPreview() {
+  const el = document.getElementById('splitEarningsPreview');
+  const rate = parseFloat(currentProfile.per_break_rate) || 0;
+  const myPct = splitModalActiveType === 'equal' ? 50 : (parseInt(document.getElementById('splitModalMyPct').value) || 50);
+  const theirPct = 100 - myPct;
+
+  if (!rate || !splitModalBreakCount) {
+    el.textContent = 'Earnings calculated on stream completion.';
+    return;
+  }
+
+  const totalEst = rate * splitModalBreakCount;
+  const myEst = totalEst * myPct / 100;
+  const theirEst = totalEst * theirPct / 100;
+  const fmt = function(v) { return '$' + v.toFixed(2); };
+  el.innerHTML = 'Based on this stream\'s sort rate ($' + rate.toFixed(2) + '/break, ' + splitModalBreakCount + ' breaks):<br>' +
+    '<strong>Your estimated earnings: ' + fmt(myEst) + '</strong><br>' +
+    '<span>' + escHtml(splitModalSelectedName) + '\'s estimated earnings: ' + fmt(theirEst) + '</span>';
+}
+
+async function splitModalNext() {
+  if (splitModalStep === 1) {
+    if (!splitModalSelectedId) { showError('Select a sorter first.'); return; }
+    splitGoToStep2();
+  } else {
+    await splitConfirmRequest();
+  }
+}
+
+async function splitConfirmRequest() {
+  const btn = document.getElementById('splitModalNextBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  const errEl = document.getElementById('splitModalError');
+  errEl.style.display = 'none';
+
+  const myPct = splitModalActiveType === 'equal' ? 50 : (parseInt(document.getElementById('splitModalMyPct').value) || 50);
+  const theirPct = 100 - myPct;
+
+  try {
+    const token = await authToken();
+    const res = await fetch('/api/sorter-splits', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stream_id: splitModalStreamId,
+        receiving_sorter_id: splitModalSelectedId,
+        split_type: splitModalActiveType,
+        initiating_sorter_percentage: myPct,
+        receiving_sorter_percentage: theirPct
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create split');
+    closeSplitModal();
+    showSuccess('Split request sent to ' + splitModalSelectedName + '. They have 24 hours to confirm.');
+    await loadSortQueue();
+    await loadQueueSplitAlerts();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Confirm and Send Request';
+  }
+}
+
+function closeSplitModal() {
+  document.getElementById('splitEarningsModal').classList.remove('active');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1767,7 +2208,7 @@ function sorterBtmNav(tab) {
   const btnMap = { queue: 'btn-btm-queue', shifts: 'btn-btm-sched', pay: 'btn-btm-pay' };
   if (btnMap[tab]) document.getElementById(btnMap[tab]).classList.add('active');
 
-  if (tab === 'queue') loadSortQueue && loadSortQueue();
+  if (tab === 'queue') { loadSortQueue && loadSortQueue(); loadQueueSplitAlerts && loadQueueSplitAlerts(); }
   if (tab === 'shifts') { loadShifts && loadShifts(); loadMyScheduleView && loadMyScheduleView(); }
   if (tab === 'pay') loadSorterPay && loadSorterPay();
 }
