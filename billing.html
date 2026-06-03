@@ -146,6 +146,27 @@
     .modal-btn-confirm { background: var(--green); color: #fff; }
     .modal-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
     .modal-loading { text-align: center; color: var(--muted); font-size: 0.88rem; padding: 0.5rem 0; }
+
+    /* ── Plan change buttons ── */
+    .btn-upgrade {
+      background: var(--primary); color: #fff;
+    }
+    .btn-upgrade:hover:not(:disabled) { opacity: 0.9; }
+    .btn-downgrade {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-downgrade:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
+    .plan-change-note {
+      text-align: center; font-size: 0.78rem; color: var(--muted);
+      margin-top: 0.6rem; line-height: 1.5;
+    }
+    .plan-change-note a { color: var(--primary); text-decoration: none; }
+    .plan-change-note a:hover { text-decoration: underline; }
+
+    /* ── Plan change modal confirm button variant ── */
+    .modal-btn-confirm.upgrade { background: var(--primary); }
+    .modal-btn-confirm.downgrade { background: var(--yellow); }
   </style>
 </head>
 <body>
@@ -194,11 +215,45 @@
 
         <button id="manageBtn" class="btn-full btn-primary" style="display:none;">Manage Subscription</button>
         <button id="switchToAnnualBtn" class="btn-full btn-annual" style="display:none;">Switch to Annual &amp; Save</button>
+        <button id="upgradePlanBtn" class="btn-full btn-upgrade" style="display:none;">Upgrade to Pro</button>
+        <button id="downgradePlanBtn" class="btn-full btn-downgrade" style="display:none; margin-top:0.75rem;">Downgrade to Starter</button>
+        <div id="planChangeNote" class="plan-change-note" style="display:none;"></div>
         <a href="register.html" id="reactivateBtn" class="btn-full btn-reactivate" style="display:none;text-align:center;text-decoration:none;">Reactivate Subscription</a>
       </div>
 
       <div style="text-align:center;margin-top:1.5rem;">
         <a href="owner.html" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">&larr; Back to Dashboard</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan Change (upgrade/downgrade) modal -->
+  <div class="modal-overlay" id="planChangeModal">
+    <div class="modal-box">
+      <h3 id="planChangeTitle">Change Plan</h3>
+      <div id="planChangeLoading" class="modal-loading">Calculating&hellip;</div>
+      <div id="planChangeDetails" style="display:none;">
+        <div class="modal-detail-row">
+          <span>New plan</span>
+          <span class="modal-detail-val" id="pcNewPlan">—</span>
+        </div>
+        <div class="modal-detail-row" id="pcChargeRow">
+          <span>Charged today (proration)</span>
+          <span class="modal-detail-val" id="pcChargeToday">—</span>
+        </div>
+        <div class="modal-detail-row" id="pcDowngradeRow" style="display:none;">
+          <span>When does this take effect?</span>
+          <span class="modal-detail-val">Immediately</span>
+        </div>
+        <div class="modal-detail-row">
+          <span>Next billing date</span>
+          <span class="modal-detail-val" id="pcRenewal">—</span>
+        </div>
+      </div>
+      <div id="planChangeError" style="display:none;font-size:0.82rem;color:var(--red);margin-top:0.75rem;"></div>
+      <div class="modal-btn-row">
+        <button class="modal-btn-cancel" id="planChangeCancelBtn">Cancel</button>
+        <button class="modal-btn-confirm upgrade" id="planChangeConfirmBtn" disabled>Confirm</button>
       </div>
     </div>
   </div>
@@ -364,16 +419,21 @@
             setupSwitchToAnnual(currentSession, tier);
           }
 
-          if (tier === 'starter' || tier === 'pro' || tier === 'legacy') {
-            const upgradeHint = document.createElement('p');
-            upgradeHint.style.cssText = 'text-align:center;font-size:0.8rem;color:var(--muted);margin-top:0.75rem;';
-            if (tier === 'starter')
-              upgradeHint.innerHTML = 'Want AI Insights? <a href="/register?plan=pro" style="color:var(--primary);font-weight:600;">Upgrade to Pro →</a>';
-            else if (tier === 'pro')
-              upgradeHint.innerHTML = 'Want the Empire Dashboard? <a href="mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Inquiry" style="color:var(--primary);font-weight:600;">Contact us for Empire →</a>';
-            else
-              upgradeHint.innerHTML = 'See our new plans: <a href="/register" style="color:var(--primary);font-weight:600;">View Plans →</a>';
-            manageBtn.parentNode.appendChild(upgradeHint);
+          const upgradeBtn   = document.getElementById('upgradePlanBtn');
+          const downgradeBtn = document.getElementById('downgradePlanBtn');
+          const changeNote   = document.getElementById('planChangeNote');
+
+          if (tier === 'starter') {
+            upgradeBtn.style.display = 'block';
+            upgradeBtn.addEventListener('click', function() { openPlanChangeModal('pro', session, cycle); });
+          } else if (tier === 'pro') {
+            downgradeBtn.style.display = 'block';
+            downgradeBtn.addEventListener('click', function() { openPlanChangeModal('starter', session, cycle); });
+            changeNote.innerHTML = 'Want the full Empire experience? <a href="mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Inquiry">Contact us for Empire →</a>';
+            changeNote.style.display = 'block';
+          } else if (tier === 'legacy') {
+            changeNote.innerHTML = 'See our new plans: <a href="/register">View Plans →</a>';
+            changeNote.style.display = 'block';
           }
 
           manageBtn.addEventListener('click', async function () {
@@ -431,6 +491,105 @@
         loadingState.style.display   = 'none';
         billingContent.style.display = 'block';
       }
+    }
+
+    // ── Plan Change (upgrade / downgrade) ────────────────────────────────────
+    function fmtMoneyCents(cents) {
+      return '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function openPlanChangeModal(targetTier, session, billingCycle) {
+      const modal       = document.getElementById('planChangeModal');
+      const loadingEl   = document.getElementById('planChangeLoading');
+      const detailsEl   = document.getElementById('planChangeDetails');
+      const errorEl     = document.getElementById('planChangeError');
+      const confirmBtn  = document.getElementById('planChangeConfirmBtn');
+      const cancelBtn   = document.getElementById('planChangeCancelBtn');
+      const titleEl     = document.getElementById('planChangeTitle');
+      const chargeRow   = document.getElementById('pcChargeRow');
+      const downgradeRow = document.getElementById('pcDowngradeRow');
+
+      const isUpgrade = targetTier === 'pro';
+      const tierLabel = targetTier.charAt(0).toUpperCase() + targetTier.slice(1);
+
+      titleEl.textContent = isUpgrade ? ('Upgrade to ' + tierLabel) : ('Downgrade to ' + tierLabel);
+      confirmBtn.className = 'modal-btn-confirm ' + (isUpgrade ? 'upgrade' : 'downgrade');
+      confirmBtn.textContent = isUpgrade ? 'Confirm Upgrade' : 'Confirm Downgrade';
+      confirmBtn.disabled = true;
+      loadingEl.style.display  = 'block';
+      detailsEl.style.display  = 'none';
+      errorEl.style.display    = 'none';
+      errorEl.textContent      = '';
+      modal.classList.add('active');
+
+      // Preview
+      fetch('/api/switch-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ targetTier, confirm: false })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) throw new Error(data.error);
+
+        const TIER_PRICE_LABELS = {
+          starter: { monthly: '$129.99/mo', annual: '$1,299.90/yr' },
+          pro:     { monthly: '$399.99/mo', annual: '$3,999.90/yr' }
+        };
+        document.getElementById('pcNewPlan').textContent  = tierLabel + ' — ' + (TIER_PRICE_LABELS[targetTier]?.[billingCycle] || '');
+        document.getElementById('pcRenewal').textContent  = fmtDate(data.renewal_date);
+
+        if (isUpgrade && data.charge_today > 0) {
+          document.getElementById('pcChargeToday').textContent = fmtMoneyCents(data.charge_today);
+          chargeRow.style.display    = '';
+          downgradeRow.style.display = 'none';
+        } else {
+          chargeRow.style.display    = 'none';
+          downgradeRow.style.display = '';
+        }
+
+        loadingEl.style.display  = 'none';
+        detailsEl.style.display  = 'block';
+        confirmBtn.disabled      = false;
+      })
+      .catch(function(err) {
+        loadingEl.style.display = 'none';
+        errorEl.textContent     = err.message;
+        errorEl.style.display   = 'block';
+      });
+
+      // Cancel
+      function closeModal() { modal.classList.remove('active'); }
+      cancelBtn.onclick = closeModal;
+      modal.onclick = function(e) { if (e.target === modal) closeModal(); };
+
+      // Confirm
+      confirmBtn.onclick = function() {
+        confirmBtn.disabled    = true;
+        confirmBtn.textContent = isUpgrade ? 'Upgrading…' : 'Downgrading…';
+        errorEl.style.display  = 'none';
+
+        fetch('/api/switch-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+          body: JSON.stringify({ targetTier, confirm: true })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) throw new Error(data.error);
+          closeModal();
+          showSuccess(isUpgrade
+            ? ('Upgraded to ' + tierLabel + '! Your new limits are now active.')
+            : ('Downgraded to ' + tierLabel + '. Changes take effect immediately.'));
+          setTimeout(function() { window.location.reload(); }, 2500);
+        })
+        .catch(function(err) {
+          errorEl.textContent    = err.message;
+          errorEl.style.display  = 'block';
+          confirmBtn.disabled    = false;
+          confirmBtn.textContent = isUpgrade ? 'Confirm Upgrade' : 'Confirm Downgrade';
+        });
+      };
     }
 
     // ── Switch to Annual ──────────────────────────────────────────────────────
