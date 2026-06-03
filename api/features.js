@@ -48,7 +48,6 @@ module.exports = async (req, res) => {
       case 'chat':          return await chatHandler(req, res, sb, action);
       case 'leaderboard':   return await leaderboardHandler(req, res, sb, action);
       case 'milestones':    return await milestonesHandler(req, res, sb, action);
-      case 'templates':     return await templatesHandler(req, res, sb, action);
       case 'sorter-splits': return await sorterSplitsHandler(req, res, sb, action);
       case 'goals':         return await goalsHandler(req, res, sb, action);
       case 'notify':        return await notifyHandler(req, res, sb, action);
@@ -531,112 +530,6 @@ async function milestonesHandler(req, res, sb, action) {
   }
 
   return fail(res, 400, 'Unknown milestones action: ' + action);
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// STREAM TEMPLATES
-// ═════════════════════════════════════════════════════════════════════════════
-
-async function templatesHandler(req, res, sb, action) {
-  const { err, profile } = await authenticate(req, sb);
-  if (err) return fail(res, err.status, err.msg);
-
-  // ── GET/POST /api/templates ────────────────────────────────────────────────
-  if (action === 'templates') {
-    if (req.method === 'GET') {
-      const { data, error } = await sb.from('stream_templates')
-        .select('id, created_at, updated_at, name, description, total_breaks, is_active, last_used_at, use_count, created_by, breaks')
-        .eq('org_id', profile.org_id)
-        .eq('is_active', true)
-        .order('use_count', { ascending: false });
-      if (error) return fail(res, 500, error.message);
-      return res.status(200).json({ templates: data || [] });
-    }
-
-    if (req.method === 'POST') {
-      if (!['owner','manager'].includes(profile.role)) return fail(res, 403, 'Owner or manager only');
-      const { name, description, breaks } = req.body || {};
-      if (!name || !Array.isArray(breaks) || breaks.length === 0) {
-        return fail(res, 400, 'name and breaks[] required');
-      }
-      // Validate each break
-      for (const b of breaks) {
-        if (!b.product_name || b.box_cost == null || b.spot_count == null || b.price_per_spot == null) {
-          return fail(res, 400, 'Each break must have product_name, box_cost, spot_count, price_per_spot');
-        }
-      }
-      const { data, error } = await sb.from('stream_templates')
-        .insert({
-          org_id: profile.org_id, created_by: profile.id,
-          name, description: description || null,
-          breaks, total_breaks: breaks.length
-        })
-        .select('*').single();
-      if (error) return fail(res, 500, error.message);
-      return res.status(201).json({ template: data });
-    }
-
-    return fail(res, 405, 'Method not allowed');
-  }
-
-  // ── PATCH/DELETE /api/templates/:id ───────────────────────────────────────
-  if (action === 'manage') {
-    if (!['owner','manager'].includes(profile.role)) return fail(res, 403, 'Owner or manager only');
-    const id = req.query.id;
-    if (!id) return fail(res, 400, 'id required');
-
-    // Verify ownership
-    const { data: tmpl } = await sb.from('stream_templates')
-      .select('id').eq('id', id).eq('org_id', profile.org_id).maybeSingle();
-    if (!tmpl) return fail(res, 404, 'Template not found');
-
-    if (req.method === 'PATCH') {
-      const { name, description, breaks } = req.body || {};
-      const updates = { updated_at: new Date().toISOString() };
-      if (name) updates.name = name;
-      if (description !== undefined) updates.description = description;
-      if (Array.isArray(breaks)) {
-        for (const b of breaks) {
-          if (!b.product_name || b.box_cost == null || b.spot_count == null || b.price_per_spot == null) {
-            return fail(res, 400, 'Each break must have product_name, box_cost, spot_count, price_per_spot');
-          }
-        }
-        updates.breaks = breaks;
-        updates.total_breaks = breaks.length;
-      }
-      const { data, error } = await sb.from('stream_templates').update(updates).eq('id', id).select('*').single();
-      if (error) return fail(res, 500, error.message);
-      return res.status(200).json({ template: data });
-    }
-
-    if (req.method === 'DELETE') {
-      const { error } = await sb.from('stream_templates')
-        .update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', id);
-      if (error) return fail(res, 500, error.message);
-      return res.status(200).json({ ok: true });
-    }
-
-    return fail(res, 405, 'Method not allowed');
-  }
-
-  // ── POST /api/templates/:id/use ───────────────────────────────────────────
-  if (action === 'use' && req.method === 'POST') {
-    const id = req.query.id;
-    if (!id) return fail(res, 400, 'id required');
-
-    const { data: tmpl, error } = await sb.from('stream_templates')
-      .select('*').eq('id', id).eq('org_id', profile.org_id).eq('is_active', true).maybeSingle();
-    if (!tmpl) return fail(res, 404, 'Template not found');
-
-    // Increment use count and update last_used_at
-    await sb.from('stream_templates')
-      .update({ use_count: (tmpl.use_count || 0) + 1, last_used_at: new Date().toISOString() })
-      .eq('id', id);
-
-    return res.status(200).json({ template: { ...tmpl, use_count: (tmpl.use_count || 0) + 1 } });
-  }
-
-  return fail(res, 400, 'Unknown templates action: ' + action);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

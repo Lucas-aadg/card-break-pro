@@ -26,9 +26,6 @@
     { "source": "/api/milestones/staff", "destination": "/api/features?feature=milestones&action=staff" },
     { "source": "/api/milestones/award", "destination": "/api/features?feature=milestones&action=award" },
 
-    { "source": "/api/templates", "destination": "/api/features?feature=templates&action=templates" },
-    { "source": "/api/templates/use", "destination": "/api/features?feature=templates&action=use" },
-    { "source": "/api/templates/manage", "destination": "/api/features?feature=templates&action=manage" },
 
     { "source": "/api/sorter-splits/pending", "destination": "/api/features?feature=sorter-splits&action=pending" },
     { "source": "/api/sorter-splits/confirm", "destination": "/api/features?feature=sorter-splits&action=confirm" },

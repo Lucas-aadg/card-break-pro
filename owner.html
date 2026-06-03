@@ -674,12 +674,6 @@
     .goal-progress-fill{height:100%;background:var(--primary);border-radius:3px;transition:width 0.4s;}
     .goal-pct{font-size:0.72rem;color:var(--primary);font-weight:700;}
 
-    /* ── TEMPLATES ── */
-    .tmpl-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem;margin-bottom:0.85rem;}
-    .tmpl-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;}
-    .tmpl-card-name{font-size:0.95rem;font-weight:700;color:var(--text);}
-    .tmpl-card-meta{font-size:0.78rem;color:var(--muted);}
-    .tmpl-card-actions{display:flex;gap:0.5rem;margin-top:0.75rem;}
 
     /* ── MEDAL CABINET ── */
     .cabinet-title{font-size:1.25rem;font-weight:900;color:var(--text);margin-bottom:0.25rem;letter-spacing:-0.3px;}
@@ -811,7 +805,6 @@
         <button class="nav-dd-item" data-tab="team">Team</button>
         <button class="nav-dd-item" data-tab="payroll">Payroll</button>
         <button class="nav-dd-item" data-tab="sorting">Sorting</button>
-        <button class="nav-dd-item" data-tab="templates">Templates</button>
         <div class="dd-section-label">Products</div>
         <button class="nav-dd-item" data-tab="inventory">Inventory</button>
         <button class="nav-dd-item" data-tab="invLog">Inventory Log</button>
@@ -2115,17 +2108,6 @@
       </div>
     </div>
 
-  </div>
-
-  <!-- ══ TEMPLATES TAB ══════════════════════════════════════ -->
-  <div class="tab-content" id="tab-templates">
-    <div class="panel">
-      <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-        <div class="panel-title" style="margin:0;">Stream Templates</div>
-        <button class="btn btn-primary" style="font-size:0.82rem;" onclick="document.getElementById('newTemplateModal').classList.add('active')">+ New Template</button>
-      </div>
-      <div id="ownerTemplatesList"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div></div>
-    </div>
   </div>
 
   <!-- ══ CHAT TAB ═══════════════════════════════════════════ -->
@@ -3719,7 +3701,7 @@ const TAB_GROUP_MAP = {
   breakEntry: 'ng-breakEntry',
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', performance: 'ng-reports', buyers: 'ng-reports',
   schedule: 'ng-manage', inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage',
-  templates: 'ng-manage', settings: 'ng-manage', referEarn: 'ng-manage',
+  settings: 'ng-manage', referEarn: 'ng-manage',
   chat: 'ng-engage', milestones: 'ng-engage', goals: 'ng-engage', leaderboard: 'ng-engage'
 };
 const GROUP_BTN_MAP = {
@@ -3770,7 +3752,6 @@ async function switchTab(tab) {
     else if (tab === 'settings') { await loadSettings(); await renderSettingsChannelList(); await settLoadMilestonesTab(); }
     else if (tab === 'buyers') await loadBuyersTab();
     else if (tab === 'referEarn') await loadReferEarn();
-    else if (tab === 'templates') await ownerLoadTemplates();
     else if (tab === 'chat') await ownerLoadChatChannels();
     else if (tab === 'milestones') await ownerLoadMilestones();
     else if (tab === 'goals') { ownerInitGoalsMonthSelect(); ownerInitGoalStaffSelect(); await ownerLoadGoals(); }
@@ -9790,77 +9771,6 @@ async function settAwardMilestone() {
 async function ownerAwardMilestone() { await settAwardMilestone(); }
 
 // ═══════════════════════════════════════════════════════════
-// OWNER — TEMPLATES
-// ═══════════════════════════════════════════════════════════
-async function ownerLoadTemplates() {
-  const list = document.getElementById('ownerTemplatesList');
-  list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
-  try {
-    const token = await ownerAuthToken();
-    const res = await fetch('/api/templates', { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    const templates = data.templates || [];
-    if (!templates.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:3rem;font-size:0.85rem;">No templates yet. Create one to save your standard break lineups.</div>'; return; }
-    list.innerHTML = templates.map(function(t) {
-      const lastUsed = t.last_used_at ? new Date(t.last_used_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : 'Never';
-      return '<div class="tmpl-card">' +
-        '<div class="tmpl-card-header">' +
-          '<div>' +
-            '<div class="tmpl-card-name">' + escHtml(t.name) + '</div>' +
-            '<div class="tmpl-card-meta">' + (t.total_breaks || 0) + ' breaks · Used ' + (t.use_count || 0) + 'x · Last used ' + lastUsed + '</div>' +
-          '</div>' +
-          '<button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:0.2rem;" onclick="ownerDeleteTemplate(\'' + t.id + '\')" title="Delete">✕</button>' +
-        '</div>' +
-        (t.description ? '<div style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem;">' + escHtml(t.description) + '</div>' : '') +
-        '<div class="tmpl-card-actions">' +
-          '<button class="btn btn-primary" style="font-size:0.8rem;" onclick="ownerUseTemplate(\'' + t.id + '\')">Load to Break Entry</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  } catch (e) { list.innerHTML = '<div style="color:var(--red);text-align:center;padding:2rem;font-size:0.85rem;">' + escHtml(e.message) + '</div>'; }
-}
-
-async function ownerUseTemplate(templateId) {
-  try {
-    const token = await ownerAuthToken();
-    const res = await fetch('/api/templates/use', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template_id: templateId })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed');
-    showGlobalSuccess('Template loaded. Switch to Break Entry to use it.');
-  } catch (e) { showGlobalError(e.message); }
-}
-
-async function ownerDeleteTemplate(templateId) {
-  if (!confirm('Delete this template?')) return;
-  try {
-    const token = await ownerAuthToken();
-    const res = await fetch('/api/templates/manage?id=' + templateId, {
-      method: 'DELETE',
-      headers: { Authorization: 'Bearer ' + token }
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed');
-    await ownerLoadTemplates();
-  } catch (e) { showGlobalError(e.message); }
-}
-
-async function ownerCreateTemplate(name, description, breaks) {
-  const token = await ownerAuthToken();
-  const res = await fetch('/api/templates', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description, breaks })
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed');
-  return data.template;
-}
-
-// ═══════════════════════════════════════════════════════════
 // OWNER — GOALS
 // ═══════════════════════════════════════════════════════════
 const GOAL_TYPE_LABELS = { organization_revenue: 'Team Revenue', individual_breaks: 'Indiv. Breaks', individual_revenue: 'Indiv. Revenue' };
@@ -10048,28 +9958,6 @@ document.getElementById('earnOverlay')?.addEventListener('click', function(e) {
 });
 </script>
 
-<!-- ══ NEW TEMPLATE MODAL ════════════════════════════════════ -->
-<div class="modal-overlay" id="newTemplateModal">
-  <div style="background:#10101e;border:1px solid rgba(79,110,247,0.25);border-radius:14px;padding:1.75rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
-    <h2 style="font-size:1rem;margin-bottom:1.25rem;">New Stream Template</h2>
-    <div style="margin-bottom:0.85rem;">
-      <label>Template Name</label>
-      <input type="text" id="tmplName" placeholder="e.g. Standard Sunday Break" />
-    </div>
-    <div style="margin-bottom:0.85rem;">
-      <label>Description (optional)</label>
-      <input type="text" id="tmplDesc" placeholder="Short note…" />
-    </div>
-    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Breaks</div>
-    <div id="tmplBreaksRows"></div>
-    <button class="btn btn-outline" style="font-size:0.8rem;margin-bottom:1.25rem;" onclick="addTmplBreakRow()">+ Add Break</button>
-    <div style="display:flex;gap:0.75rem;margin-top:0.5rem;">
-      <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('newTemplateModal').classList.remove('active')">Cancel</button>
-      <button class="btn btn-primary" style="flex:1;" onclick="submitNewTemplate()">Save Template</button>
-    </div>
-  </div>
-</div>
-
 <!-- ══ NEW MILESTONE MODAL ═══════════════════════════════════ -->
 <div class="modal-overlay" id="newMilestoneModal">
   <div style="background:#10101e;border:1px solid rgba(79,110,247,0.25);border-radius:14px;padding:1.75rem;width:100%;max-width:460px;">
@@ -10150,50 +10038,9 @@ document.getElementById('earnOverlay')?.addEventListener('click', function(e) {
 
 <script>
 // ── Modal click-outside-to-close ───────────────────────────
-document.querySelectorAll('#newTemplateModal,#newMilestoneModal,#newGoalModal,#lbSettingsModal').forEach(function(el) {
+document.querySelectorAll('#newMilestoneModal,#newGoalModal,#lbSettingsModal').forEach(function(el) {
   el.addEventListener('click', function(e) { if (e.target === el) el.classList.remove('active'); });
 });
-
-// ── Templates modal helpers ─────────────────────────────────
-// (template modal close handled by the querySelectorAll above)
-
-function addTmplBreakRow() {
-  const container = document.getElementById('tmplBreaksRows');
-  const idx = container.children.length;
-  const row = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:0.4rem;margin-bottom:0.5rem;align-items:center;';
-  row.innerHTML = '<input placeholder="Product name" class="tmpl-pname" />' +
-    '<input type="number" placeholder="Box cost" class="tmpl-box" />' +
-    '<input type="number" placeholder="Spots" class="tmpl-spots" />' +
-    '<input type="number" placeholder="$/spot" class="tmpl-price" />' +
-    '<button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;" onclick="this.closest(\'div\').remove()">✕</button>';
-  container.appendChild(row);
-}
-
-async function submitNewTemplate() {
-  const name = document.getElementById('tmplName').value.trim();
-  if (!name) { alert('Template name required.'); return; }
-  const rows = document.querySelectorAll('#tmplBreaksRows > div');
-  const breaks = [];
-  for (const row of rows) {
-    const pname = row.querySelector('.tmpl-pname')?.value.trim();
-    const box = parseFloat(row.querySelector('.tmpl-box')?.value);
-    const spots = parseInt(row.querySelector('.tmpl-spots')?.value);
-    const price = parseFloat(row.querySelector('.tmpl-price')?.value);
-    if (!pname || isNaN(box) || isNaN(spots) || isNaN(price)) { alert('Fill in all break fields.'); return; }
-    breaks.push({ product_name: pname, box_cost: box, spot_count: spots, price_per_spot: price });
-  }
-  if (!breaks.length) { alert('Add at least one break.'); return; }
-  try {
-    await ownerCreateTemplate(name, document.getElementById('tmplDesc').value.trim(), breaks);
-    document.getElementById('newTemplateModal').classList.remove('active');
-    document.getElementById('tmplName').value = '';
-    document.getElementById('tmplDesc').value = '';
-    document.getElementById('tmplBreaksRows').innerHTML = '';
-    await ownerLoadTemplates();
-    showGlobalSuccess('Template saved.');
-  } catch (e) { showGlobalError(e.message); }
-}
 
 // ── Milestones modal helpers ────────────────────────────────
 async function submitNewMilestone() {
