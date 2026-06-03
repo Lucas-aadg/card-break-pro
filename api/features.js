@@ -279,7 +279,10 @@ async function leaderboardHandler(req, res, sb, action) {
     const month = parseInt(req.query.month || req.query.period_month || (now.getMonth() + 1), 10);
     const category = req.query.category || 'breaks_completed';
 
-    const visibleCategories = settings?.visible_categories || ['breaks_completed','revenue_generated'];
+    const VALID_CATS = ['breaks_completed', 'revenue_generated'];
+    const rawCats = settings?.visible_categories || VALID_CATS;
+    const visibleCategories = rawCats.filter(function(c) { return VALID_CATS.includes(c); });
+    if (!visibleCategories.length) visibleCategories.push(...VALID_CATS);
     if (!visibleCategories.includes(category)) return fail(res, 400, 'Category not available');
 
     let { data: rows, error } = await sb.from('leaderboard_snapshots')

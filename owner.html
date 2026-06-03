@@ -648,15 +648,26 @@
 
     /* ── LEADERBOARD ── */
     .lb-cats-o{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
-    .lb-cat-btn-o{padding:0.35rem 0.85rem;border-radius:100px;border:1px solid var(--border-bright);background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
-    .lb-cat-btn-o.active{background:var(--primary);border-color:var(--primary);color:#fff;}
-    .lb-row-o{display:flex;align-items:center;gap:0.85rem;padding:0.75rem 1rem;border-bottom:1px solid rgba(79,110,247,0.06);}
-    .lb-row-o:last-child{border-bottom:none;}
-    .lb-row-o.lb-me-o{background:rgba(79,110,247,0.06);border-radius:8px;border:1px solid rgba(79,110,247,0.15);}
-    .lb-rank-o{font-size:0.82rem;font-weight:800;color:var(--muted);width:28px;text-align:center;flex-shrink:0;}
-    .lb-rank-o.gold{color:#f59e0b;} .lb-rank-o.silver{color:#94a3b8;} .lb-rank-o.bronze{color:#cd7f32;}
-    .lb-name-o{flex:1;font-size:0.88rem;font-weight:600;color:var(--text);}
-    .lb-val-o{font-size:0.88rem;font-weight:700;color:var(--primary);}
+    /* ── LEADERBOARD V3 ── */
+    .lb-seg-ctrl{display:inline-flex;border:1px solid var(--border-bright);border-radius:100px;overflow:hidden;margin-bottom:1.25rem;}
+    .lb-seg-btn{padding:0.48rem 1.5rem;background:transparent;border:none;color:var(--muted);font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+    .lb-seg-btn.active{background:var(--primary);color:#fff;}
+    .lb-seg-btn:first-child{border-radius:100px 0 0 100px;}
+    .lb-seg-btn:last-child{border-radius:0 100px 100px 0;}
+    .lb-v3-row{display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0.9rem;border-radius:8px;border:1px solid transparent;margin-bottom:2px;transition:background 0.12s;}
+    .lb-v3-row:hover{background:rgba(255,255,255,0.025);}
+    .lb-v3-row.rank1{background:rgba(245,158,11,0.06);border-color:rgba(245,158,11,0.2);border-left:3px solid #f59e0b;}
+    .lb-v3-row.rank2{background:rgba(148,163,184,0.05);border-color:rgba(148,163,184,0.18);border-left:3px solid #94a3b8;}
+    .lb-v3-row.rank3{background:rgba(205,127,50,0.05);border-color:rgba(205,127,50,0.18);border-left:3px solid #cd7f32;}
+    .lb-v3-row.lb-v3-me{background:rgba(79,110,247,0.07);border-color:rgba(79,110,247,0.2);}
+    .lb-v3-rank{font-size:0.82rem;font-weight:800;color:var(--muted);width:26px;text-align:center;flex-shrink:0;}
+    .lb-v3-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:800;color:#fff;flex-shrink:0;}
+    .lb-v3-name{flex:1;font-size:0.87rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .lb-v3-bar{width:90px;flex-shrink:0;}
+    .lb-v3-val{font-size:0.9rem;font-weight:800;min-width:54px;text-align:right;white-space:nowrap;}
+    .lb-v3-val.rev{color:#22c55e;}
+    .lb-v3-val.brk{color:var(--primary);}
+    @media(max-width:480px){.lb-v3-bar{display:none;}.lb-seg-btn{padding:0.45rem 1.1rem;}}
 
     /* ── MILESTONES ── */
     .ms-grid-o{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0.85rem;}
@@ -2166,19 +2177,17 @@
 
   <!-- ══ LEADERBOARD TAB ════════════════════════════════════ -->
   <div class="tab-content" id="tab-leaderboard">
-    <div class="panel">
-      <div class="lb-v2-header">
+    <div class="panel" style="padding:0;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
         <div class="lb-month-nav">
           <button class="lb-month-btn" id="ownerLbPrev" onclick="ownerLbNavMonth(-1)">&#8249;</button>
           <span class="lb-month-label" id="ownerLbMonthLabel">—</span>
           <button class="lb-month-btn" id="ownerLbNext" onclick="ownerLbNavMonth(1)">&#8250;</button>
         </div>
-        <div style="display:flex;gap:0.5rem;">
-          <button class="btn btn-outline" style="font-size:0.78rem;padding:0.35rem 0.8rem;" onclick="document.getElementById('lbSettingsModal').classList.add('active')">Settings</button>
-        </div>
+        <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.75rem;" onclick="document.getElementById('lbSettingsModal').classList.add('active')">Settings</button>
       </div>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;" id="ownerLbCats"></div>
-      <div id="ownerLbList"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div></div>
+      <div style="padding:1rem 1.25rem 0;" id="ownerLbCats"></div>
+      <div id="ownerLbList" style="padding:0 0.75rem 0.75rem;"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div></div>
     </div>
   </div>
 
@@ -9579,38 +9588,75 @@ async function ownerLoadLeaderboard() {
 }
 
 function ownerRenderLbCats(cats) {
-  document.getElementById('ownerLbCats').innerHTML = cats.map(function(c) {
-    return '<button class="lb-cat-btn-o' + (c === ownerActiveLbCat ? ' active' : '') + '" onclick="ownerSetLbCat(\'' + c + '\')">' + (OWNER_LB_LABELS[c] || c) + '</button>';
-  }).join('');
+  const validCats = (cats || []).filter(function(c) { return OWNER_LB_LABELS[c]; });
+  const display = validCats.length ? validCats : Object.keys(OWNER_LB_LABELS);
+  document.getElementById('ownerLbCats').innerHTML =
+    '<div class="lb-seg-ctrl">' +
+    display.map(function(c) {
+      return '<button class="lb-seg-btn' + (c === ownerActiveLbCat ? ' active' : '') + '" onclick="ownerSetLbCat(\'' + c + '\')">' + (OWNER_LB_LABELS[c] || c) + '</button>';
+    }).join('') +
+    '</div>';
 }
 
 function ownerSetLbCat(cat) { ownerActiveLbCat = cat; ownerLoadLeaderboard(); }
 
 function ownerRenderLbList(entries, myRank) {
   const list = document.getElementById('ownerLbList');
-  if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data for this period.</div>'; return; }
+  if (!entries.length) {
+    list.innerHTML =
+      '<div style="text-align:center;padding:3rem 1rem;">' +
+        '<div style="font-size:2rem;margin-bottom:0.65rem;">📊</div>' +
+        '<div style="font-weight:700;color:var(--text);margin-bottom:0.35rem;">No data yet</div>' +
+        '<div style="font-size:0.83rem;color:var(--muted);">Rankings appear after streams are completed this month.</div>' +
+      '</div>';
+    return;
+  }
   const isRevenue = ownerActiveLbCat === 'revenue_generated';
-  const MEDALS = ['🥇','🥈','🥉'];
+  const MEDAL_EMOJIS = { 1:'🥇', 2:'🥈', 3:'🥉' };
+  const AV_COLORS = {
+    1: 'linear-gradient(135deg,#f59e0b,#d97706)',
+    2: 'linear-gradient(135deg,#94a3b8,#64748b)',
+    3: 'linear-gradient(135deg,#cd7f32,#a0522d)'
+  };
   const maxVal = Math.max.apply(null, entries.map(function(e){ return parseFloat(e.value) || 0; })) || 1;
+
+  function initials(name) {
+    return (name || '?').split(' ').map(function(w){ return w[0]||''; }).join('').toUpperCase().slice(0,2) || '?';
+  }
+  function fmtVal(v) {
+    if (isRevenue) return '$' + (parseFloat(v)||0).toLocaleString('en-US',{maximumFractionDigits:0});
+    return Math.round(v||0).toLocaleString('en-US');
+  }
+
   const rows = entries.slice(0, 10).map(function(e, i) {
     const rank = e.rank || (i + 1);
-    const medal = rank <= 3 ? MEDALS[rank - 1] : null;
-    const rankClass = rank === 1 ? ' gold' : rank === 2 ? ' silver' : rank === 3 ? ' bronze' : '';
-    const val = isRevenue ? '$' + (parseFloat(e.value) || 0).toFixed(0) : Math.round(e.value || 0).toString();
-    const barPct = maxVal > 0 ? Math.round((parseFloat(e.value) || 0) / maxVal * 100) : 0;
+    const medal = MEDAL_EMOJIS[rank] || null;
+    const avBg = AV_COLORS[rank] || 'var(--primary)';
+    const barPct = Math.round((parseFloat(e.value)||0) / maxVal * 100);
     const isMe = e.staff_id === currentUser?.id;
-    return '<div class="lb-row-o' + (isMe ? ' lb-me-o' : '') + '">' +
-      '<div class="lb-medal">' + (medal || '<span class="lb-rank-o' + rankClass + '">' + rank + '</span>') + '</div>' +
-      '<div class="lb-name-o">' + escHtml(e.display_name || '?') + (isMe ? ' <span style="font-size:0.68rem;color:var(--primary);">(you)</span>' : '') + '</div>' +
-      '<div class="lb-bar-wrap"><div class="lb-bar-track"><div class="lb-bar-fill" style="width:' + barPct + '%"></div></div></div>' +
-      '<div class="lb-val-o">' + val + '</div>' +
+    const rankClass = rank <= 3 ? ' rank' + rank : '';
+    const meClass = (isMe && rank > 3) ? ' lb-v3-me' : '';
+    const valClass = isRevenue ? ' rev' : ' brk';
+    return '<div class="lb-v3-row' + rankClass + meClass + '">' +
+      '<div class="lb-v3-rank">' + (medal ? '<span style="font-size:1rem;">' + medal + '</span>' : rank) + '</div>' +
+      '<div class="lb-v3-avatar" style="background:' + avBg + ';">' + initials(e.display_name) + '</div>' +
+      '<div class="lb-v3-name">' + escHtml(e.display_name||'?') + (isMe ? ' <span style="font-size:0.68rem;color:var(--primary);font-weight:600;">(you)</span>' : '') + '</div>' +
+      '<div class="lb-v3-bar"><div class="lb-bar-track"><div class="lb-bar-fill" style="width:' + barPct + '%"></div></div></div>' +
+      '<div class="lb-v3-val' + valClass + '">' + fmtVal(e.value) + '</div>' +
     '</div>';
   }).join('');
+
   let myRankHtml = '';
   if (myRank && myRank.rank > 10) {
-    const val = isRevenue ? '$' + (parseFloat(myRank.value) || 0).toFixed(0) : Math.round(myRank.value || 0).toString();
-    myRankHtml = '<div style="border-top:1px dashed rgba(255,255,255,0.08);margin-top:0.75rem;padding-top:0.75rem;">' +
-      '<div class="lb-row-o lb-me-o"><div class="lb-medal"><span class="lb-rank-o">' + myRank.rank + '</span></div><div class="lb-name-o">You</div><div class="lb-bar-wrap"></div><div class="lb-val-o">' + val + '</div></div></div>';
+    myRankHtml = '<div style="border-top:1px dashed rgba(255,255,255,0.07);margin-top:0.75rem;padding-top:0.75rem;">' +
+      '<div class="lb-v3-row lb-v3-me">' +
+        '<div class="lb-v3-rank">' + myRank.rank + '</div>' +
+        '<div class="lb-v3-avatar" style="background:var(--primary);">Me</div>' +
+        '<div class="lb-v3-name">You</div>' +
+        '<div class="lb-v3-bar"></div>' +
+        '<div class="lb-v3-val' + (isRevenue ? ' rev' : ' brk') + '">' + fmtVal(myRank.value) + '</div>' +
+      '</div>' +
+    '</div>';
   }
   list.innerHTML = rows + myRankHtml;
 }
