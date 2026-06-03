@@ -63,13 +63,21 @@ module.exports = async (req, res) => {
 // CHAT
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Role → which channel slugs are visible
+// Role → which channel slugs are visible (owner intentionally excluded from role-specific chats)
 const CHANNEL_VISIBILITY = {
-  owner:   ['all_team','breakers_only','sorters_only','announcements'],
-  manager: ['all_team','breakers_only','sorters_only','announcements'],
+  owner:   ['all_team','announcements'],
+  manager: ['all_team','announcements'],
   breaker: ['all_team','breakers_only','announcements'],
   sorter:  ['all_team','sorters_only','announcements'],
 };
+
+// Default channels created for every new org
+const DEFAULT_CHANNELS = [
+  { slug: 'announcements',  name: '📢 Announcements', description: 'Important updates from ownership. Read-only for staff.', can_post_roles: ['owner','manager'], sort_order: 1 },
+  { slug: 'all_team',       name: '💬 Team Chat',     description: 'Everyone on the team.',                                  can_post_roles: ['owner','manager','breaker','sorter'], sort_order: 2 },
+  { slug: 'breakers_only',  name: '🃏 Breaker Chat',  description: 'Breakers only.',                                         can_post_roles: ['breaker'], sort_order: 3 },
+  { slug: 'sorters_only',   name: '📦 Sorter Chat',   description: 'Sorters only.',                                          can_post_roles: ['sorter'], sort_order: 4 },
+];
 
 async function chatHandler(req, res, sb, action) {
   const { err, profile } = await authenticate(req, sb);
@@ -78,6 +86,20 @@ async function chatHandler(req, res, sb, action) {
   // ── GET /api/chat/channels ─────────────────────────────────────────────────
   if (action === 'channels' && req.method === 'GET') {
     const allowedSlugs = CHANNEL_VISIBILITY[profile.role] || ['all_team','announcements'];
+
+    // Check if org has any channels yet
+    const { data: existing } = await sb.from('chat_channels')
+      .select('id').eq('org_id', profile.org_id).limit(1);
+
+    if (!existing || existing.length === 0) {
+      // First time: seed all 4 default channels for this org
+      await sb.from('chat_channels').insert(
+        DEFAULT_CHANNELS.map(function(c) {
+          return { org_id: profile.org_id, slug: c.slug, name: c.name, description: c.description, can_post_roles: c.can_post_roles, is_active: true };
+        })
+      );
+    }
+
     const { data, error } = await sb.from('chat_channels')
       .select('*')
       .eq('org_id', profile.org_id)
@@ -183,8 +205,8 @@ async function chatHandler(req, res, sb, action) {
 
   // ── POST /api/chat/messages/:messageId/reactions ───────────────────────────
   if (action === 'reactions' && req.method === 'POST') {
-    const messageId = req.query.messageId;
-    const { emoji } = req.body || {};
+    const { emoji, message_id: bodyMessageId } = req.body || {};
+    const messageId = req.query.messageId || bodyMessageId;
     if (!messageId) return fail(res, 400, 'messageId required');
     const ALLOWED_EMOJI = ['👍','🔥','💰','✅'];
     if (!ALLOWED_EMOJI.includes(emoji)) return fail(res, 400, 'emoji must be one of: 👍 🔥 💰 ✅');
@@ -436,6 +458,51 @@ async function milestonesHandler(req, res, sb, action) {
       const earnedSet = new Set((earned || []).map(e => e.milestone_id));
       const earnedMap = {};
       for (const e of (earned || [])) earnedMap[e.milestone_id] = e.awarded_at;
+
+      // Auto-check automatic milestones against existing performance data
+      const automaticUnawarded = (defs || []).filter(function(d) {
+        return d.trigger_type === 'automatic' && !earnedSet.has(d.id) && d.trigger_metric && d.trigger_value != null;
+      });
+
+      if (automaticUnawarded.length > 0) {
+        const neededMetrics = new Set(automaticUnawarded.map(function(d) { return d.trigger_metric; }));
+        const metricValues = {};
+
+        if (neededMetrics.has('breaks_completed')) {
+          const { count } = await sb.from('breaks')
+            .select('id', { count: 'exact', head: true })
+            .eq('breaker_id', profile.id)
+            .eq('org_id', profile.org_id);
+          metricValues.breaks_completed = count || 0;
+        }
+        if (neededMetrics.has('revenue_generated')) {
+          const { data: revRows } = await sb.from('breaks')
+            .select('revenue')
+            .eq('breaker_id', profile.id)
+            .eq('org_id', profile.org_id);
+          metricValues.revenue_generated = (revRows || []).reduce(function(s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+        }
+
+        const toAward = automaticUnawarded.filter(function(d) {
+          return metricValues[d.trigger_metric] !== undefined && metricValues[d.trigger_metric] >= d.trigger_value;
+        });
+
+        if (toAward.length > 0) {
+          const now = new Date().toISOString();
+          const { data: newAwards } = await sb.from('staff_milestones')
+            .upsert(
+              toAward.map(function(d) {
+                return { staff_id: profile.id, milestone_id: d.id, org_id: profile.org_id, awarded_at: now };
+              }),
+              { onConflict: 'staff_id,milestone_id', ignoreDuplicates: true }
+            )
+            .select('milestone_id, awarded_at');
+          for (const a of (newAwards || [])) {
+            earnedSet.add(a.milestone_id);
+            earnedMap[a.milestone_id] = a.awarded_at;
+          }
+        }
+      }
 
       return res.status(200).json({
         milestones: (defs || []).map(d => ({

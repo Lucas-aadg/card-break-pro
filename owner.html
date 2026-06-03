@@ -830,7 +830,7 @@
       <button class="nav-group-btn" id="ngb-engage">Engage ▾</button>
       <div class="nav-dropdown">
         <button class="nav-dd-item" data-tab="chat">Chat <span class="chat-nav-badge" id="chatNavBadge"></span></button>
-        <button class="nav-dd-item" data-tab="milestones">Medal Cabinet</button>
+        <button class="nav-dd-item" data-tab="milestones">Achievements</button>
         <button class="nav-dd-item" data-tab="goals">Goals</button>
         <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
       </div>
@@ -911,7 +911,7 @@
     <!-- ── HOME: MEDAL CABINET PREVIEW ── -->
     <div id="homeCabinetSection" style="display:none;margin-bottom:2.25rem;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
-        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);">Medal Cabinet</div>
+        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);">Achievements</div>
         <button class="btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:0.72rem;" onclick="switchTab('milestones')">View All</button>
       </div>
       <div id="homeCabinetShelf" class="cabinet-shelf"></div>
@@ -2152,7 +2152,7 @@
   <!-- ══ MEDAL CABINET TAB ═════════════════════════════════ -->
   <div class="tab-content" id="tab-milestones">
     <div class="panel">
-      <div class="cabinet-title">Medal Cabinet</div>
+      <div class="cabinet-title">Achievements</div>
       <div class="cabinet-sub" id="ownerCabinetSub">Your earned achievements. Complete breaks and hit targets to unlock more.</div>
       <div id="ownerCabinetEarned">
         <div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>
@@ -9672,7 +9672,7 @@ function ownerRenderCabinet(milestones, containerId) {
   const earned = milestones.filter(function(m){ return m.earned; });
   const locked = milestones.filter(function(m){ return !m.earned; });
   if (!earned.length && !locked.length) {
-    el.innerHTML = '<div class="cabinet-empty"><div class="cabinet-empty-icon">🏅</div><div class="cabinet-empty-text">Your cabinet is empty. Complete breaks and hit targets to earn your first badge.</div></div>';
+    el.innerHTML = '<div class="cabinet-empty"><div class="cabinet-empty-icon">🏅</div><div class="cabinet-empty-text">No achievements yet. Complete breaks and hit targets to unlock your first one.</div></div>';
     return;
   }
   let html = '';

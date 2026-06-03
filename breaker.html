@@ -513,7 +513,7 @@
   <button class="breaker-tab-btn" data-tab="payouts" id="payoutsTabBtn">My Pay</button>
   <button class="breaker-tab-btn" data-tab="chat">Chat</button>
   <button class="breaker-tab-btn" data-tab="leaderboard">Leaderboard</button>
-  <button class="breaker-tab-btn" data-tab="milestones">Medal Cabinet</button>
+  <button class="breaker-tab-btn" data-tab="milestones">Achievements</button>
 </div>
 
 <!-- Personal goal bar -->
@@ -846,7 +846,7 @@
   <!-- ── MEDAL CABINET TAB ── -->
   <div class="breaker-tab-content" id="breaker-tab-milestones">
     <div class="panel">
-      <div class="cabinet-title">Medal Cabinet</div>
+      <div class="cabinet-title">Achievements</div>
       <div class="cabinet-sub">Your earned achievements</div>
       <div id="brkCabinetEarned">
         <div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>
@@ -3521,7 +3521,7 @@ function brkRenderCabinet(milestones) {
   const earned = milestones.filter(function(m){ return m.earned; });
   const locked = milestones.filter(function(m){ return !m.earned; });
   if (!earned.length && !locked.length) {
-    el.innerHTML = '<div class="cabinet-empty"><div class="cabinet-empty-icon">🏅</div><div class="cabinet-empty-text">Your cabinet is empty. Complete breaks and hit targets to earn your first badge.</div></div>';
+    el.innerHTML = '<div class="cabinet-empty"><div class="cabinet-empty-icon">🏅</div><div class="cabinet-empty-text">No achievements yet. Complete breaks and hit targets to unlock your first one.</div></div>';
     return;
   }
   let html = '';
