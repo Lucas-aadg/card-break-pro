@@ -10201,6 +10201,10 @@ async function ownerAwardMilestone() { await settAwardMilestone(); }
 // OWNER — GOALS
 // ═══════════════════════════════════════════════════════════
 const GOAL_TYPE_LABELS = { organization_revenue: 'Team Revenue', individual_breaks: 'Indiv. Breaks', individual_revenue: 'Indiv. Revenue' };
+function getGoalLabel(goal_type) {
+  if (goal_type && goal_type.startsWith('custom:')) return goal_type.slice(7);
+  return GOAL_TYPE_LABELS[goal_type] || goal_type;
+}
 
 function ownerInitGoalsMonthSelect() {
   const sel = document.getElementById('ownerGoalsMonth');
@@ -10235,7 +10239,7 @@ async function ownerLoadGoals() {
       const targetFmt = isRevenue ? '$' + (parseFloat(g.target_value)).toFixed(0) : Math.round(g.target_value).toString();
       const staffName = g.staff_id ? ((allProfiles || []).find(function(p){ return p.id === g.staff_id; })?.display_name || 'Staff') : 'Team';
       return '<div class="goal-card">' +
-        '<div class="goal-card-title">' + escHtml(GOAL_TYPE_LABELS[g.goal_type] || g.goal_type) + ' — ' + escHtml(staffName) + '</div>' +
+        '<div class="goal-card-title">' + escHtml(getGoalLabel(g.goal_type)) + ' — ' + escHtml(staffName) + '</div>' +
         '<div class="goal-card-value">' + currentFmt + ' <span style="font-size:1rem;color:var(--muted);">/ ' + targetFmt + '</span></div>' +
         '<div class="goal-progress-bar"><div class="goal-progress-fill" style="width:' + pct + '%;"></div></div>' +
         '<div class="goal-pct">' + pct + '%</div>' +
@@ -10303,7 +10307,7 @@ function ownerRenderHomeGoalBars(goals) {
     if (pct >= 100) anyComplete = true;
     return '<div class="home-goal-bar-wrap">' +
       '<div class="home-goal-bar-header">' +
-        '<span class="home-goal-bar-name">' + escHtml(GOAL_TYPE_LABELS[g.goal_type] || g.goal_type) + ' Goal</span>' +
+        '<span class="home-goal-bar-name">' + escHtml(getGoalLabel(g.goal_type)) + ' Goal</span>' +
         '<span class="home-goal-bar-vals">' + curFmt + ' / ' + tgtFmt + '</span>' +
         '<span class="home-goal-bar-pct" style="color:' + pctColor + ';margin-left:0.5rem;">' + pct + '%</span>' +
       '</div>' +
@@ -10413,12 +10417,14 @@ document.getElementById('earnOverlay')?.addEventListener('click', function(e) {
   <div style="background:#10101e;border:1px solid rgba(79,110,247,0.25);border-radius:14px;padding:1.75rem;width:100%;max-width:420px;">
     <h2 style="font-size:1rem;margin-bottom:1.25rem;">Set Goal</h2>
     <div style="margin-bottom:0.85rem;"><label>Goal Type</label>
-      <select id="newGoalType">
+      <select id="newGoalType" onchange="toggleCustomGoalName()">
         <option value="organization_revenue">Team Revenue ($)</option>
         <option value="individual_breaks">Individual Breaks (count)</option>
         <option value="individual_revenue">Individual Revenue ($)</option>
+        <option value="custom">Custom Goal</option>
       </select>
     </div>
+    <div id="customGoalNameWrap" style="margin-bottom:0.85rem;display:none;"><label>Goal Name</label><input type="text" id="newGoalCustomName" placeholder="e.g. Reach 500 buyers" maxlength="100" /></div>
     <div style="margin-bottom:0.85rem;"><label>Target Value</label><input type="number" id="newGoalTarget" placeholder="e.g. 5000" min="1" /></div>
     <div style="margin-bottom:0.85rem;"><label>For (leave blank for whole team)</label>
       <select id="newGoalStaff"><option value="">Whole team</option></select>
@@ -10497,8 +10503,19 @@ function ownerInitGoalStaffSelect() {
   sel.innerHTML = '<option value="">Whole team</option>' + (allProfiles || []).map(function(p){ return '<option value="' + p.id + '">' + escHtml(p.display_name) + ' (' + p.role + ')</option>'; }).join('');
 }
 
+function toggleCustomGoalName() {
+  const sel = document.getElementById('newGoalType');
+  const wrap = document.getElementById('customGoalNameWrap');
+  if (wrap) wrap.style.display = sel.value === 'custom' ? '' : 'none';
+}
+
 async function submitNewGoal() {
-  const goalType = document.getElementById('newGoalType').value;
+  let goalType = document.getElementById('newGoalType').value;
+  if (goalType === 'custom') {
+    const name = (document.getElementById('newGoalCustomName').value || '').trim();
+    if (!name) { showGlobalError('Enter a name for your custom goal.'); return; }
+    goalType = 'custom:' + name;
+  }
   const target = parseFloat(document.getElementById('newGoalTarget').value);
   const staffId = document.getElementById('newGoalStaff').value;
   const visible = document.getElementById('newGoalVisible').checked;
@@ -10509,6 +10526,9 @@ async function submitNewGoal() {
     await ownerCreateGoal(goalType, target, staffId || null, year, month);
     document.getElementById('newGoalModal').classList.remove('active');
     document.getElementById('newGoalTarget').value = '';
+    document.getElementById('newGoalCustomName').value = '';
+    document.getElementById('newGoalType').value = 'organization_revenue';
+    toggleCustomGoalName();
     await ownerLoadGoals();
     showGlobalSuccess('Goal set.');
   } catch (e) { showGlobalError(e.message); }

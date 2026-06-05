@@ -794,7 +794,11 @@ async function goalsHandler(req, res, sb, action) {
       if (profile.role !== 'owner') return fail(res, 403, 'Owner only');
       const { goal_type, target_value, staff_id, goal_year, goal_month, is_visible_to_all } = req.body || {};
       if (!goal_type || target_value == null) return fail(res, 400, 'goal_type and target_value required');
-      if (!['revenue', 'breaks', 'streams', 'profit'].includes(goal_type)) return fail(res, 400, 'Invalid goal_type');
+      const VALID_GOAL_TYPES = ['organization_revenue', 'individual_breaks', 'individual_revenue'];
+      const isCustom = typeof goal_type === 'string' && goal_type.startsWith('custom:');
+      if (!VALID_GOAL_TYPES.includes(goal_type) && !isCustom) return fail(res, 400, 'Invalid goal_type');
+      if (isCustom && goal_type.slice(7).trim().length === 0) return fail(res, 400, 'Custom goal name cannot be empty');
+      if (isCustom && goal_type.length > 110) return fail(res, 400, 'Custom goal name too long');
       const tv = parseFloat(target_value);
       if (isNaN(tv) || tv < 0 || tv > 9999999) return fail(res, 400, 'target_value must be a number between 0 and 9,999,999');
 
