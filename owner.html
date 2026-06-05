@@ -935,7 +935,7 @@
     <div class="nav-group" id="ng-engage">
       <button class="nav-group-btn" id="ngb-engage">Engage ▾</button>
       <div class="nav-dropdown">
-        <button class="nav-dd-item" data-tab="chat">Chat <span class="chat-nav-badge" id="chatNavBadge"></span></button>
+        <button class="nav-dd-item" data-tab="announcements">Announcements</button>
         <button class="nav-dd-item" data-tab="goals">Goals</button>
         <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
       </div>
@@ -2304,30 +2304,19 @@
   </div>
 
   <!-- ══ CHAT TAB ═══════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-chat">
-    <!-- Mobile channel tabs -->
-    <div id="ownerChatMobileTabs" style="display:none;overflow-x:auto;white-space:nowrap;border-bottom:1px solid var(--border);background:var(--card-solid);padding:0 0.25rem;"></div>
-    <div class="owner-chat-grid">
-      <!-- Sidebar -->
-      <div class="chat-sidebar-col" style="background:rgba(0,0,0,0.25);border-right:1px solid var(--border);display:flex;flex-direction:column;">
-        <div style="font-size:0.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;padding:0.75rem 1rem 0.4rem;flex-shrink:0;">Channels</div>
-        <div id="ownerChatChannelList" style="flex:1;overflow-y:auto;"></div>
-      </div>
-      <!-- Message area -->
-      <div style="display:flex;flex-direction:column;min-width:0;">
-        <div class="chat-header-o" id="ownerChatHeaderO">
-          <span class="chat-header-o-name" id="ownerChatHeaderName" style="color:var(--muted);font-size:0.82rem;font-style:italic;">Select a channel</span>
+  <div class="tab-content" id="tab-announcements">
+    <div class="panel" style="max-width:680px;">
+      <!-- Post form — owner/manager only -->
+      <div id="annPostWrap" style="margin-bottom:1.5rem;display:none;">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.5rem;">New Announcement</div>
+        <div style="display:flex;gap:0.75rem;align-items:flex-end;">
+          <textarea id="annInput" placeholder="Write an announcement to your team…" rows="3" maxlength="1000" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.65rem 0.85rem;font-size:0.9rem;font-family:inherit;resize:none;outline:none;" onkeydown="if(event.ctrlKey&&event.key==='Enter')postAnnouncement()"></textarea>
+          <button class="btn btn-primary" id="annPostBtn" onclick="postAnnouncement()" style="white-space:nowrap;align-self:flex-end;">Post</button>
         </div>
-        <div id="ownerChatMsgsWrap" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.65rem;"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Select a channel to start.</div></div>
-        <div id="ownerChatAnnounceNotice" class="chat-announce-notice" style="display:none;">Announcements — read only</div>
-        <div style="display:flex;flex-direction:column;gap:0.25rem;padding:0.75rem;border-top:1px solid var(--border);flex-shrink:0;">
-          <div style="display:flex;gap:0.5rem;">
-            <textarea id="ownerChatInput" rows="1" placeholder="Message… (Enter to send, Shift+Enter for newline)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.88rem;padding:0.55rem 0.85rem;outline:none;font-family:inherit;resize:none;max-height:120px;overflow-y:auto;line-height:1.45;" maxlength="2000" onkeydown="ownerChatKeydown(event)" oninput="ownerChatInputHandler(this)"></textarea>
-            <button class="btn btn-primary" style="font-size:0.82rem;padding:0.55rem 1rem;align-self:flex-end;" onclick="ownerSendChatMsg()">Send</button>
-          </div>
-          <div style="display:flex;justify-content:flex-end;"><span class="chat-counter-o" id="ownerChatCounter">0 / 2000</span></div>
-        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.35rem;">Ctrl+Enter to post</div>
       </div>
+      <!-- Feed -->
+      <div id="annFeed"><div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading announcements…</div></div>
     </div>
   </div>
 
@@ -3940,7 +3929,7 @@ const TAB_GROUP_MAP = {
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', performance: 'ng-reports', buyers: 'ng-reports',
   schedule: 'ng-manage', inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage',
   settings: 'ng-manage', referEarn: 'ng-manage',
-  chat: 'ng-engage', goals: 'ng-engage', leaderboard: 'ng-engage'
+  announcements: 'ng-engage', goals: 'ng-engage', leaderboard: 'ng-engage'
 };
 const GROUP_BTN_MAP = {
   'ng-reports': 'ngb-reports', 'ng-manage': 'ngb-manage', 'ng-engage': 'ngb-engage'
@@ -3990,7 +3979,7 @@ async function switchTab(tab) {
     else if (tab === 'settings') { await loadSettings(); await renderSettingsChannelList(); await settLoadMilestonesTab(); }
     else if (tab === 'buyers') await loadBuyersTab();
     else if (tab === 'referEarn') await loadReferEarn();
-    else if (tab === 'chat') await ownerLoadChatChannels();
+    else if (tab === 'announcements') await loadOwnerAnnouncements();
     else if (tab === 'milestones') await ownerLoadMilestones();
     else if (tab === 'goals') { ownerInitGoalsMonthSelect(); ownerInitGoalStaffSelect(); await ownerLoadGoals(); }
     else if (tab === 'leaderboard') await ownerLoadLeaderboard();
@@ -9860,175 +9849,82 @@ async function ownerAuthToken() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// OWNER — CHAT
+// OWNER — ANNOUNCEMENTS
 // ═══════════════════════════════════════════════════════════
-let ownerChatChannels = [];
-let ownerActiveChatChannel = null;
-let ownerActiveChatIsAnnouncement = false;
-let ownerChatRealtimeSub = null;
-const OWNER_CHAT_EMOJIS = ['👍','🔥','💰','✅'];
-let ownerChatUnreadInterval = null;
+let _annChannelId = null;
 
-async function ownerLoadChatChannels() {
+async function loadOwnerAnnouncements() {
+  const feed = document.getElementById('annFeed');
+  const postWrap = document.getElementById('annPostWrap');
+  if (!feed) return;
+
+  // Show post form for owner/manager
+  if (postWrap) postWrap.style.display = ['owner','manager'].includes(orgTier === 'exempt' ? 'owner' : (currentProfile?.role || '')) ? '' : 'none';
+  if (postWrap) postWrap.style.display = (['owner','manager'].includes(currentProfile?.role)) ? '' : 'none';
+
+  feed.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading…</div>';
   try {
     const token = await ownerAuthToken();
-    const res = await fetch('/api/chat/channels', { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    ownerChatChannels = data.channels || [];
-    ownerRenderChatSidebar();
-    if (ownerChatChannels.length) ownerSelectChatChannel(ownerChatChannels[0].id);
-    ownerStartChatUnreadPoll();
-  } catch (e) { console.error('ownerLoadChatChannels', e); }
+    // Get announcements channel ID
+    if (!_annChannelId) {
+      const chRes = await fetch('/api/chat/channels', { headers: { Authorization: 'Bearer ' + token } });
+      const chData = await chRes.json();
+      const annCh = (chData.channels || []).find(function(c){ return c.slug === 'announcements'; });
+      if (!annCh) { feed.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);">No announcements channel found.</div>'; return; }
+      _annChannelId = annCh.id;
+    }
+    const msgRes = await fetch('/api/chat/channels/' + _annChannelId + '/messages?limit=50', { headers: { Authorization: 'Bearer ' + token } });
+    const msgData = await msgRes.json();
+    annRenderFeed(msgData.messages || [], feed);
+  } catch (e) {
+    feed.innerHTML = '<div style="padding:1rem;color:var(--red);font-size:0.85rem;">Failed to load: ' + escHtml(e.message) + '</div>';
+  }
 }
 
-function ownerRenderChatSidebar() {
-  const list = document.getElementById('ownerChatChannelList');
-  const mobileTabs = document.getElementById('ownerChatMobileTabs');
-  if (!ownerChatChannels.length) {
-    list.innerHTML = '<div style="padding:0.75rem 1rem;font-size:0.82rem;color:var(--muted);">No channels yet.</div>';
-    if (mobileTabs) mobileTabs.innerHTML = '';
+function annRenderFeed(msgs, feedEl) {
+  const el = feedEl || document.getElementById('annFeed');
+  if (!el) return;
+  if (!msgs.length) {
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">No announcements yet.</div>';
     return;
   }
-  const btns = ownerChatChannels.map(function(ch) {
-    const isAnn = ch.channel_type === 'announcement';
-    const annTag = isAnn ? ' <span style="font-size:0.6rem;background:rgba(245,158,11,0.15);color:var(--yellow);border-radius:4px;padding:0 3px;vertical-align:middle;">ANN</span>' : '';
-    return { ch: ch, isAnn: isAnn, annTag: annTag };
-  });
-  list.innerHTML = btns.map(function(b) {
-    return '<button class="chat-ch-btn-o' + (ownerActiveChatChannel === b.ch.id ? ' active' : '') + '" onclick="ownerSelectChatChannel(\'' + b.ch.id + '\')" style="display:flex;align-items:center;gap:0.4rem;">' +
-      '<span>' + escHtml(b.ch.name || b.ch.slug) + '</span>' + b.annTag + '</button>';
-  }).join('');
-  if (mobileTabs) {
-    mobileTabs.innerHTML = btns.map(function(b) {
-      const active = ownerActiveChatChannel === b.ch.id;
-      return '<button onclick="ownerSelectChatChannel(\'' + b.ch.id + '\')" style="flex-shrink:0;padding:0.35rem 0.85rem;border-radius:100px;border:1px solid ' + (active ? 'var(--primary)' : 'var(--border)') + ';background:' + (active ? 'rgba(79,110,247,0.15)' : 'transparent') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">' +
-        escHtml(b.ch.name || b.ch.slug) + (b.isAnn ? ' 📢' : '') + '</button>';
-    }).join('');
-  }
-}
-
-async function ownerSelectChatChannel(channelId) {
-  ownerActiveChatChannel = channelId;
-  const ch = (ownerChatChannels || []).find(function(c){ return c.id === channelId; });
-  ownerActiveChatIsAnnouncement = ch && ch.channel_type === 'announcement';
-  ownerRenderChatSidebar();
-  const headerName = document.getElementById('ownerChatHeaderName');
-  if (headerName && ch) headerName.textContent = (ch.name || ch.slug) + (ownerActiveChatIsAnnouncement ? ' 📢' : '');
-  const annNotice = document.getElementById('ownerChatAnnounceNotice');
-  if (annNotice) annNotice.style.display = ownerActiveChatIsAnnouncement ? 'block' : 'none';
-  const inputEl = document.getElementById('ownerChatInput');
-  if (inputEl) inputEl.disabled = false;
-  const wrap = document.getElementById('ownerChatMsgsWrap');
-  wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
-  try {
-    const token = await ownerAuthToken();
-    const res = await fetch('/api/chat/channels/' + channelId + '/messages', { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    ownerRenderChatMessages(data.messages || []);
-    ownerSubscribeChatRealtime(channelId);
-  } catch (e) { wrap.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed: ' + escHtml(e.message) + '</div>'; }
-}
-
-function ownerRenderChatMessages(msgs) {
-  const wrap = document.getElementById('ownerChatMsgsWrap');
-  if (!msgs.length) { wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No messages yet. Say something!</div>'; return; }
-  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-  const reversed = msgs.slice().reverse();
-  wrap.innerHTML = reversed.map(function(m) {
-    const name = m.sender?.display_name || '?';
-    const role = m.sender?.role || '';
-    const initials = name.split(' ').map(function(w){ return w[0]; }).join('').toUpperCase().slice(0,2);
-    const isOnline = m.sender?.last_seen && new Date(m.sender.last_seen).getTime() > fiveMinAgo;
-    const roleBadge = role ? '<span class="role-badge-o role-badge-' + escHtml(role) + '">' + escHtml(role) + '</span>' : '';
-    const onlineDot = isOnline ? '<span class="chat-online-dot" title="Online"></span>' : '';
-    const rxnHtml = OWNER_CHAT_EMOJIS.map(function(e) {
-      const info = m.reactions && m.reactions[e];
-      const count = info ? info.count : 0;
-      const active = info && info.reacted ? ' reacted' : '';
-      return '<button class="chat-rxn-btn-o' + active + '" onclick="ownerToggleReaction(\'' + m.id + '\',\'' + e + '\')">' + e + (count > 0 ? ' ' + count : '') + '</button>';
-    }).join('');
-    return '<div class="chat-msg-o">' +
-      '<div class="chat-avatar-o" style="position:relative;">' + escHtml(initials) + onlineDot + '</div>' +
-      '<div style="flex:1;min-width:0;">' +
-        '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;display:flex;align-items:center;flex-wrap:wrap;gap:0.15rem;">' +
-          '<span style="font-weight:700;color:var(--text);">' + escHtml(name) + '</span>' + roleBadge +
-          '<span style="margin-left:0.3rem;">' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) + '</span>' +
-        '</div>' +
-        '<div style="font-size:0.88rem;color:' + (m.is_deleted ? 'var(--muted)' : 'var(--text)') + ';line-height:1.5;word-break:break-word;' + (m.is_deleted ? 'font-style:italic;' : '') + '">' + escHtml(m.is_deleted ? '[deleted]' : m.content) + '</div>' +
-        '<div style="display:flex;gap:0.3rem;margin-top:0.35rem;flex-wrap:wrap;">' + rxnHtml + '</div>' +
+  const sorted = msgs.slice().reverse(); // newest first
+  el.innerHTML = sorted.map(function(m) {
+    const name = (m.sender && m.sender.display_name) || 'Team';
+    const role = (m.sender && m.sender.role) || '';
+    const dateStr = new Date(m.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' · ' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;margin-bottom:0.65rem;background:var(--bg);">' +
+      '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">' +
+        '<span style="font-size:1.1rem;">📢</span>' +
+        '<span style="font-weight:700;font-size:0.88rem;">' + escHtml(name) + '</span>' +
+        (role ? '<span style="font-size:0.65rem;background:rgba(79,110,247,0.12);color:var(--primary);padding:1px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;">' + escHtml(role) + '</span>' : '') +
+        '<span style="font-size:0.72rem;color:var(--muted);margin-left:auto;">' + dateStr + '</span>' +
       '</div>' +
+      '<div style="font-size:0.92rem;color:var(--text);line-height:1.6;white-space:pre-wrap;">' + escHtml(m.content) + '</div>' +
     '</div>';
   }).join('');
-  wrap.scrollTop = wrap.scrollHeight;
 }
 
-function ownerChatKeydown(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ownerSendChatMsg(); }
-}
-
-function ownerChatInputHandler(el) {
-  const len = el.value.length;
-  const counter = document.getElementById('ownerChatCounter');
-  if (counter) { counter.textContent = len + ' / 2000'; counter.classList.toggle('warn', len >= 1800); }
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-}
-
-async function ownerSendChatMsg() {
-  const input = document.getElementById('ownerChatInput');
+async function postAnnouncement() {
+  const input = document.getElementById('annInput');
   const content = (input.value || '').trim();
-  if (!content || !ownerActiveChatChannel) return;
-  input.value = '';
-  input.style.height = 'auto';
-  ownerChatInputHandler(input);
+  if (!content) return;
+  const btn = document.getElementById('annPostBtn');
+  btn.disabled = true; btn.textContent = 'Posting…';
   try {
     const token = await ownerAuthToken();
-    await fetch('/api/chat/channels/' + ownerActiveChatChannel + '/messages', {
+    if (!_annChannelId) { await loadOwnerAnnouncements(); }
+    if (!_annChannelId) throw new Error('Announcements channel not found');
+    const res = await fetch('/api/chat/channels/' + _annChannelId + '/messages', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ content })
     });
-    await ownerSelectChatChannel(ownerActiveChatChannel);
-  } catch (e) { input.value = content; }
-}
-
-async function ownerToggleReaction(msgId, emoji) {
-  try {
-    const token = await ownerAuthToken();
-    await fetch('/api/chat/reactions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message_id: msgId, emoji })
-    });
-    await ownerSelectChatChannel(ownerActiveChatChannel);
-  } catch (e) { console.error('ownerToggleReaction', e); }
-}
-
-function ownerSubscribeChatRealtime(channelId) {
-  if (ownerChatRealtimeSub) { sb.removeChannel(ownerChatRealtimeSub); ownerChatRealtimeSub = null; }
-  ownerChatRealtimeSub = sb.channel('owner-chat-' + channelId)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'channel_id=eq.' + channelId }, function() {
-      if (ownerActiveChatChannel === channelId) ownerSelectChatChannel(channelId);
-    }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_reactions' }, function() {
-      if (ownerActiveChatChannel === channelId) ownerSelectChatChannel(channelId);
-    }).subscribe();
-}
-
-function ownerStartChatUnreadPoll() {
-  if (ownerChatUnreadInterval) return;
-  ownerPollChatUnread();
-  ownerChatUnreadInterval = setInterval(ownerPollChatUnread, 30000);
-}
-
-async function ownerPollChatUnread() {
-  try {
-    const token = await ownerAuthToken();
-    const res = await fetch('/api/chat/unread', { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    const count = data.unread_count || 0;
-    const badge = document.getElementById('chatNavBadge');
-    if (badge) { badge.textContent = count > 99 ? '99+' : String(count); badge.style.display = count > 0 ? 'inline-block' : 'none'; }
-  } catch (e) { /* silently ignore */ }
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Post failed'); }
+    input.value = '';
+    await loadOwnerAnnouncements();
+  } catch (e) { showGlobalError(escHtml(e.message)); }
+  finally { btn.disabled = false; btn.textContent = 'Post'; }
 }
 
 // ═══════════════════════════════════════════════════════════

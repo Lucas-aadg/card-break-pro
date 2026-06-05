@@ -511,7 +511,7 @@
   <button class="breaker-tab-btn active" data-tab="entry">Break Entry</button>
   <button class="breaker-tab-btn" data-tab="shifts">My Shifts</button>
   <button class="breaker-tab-btn" data-tab="payouts" id="payoutsTabBtn">My Pay</button>
-  <button class="breaker-tab-btn" data-tab="chat">Chat</button>
+  <button class="breaker-tab-btn" data-tab="announcements">Announcements</button>
   <button class="breaker-tab-btn" data-tab="leaderboard">Leaderboard</button>
   <button class="breaker-tab-btn" data-tab="milestones">Achievements</button>
 </div>
@@ -814,19 +814,10 @@
 
 
   <!-- ── CHAT TAB ── -->
-  <div class="breaker-tab-content" id="breaker-tab-chat">
-    <div class="chat-layout">
-      <div class="chat-sidebar" id="brkChatSidebar">
-        <div style="font-size:0.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:0 1rem 0.5rem;">Channels</div>
-        <div id="brkChatChannelList"></div>
-      </div>
-      <div class="chat-main">
-        <div id="brkChatMsgsWrap" class="chat-msgs"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Select a channel to start.</div></div>
-        <div class="chat-input-row">
-          <input class="chat-input" id="brkChatMsgInput" placeholder="Message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();brkSendChatMsg();}" maxlength="2000" />
-          <button class="chat-send-btn" onclick="brkSendChatMsg()">Send</button>
-        </div>
-      </div>
+  <div class="breaker-tab-content" id="breaker-tab-announcements">
+    <div class="panel" style="max-width:640px;">
+      <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:1rem;">Announcements from your team</div>
+      <div id="brkAnnFeed"><div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading…</div></div>
     </div>
   </div>
 
@@ -2080,7 +2071,7 @@ function setupBreakerTabs() {
       document.getElementById('breaker-tab-' + btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'payouts') loadPayouts();
       if (btn.dataset.tab === 'shifts') { loadShifts(); loadMyScheduleView(); }
-      if (btn.dataset.tab === 'chat') brkLoadChatChannels();
+      if (btn.dataset.tab === 'announcements') brkLoadAnnouncements();
       if (btn.dataset.tab === 'leaderboard') brkLoadLeaderboard();
       if (btn.dataset.tab === 'milestones') brkLoadMilestones();
     });
@@ -3338,104 +3329,44 @@ async function brkAuthToken() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// BREAKER — CHAT
+// BREAKER — ANNOUNCEMENTS
 // ═══════════════════════════════════════════════════════════
-let brkChatChannels = [];
-let brkActiveChatChannel = null;
-let brkChatRealtimeSub = null;
-const BRK_CHAT_EMOJIS = ['👍','🔥','💰','✅'];
+var _brkAnnChannelId = null;
 
-async function brkLoadChatChannels() {
+async function brkLoadAnnouncements() {
+  const feed = document.getElementById('brkAnnFeed');
+  if (!feed) return;
+  feed.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading…</div>';
   try {
     const token = await brkAuthToken();
-    const res = await fetch('/api/chat/channels', { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    brkChatChannels = data.channels || [];
-    brkRenderChatSidebar();
-    if (brkChatChannels.length) brkSelectChatChannel(brkChatChannels[0].id);
-  } catch (e) { console.error('brkLoadChatChannels', e); }
-}
-
-function brkRenderChatSidebar() {
-  const list = document.getElementById('brkChatChannelList');
-  if (!brkChatChannels.length) { list.innerHTML = '<div style="padding:0.75rem 1rem;font-size:0.82rem;color:var(--muted);">No channels.</div>'; return; }
-  list.innerHTML = brkChatChannels.map(function(ch) {
-    return '<button class="chat-ch-btn' + (brkActiveChatChannel === ch.id ? ' active' : '') + '" onclick="brkSelectChatChannel(\'' + ch.id + '\')">' + escHtml(ch.name || ch.slug) + '</button>';
-  }).join('');
-}
-
-async function brkSelectChatChannel(channelId) {
-  brkActiveChatChannel = channelId;
-  brkRenderChatSidebar();
-  const wrap = document.getElementById('brkChatMsgsWrap');
-  wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
-  try {
-    const token = await brkAuthToken();
-    const res = await fetch('/api/chat/channels/' + channelId + '/messages', { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    brkRenderChatMessages(data.messages || []);
-    brkSubscribeChatRealtime(channelId);
-  } catch (e) { wrap.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed: ' + escHtml(e.message) + '</div>'; }
-}
-
-function brkRenderChatMessages(msgs) {
-  const wrap = document.getElementById('brkChatMsgsWrap');
-  if (!msgs.length) { wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No messages yet. Say hi!</div>'; return; }
-  const reversed = msgs.slice().reverse();
-  wrap.innerHTML = reversed.map(function(m) {
-    const initials = ((m.sender?.display_name || '?').split(' ').map(function(w){ return w[0]; }).join('').toUpperCase().slice(0,2));
-    const rxnHtml = BRK_CHAT_EMOJIS.map(function(e) {
-      const info = m.reactions && m.reactions[e];
-      const count = info ? info.count : 0;
-      const active = info && info.reacted ? ' reacted' : '';
-      return '<button class="chat-rxn-btn' + active + '" onclick="brkToggleReaction(\'' + m.id + '\',\'' + e + '\')">' + e + (count > 0 ? ' ' + count : '') + '</button>';
+    if (!_brkAnnChannelId) {
+      const chRes = await fetch('/api/chat/channels', { headers: { Authorization: 'Bearer ' + token } });
+      const chData = await chRes.json();
+      const annCh = (chData.channels || []).find(function(c){ return c.slug === 'announcements'; });
+      if (!annCh) { feed.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);">No announcements yet.</div>'; return; }
+      _brkAnnChannelId = annCh.id;
+    }
+    const msgRes = await fetch('/api/chat/channels/' + _brkAnnChannelId + '/messages?limit=50', { headers: { Authorization: 'Bearer ' + token } });
+    const msgData = await msgRes.json();
+    const msgs = (msgData.messages || []).slice().reverse();
+    if (!msgs.length) { feed.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">No announcements yet.</div>'; return; }
+    feed.innerHTML = msgs.map(function(m) {
+      const name = (m.sender && m.sender.display_name) || 'Team';
+      const role = (m.sender && m.sender.role) || '';
+      const dateStr = new Date(m.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' · ' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+      return '<div style="border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;margin-bottom:0.65rem;background:var(--bg);">' +
+        '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">' +
+          '<span style="font-size:1.1rem;">📢</span>' +
+          '<span style="font-weight:700;font-size:0.88rem;">' + escHtml(name) + '</span>' +
+          (role ? '<span style="font-size:0.65rem;background:rgba(79,110,247,0.12);color:var(--primary);padding:1px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;">' + escHtml(role) + '</span>' : '') +
+          '<span style="font-size:0.72rem;color:var(--muted);margin-left:auto;">' + dateStr + '</span>' +
+        '</div>' +
+        '<div style="font-size:0.92rem;color:var(--text);line-height:1.6;white-space:pre-wrap;">' + escHtml(m.content) + '</div>' +
+      '</div>';
     }).join('');
-    return '<div class="chat-msg">' +
-      '<div class="chat-avatar">' + initials + '</div>' +
-      '<div class="chat-msg-body">' +
-        '<div class="chat-msg-meta"><span class="chat-msg-name">' + escHtml(m.sender?.display_name || '?') + '</span>' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) + '</div>' +
-        '<div class="chat-msg-text' + (m.is_deleted ? ' deleted' : '') + '">' + escHtml(m.content) + '</div>' +
-        '<div class="chat-reactions">' + rxnHtml + '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-  wrap.scrollTop = wrap.scrollHeight;
-}
-
-async function brkSendChatMsg() {
-  const input = document.getElementById('brkChatMsgInput');
-  const content = input.value.trim();
-  if (!content || !brkActiveChatChannel) return;
-  input.value = '';
-  try {
-    const token = await brkAuthToken();
-    await fetch('/api/chat/channels/' + brkActiveChatChannel + '/messages', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content })
-    });
-    await brkSelectChatChannel(brkActiveChatChannel);
-  } catch (e) { input.value = content; }
-}
-
-async function brkToggleReaction(msgId, emoji) {
-  try {
-    const token = await brkAuthToken();
-    await fetch('/api/chat/reactions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message_id: msgId, emoji })
-    });
-    await brkSelectChatChannel(brkActiveChatChannel);
-  } catch (e) { console.error('brkToggleReaction', e); }
-}
-
-function brkSubscribeChatRealtime(channelId) {
-  if (brkChatRealtimeSub) { sb.removeChannel(brkChatRealtimeSub); brkChatRealtimeSub = null; }
-  brkChatRealtimeSub = sb.channel('brk-chat-' + channelId)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'channel_id=eq.' + channelId }, function() {
-      if (brkActiveChatChannel === channelId) brkSelectChatChannel(channelId);
-    }).subscribe();
+  } catch (e) {
+    feed.innerHTML = '<div style="padding:1rem;color:var(--red);font-size:0.85rem;">Failed to load: ' + escHtml(e.message) + '</div>';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
