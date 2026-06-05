@@ -774,6 +774,55 @@
     .ms-syst-desc{font-size:0.75rem;color:var(--muted);margin-top:0.1rem;}
     .ms-custom-card{background:rgba(79,110,247,0.05);border:1px solid rgba(79,110,247,0.18);border-radius:10px;padding:0.85rem 1rem;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.85rem;}
 
+    /* ── EDIT STREAM MODAL ── */
+    .es-modal-box{background:var(--card);border:1px solid var(--border);border-radius:14px;width:95%;max-width:700px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}
+    .es-modal-hd{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+    .es-modal-title{font-size:1.1rem;font-weight:800;color:var(--text);}
+    .es-modal-sub{font-size:0.78rem;color:var(--muted);margin-top:0.15rem;}
+    .es-close-btn{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:0.25rem 0.5rem;border-radius:6px;line-height:1;}
+    .es-close-btn:hover{color:var(--text);}
+    .es-modal-body{overflow-y:auto;padding:1.5rem;flex:1;}
+    .es-modal-ft{padding:1rem 1.5rem;border-top:1px solid var(--border);flex-shrink:0;background:var(--card);}
+    .es-modal-actions{display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.75rem;}
+    .es-ft-totals{display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.82rem;}
+    .es-ft-item{display:flex;flex-direction:column;gap:0.1rem;}
+    .es-ft-label{font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);}
+    .es-ft-val{font-size:1rem;font-weight:800;color:var(--text);}
+    .es-row-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+    @media(max-width:500px){.es-row-2{grid-template-columns:1fr;}}
+    .es-field{display:flex;flex-direction:column;gap:0.35rem;margin-bottom:1rem;}
+    .es-field label{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);}
+    .es-field label span{text-transform:none;font-weight:400;letter-spacing:0;}
+    .es-field input,.es-field textarea{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.6rem 0.75rem;font-size:0.95rem;font-family:inherit;width:100%;box-sizing:border-box;}
+    .es-field input:focus,.es-field textarea:focus{border-color:var(--primary);outline:none;}
+    .es-field input[type="number"]{font-family:'Consolas',monospace;font-weight:700;}
+    .es-net-row{display:flex;align-items:center;gap:1.5rem;background:rgba(79,110,247,0.07);border:1px solid rgba(79,110,247,0.2);border-radius:8px;padding:0.65rem 1rem;margin-bottom:1.25rem;flex-wrap:wrap;}
+    .es-net-item{font-size:0.82rem;color:var(--muted);}
+    .es-net-item strong{color:var(--text);}
+    .es-section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);}
+    .es-section-lbl{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+    .es-add-break-btn{background:rgba(79,110,247,0.1);border:1px solid rgba(79,110,247,0.25);color:var(--primary);border-radius:6px;padding:0.28rem 0.85rem;font-size:0.78rem;font-weight:700;cursor:pointer;}
+    .es-add-break-btn:hover{background:rgba(79,110,247,0.18);}
+    .es-break-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;margin-bottom:0.75rem;overflow:hidden;}
+    .es-break-card-hd{display:flex;align-items:center;justify-content:space-between;padding:0.65rem 1rem;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);}
+    .es-break-num{font-size:0.82rem;font-weight:700;color:var(--text);}
+    .es-break-boxcost{font-size:0.78rem;color:var(--muted);}
+    .es-delete-break{background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0.2rem 0.5rem;border-radius:4px;font-weight:600;}
+    .es-delete-break:hover{color:var(--red);background:rgba(239,68,68,0.08);}
+    .es-prod-table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+    .es-prod-table th{padding:0.35rem 0.75rem;text-align:left;color:var(--muted);font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+    .es-prod-table td{padding:0.4rem 0.75rem;border-bottom:1px solid rgba(45,45,61,0.4);}
+    .es-prod-table tr:last-child td{border-bottom:none;}
+    .es-qty-inp{width:64px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:0.28rem 0.45rem;font-size:0.82rem;text-align:center;font-family:'Consolas',monospace;}
+    .es-qty-inp:focus{border-color:var(--primary);outline:none;}
+    .es-ext-cost{font-weight:600;color:var(--text);}
+    .es-break-total-row{display:flex;justify-content:flex-end;padding:0.5rem 0.75rem;font-size:0.8rem;color:var(--muted);background:rgba(79,110,247,0.04);border-top:1px solid var(--border);}
+    .es-break-total-row strong{color:var(--primary);margin-left:0.5rem;}
+    .es-slip-drop{border:2px dashed rgba(79,110,247,0.35);border-radius:10px;padding:1.25rem;text-align:center;cursor:pointer;background:rgba(79,110,247,0.03);transition:.2s;margin-top:0.5rem;}
+    .es-slip-drop:hover{border-color:var(--primary);background:rgba(79,110,247,0.06);}
+    .es-slip-drop.has-file{border-color:var(--green);background:rgba(34,197,94,0.04);}
+    .es-slip-label{font-size:0.82rem;color:var(--muted);margin-top:0.35rem;}
+
     /* ── ANALYTICS ── */
     .an-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;margin-bottom:1.25rem;}
     .an-title{font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
@@ -2483,23 +2532,79 @@
 
 <!-- EDIT STREAM MODAL -->
 <div class="modal-overlay" id="editStreamModal">
-  <div class="modal" style="max-width:440px;">
-    <h2>Edit Stream Summary</h2>
-    <div style="margin-bottom:1.25rem;">
-      <label style="display:block;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.5rem;">Final Sales (platform payout)</label>
-      <input type="number" id="editStreamFinalSales" placeholder="0.00" min="0" step="0.01" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.6rem 0.75rem;font-size:1rem;font-weight:700;font-family:'Consolas',monospace;" />
+  <div class="es-modal-box">
+
+    <!-- Header -->
+    <div class="es-modal-hd">
+      <div>
+        <div class="es-modal-title">Edit Stream Summary</div>
+        <div class="es-modal-sub" id="esSubtitle"></div>
+      </div>
+      <button class="es-close-btn" onclick="closeEditStream()">✕</button>
     </div>
-    <div style="margin-bottom:1.25rem;">
-      <label style="display:block;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.5rem;">Notes (optional)</label>
-      <textarea id="editStreamNotes" rows="3" placeholder="Any notes…" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.6rem 0.75rem;font-size:0.875rem;resize:vertical;"></textarea>
+
+    <!-- Body -->
+    <div class="es-modal-body" id="esModalBody">
+      <div id="esLoadingState" style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading stream data…</div>
+      <div id="esContent" style="display:none;">
+
+        <!-- Revenue + Final Sales -->
+        <div class="es-row-2">
+          <div class="es-field">
+            <label>Total Revenue</label>
+            <input type="number" id="esTotalRev" placeholder="0.00" min="0" step="0.01" oninput="esUpdateTotals()" />
+          </div>
+          <div class="es-field">
+            <label>Final Sales <span>— platform payout</span></label>
+            <input type="number" id="esFinalSales" placeholder="0.00" min="0" step="0.01" oninput="esUpdateTotals()" />
+          </div>
+        </div>
+
+        <!-- Live totals preview -->
+        <div class="es-net-row" id="esNetRow">
+          <div class="es-net-item">Box Cost: <strong id="esBoxCostDisplay">$0.00</strong></div>
+          <div class="es-net-item">Net Profit: <strong id="esNetProfitDisplay" style="color:var(--green);">—</strong></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="es-field">
+          <label>Notes <span>(optional)</span></label>
+          <textarea id="esNotes" rows="2" placeholder="Any notes about this stream…"></textarea>
+        </div>
+
+        <!-- Breaks -->
+        <div class="es-section-hd" style="margin-top:0.5rem;">
+          <div class="es-section-lbl" id="esBreakCountLabel">Breaks</div>
+          <button class="es-add-break-btn" onclick="esAddBreak()">+ Add Break</button>
+        </div>
+        <div id="esBreakList"></div>
+
+        <!-- Slip section — only if no slip on file -->
+        <div id="esSlipSection" style="display:none;margin-top:1.25rem;">
+          <div class="es-section-hd">
+            <div class="es-section-lbl">Packing Slip</div>
+            <span style="font-size:0.72rem;color:var(--yellow);">No slip on file</span>
+          </div>
+          <div class="es-slip-drop" id="esSlipDrop" onclick="document.getElementById('esSlipInput').click()">
+            <div style="font-size:1.8rem;margin-bottom:0.4rem;">📄</div>
+            <div style="font-size:0.85rem;font-weight:700;color:var(--text);" id="esSlipDropLabel">Drop packing slip PDF here or tap to select</div>
+            <div class="es-slip-label">PDF only · Max 50MB</div>
+          </div>
+          <input type="file" id="esSlipInput" accept="application/pdf,.pdf" style="display:none;" onchange="esSlipSelected(this)" />
+        </div>
+
+      </div>
     </div>
-    <div id="editStreamNetPreview" style="background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.875rem;margin-bottom:1.25rem;display:none;">
-      Net Profit: <strong id="editStreamNetVal" style="color:var(--primary);">—</strong>
+
+    <!-- Footer -->
+    <div class="es-modal-ft">
+      <div class="es-ft-totals" id="esFtTotals"></div>
+      <div class="es-modal-actions">
+        <button class="btn btn-outline" onclick="closeEditStream()">Cancel</button>
+        <button class="btn btn-primary" id="esSaveBtn" onclick="confirmEditStream()">Save Changes</button>
+      </div>
     </div>
-    <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-      <button class="btn btn-outline" onclick="document.getElementById('editStreamModal').classList.remove('active')">Cancel</button>
-      <button class="btn btn-primary" id="editStreamSaveBtn" onclick="confirmEditStream()">Save Changes</button>
-    </div>
+
   </div>
 </div>
 
@@ -5562,9 +5667,8 @@ function exportHistoryCsv() {
 // ══════════════════════════════════════════════════════════
 function setupStreamSummary() {
   document.getElementById('ssRefreshBtn').addEventListener('click', loadStreamSummary);
-  document.getElementById('editStreamFinalSales').addEventListener('input', updateEditNetPreview);
   document.getElementById('editStreamModal').addEventListener('click', function (e) {
-    if (e.target === this) this.classList.remove('active');
+    if (e.target === this) closeEditStream();
   });
 }
 
@@ -5605,7 +5709,7 @@ async function loadStreamSummary() {
         '<td>' + profitDisplay + '</td>' +
         '<td><span class="badge ' + (s.status === 'active' ? 'badge-green' : 'badge-gray') + '">' + escHtml(s.status) + '</span></td>' +
         '<td style="text-align:center;display:flex;gap:0.25rem;justify-content:center;align-items:center;">' +
-          '<button onclick="openEditStream(\'' + s.id + '\',' + (s.final_sales != null ? s.final_sales : 0) + ',' + (parseFloat(s.total_product_cost)||0) + ',' + (parseFloat(s.total_other_costs)||0) + ',\'' + escHtml((s.notes||'').replace(/'/g,"\\'")) + '\',\'' + (s.breaker_id || '') + '\')" title="Edit stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:0.9rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--primary)\'" onmouseout="this.style.color=\'var(--muted)\'">✏️</button>' +
+          '<button onclick="openEditStream(\'' + s.id + '\')" title="Edit stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:0.9rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--primary)\'" onmouseout="this.style.color=\'var(--muted)\'">✏️</button>' +
           '<button onclick="deleteStream(\'' + s.id + '\',\'' + escHtml(s.stream_key) + '\')" title="Delete stream" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button>' +
         '</td>';
       tbody.appendChild(tr);
@@ -5616,87 +5720,357 @@ async function loadStreamSummary() {
   }
 }
 
-let editingStreamId = null;
-let editingStreamBoxCost = 0;
-let editingStreamOtherCosts = 0;
-let editingStreamBreakerId = null;
+// ── Edit Stream State ─────────────────────────────────────────────────────
+var _esStreamId = null;
+var _esStreamData = null;
+var _esOrigBreaks = [];   // snapshot from DB for inventory diff
+var _esEditBreaks = [];   // working copy: [{id,break_number,products_used,_new,_deleted}]
+var _esSlipFile = null;
+var _esHasSlip = false;
 
-function openEditStream(streamId, currentFinalSales, boxCost, otherCosts, currentNotes, breakerId) {
-  editingStreamId = streamId;
-  editingStreamBoxCost = boxCost;
-  editingStreamOtherCosts = otherCosts;
-  editingStreamBreakerId = breakerId || null;
-
-  document.getElementById('editStreamFinalSales').value = currentFinalSales || '';
-  document.getElementById('editStreamNotes').value = currentNotes || '';
-  updateEditNetPreview();
-  document.getElementById('editStreamModal').classList.add('active');
+function closeEditStream() {
+  document.getElementById('editStreamModal').classList.remove('active');
+  _esStreamId = null; _esStreamData = null;
+  _esOrigBreaks = []; _esEditBreaks = [];
+  _esSlipFile = null; _esHasSlip = false;
 }
 
-function updateEditNetPreview() {
-  const finalSales = parseFloat(document.getElementById('editStreamFinalSales').value) || 0;
-  const net = finalSales - editingStreamBoxCost - editingStreamOtherCosts;
-  const preview = document.getElementById('editStreamNetPreview');
-  const val = document.getElementById('editStreamNetVal');
-  preview.style.display = 'block';
-  val.textContent = fmt(net);
-  val.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+async function openEditStream(streamId) {
+  _esStreamId = streamId;
+  _esSlipFile = null;
+
+  document.getElementById('esLoadingState').style.display = 'block';
+  document.getElementById('esContent').style.display = 'none';
+  document.getElementById('editStreamModal').classList.add('active');
+
+  try {
+    const [streamRes, breaksRes, slipRes] = await Promise.all([
+      sb.from('streams').select('*').eq('id', streamId).single(),
+      sb.from('breaks').select('id, break_number, products_used, revenue, total_product_cost')
+        .eq('stream_id', streamId).eq('org_id', currentProfile.org_id)
+        .order('break_number', { ascending: true }),
+      sb.from('stream_slip_imports').select('id').eq('stream_id', streamId).eq('status', 'complete').maybeSingle()
+    ]);
+
+    if (streamRes.error) throw streamRes.error;
+    _esStreamData = streamRes.data;
+
+    _esOrigBreaks = JSON.parse(JSON.stringify(breaksRes.data || []));
+    _esEditBreaks = JSON.parse(JSON.stringify(breaksRes.data || [])).map(function(b, i) {
+      return { id: b.id, break_number: b.break_number || (i + 1), products_used: b.products_used || [], _new: false, _deleted: false };
+    });
+
+    _esHasSlip = !!slipRes.data;
+
+    // Render
+    document.getElementById('esSubtitle').textContent = escHtml(_esStreamData.stream_key || '') + ' · ' + escHtml(_esStreamData.break_date || '');
+    document.getElementById('esTotalRev').value = _esStreamData.total_submitted_revenue || '';
+    document.getElementById('esFinalSales').value = _esStreamData.final_sales || '';
+    document.getElementById('esNotes').value = _esStreamData.notes || '';
+    document.getElementById('esSlipSection').style.display = _esHasSlip ? 'none' : '';
+
+    esRenderAllBreaks();
+    esUpdateTotals();
+
+    document.getElementById('esLoadingState').style.display = 'none';
+    document.getElementById('esContent').style.display = 'block';
+  } catch (e) {
+    document.getElementById('esLoadingState').textContent = 'Failed to load stream: ' + escHtml(e.message);
+  }
+}
+
+function esRenderAllBreaks() {
+  const list = document.getElementById('esBreakList');
+  const active = _esEditBreaks.filter(function(b){ return !b._deleted; });
+  document.getElementById('esBreakCountLabel').textContent = 'Breaks (' + active.length + ')';
+
+  if (!active.length) {
+    list.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--muted);font-size:0.82rem;">No breaks yet. Add one below.</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  _esEditBreaks.forEach(function(brk, idx) {
+    if (brk._deleted) return;
+    list.appendChild(esBuildBreakCard(brk, idx));
+  });
+}
+
+function esBuildBreakCard(brk, idx) {
+  const card = document.createElement('div');
+  card.className = 'es-break-card';
+  card.dataset.idx = idx;
+
+  // Header
+  const hd = document.createElement('div');
+  hd.className = 'es-break-card-hd';
+  hd.innerHTML =
+    '<span class="es-break-num">Break #' + (brk.break_number || (idx + 1)) + '</span>' +
+    '<div style="display:flex;align-items:center;gap:0.75rem;">' +
+      '<span class="es-break-boxcost" id="es-break-cost-' + idx + '">$0.00 box cost</span>' +
+      '<button class="es-delete-break" onclick="esDeleteBreak(' + idx + ')">Delete Break</button>' +
+    '</div>';
+  card.appendChild(hd);
+
+  // Product table
+  const table = document.createElement('table');
+  table.className = 'es-prod-table';
+  table.innerHTML = '<thead><tr><th>Product</th><th>Unit Cost</th><th>Qty</th><th>Total</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+
+  const activeProds = (orgProducts || []).filter(function(p){ return p.active; });
+  activeProds.forEach(function(p) {
+    const existing = (brk.products_used || []).find(function(u){ return u.product_id === p.id; });
+    const qty = existing ? (existing.qty || 0) : 0;
+    const extCost = qty * (parseFloat(p.unit_cost) || 0);
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td style="font-weight:600;">' + escHtml(p.name) + '</td>' +
+      '<td style="color:var(--muted);">' + fmt(p.unit_cost) + '</td>' +
+      '<td><input type="number" class="es-qty-inp" data-prod-id="' + p.id + '" data-break-idx="' + idx + '" min="0" value="' + qty + '" oninput="esQtyChanged(this,' + idx + ')" /></td>' +
+      '<td class="es-ext-cost" id="es-ext-' + idx + '-' + p.id + '">' + fmt(extCost) + '</td>';
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  card.appendChild(table);
+
+  // Break box cost footer
+  const foot = document.createElement('div');
+  foot.className = 'es-break-total-row';
+  foot.innerHTML = 'Break Box Cost: <strong id="es-break-cost-ft-' + idx + '">$0.00</strong>';
+  card.appendChild(foot);
+
+  // Calculate initial cost
+  setTimeout(function(){ esUpdateBreakCost(idx); }, 0);
+
+  return card;
+}
+
+function esQtyChanged(input, idx) {
+  const prodId = input.dataset.prodId;
+  const qty = Math.max(0, parseInt(input.value, 10) || 0);
+  input.value = qty;
+  const product = (orgProducts || []).find(function(p){ return p.id === prodId; });
+  if (!product) return;
+  const extCost = qty * (parseFloat(product.unit_cost) || 0);
+  const extEl = document.getElementById('es-ext-' + idx + '-' + prodId);
+  if (extEl) extEl.textContent = fmt(extCost);
+  esUpdateBreakCost(idx);
+  esUpdateTotals();
+}
+
+function esUpdateBreakCost(idx) {
+  const card = document.querySelector('[data-idx="' + idx + '"]');
+  if (!card) return;
+  let total = 0;
+  card.querySelectorAll('.es-qty-inp').forEach(function(inp) {
+    const qty = parseInt(inp.value, 10) || 0;
+    const product = (orgProducts || []).find(function(p){ return p.id === inp.dataset.prodId; });
+    total += qty * (parseFloat(product && product.unit_cost) || 0);
+  });
+  const hd = document.getElementById('es-break-cost-' + idx);
+  const ft = document.getElementById('es-break-cost-ft-' + idx);
+  if (hd) hd.textContent = fmt(total) + ' box cost';
+  if (ft) ft.textContent = fmt(total);
+}
+
+function esGetBreaksFromUI() {
+  const result = [];
+  _esEditBreaks.forEach(function(brk, idx) {
+    if (brk._deleted) return;
+    const card = document.querySelector('[data-idx="' + idx + '"]');
+    const productsUsed = [];
+    if (card) {
+      card.querySelectorAll('.es-qty-inp').forEach(function(inp) {
+        const qty = parseInt(inp.value, 10) || 0;
+        if (qty > 0) {
+          const product = (orgProducts || []).find(function(p){ return p.id === inp.dataset.prodId; });
+          if (product) productsUsed.push({ product_id: product.id, name: product.name, qty, unit_cost: product.unit_cost, ext_cost: qty * product.unit_cost });
+        }
+      });
+    }
+    const boxCost = productsUsed.reduce(function(s, p){ return s + p.ext_cost; }, 0);
+    result.push({ id: brk.id || null, break_number: brk.break_number, products_used: productsUsed, box_cost: boxCost, _new: brk._new });
+  });
+  return result;
+}
+
+function esUpdateTotals() {
+  const currentBreaks = esGetBreaksFromUI();
+  const totalBoxCost = currentBreaks.reduce(function(s, b){ return s + b.box_cost; }, 0);
+  const finalSales = parseFloat(document.getElementById('esFinalSales').value) || 0;
+  const netProfit = finalSales - totalBoxCost;
+
+  document.getElementById('esBoxCostDisplay').textContent = fmt(totalBoxCost);
+  const npEl = document.getElementById('esNetProfitDisplay');
+  npEl.textContent = fmt(netProfit);
+  npEl.style.color = netProfit >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // Footer totals
+  const totalRev = parseFloat(document.getElementById('esTotalRev').value) || 0;
+  document.getElementById('esFtTotals').innerHTML =
+    '<div class="es-ft-item"><div class="es-ft-label">Total Rev</div><div class="es-ft-val">' + fmt(totalRev) + '</div></div>' +
+    '<div class="es-ft-item"><div class="es-ft-label">Final Sales</div><div class="es-ft-val">' + fmt(finalSales) + '</div></div>' +
+    '<div class="es-ft-item"><div class="es-ft-label">Box Cost</div><div class="es-ft-val">' + fmt(totalBoxCost) + '</div></div>' +
+    '<div class="es-ft-item"><div class="es-ft-label">Net Profit</div><div class="es-ft-val" style="color:' + (netProfit >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(netProfit) + '</div></div>';
+}
+
+function esAddBreak() {
+  const active = _esEditBreaks.filter(function(b){ return !b._deleted; });
+  _esEditBreaks.push({ id: null, break_number: active.length + 1, products_used: [], _new: true, _deleted: false });
+  esRenderAllBreaks();
+  esUpdateTotals();
+}
+
+function esDeleteBreak(idx) {
+  if (_esEditBreaks[idx]) {
+    if (_esEditBreaks[idx]._new) {
+      _esEditBreaks.splice(idx, 1);
+    } else {
+      _esEditBreaks[idx]._deleted = true;
+    }
+    esRenderAllBreaks();
+    esUpdateTotals();
+  }
+}
+
+function esSlipSelected(input) {
+  if (!input.files || !input.files[0]) return;
+  _esSlipFile = input.files[0];
+  const drop = document.getElementById('esSlipDrop');
+  const label = document.getElementById('esSlipDropLabel');
+  drop.classList.add('has-file');
+  label.textContent = '📄 ' + _esSlipFile.name;
 }
 
 async function confirmEditStream() {
-  const finalSalesStr = document.getElementById('editStreamFinalSales').value.trim();
-  if (!finalSalesStr || isNaN(parseFloat(finalSalesStr))) {
-    alert('Please enter a valid Final Sales amount.');
-    return;
-  }
-  const finalSales = parseFloat(finalSalesStr);
-  const notes = document.getElementById('editStreamNotes').value.trim();
-  const netProfit = finalSales - editingStreamBoxCost - editingStreamOtherCosts;
-  // Use the breaker's commission rate, not the owner's
-  const breaker = editingStreamBreakerId ? allProfiles.find(function(p){ return p.id === editingStreamBreakerId; }) : null;
-  const commissionRate = (parseFloat((breaker || currentProfile).commission_rate) || 0) / 100;
-  const streamProfit = finalSales - editingStreamBoxCost - editingStreamOtherCosts;
-  const commissionPayout = streamProfit > 0 ? streamProfit * commissionRate : 0;
+  const totalRev = parseFloat(document.getElementById('esTotalRev').value) || 0;
+  const finalSales = parseFloat(document.getElementById('esFinalSales').value) || 0;
+  const notes = document.getElementById('esNotes').value.trim();
 
-  const btn = document.getElementById('editStreamSaveBtn');
+  if (!finalSales) { showGlobalError('Please enter Final Sales amount.'); return; }
+
+  const btn = document.getElementById('esSaveBtn');
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
   try {
-    const { error } = await sb.from('streams').update({
-      final_sales: finalSales,
-      net_profit: netProfit,
-      commission_payout: commissionPayout,
-      notes: notes || null,
-      status: 'closed',
-      closed_at: new Date().toISOString()
-    }).eq('id', editingStreamId);
+    const currentBreaks = esGetBreaksFromUI();
+    const totalBoxCost = currentBreaks.reduce(function(s, b){ return s + b.box_cost; }, 0);
+    const netProfit = finalSales - totalBoxCost;
 
-    if (error) throw error;
+    // Commission using breaker's rate
+    const breaker = _esStreamData.breaker_id ? allProfiles.find(function(p){ return p.id === _esStreamData.breaker_id; }) : null;
+    const commRate = (parseFloat(breaker && breaker.commission_rate) || 0) / 100;
+    const commPayout = netProfit > 0 ? netProfit * commRate : 0;
 
-    // Sync each break's net_profit to use the actual fee rate from final_sales
-    try {
-      const { data: sBreaks } = await sb.from('breaks')
-        .select('id, revenue, total_product_cost, other_costs')
-        .eq('stream_id', editingStreamId).eq('org_id', currentProfile.org_id);
-      const totalRev = (sBreaks || []).reduce(function(s, b){ return s + (parseFloat(b.revenue)||0); }, 0);
-      if (totalRev > 0) {
-        const actualFeeRate = Math.max(0, (totalRev - finalSales) / totalRev);
-        for (const b of (sBreaks || [])) {
-          const rev = parseFloat(b.revenue) || 0;
-          const np = rev - (parseFloat(b.total_product_cost)||0) - (rev * actualFeeRate) - (parseFloat(b.other_costs)||0);
-          await sb.from('breaks').update({ net_profit: np }).eq('id', b.id).eq('org_id', currentProfile.org_id);
-        }
-      }
-    } catch (syncErr) { console.warn('Break profit sync failed:', syncErr); }
-
-    // Create sort task if one doesn't already exist for this stream
-    const { data: existing } = await sb.from('sort_tasks').select('id').eq('stream_id', editingStreamId).eq('org_id', currentProfile.org_id).maybeSingle();
-    if (!existing) {
-      await sb.from('sort_tasks').insert({ org_id: currentProfile.org_id, stream_id: editingStreamId, status: 'pending' });
+    // ── Inventory delta ──────────────────────────────────────────────────
+    const stockDelta = {};
+    // Restore original usage
+    _esOrigBreaks.forEach(function(b) {
+      (b.products_used || []).forEach(function(p) {
+        stockDelta[p.product_id] = (stockDelta[p.product_id] || 0) + (p.qty || 0);
+      });
+    });
+    // Deduct new usage
+    currentBreaks.forEach(function(b) {
+      (b.products_used || []).forEach(function(p) {
+        stockDelta[p.product_id] = (stockDelta[p.product_id] || 0) - (p.qty || 0);
+      });
+    });
+    // Apply delta to inventory
+    for (const [prodId, delta] of Object.entries(stockDelta)) {
+      if (delta === 0) continue;
+      const product = (orgProducts || []).find(function(p){ return p.id === prodId; });
+      if (!product) continue;
+      const newStock = Math.max(0, (product.current_stock || 0) + delta);
+      await sb.from('products').update({ current_stock: newStock, updated_at: new Date().toISOString() }).eq('id', prodId).eq('org_id', currentProfile.org_id);
+      product.current_stock = newStock; // update local cache
     }
 
-    document.getElementById('editStreamModal').classList.remove('active');
+    // ── Delete removed breaks ────────────────────────────────────────────
+    const deletedIds = _esEditBreaks.filter(function(b){ return b._deleted && b.id; }).map(function(b){ return b.id; });
+    if (deletedIds.length) {
+      await sb.from('breaks').delete().in('id', deletedIds).eq('org_id', currentProfile.org_id);
+    }
+
+    // ── Update / Insert breaks ───────────────────────────────────────────
+    for (const b of currentBreaks) {
+      const boxCost = b.products_used.reduce(function(s, p){ return s + p.ext_cost; }, 0);
+      if (b.id) {
+        await sb.from('breaks').update({
+          products_used: b.products_used,
+          total_product_cost: boxCost,
+          updated_at: new Date().toISOString()
+        }).eq('id', b.id).eq('org_id', currentProfile.org_id);
+      } else {
+        await sb.from('breaks').insert({
+          org_id: currentProfile.org_id,
+          stream_id: _esStreamId,
+          breaker_id: _esStreamData.breaker_id || null,
+          break_number: b.break_number,
+          break_date: _esStreamData.break_date,
+          revenue: 0,
+          total_product_cost: boxCost,
+          products_used: b.products_used,
+          net_profit: 0,
+          status: 'completed'
+        });
+      }
+    }
+
+    // ── Sync per-break net_profit with new fee rate ───────────────────────
+    if (totalRev > 0) {
+      const feeRate = Math.max(0, (totalRev - finalSales) / totalRev);
+      const { data: allBreaks } = await sb.from('breaks').select('id, revenue, total_product_cost, other_costs').eq('stream_id', _esStreamId).eq('org_id', currentProfile.org_id);
+      for (const b of (allBreaks || [])) {
+        const rev = parseFloat(b.revenue) || 0;
+        const np = rev - (parseFloat(b.total_product_cost) || 0) - (rev * feeRate) - (parseFloat(b.other_costs) || 0);
+        await sb.from('breaks').update({ net_profit: np }).eq('id', b.id).eq('org_id', currentProfile.org_id);
+      }
+    }
+
+    // ── Update stream record ─────────────────────────────────────────────
+    const breakCount = currentBreaks.length;
+    await sb.from('streams').update({
+      total_submitted_revenue: totalRev,
+      final_sales: finalSales,
+      total_product_cost: totalBoxCost,
+      total_fees: Math.max(0, totalRev - finalSales),
+      net_profit: netProfit,
+      commission_payout: commPayout,
+      break_count: breakCount,
+      notes: notes || null,
+      updated_at: new Date().toISOString()
+    }).eq('id', _esStreamId);
+
+    // ── Process slip if uploaded ─────────────────────────────────────────
+    if (_esSlipFile) {
+      try {
+        const tok = (await sb.auth.getSession()).data.session.access_token;
+        const fd = new FormData(); fd.append('file', _esSlipFile);
+        const parseResp = await fetch('/api/import-slip', { method: 'POST', body: fd });
+        const parsed = await parseResp.json();
+        if (parseResp.ok && parsed.buyers && parsed.buyers.length > 0) {
+          await fetch('/api/process-import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+            body: JSON.stringify({
+              orgId: currentProfile.org_id,
+              streamId: _esStreamId,
+              buyers: parsed.buyers,
+              streamDate: parsed.streamDate || _esStreamData.break_date,
+              importedBy: currentUser.id,
+              rawFilename: _esSlipFile.name
+            })
+          });
+        }
+      } catch (slipErr) { console.warn('Slip import during edit failed:', slipErr.message); }
+    }
+
+    closeEditStream();
+    showGlobalSuccess('Stream updated successfully.');
     await loadStreamSummary();
   } catch (err) {
     showGlobalError('Failed to update stream: ' + escHtml(err.message));
