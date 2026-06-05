@@ -51,6 +51,7 @@ module.exports = async (req, res) => {
       case 'sorter-splits': return await sorterSplitsHandler(req, res, sb, action);
       case 'goals':         return await goalsHandler(req, res, sb, action);
       case 'notify':        return await notifyHandler(req, res, sb, action);
+      case 'analytics':     return await analyticsHandler(req, res, sb, action);
       default:              return fail(res, 400, 'Unknown feature: ' + feature);
     }
   } catch (err) {
@@ -1173,4 +1174,174 @@ function buildInventoryLowText(name, productName, stock, inventoryUrl) {
 function buildInventoryLowHtml(name, productName, stock, inventoryUrl) {
   const stockColor = stock === 0 ? '#ef4444' : '#f59e0b';
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',system-ui,sans-serif;"><div style="max-width:560px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);"><div style="background:#0d0d14;padding:24px 28px;"><div style="font-size:1rem;font-weight:800;letter-spacing:2px;color:#e2e8f0;">CARD <span style="color:#4f6ef7;">BREAK</span> PRO</div></div><div style="padding:32px 28px;"><p style="margin:0 0 16px;font-size:1rem;color:#1e293b;">Hey ${escHtml(name)},</p><div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:10px;padding:16px 20px;margin-bottom:20px;"><div style="font-size:0.75rem;font-weight:700;color:#b45309;text-transform:uppercase;margin-bottom:6px;">Low Stock Alert</div><div style="font-size:1.1rem;font-weight:800;color:#1e293b;">${escHtml(productName)}</div><div style="margin-top:4px;font-size:0.95rem;color:${stockColor};font-weight:700;">${stock} ${stock === 1 ? 'box' : 'boxes'} remaining</div></div><p style="margin:0 0 24px;font-size:0.9rem;color:#334155;line-height:1.65;">You may want to restock before your next stream.</p><a href="${inventoryUrl}" style="display:inline-block;background:#4f6ef7;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:0.9rem;">View Inventory →</a><p style="margin:28px 0 0;font-size:0.85rem;color:#94a3b8;">— Card Break Pro</p></div></div></body></html>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ANALYTICS
+// ═════════════════════════════════════════════════════════════════════════════
+
+async function analyticsHandler(req, res, sb, action) {
+  if (req.method !== 'GET') return fail(res, 405, 'Method not allowed');
+
+  const { err, profile } = await authenticate(req, sb);
+  if (err) return fail(res, err.status, err.msg);
+  if (profile.role !== 'owner') return fail(res, 403, 'Owner only');
+
+  const PERIOD_DAYS = { '7d': 7, '30d': 30, '90d': 90, 'all': null };
+  const period = req.query.period || '30d';
+  if (!Object.prototype.hasOwnProperty.call(PERIOD_DAYS, period)) return fail(res, 400, 'Invalid period. Use 7d, 30d, 90d, or all');
+  const periodDays = PERIOD_DAYS[period];
+  const orgId = profile.org_id;
+
+  const now = new Date();
+  const cutoff    = periodDays ? new Date(now.getTime() - periodDays * 86400000).toISOString() : null;
+  const prevCutoff = periodDays ? new Date(now.getTime() - 2 * periodDays * 86400000).toISOString() : null;
+
+  const [streamsRes, prevStreamsRes, breaksRes, buyersRes, staffRes, productsRes] = await Promise.all([
+    cutoff
+      ? sb.from('streams').select('id,closed_at,break_date,final_sales,net_profit,break_count,total_product_cost,total_other_costs').eq('org_id', orgId).eq('status','closed').gte('closed_at', cutoff)
+      : sb.from('streams').select('id,closed_at,break_date,final_sales,net_profit,break_count,total_product_cost,total_other_costs').eq('org_id', orgId).eq('status','closed'),
+    periodDays
+      ? sb.from('streams').select('final_sales,net_profit').eq('org_id', orgId).eq('status','closed').gte('closed_at', prevCutoff).lt('closed_at', cutoff)
+      : Promise.resolve({ data: [] }),
+    cutoff
+      ? sb.from('breaks').select('breaker_id,revenue,net_profit').eq('org_id', orgId).gte('created_at', cutoff)
+      : sb.from('breaks').select('breaker_id,revenue,net_profit').eq('org_id', orgId),
+    sb.from('buyers').select('id,total_spent,temperature,total_breaks_purchased,created_at,last_purchase_date').eq('organization_id', orgId),
+    sb.from('profiles').select('id,display_name').eq('org_id', orgId).eq('role','breaker'),
+    sb.from('products').select('id,name,current_stock').eq('org_id', orgId).lte('current_stock', 3)
+  ]);
+
+  const streams    = streamsRes.data || [];
+  const prevStreams = prevStreamsRes.data || [];
+  const breaks     = breaksRes.data || [];
+  const buyers     = buyersRes.data || [];
+  const staff      = staffRes.data || [];
+  const lowProducts = productsRes.data || [];
+
+  // ── Stream aggregates ─────────────────────────────────────────────────────
+  const totalStreams   = streams.length;
+  const totalRevenue   = streams.reduce(function(s,x){ return s + (parseFloat(x.final_sales)||0); }, 0);
+  const totalProfit    = streams.reduce(function(s,x){ return s + (parseFloat(x.net_profit)||0); }, 0);
+  const totalBoxCost   = streams.reduce(function(s,x){ return s + (parseFloat(x.total_product_cost)||0); }, 0);
+  const totalFees      = streams.reduce(function(s,x){ return s + (parseFloat(x.total_other_costs)||0); }, 0);
+  const totalBreakCount = streams.reduce(function(s,x){ return s + (parseInt(x.break_count)||0); }, 0);
+  const marginPct      = totalRevenue ? (totalProfit / totalRevenue) * 100 : 0;
+  const boxCostPct     = totalRevenue ? (totalBoxCost / totalRevenue) * 100 : 0;
+  const feePct         = totalRevenue ? (totalFees / totalRevenue) * 100 : 0;
+
+  // Day of week
+  const byDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(n){ return { day:n, count:0, revenue:0, profit:0, avg_revenue:0, avg_profit:0 }; });
+  streams.forEach(function(s) {
+    const idx = new Date(s.closed_at || s.break_date).getDay();
+    byDay[idx].count++;
+    byDay[idx].revenue += parseFloat(s.final_sales)||0;
+    byDay[idx].profit  += parseFloat(s.net_profit)||0;
+  });
+  byDay.forEach(function(d){ d.avg_revenue = d.count ? d.revenue/d.count : 0; d.avg_profit = d.count ? d.profit/d.count : 0; });
+
+  // Weekly trend
+  const trendMap = {};
+  streams.forEach(function(s) {
+    const date = new Date(s.closed_at || s.break_date);
+    const ws = new Date(date); ws.setDate(date.getDate() - date.getDay());
+    const key = ws.toISOString().split('T')[0];
+    if (!trendMap[key]) trendMap[key] = { period:key, revenue:0, profit:0, count:0 };
+    trendMap[key].revenue += parseFloat(s.final_sales)||0;
+    trendMap[key].profit  += parseFloat(s.net_profit)||0;
+    trendMap[key].count++;
+  });
+  const trend = Object.values(trendMap).sort(function(a,b){ return a.period < b.period ? -1 : 1; });
+
+  // ── Previous period comparison ────────────────────────────────────────────
+  const prevRevenue = prevStreams.reduce(function(s,x){ return s + (parseFloat(x.final_sales)||0); }, 0);
+  const prevProfit  = prevStreams.reduce(function(s,x){ return s + (parseFloat(x.net_profit)||0); }, 0);
+  const revChangePct    = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : null;
+  const profitChangePct = prevProfit  > 0 ? ((totalProfit  - prevProfit)  / prevProfit)  * 100 : null;
+
+  // ── Buyer stats ───────────────────────────────────────────────────────────
+  const totalBuyers   = buyers.length;
+  const now30  = new Date(now); now30.setDate(now.getDate() - 30);
+  const now7   = new Date(now); now7.setDate(now.getDate() - 7);
+  const newThisMonth  = buyers.filter(function(b){ return b.created_at && new Date(b.created_at) >= now30; }).length;
+  const newThisWeek   = buyers.filter(function(b){ return b.created_at && new Date(b.created_at) >= now7; }).length;
+  const returnBuyers  = buyers.filter(function(b){ return (b.total_breaks_purchased||0) > 1; }).length;
+  const retentionRate = totalBuyers ? (returnBuyers / totalBuyers) * 100 : 0;
+  const avgSpend      = totalBuyers ? buyers.reduce(function(s,b){ return s+(parseFloat(b.total_spent)||0); }, 0) / totalBuyers : 0;
+
+  const sorted10 = buyers.slice().sort(function(a,b){ return (parseFloat(b.total_spent)||0)-(parseFloat(a.total_spent)||0); });
+  const top10Count   = Math.max(1, Math.ceil(totalBuyers * 0.1));
+  const top10Rev     = sorted10.slice(0,top10Count).reduce(function(s,b){ return s+(parseFloat(b.total_spent)||0); }, 0);
+  const totalBuyerRev = buyers.reduce(function(s,b){ return s+(parseFloat(b.total_spent)||0); }, 0);
+  const top10Pct     = totalBuyerRev ? (top10Rev / totalBuyerRev) * 100 : 0;
+
+  const atRiskFrom = new Date(now); atRiskFrom.setDate(now.getDate() - 20);
+  const atRiskTo   = new Date(now); atRiskTo.setDate(now.getDate() - 14);
+  const atRisk = buyers.filter(function(b){
+    if (!b.last_purchase_date) return false;
+    const d = new Date(b.last_purchase_date);
+    return d >= atRiskFrom && d <= atRiskTo;
+  }).length;
+
+  const hot  = buyers.filter(function(b){ return b.temperature === 'hot';  }).length;
+  const warm = buyers.filter(function(b){ return b.temperature === 'warm'; }).length;
+  const cold = buyers.filter(function(b){ return b.temperature === 'cold'; }).length;
+
+  // ── Staff performance ─────────────────────────────────────────────────────
+  const staffMap = {};
+  staff.forEach(function(p){ staffMap[p.id] = { id:p.id, name:p.display_name, revenue:0, profit:0, breaks:0 }; });
+  breaks.forEach(function(b){
+    if (staffMap[b.breaker_id]) {
+      staffMap[b.breaker_id].revenue += parseFloat(b.revenue)||0;
+      staffMap[b.breaker_id].profit  += parseFloat(b.net_profit)||0;
+      staffMap[b.breaker_id].breaks++;
+    }
+  });
+  const staffStats = Object.values(staffMap)
+    .filter(function(s){ return s.breaks > 0; })
+    .sort(function(a,b){ return b.revenue - a.revenue; })
+    .slice(0, 10);
+
+  return res.status(200).json({
+    period,
+    streams: {
+      total: totalStreams,
+      total_revenue: totalRevenue,
+      total_profit: totalProfit,
+      avg_revenue: totalStreams ? totalRevenue / totalStreams : 0,
+      avg_profit:  totalStreams ? totalProfit  / totalStreams : 0,
+      avg_breaks:  totalStreams ? totalBreakCount / totalStreams : 0,
+      margin_pct:  marginPct,
+      box_cost_pct: boxCostPct,
+      fee_pct:     feePct,
+      by_day: byDay,
+      trend: trend
+    },
+    financial: {
+      total_revenue: totalRevenue,
+      total_profit:  totalProfit,
+      prev_revenue:  prevRevenue,
+      prev_profit:   prevProfit,
+      revenue_change_pct:    revChangePct,
+      profit_change_pct:     profitChangePct,
+      margin_pct:    marginPct,
+      box_cost_pct:  boxCostPct,
+      fee_pct:       feePct
+    },
+    buyers: {
+      total:          totalBuyers,
+      new_this_month: newThisMonth,
+      new_this_week:  newThisWeek,
+      retention_rate: retentionRate,
+      avg_spend:      avgSpend,
+      top10_pct:      top10Pct,
+      at_risk:        atRisk,
+      hot, warm, cold
+    },
+    staff: staffStats,
+    inventory: {
+      low_stock_count: lowProducts.length,
+      low_stock_items: lowProducts.map(function(p){ return { name: p.name, stock: p.current_stock }; })
+    }
+  });
 }

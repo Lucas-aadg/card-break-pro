@@ -36,7 +36,9 @@
     { "source": "/api/goals/manage", "destination": "/api/features?feature=goals&action=manage" },
 
     { "source": "/api/notify-stream-closed", "destination": "/api/features?feature=notify&action=stream-closed" },
-    { "source": "/api/notify-inventory-low", "destination": "/api/features?feature=notify&action=inventory-low" }
+    { "source": "/api/notify-inventory-low", "destination": "/api/features?feature=notify&action=inventory-low" },
+
+    { "source": "/api/analytics", "destination": "/api/features?feature=analytics&action=get" }
   ],
   "crons": [
     {

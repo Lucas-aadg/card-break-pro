@@ -773,6 +773,63 @@
     .ms-syst-name{font-size:0.85rem;font-weight:700;color:var(--text);}
     .ms-syst-desc{font-size:0.75rem;color:var(--muted);margin-top:0.1rem;}
     .ms-custom-card{background:rgba(79,110,247,0.05);border:1px solid rgba(79,110,247,0.18);border-radius:10px;padding:0.85rem 1rem;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.85rem;}
+
+    /* ── ANALYTICS ── */
+    .an-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;margin-bottom:1.25rem;}
+    .an-title{font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+    .an-period-ctrl{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:2px;}
+    .an-period-btn{padding:0.28rem 0.85rem;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);transition:all 0.15s;letter-spacing:0.3px;}
+    .an-period-btn.active{background:var(--primary);color:#fff;}
+    .an-loading{padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;}
+
+    .an-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0.65rem;margin-bottom:1.5rem;}
+    @media(max-width:700px){.an-kpi-row{grid-template-columns:repeat(2,1fr);}}
+    .an-kpi{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;position:relative;overflow:hidden;}
+    .an-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ak,var(--primary));opacity:0.9;}
+    .an-kpi-label{font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.45rem;}
+    .an-kpi-val{font-size:1.45rem;font-weight:900;color:var(--text);line-height:1;margin-bottom:0.35rem;letter-spacing:-0.5px;}
+    .an-kpi-badge{display:inline-flex;align-items:center;gap:0.15rem;font-size:0.68rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:100px;}
+    .an-kpi-badge.up{background:rgba(34,197,94,0.14);color:var(--green);}
+    .an-kpi-badge.dn{background:rgba(239,68,68,0.14);color:var(--red);}
+    .an-kpi-badge.nt{background:rgba(100,116,139,0.12);color:var(--muted);}
+
+    .an-section{margin-bottom:1.5rem;}
+    .an-section-hd{font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.75rem;padding-bottom:0.4rem;border-bottom:1px solid var(--border);}
+    .an-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;}
+    @media(max-width:540px){.an-grid{grid-template-columns:repeat(2,1fr);}}
+    .an-stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.8rem 0.9rem;}
+    .an-stat-val{font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:0.15rem;}
+    .an-stat-lbl{font-size:0.68rem;color:var(--muted);line-height:1.3;}
+    .an-stat.c-pri .an-stat-val{color:var(--primary);}
+    .an-stat.c-grn .an-stat-val{color:var(--green);}
+    .an-stat.c-ylw .an-stat-val{color:var(--yellow);}
+    .an-stat.c-red .an-stat-val{color:var(--red);}
+
+    .an-chart-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.6rem 1rem;font-size:0.79rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all 0.15s;text-align:left;margin-bottom:0;}
+    .an-chart-toggle:hover{border-color:var(--primary);color:var(--text);}
+    .an-chart-toggle.open{border-color:rgba(79,110,247,0.5);color:var(--text);border-radius:8px 8px 0 0;}
+    .an-chart-body{background:var(--bg);border:1px solid rgba(79,110,247,0.35);border-top:none;border-radius:0 0 8px 8px;padding:1.1rem 1rem;margin-bottom:1rem;}
+    .an-chart-icon{font-size:0.65rem;transition:transform 0.2s;}
+    .an-chart-toggle.open .an-chart-icon{transform:rotate(90deg);}
+
+    .an-staff-tbl{width:100%;border-collapse:collapse;font-size:0.82rem;}
+    .an-staff-tbl th{text-align:left;padding:0.35rem 0.6rem;color:var(--muted);font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+    .an-staff-tbl td{padding:0.5rem 0.6rem;border-bottom:1px solid rgba(45,45,61,0.45);}
+    .an-staff-tbl tr:last-child td{border-bottom:none;}
+    .an-staff-tbl .rk{color:var(--muted);font-weight:700;font-size:0.75rem;width:1.2rem;}
+
+    .an-inv-item{display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.75rem;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:7px;margin-bottom:0.4rem;font-size:0.82rem;}
+    .an-inv-name{font-weight:600;color:var(--text);}
+    .an-inv-stock{font-weight:700;color:var(--yellow);font-size:0.78rem;}
+    .an-inv-stock.out{color:var(--red);}
+
+    .an-locked-wrap{position:relative;min-height:280px;}
+    .an-locked-blur{filter:blur(5px);pointer-events:none;user-select:none;opacity:0.35;}
+    .an-locked-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:5;}
+    .an-locked-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:2rem 1.5rem;text-align:center;max-width:300px;box-shadow:0 8px 40px rgba(0,0,0,0.4);}
+    .an-locked-icon{font-size:2.2rem;margin-bottom:0.65rem;}
+    .an-locked-ttl{font-weight:800;font-size:0.95rem;color:var(--text);margin-bottom:0.4rem;}
+    .an-locked-sub{font-size:0.8rem;color:var(--muted);margin-bottom:1.1rem;line-height:1.5;}
   </style>
 </head>
 <body>
@@ -1371,22 +1428,107 @@
       <div class="stat-card"><div class="stat-label">Total Breaks</div><div class="stat-value" id="dash-totalBreaks">—</div></div>
       <div class="stat-card"><div class="stat-label">Total Streams</div><div class="stat-value" id="dash-totalStreams">—</div></div>
     </div>
-    <div class="panel">
-      <div class="panel-title">Recent Breaks (Last 10)</div>
-      <div class="tbl-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Stream</th>
-              <th>Break #</th>
-              <th>Breaker</th>
-              <th>Revenue</th>
-              <th>Profit</th>
-            </tr>
-          </thead>
-          <tbody id="dashRecentBody"></tbody>
-        </table>
+    <!-- ── ANALYTICS ── -->
+    <div class="panel" id="analyticsPanel">
+      <div class="an-header">
+        <div class="an-title">Analytics</div>
+        <div class="an-period-ctrl" id="anPeriodCtrl">
+          <button class="an-period-btn" data-p="7d" onclick="anSetPeriod('7d')">7D</button>
+          <button class="an-period-btn active" data-p="30d" onclick="anSetPeriod('30d')">30D</button>
+          <button class="an-period-btn" data-p="90d" onclick="anSetPeriod('90d')">90D</button>
+          <button class="an-period-btn" data-p="all" onclick="anSetPeriod('all')">All Time</button>
+        </div>
+      </div>
+
+      <!-- Locked overlay for Starter -->
+      <div id="anLockedWrap" class="an-locked-wrap" style="display:none;">
+        <div class="an-locked-blur">
+          <div class="an-kpi-row">
+            <div class="an-kpi"><div class="an-kpi-label">Total Revenue</div><div class="an-kpi-val">$—</div></div>
+            <div class="an-kpi"><div class="an-kpi-label">Total Profit</div><div class="an-kpi-val">$—</div></div>
+            <div class="an-kpi"><div class="an-kpi-label">Streams</div><div class="an-kpi-val">—</div></div>
+            <div class="an-kpi"><div class="an-kpi-label">Margin</div><div class="an-kpi-val">—%</div></div>
+          </div>
+        </div>
+        <div class="an-locked-overlay">
+          <div class="an-locked-card">
+            <div class="an-locked-icon">📊</div>
+            <div class="an-locked-ttl">Stream Analytics</div>
+            <div class="an-locked-sub">Full analytics and trends are available on Pro and Empire plans.</div>
+            <a href="/billing" style="display:inline-block;background:var(--primary);color:#fff;padding:0.5rem 1.4rem;border-radius:8px;font-weight:700;font-size:0.82rem;text-decoration:none;">Upgrade to Pro →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics content (pro/empire/exempt) -->
+      <div id="anBody">
+        <div class="an-loading" id="anLoading">Loading analytics…</div>
+        <div id="anContent" style="display:none;">
+
+          <!-- KPI row -->
+          <div class="an-kpi-row" id="anKpis"></div>
+
+          <!-- Revenue Trend chart -->
+          <div class="an-section">
+            <button class="an-chart-toggle" id="anToggleRevenue" onclick="anToggleChart('Revenue')">
+              <span>📈 Revenue &amp; Profit Trend</span><span class="an-chart-icon">▶</span>
+            </button>
+            <div class="an-chart-body" id="anChartRevenue" style="display:none;">
+              <canvas id="anCanvasRevenue" height="80"></canvas>
+            </div>
+          </div>
+
+          <!-- Stream Performance -->
+          <div class="an-section">
+            <div class="an-section-hd">Stream Performance</div>
+            <div class="an-grid" id="anStreamGrid"></div>
+          </div>
+
+          <!-- Day of Week chart -->
+          <div class="an-section">
+            <button class="an-chart-toggle" id="anToggleDow" onclick="anToggleChart('Dow')">
+              <span>📅 Revenue by Day of Week</span><span class="an-chart-icon">▶</span>
+            </button>
+            <div class="an-chart-body" id="anChartDow" style="display:none;">
+              <canvas id="anCanvasDow" height="90"></canvas>
+            </div>
+          </div>
+
+          <!-- Financial Health -->
+          <div class="an-section">
+            <div class="an-section-hd">Financial Health</div>
+            <div class="an-grid" id="anFinGrid"></div>
+          </div>
+
+          <!-- Buyer Intelligence -->
+          <div class="an-section">
+            <div class="an-section-hd">Buyer Intelligence</div>
+            <div class="an-grid" id="anBuyerGrid"></div>
+          </div>
+
+          <!-- Buyer Temperature chart -->
+          <div class="an-section">
+            <button class="an-chart-toggle" id="anToggleTemp" onclick="anToggleChart('Temp')">
+              <span>🌡️ Buyer Temperature</span><span class="an-chart-icon">▶</span>
+            </button>
+            <div class="an-chart-body" id="anChartTemp" style="display:none;max-width:260px;margin:0 auto;">
+              <canvas id="anCanvasTemp"></canvas>
+            </div>
+          </div>
+
+          <!-- Staff Performance -->
+          <div class="an-section" id="anStaffSection">
+            <div class="an-section-hd">Staff Performance</div>
+            <div id="anStaffBody"></div>
+          </div>
+
+          <!-- Inventory Alerts -->
+          <div class="an-section" id="anInventorySection" style="display:none;">
+            <div class="an-section-hd">Inventory Alerts</div>
+            <div id="anInventoryBody"></div>
+          </div>
+
+        </div>
       </div>
     </div>
   </div>
@@ -3734,7 +3876,7 @@ async function switchTab(tab) {
     else if (tab === 'payroll') await loadPayroll();
     else if (tab === 'history') await loadHistory();
     else if (tab === 'streamSummary') await loadStreamSummary();
-    else if (tab === 'dashboard') await loadDashboard();
+    else if (tab === 'dashboard') { await loadDashboard(); loadAnalytics(anPeriod); }
     else if (tab === 'productRoi') await loadProductRoi();
     else if (tab === 'performance') await loadPerformance();
     else if (tab === 'team') await loadTeam();
@@ -8859,7 +9001,7 @@ function closeMoreSheet() { document.getElementById('moreSheet').classList.remov
     const ins = document.getElementById('moreItemInsights');
     const emp = document.getElementById('moreItemEmpire');
     if (ins) ins.style.display = (tier === 'pro' || tier === 'empire' || tier === 'exempt') ? '' : 'none';
-    if (emp) emp.style.display = (tier === 'empire' || tier === 'exempt') ? '' : 'none';
+    if (emp) emp.style.display = (tier === 'pro' || tier === 'empire' || tier === 'exempt') ? '' : 'none';
   }
   // Run after auth loads orgTier
   setTimeout(updateMoreSheet, 2000);
@@ -10164,5 +10306,250 @@ async function saveLbSettings() {
 </script>
 
 <script src="/pwa.js"></script>
+
+<!-- ── ANALYTICS ─────────────────────────────────────────────────────────── -->
+<script>
+'use strict';
+
+var anPeriod = '30d';
+var _anChartRevenue = null;
+var _anChartDow = null;
+var _anChartTemp = null;
+
+async function loadAnalytics(period) {
+  if (period) anPeriod = period;
+
+  // Period button state
+  document.querySelectorAll('.an-period-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.p === anPeriod);
+  });
+
+  // Tier gate — starter sees locked overlay
+  if (orgTier === 'starter') {
+    document.getElementById('anLockedWrap').style.display = '';
+    document.getElementById('anBody').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('anLockedWrap').style.display = 'none';
+  document.getElementById('anBody').style.display = '';
+  document.getElementById('anLoading').style.display = 'block';
+  document.getElementById('anContent').style.display = 'none';
+
+  try {
+    var sess = (await sb.auth.getSession()).data.session;
+    var resp = await fetch('/api/analytics?period=' + anPeriod, {
+      headers: { 'Authorization': 'Bearer ' + sess.access_token }
+    });
+    var d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'Analytics failed');
+    anRender(d);
+    document.getElementById('anLoading').style.display = 'none';
+    document.getElementById('anContent').style.display = 'block';
+  } catch (e) {
+    document.getElementById('anLoading').textContent = 'Failed to load analytics — ' + e.message;
+  }
+}
+
+function anSetPeriod(p) { loadAnalytics(p); }
+
+function anToggleChart(name) {
+  var btn  = document.getElementById('anToggle' + name);
+  var body = document.getElementById('anChart' + name);
+  var open = btn.classList.toggle('open');
+  body.style.display = open ? 'block' : 'none';
+  if (open) anInitChart(name);
+}
+
+var _anData = null;
+
+function anRender(d) {
+  _anData = d;
+  // Destroy stale charts
+  ['Revenue','Dow','Temp'].forEach(function(n) {
+    var btn = document.getElementById('anToggle' + n);
+    var body = document.getElementById('anChart' + n);
+    if (btn && btn.classList.contains('open')) { btn.classList.remove('open'); body.style.display = 'none'; }
+  });
+  if (_anChartRevenue) { _anChartRevenue.destroy(); _anChartRevenue = null; }
+  if (_anChartDow)     { _anChartDow.destroy();     _anChartDow = null; }
+  if (_anChartTemp)    { _anChartTemp.destroy();     _anChartTemp = null; }
+
+  anRenderKpis(d);
+  anRenderStreamGrid(d.streams);
+  anRenderFinGrid(d.financial);
+  anRenderBuyerGrid(d.buyers);
+  anRenderStaff(d.staff);
+  anRenderInventory(d.inventory);
+}
+
+function anFmt(n) { return '$' + (parseFloat(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function anFmtK(n) {
+  n = parseFloat(n)||0;
+  if (n >= 1000000) return '$' + (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return '$' + (n/1000).toFixed(1) + 'K';
+  return '$' + n.toFixed(0);
+}
+function anPct(n) { return (parseFloat(n)||0).toFixed(1) + '%'; }
+function anChangeBadge(pct) {
+  if (pct === null || pct === undefined) return '<span class="an-kpi-badge nt">—</span>';
+  var p = parseFloat(pct);
+  var cls = p >= 0 ? 'up' : 'dn';
+  var arrow = p >= 0 ? '▲' : '▼';
+  return '<span class="an-kpi-badge ' + cls + '">' + arrow + ' ' + Math.abs(p).toFixed(1) + '% vs prev</span>';
+}
+
+function anRenderKpis(d) {
+  var f = d.financial;
+  var s = d.streams;
+  var kpis = [
+    { label:'Total Revenue', val: anFmtK(f.total_revenue), badge: anChangeBadge(f.revenue_change_pct), color:'var(--primary)' },
+    { label:'Total Profit',  val: anFmtK(f.total_profit),  badge: anChangeBadge(f.profit_change_pct),  color:'var(--green)' },
+    { label:'Streams',       val: s.total,                  badge: '',                                   color:'var(--primary)' },
+    { label:'Margin',        val: anPct(f.margin_pct),      badge: '',                                   color: parseFloat(f.margin_pct) >= 25 ? 'var(--green)' : 'var(--yellow)' }
+  ];
+  document.getElementById('anKpis').innerHTML = kpis.map(function(k) {
+    return '<div class="an-kpi" style="--ak:' + k.color + '"><div class="an-kpi-label">' + k.label + '</div>' +
+           '<div class="an-kpi-val">' + k.val + '</div>' + k.badge + '</div>';
+  }).join('');
+}
+
+function anStatCard(val, lbl, colorClass) {
+  return '<div class="an-stat' + (colorClass ? ' ' + colorClass : '') + '"><div class="an-stat-val">' + val + '</div><div class="an-stat-lbl">' + lbl + '</div></div>';
+}
+
+function anRenderStreamGrid(s) {
+  if (!s || !s.total) {
+    document.getElementById('anStreamGrid').innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-size:0.82rem;padding:0.5rem 0;">No closed streams in this period.</div>';
+    return;
+  }
+  var bestDay = (s.by_day || []).reduce(function(b, d) { return (!b || d.avg_revenue > b.avg_revenue) ? d : b; }, null);
+  document.getElementById('anStreamGrid').innerHTML = [
+    anStatCard(s.total, 'Streams Closed', ''),
+    anStatCard(anFmt(s.avg_revenue), 'Avg Revenue / Stream', 'c-pri'),
+    anStatCard(anFmt(s.avg_profit), 'Avg Profit / Stream', 'c-grn'),
+    anStatCard((parseFloat(s.avg_breaks)||0).toFixed(1), 'Avg Breaks / Stream', ''),
+    anStatCard(anPct(s.margin_pct), 'Avg Margin %', parseFloat(s.margin_pct) >= 25 ? 'c-grn' : 'c-ylw'),
+    anStatCard(bestDay && bestDay.count ? bestDay.day : '—', 'Best Day (Avg Rev)', 'c-pri')
+  ].join('');
+}
+
+function anRenderFinGrid(f) {
+  document.getElementById('anFinGrid').innerHTML = [
+    anStatCard(anFmt(f.total_revenue), 'Period Revenue', 'c-pri'),
+    anStatCard(anFmt(f.total_profit), 'Period Profit', parseFloat(f.total_profit) >= 0 ? 'c-grn' : 'c-red'),
+    anStatCard(anPct(f.margin_pct), 'Profit Margin', parseFloat(f.margin_pct) >= 25 ? 'c-grn' : 'c-ylw'),
+    anStatCard(anPct(f.box_cost_pct), 'Box Cost %', ''),
+    anStatCard(anPct(f.fee_pct), 'Platform Fees %', ''),
+    anStatCard(f.revenue_change_pct !== null ? ((parseFloat(f.revenue_change_pct) >= 0 ? '+' : '') + parseFloat(f.revenue_change_pct).toFixed(1) + '%') : '—',
+               'vs Previous Period', parseFloat(f.revenue_change_pct) >= 0 ? 'c-grn' : 'c-red')
+  ].join('');
+}
+
+function anRenderBuyerGrid(b) {
+  document.getElementById('anBuyerGrid').innerHTML = [
+    anStatCard(b.total, 'Total Buyers', ''),
+    anStatCard(b.new_this_month, 'New This Month', 'c-pri'),
+    anStatCard(b.new_this_week, 'New This Week', 'c-pri'),
+    anStatCard(anPct(b.retention_rate), 'Retention Rate', parseFloat(b.retention_rate) >= 50 ? 'c-grn' : 'c-ylw'),
+    anStatCard(anFmt(b.avg_spend), 'Avg Buyer Spend', ''),
+    anStatCard(anPct(b.top10_pct), 'Top 10% Revenue Share', ''),
+    anStatCard(b.at_risk, 'At-Risk Buyers', b.at_risk > 0 ? 'c-ylw' : 'c-grn'),
+    anStatCard(b.hot, 'Hot Buyers', 'c-red'),
+    anStatCard(b.warm, 'Warm Buyers', 'c-ylw')
+  ].join('');
+}
+
+function anRenderStaff(staff) {
+  var sec = document.getElementById('anStaffSection');
+  var body = document.getElementById('anStaffBody');
+  if (!staff || !staff.length) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  body.innerHTML = '<table class="an-staff-tbl"><thead><tr>' +
+    '<th class="rk">#</th><th>Breaker</th><th>Breaks</th><th>Revenue</th><th>Profit</th><th>Margin</th>' +
+    '</tr></thead><tbody>' +
+    staff.map(function(s, i) {
+      var margin = s.revenue ? ((s.profit / s.revenue) * 100).toFixed(1) + '%' : '—';
+      var mColor = s.revenue && (s.profit / s.revenue) >= 0.25 ? 'var(--green)' : 'var(--muted)';
+      return '<tr><td class="rk">' + (i+1) + '</td>' +
+        '<td style="font-weight:600;">' + escHtml(s.name || '—') + '</td>' +
+        '<td>' + s.breaks + '</td>' +
+        '<td style="color:var(--primary);font-weight:700;">' + anFmt(s.revenue) + '</td>' +
+        '<td style="color:' + (s.profit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + anFmt(s.profit) + '</td>' +
+        '<td style="color:' + mColor + ';font-weight:700;">' + margin + '</td></tr>';
+    }).join('') +
+    '</tbody></table>';
+}
+
+function anRenderInventory(inv) {
+  var sec = document.getElementById('anInventorySection');
+  var body = document.getElementById('anInventoryBody');
+  if (!inv || !inv.low_stock_count) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  body.innerHTML = inv.low_stock_items.map(function(item) {
+    var cls = item.stock === 0 ? 'out' : '';
+    return '<div class="an-inv-item"><span class="an-inv-name">' + escHtml(item.name) + '</span>' +
+           '<span class="an-inv-stock ' + cls + '">' + (item.stock === 0 ? 'Out of stock' : item.stock + ' left') + '</span></div>';
+  }).join('');
+}
+
+function anInitChart(name) {
+  if (!_anData || typeof Chart === 'undefined') return;
+  var CHART_DEFAULTS = {
+    plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11, family: 'Segoe UI' } } } },
+    scales: {
+      x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+      y: { ticks: { color: '#64748b', font: { size: 10 }, callback: function(v){ return '$' + (v >= 1000 ? (v/1000).toFixed(0)+'K' : v); } }, grid: { color: 'rgba(255,255,255,0.06)' } }
+    }
+  };
+
+  if (name === 'Revenue' && !_anChartRevenue) {
+    var trend = _anData.streams.trend || [];
+    var labels = trend.map(function(t){ return t.period ? t.period.slice(5) : ''; });
+    _anChartRevenue = new Chart(document.getElementById('anCanvasRevenue'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Revenue', data: trend.map(function(t){ return parseFloat(t.revenue)||0; }), borderColor: '#4f6ef7', backgroundColor: 'rgba(79,110,247,0.08)', tension: 0.35, fill: true, pointRadius: 3, pointHoverRadius: 5 },
+          { label: 'Profit',  data: trend.map(function(t){ return parseFloat(t.profit)||0;  }), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.06)',  tension: 0.35, fill: true, pointRadius: 3, pointHoverRadius: 5 }
+        ]
+      },
+      options: Object.assign({}, CHART_DEFAULTS, { responsive: true, interaction: { mode: 'index', intersect: false } })
+    });
+  }
+
+  if (name === 'Dow' && !_anChartDow) {
+    var days = _anData.streams.by_day || [];
+    _anChartDow = new Chart(document.getElementById('anCanvasDow'), {
+      type: 'bar',
+      data: {
+        labels: days.map(function(d){ return d.day; }),
+        datasets: [
+          { label: 'Avg Revenue', data: days.map(function(d){ return parseFloat(d.avg_revenue)||0; }), backgroundColor: 'rgba(79,110,247,0.65)', borderRadius: 5 },
+          { label: 'Avg Profit',  data: days.map(function(d){ return parseFloat(d.avg_profit)||0;  }), backgroundColor: 'rgba(34,197,94,0.55)',  borderRadius: 5 }
+        ]
+      },
+      options: Object.assign({}, CHART_DEFAULTS, { responsive: true })
+    });
+  }
+
+  if (name === 'Temp' && !_anChartTemp) {
+    var b = _anData.buyers;
+    _anChartTemp = new Chart(document.getElementById('anCanvasTemp'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Hot', 'Warm', 'Cold'],
+        datasets: [{ data: [b.hot, b.warm, b.cold], backgroundColor: ['rgba(239,68,68,0.8)','rgba(245,158,11,0.7)','rgba(100,116,139,0.5)'], borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: {
+        responsive: true, cutout: '65%',
+        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 16 } } }
+      }
+    });
+  }
+}
+</script>
+
 </body>
 </html>
