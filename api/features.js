@@ -1199,8 +1199,8 @@ async function analyticsHandler(req, res, sb, action) {
 
   const [streamsRes, prevStreamsRes, breaksRes, buyersRes, staffRes, productsRes] = await Promise.all([
     cutoff
-      ? sb.from('streams').select('id,closed_at,break_date,final_sales,net_profit,break_count,total_product_cost,total_other_costs').eq('org_id', orgId).eq('status','closed').gte('closed_at', cutoff)
-      : sb.from('streams').select('id,closed_at,break_date,final_sales,net_profit,break_count,total_product_cost,total_other_costs').eq('org_id', orgId).eq('status','closed'),
+      ? sb.from('streams').select('id,closed_at,break_date,final_sales,total_submitted_revenue,net_profit,break_count,total_product_cost').eq('org_id', orgId).eq('status','closed').gte('closed_at', cutoff)
+      : sb.from('streams').select('id,closed_at,break_date,final_sales,total_submitted_revenue,net_profit,break_count,total_product_cost').eq('org_id', orgId).eq('status','closed'),
     periodDays
       ? sb.from('streams').select('final_sales,net_profit').eq('org_id', orgId).eq('status','closed').gte('closed_at', prevCutoff).lt('closed_at', cutoff)
       : Promise.resolve({ data: [] }),
@@ -1222,13 +1222,15 @@ async function analyticsHandler(req, res, sb, action) {
   // ── Stream aggregates ─────────────────────────────────────────────────────
   const totalStreams   = streams.length;
   const totalRevenue   = streams.reduce(function(s,x){ return s + (parseFloat(x.final_sales)||0); }, 0);
+  const totalGrossRev  = streams.reduce(function(s,x){ return s + (parseFloat(x.total_submitted_revenue)||parseFloat(x.final_sales)||0); }, 0);
   const totalProfit    = streams.reduce(function(s,x){ return s + (parseFloat(x.net_profit)||0); }, 0);
   const totalBoxCost   = streams.reduce(function(s,x){ return s + (parseFloat(x.total_product_cost)||0); }, 0);
-  const totalFees      = streams.reduce(function(s,x){ return s + (parseFloat(x.total_other_costs)||0); }, 0);
+  // Platform fee = what buyers paid minus what the platform paid out
+  const totalFees      = streams.reduce(function(s,x){ return s + Math.max(0,(parseFloat(x.total_submitted_revenue)||0)-(parseFloat(x.final_sales)||0)); }, 0);
   const totalBreakCount = streams.reduce(function(s,x){ return s + (parseInt(x.break_count)||0); }, 0);
   const marginPct      = totalRevenue ? (totalProfit / totalRevenue) * 100 : 0;
   const boxCostPct     = totalRevenue ? (totalBoxCost / totalRevenue) * 100 : 0;
-  const feePct         = totalRevenue ? (totalFees / totalRevenue) * 100 : 0;
+  const feePct         = totalGrossRev ? (totalFees / totalGrossRev) * 100 : 0;
 
   // Day of week
   const byDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(n){ return { day:n, count:0, revenue:0, profit:0, avg_revenue:0, avg_profit:0 }; });
