@@ -2900,7 +2900,13 @@ initAuth();
     <span class="btm-nav-icon">📅</span><span class="btm-nav-label">Schedule</span>
   </button>
   <button class="btm-nav-item" id="btn-btm-payouts" onclick="breakerBtmNav('payouts')">
-    <span class="btm-nav-icon">💰</span><span class="btm-nav-label">Payouts</span>
+    <span class="btm-nav-icon">💰</span><span class="btm-nav-label">My Pay</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-announcements" onclick="breakerBtmNav('announcements')">
+    <span class="btm-nav-icon">📢</span><span class="btm-nav-label">Updates</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-milestones" onclick="breakerBtmNav('milestones')">
+    <span class="btm-nav-icon">🏅</span><span class="btm-nav-label">Achievements</span>
   </button>
 </nav>
 
@@ -2924,9 +2930,12 @@ function breakerBtmNav(tab) {
   if (content) content.classList.add('active');
   const btn = document.getElementById('btn-btm-' + tab);
   if (btn) btn.classList.add('active');
-  // Trigger existing tab logic if needed
-  if (tab === 'payouts') loadMyPay && loadMyPay();
-  if (tab === 'shifts') loadMyScheduleView && loadMyScheduleView();
+  // Trigger tab load functions
+  if (tab === 'payouts')        { typeof loadMyPay !== 'undefined' && loadMyPay(); }
+  if (tab === 'shifts')         { typeof loadMyScheduleView !== 'undefined' && loadMyScheduleView(); }
+  if (tab === 'announcements')  { typeof brkLoadAnnouncements !== 'undefined' && brkLoadAnnouncements(); }
+  if (tab === 'milestones')     { typeof brkLoadMilestones !== 'undefined' && brkLoadMilestones(); }
+  if (tab === 'leaderboard')    { typeof brkLoadLeaderboard !== 'undefined' && brkLoadLeaderboard(); }
   // Sync mobile header
   updateMobileBreakHeader();
 }

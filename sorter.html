@@ -2125,6 +2125,12 @@ function renderLbList(entries, myRank) {
   <button class="btm-nav-item" id="btn-btm-pay" onclick="sorterBtmNav('pay')">
     <span class="btm-nav-icon">💰</span><span class="btm-nav-label">My Pay</span>
   </button>
+  <button class="btm-nav-item" id="btn-btm-announcements" onclick="sorterBtmNav('announcements')">
+    <span class="btm-nav-icon">📢</span><span class="btm-nav-label">Updates</span>
+  </button>
+  <button class="btm-nav-item" id="btn-btm-leaderboard" onclick="sorterBtmNav('leaderboard')">
+    <span class="btm-nav-icon">🏆</span><span class="btm-nav-label">Leaderboard</span>
+  </button>
 </nav>
 
 <script>
@@ -2136,12 +2142,14 @@ function sorterBtmNav(tab) {
   const content = document.getElementById('tab-' + tab);
   if (content) content.classList.add('active');
 
-  const btnMap = { queue: 'btn-btm-queue', shifts: 'btn-btm-sched', pay: 'btn-btm-pay' };
+  const btnMap = { queue: 'btn-btm-queue', shifts: 'btn-btm-sched', pay: 'btn-btm-pay', announcements: 'btn-btm-announcements', leaderboard: 'btn-btm-leaderboard' };
   if (btnMap[tab]) document.getElementById(btnMap[tab]).classList.add('active');
 
-  if (tab === 'queue') { loadSortQueue && loadSortQueue(); loadQueueSplitAlerts && loadQueueSplitAlerts(); }
-  if (tab === 'shifts') { loadShifts && loadShifts(); loadMyScheduleView && loadMyScheduleView(); }
-  if (tab === 'pay') loadSorterPay && loadSorterPay();
+  if (tab === 'queue')         { typeof loadSortQueue !== 'undefined' && loadSortQueue(); typeof loadQueueSplitAlerts !== 'undefined' && loadQueueSplitAlerts(); }
+  if (tab === 'shifts')        { typeof loadShifts !== 'undefined' && loadShifts(); typeof loadMyScheduleView !== 'undefined' && loadMyScheduleView(); }
+  if (tab === 'pay')           { typeof loadSorterPay !== 'undefined' && loadSorterPay(); }
+  if (tab === 'announcements') { typeof srtLoadAnnouncements !== 'undefined' && srtLoadAnnouncements(); }
+  if (tab === 'leaderboard')   { typeof loadLeaderboard !== 'undefined' && loadLeaderboard(); }
 }
 </script>
 
