@@ -113,7 +113,7 @@ async function chatHandler(req, res, sb, action) {
 
   // ── GET/POST /api/chat/channels/:channelId/messages ────────────────────────
   if (action === 'messages') {
-    const channelId = req.query.channelId;
+    const channelId = Array.isArray(req.query.channelId) ? req.query.channelId[0] : req.query.channelId;
     if (!channelId) return fail(res, 400, 'channelId required');
 
     // Verify channel belongs to this org and user can see it

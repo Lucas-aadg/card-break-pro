@@ -1895,7 +1895,7 @@ async function selectChatChannel(channelId) {
   wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
   try {
     const token = await authToken();
-    const res = await fetch('/api/chat/channels/' + channelId + '/messages?channelId=' + channelId, { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/chat/channels/' + channelId + '/messages, { headers: { Authorization: 'Bearer ' + token } });
     const data = await res.json();
     renderChatMessages(data.messages || []);
     subscribeChatRealtime(channelId);
@@ -1934,7 +1934,7 @@ async function sendChatMsg() {
   input.value = '';
   try {
     const token = await authToken();
-    await fetch('/api/chat/channels/' + activeChatChannel + '/messages?channelId=' + activeChatChannel, {
+    await fetch('/api/chat/channels/' + activeChatChannel + '/messages', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ content })

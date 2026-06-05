@@ -9922,7 +9922,7 @@ async function ownerSelectChatChannel(channelId) {
   wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div>';
   try {
     const token = await ownerAuthToken();
-    const res = await fetch('/api/chat/channels/' + channelId + '/messages?channelId=' + channelId, { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/api/chat/channels/' + channelId + '/messages', { headers: { Authorization: 'Bearer ' + token } });
     const data = await res.json();
     ownerRenderChatMessages(data.messages || []);
     ownerSubscribeChatRealtime(channelId);
@@ -9983,7 +9983,7 @@ async function ownerSendChatMsg() {
   ownerChatInputHandler(input);
   try {
     const token = await ownerAuthToken();
-    await fetch('/api/chat/channels/' + ownerActiveChatChannel + '/messages?channelId=' + ownerActiveChatChannel, {
+    await fetch('/api/chat/channels/' + ownerActiveChatChannel + '/messages', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ content })
