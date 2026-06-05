@@ -66,6 +66,7 @@ module.exports = async (req, res) => {
     try {
       const { code, email } = req.body;
       if (!code) return res.status(400).json({ error: 'code is required' });
+      if (typeof code !== 'string' || code.trim().length > 20) return res.status(400).json({ error: 'Invalid code format' });
 
       const upperCode = code.trim().toUpperCase();
 
@@ -105,6 +106,9 @@ module.exports = async (req, res) => {
     try {
       const { code, referredOrgId } = req.body;
       if (!code || !referredOrgId) return res.status(400).json({ error: 'code and referredOrgId are required' });
+      if (typeof code !== 'string' || code.trim().length > 20) return res.status(400).json({ error: 'Invalid code format' });
+      // Validate referredOrgId is UUID-shaped before querying
+      if (!/^[0-9a-f-]{36}$/.test(referredOrgId)) return res.status(400).json({ error: 'Invalid referredOrgId' });
 
       const upperCode = code.trim().toUpperCase();
 

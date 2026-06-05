@@ -3319,7 +3319,8 @@ async function loadLiveActivity() {
     const profileId = s.breaker_id || s.sorter_id;
     const person = profileMap[profileId] || {};
     const ch = s.channel_id && channelMap[s.channel_id] ? channelMap[s.channel_id] : null;
-    const chBadge = ch ? '<span class="live-activity-ch" style="background:' + ch.color + '22;color:' + ch.color + ';">' + ch.icon + ' ' + escHtml(ch.name) + '</span>' : '';
+    const safeChColor = ch && /^#[0-9a-fA-F]{3,8}$/.test(ch.color) ? ch.color : '#4f6ef7';
+    const chBadge = ch ? '<span class="live-activity-ch" style="background:' + safeChColor + '22;color:' + safeChColor + ';">' + escHtml(ch.icon || '') + ' ' + escHtml(ch.name) + '</span>' : '';
     const since = s.clocked_in_at ? 'Since ' + fmtTime(s.clocked_in_at) : '';
     return '<div class="live-activity-item">' +
       '<span class="live-activity-dot"></span>' +
@@ -3614,7 +3615,7 @@ async function initAuth() {
           <div style="background:#13131e;border:1px solid #2d2d3d;border-radius:12px;padding:40px;max-width:480px;text-align:center;">
             <div style="font-size:2rem;font-weight:800;color:#e2e8f0;margin-bottom:8px;">CARD <span style="color:#4f6ef7;">BREAK</span> PRO</div>
             <div style="color:#ef4444;font-size:1.1rem;font-weight:600;margin-bottom:12px;">Subscription Required</div>
-            <div style="color:#64748b;margin-bottom:24px;font-size:0.95rem;">Your subscription is ${sub ? sub.status : 'inactive'}. Activate your subscription to access the dashboard.</div>
+            <div style="color:#64748b;margin-bottom:24px;font-size:0.95rem;">Your subscription is ${['active','past_due','cancelled','inactive'].includes(sub?.status) ? sub.status : 'inactive'}. Activate your subscription to access the dashboard.</div>
             <a href="/billing.html" style="display:inline-block;background:#4f6ef7;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;text-decoration:none;margin-bottom:12px;">Manage Subscription</a>
             <br>
             <button onclick="sb.auth.signOut().then(()=>location.href='/index.html')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.85rem;margin-top:8px;">Sign Out</button>
@@ -7755,7 +7756,7 @@ function renderWeekGrid() {
     const initials = (p.display_name||'?').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2);
     const roleColor = p.role==='sorter'?'#a855f7':'#4f6ef7';
     const hrs = hoursMap[p.id]||0;
-    let row = '<tr><td class="wg-staff-cell"><div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:30px;height:30px;border-radius:50%;background:'+roleColor+';display:flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:800;color:#fff;flex-shrink:0;">'+initials+'</div><div style="min-width:0;"><div style="font-weight:700;font-size:0.77rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">'+escHtml(p.display_name)+'</div><div style="font-size:0.59rem;color:var(--muted);text-transform:uppercase;">'+p.role+'</div></div></div></td>';
+    let row = '<tr><td class="wg-staff-cell"><div style="display:flex;align-items:center;gap:0.5rem;"><div style="width:30px;height:30px;border-radius:50%;background:'+roleColor+';display:flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:800;color:#fff;flex-shrink:0;">'+initials+'</div><div style="min-width:0;"><div style="font-weight:700;font-size:0.77rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">'+escHtml(p.display_name)+'</div><div style="font-size:0.59rem;color:var(--muted);text-transform:uppercase;">'+escHtml(p.role)+'</div></div></div></td>';
     dateStrs.forEach(function(ds){
       const isToday = ds===todayStr;
       const shifts = (shiftMap[p.id]&&shiftMap[p.id][ds])||[];

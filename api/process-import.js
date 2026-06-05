@@ -11,6 +11,9 @@ module.exports = async (req, res) => {
   if (!orgId || !Array.isArray(buyers) || buyers.length === 0) {
     return res.status(400).json({ error: 'Missing required fields: orgId, buyers' });
   }
+  if (!/^[0-9a-f-]{36}$/.test(orgId)) return res.status(400).json({ error: 'Invalid orgId' });
+  if (streamId && !/^[0-9a-f-]{36}$/.test(streamId)) return res.status(400).json({ error: 'Invalid streamId' });
+  if (buyers.length > 500) return res.status(400).json({ error: 'Too many buyers in single import (max 500)' });
 
   const sb = createClient(
     process.env.SUPABASE_URL,

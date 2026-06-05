@@ -128,7 +128,7 @@ async function chatHandler(req, res, sb, action) {
     if (!allowedSlugs.includes(channel.slug)) return fail(res, 403, 'Access denied to this channel');
 
     if (req.method === 'GET') {
-      const limit  = Math.min(parseInt(req.query.limit || '50', 10), 100);
+      const limit  = Math.max(1, Math.min(parseInt(req.query.limit || '50', 10), 100));
       const before = req.query.before; // message id cursor
 
       let query = sb.from('chat_messages')
@@ -519,8 +519,19 @@ async function milestonesHandler(req, res, sb, action) {
       if (!name || !description || !badge_icon || !badge_color || !trigger_type) {
         return fail(res, 400, 'name, description, badge_icon, badge_color, trigger_type required');
       }
+      if (typeof name !== 'string' || name.length > 100) return fail(res, 400, 'name must be under 100 characters');
+      if (typeof description !== 'string' || description.length > 500) return fail(res, 400, 'description must be under 500 characters');
+      if (typeof badge_icon !== 'string' || badge_icon.length > 20) return fail(res, 400, 'badge_icon must be under 20 characters');
+      if (!/^#[0-9a-fA-F]{3,8}$/.test(badge_color)) return fail(res, 400, 'badge_color must be a valid hex color (e.g. #4f6ef7)');
       if (!['manual','automatic'].includes(trigger_type)) return fail(res, 400, 'trigger_type must be manual or automatic');
       if (trigger_type === 'automatic' && !trigger_metric) return fail(res, 400, 'trigger_metric required for automatic milestones');
+      if (trigger_type === 'automatic' && !['breaks_completed','revenue_generated'].includes(trigger_metric)) {
+        return fail(res, 400, 'trigger_metric must be breaks_completed or revenue_generated');
+      }
+      if (trigger_value != null) {
+        const tv = parseFloat(trigger_value);
+        if (isNaN(tv) || tv < 0 || tv > 9999999) return fail(res, 400, 'trigger_value must be a number between 0 and 9,999,999');
+      }
 
       const { data, error } = await sb.from('milestone_definitions')
         .insert({
@@ -640,6 +651,7 @@ async function sorterSplitsHandler(req, res, sb, action) {
     const initPct = parseFloat(initiating_sorter_percentage);
     const recvPct = parseFloat(receiving_sorter_percentage);
     if (isNaN(initPct) || isNaN(recvPct)) return fail(res, 400, 'percentages required');
+    if (initPct < 0 || initPct > 100 || recvPct < 0 || recvPct > 100) return fail(res, 400, 'Percentages must be between 0 and 100');
     if (Math.abs(initPct + recvPct - 100) > 0.001) return fail(res, 400, 'Percentages must sum to 100');
 
     // Verify stream exists in this org
@@ -781,10 +793,15 @@ async function goalsHandler(req, res, sb, action) {
       if (profile.role !== 'owner') return fail(res, 403, 'Owner only');
       const { goal_type, target_value, staff_id, goal_year, goal_month, is_visible_to_all } = req.body || {};
       if (!goal_type || target_value == null) return fail(res, 400, 'goal_type and target_value required');
+      if (!['revenue', 'breaks', 'streams', 'profit'].includes(goal_type)) return fail(res, 400, 'Invalid goal_type');
+      const tv = parseFloat(target_value);
+      if (isNaN(tv) || tv < 0 || tv > 9999999) return fail(res, 400, 'target_value must be a number between 0 and 9,999,999');
 
       const now = new Date();
-      const year  = goal_year  || now.getFullYear();
-      const month = goal_month || (now.getMonth() + 1);
+      const year  = parseInt(goal_year  || now.getFullYear(), 10);
+      const month = parseInt(goal_month || (now.getMonth() + 1), 10);
+      if (isNaN(year) || year < 2020 || year > 2099) return fail(res, 400, 'Invalid goal_year');
+      if (isNaN(month) || month < 1 || month > 12) return fail(res, 400, 'Invalid goal_month');
 
       // Upsert via delete + insert to handle the nullable unique constraint cleanly
       const matchQuery = sb.from('monthly_goals')
@@ -795,7 +812,7 @@ async function goalsHandler(req, res, sb, action) {
         : await matchQuery.is('staff_id', null).maybeSingle();
 
       const payload = {
-        org_id: profile.org_id, goal_type, target_value: parseFloat(target_value),
+        org_id: profile.org_id, goal_type, target_value: tv,
         staff_id: staff_id || null, goal_year: year, goal_month: month,
         is_visible_to_all: is_visible_to_all !== false,
         created_by: profile.id, updated_at: new Date().toISOString()
@@ -848,9 +865,11 @@ async function notifyHandler(req, res, sb, action) {
 
   // ── POST /api/notify-stream-closed ────────────────────────────────────────
   if (action === 'stream-closed') {
-    const { stream_id, stream_key, break_count } = req.body || {};
+    const { stream_id, stream_key: rawStreamKey, break_count } = req.body || {};
     const org_id = profile.org_id;
-    if (!stream_key) return fail(res, 400, 'stream_key required');
+    if (!rawStreamKey) return fail(res, 400, 'stream_key required');
+    // Strip any HTML from user-supplied stream_key before embedding in notifications/emails
+    const stream_key = String(rawStreamKey).replace(/<[^>]*>/g, '').slice(0, 100);
 
     const { data: sorters } = await sb.from('profiles')
       .select('id, display_name').eq('org_id', org_id).eq('role', 'sorter');
