@@ -17,6 +17,14 @@ module.exports = async (req, res) => {
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
   );
 
+  // Verify caller is authenticated and belongs to the claimed org
+  const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
+  if (!token) return res.status(401).json({ error: 'Missing auth token' });
+  const { data: { user }, error: authErr } = await sb.auth.getUser(token);
+  if (authErr || !user) return res.status(401).json({ error: 'Invalid token' });
+  const { data: callerProfile } = await sb.from('profiles').select('org_id').eq('id', user.id).maybeSingle();
+  if (!callerProfile || callerProfile.org_id !== orgId) return res.status(403).json({ error: 'Forbidden' });
+
   const purchaseDate = parseDate(streamDate);
   let importId = null;
 

@@ -1,4 +1,5 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { createClient } = require('@supabase/supabase-js');
 
 const PRICE_IDS = {
   starter:        process.env.STRIPE_PRICE_ID_STARTER || 'price_1TcA00AQv5DHthFTUHf8QFvL',
@@ -23,6 +24,13 @@ module.exports = async (req, res) => {
     const { userId, email, orgId, tier = 'starter', billingCycle = 'monthly', trialDaysOverride } = req.body;
     if (!userId || !email || !orgId) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Verify userId actually owns orgId — prevents supplying someone else's orgId
+    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY);
+    const { data: ownerProfile } = await sb.from('profiles').select('org_id').eq('id', userId).maybeSingle();
+    if (!ownerProfile || ownerProfile.org_id !== orgId) {
+      return res.status(403).json({ error: 'User does not belong to this organization' });
     }
 
     const priceLookupKey = billingCycle === 'annual' ? tier + '_annual' : tier;

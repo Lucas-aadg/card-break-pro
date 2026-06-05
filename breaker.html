@@ -1668,11 +1668,13 @@ async function handleSubmitBreak() {
       .filter(function(p) { return p && p.current_stock <= 3; })
       .map(function(p) { return { id: p.id, name: p.name, current_stock: p.current_stock }; });
     if (lowCheck.length > 0) {
-      fetch('/api/notify-inventory-low', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ org_id: currentProfile.org_id, products: lowCheck })
-      }).catch(function() {});
+      brkAuthToken().then(function(tok) {
+        fetch('/api/notify-inventory-low', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+          body: JSON.stringify({ products: lowCheck })
+        }).catch(function() {});
+      });
     }
 
     // Update stream totals
@@ -1922,16 +1924,17 @@ async function handleConfirmClose() {
     }
 
     // Notify sorters that stream is closed (fire and forget)
-    fetch('/api/notify-stream-closed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        stream_id: closedStreamId,
-        stream_key: closedStreamKey,
-        break_count: submittedBreaks.length,
-        org_id: currentProfile.org_id
-      })
-    }).catch(function() {});
+    brkAuthToken().then(function(tok) {
+      fetch('/api/notify-stream-closed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({
+          stream_id: closedStreamId,
+          stream_key: closedStreamKey,
+          break_count: submittedBreaks.length
+        })
+      }).catch(function() {});
+    });
   } catch (err) {
     showError('Failed to close stream: ' + escHtml(err.message));
     console.error(err);
@@ -3176,9 +3179,10 @@ async function confirmSlipImport() {
   btn.disabled = true;
   btn.textContent = 'Importing…';
   try {
+    var tok = await brkAuthToken();
     var resp = await fetch('/api/process-import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
       body: JSON.stringify({
         orgId: currentProfile.org_id,
         streamId: currentStream ? currentStream.id : null,

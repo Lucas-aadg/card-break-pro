@@ -838,16 +838,19 @@ async function goalsHandler(req, res, sb, action) {
 
 // ═════════════════════════════════════════════════════════════════════════════
 // NOTIFY (absorbed from notify-stream-closed.js + notify-inventory-low.js)
-// These routes are called server-side without auth headers — uses org_id in body
 // ═════════════════════════════════════════════════════════════════════════════
 
 async function notifyHandler(req, res, sb, action) {
   if (req.method !== 'POST') return fail(res, 405, 'Method not allowed');
 
+  const { err, profile } = await authenticate(req, sb);
+  if (err) return fail(res, err.status, err.msg);
+
   // ── POST /api/notify-stream-closed ────────────────────────────────────────
   if (action === 'stream-closed') {
-    const { stream_id, stream_key, break_count, org_id } = req.body || {};
-    if (!org_id || !stream_key) return fail(res, 400, 'org_id and stream_key required');
+    const { stream_id, stream_key, break_count } = req.body || {};
+    const org_id = profile.org_id;
+    if (!stream_key) return fail(res, 400, 'stream_key required');
 
     const { data: sorters } = await sb.from('profiles')
       .select('id, display_name').eq('org_id', org_id).eq('role', 'sorter');
@@ -899,9 +902,10 @@ async function notifyHandler(req, res, sb, action) {
 
   // ── POST /api/notify-inventory-low ────────────────────────────────────────
   if (action === 'inventory-low') {
-    const { org_id, products } = req.body || {};
-    if (!org_id || !Array.isArray(products) || products.length === 0) {
-      return fail(res, 400, 'org_id and products[] required');
+    const { products } = req.body || {};
+    const org_id = profile.org_id;
+    if (!Array.isArray(products) || products.length === 0) {
+      return fail(res, 400, 'products[] required');
     }
     const LOW_THRESHOLD = 3;
     const lowProducts = products.filter(p => p.current_stock <= LOW_THRESHOLD);
