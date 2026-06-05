@@ -4662,36 +4662,61 @@ async function coSaveBuyers(list, orgId) {
   var now   = new Date().toISOString();
   for (var i = 0; i < list.length; i++) {
     var b = list[i];
+    var uname = (b.username || '').toLowerCase();
+    if (!uname) continue;
+
+    // Case-insensitive lookup with platform filter for consistency
     var res = await sb.from('buyers')
       .select('id,total_spent,total_breaks_purchased,total_streams_participated')
-      .eq('organization_id', orgId).eq('username', b.username).maybeSingle();
+      .eq('organization_id', orgId)
+      .eq('platform', 'whatnot')
+      .ilike('username', uname)
+      .maybeSingle();
     var existing = res.data;
     var buyerId = null;
+
     if (existing) {
       buyerId = existing.id;
-      await sb.from('buyers').update({
-        total_spent: (parseFloat(existing.total_spent) || 0) + b.total,
-        total_breaks_purchased: (existing.total_breaks_purchased || 0) + 1,
-        total_streams_participated: (existing.total_streams_participated || 0) + 1,
-        last_purchase_date: today, is_new_buyer: false, updated_at: now
-      }).eq('id', buyerId);
-    } else {
-      var ins = await sb.from('buyers').insert({
-        organization_id: orgId, username: b.username,
-        total_spent: b.total, total_breaks_purchased: 1,
-        total_streams_participated: 1, last_purchase_date: today,
-        is_new_buyer: b.isNew, temperature: 'cold',
-        created_at: now, updated_at: now
-      }).select('id').single();
-      buyerId = ins.data ? ins.data.id : null;
-    }
-    if (buyerId) {
-      try {
+      // Dedup: skip if we already have a purchase with this exact amount today
+      var dupCheck = await sb.from('buyer_purchases')
+        .select('id', { count: 'exact', head: true })
+        .eq('buyer_id', existing.id)
+        .eq('purchase_date', today)
+        .eq('amount', b.total || 0);
+      if (!dupCheck.count || dupCheck.count === 0) {
+        await sb.from('buyers').update({
+          total_spent: (parseFloat(existing.total_spent) || 0) + (b.total || 0),
+          total_breaks_purchased: (existing.total_breaks_purchased || 0) + 1,
+          total_streams_participated: (existing.total_streams_participated || 0) + 1,
+          last_purchase_date: today, is_new_buyer: false, updated_at: now
+        }).eq('id', buyerId);
         await sb.from('buyer_purchases').insert({
           organization_id: orgId, buyer_id: buyerId,
-          amount: b.total, purchase_date: today
-        });
-      } catch(e) {}
+          amount: b.total || 0, purchase_date: today, platform: 'whatnot'
+        }).catch(function(e) { console.warn('buyer_purchases insert:', e.message); });
+      }
+    } else {
+      var ins = await sb.from('buyers').insert({
+        organization_id: orgId,
+        platform: 'whatnot',
+        username: uname,
+        first_seen_date: today,
+        total_spent: b.total || 0,
+        total_breaks_purchased: 1,
+        total_streams_participated: 1,
+        last_purchase_date: today,
+        is_new_buyer: b.isNew || false,
+        temperature: 'cold',
+        created_at: now,
+        updated_at: now
+      }).select('id').single();
+      buyerId = ins.data ? ins.data.id : null;
+      if (buyerId) {
+        await sb.from('buyer_purchases').insert({
+          organization_id: orgId, buyer_id: buyerId,
+          amount: b.total || 0, purchase_date: today, platform: 'whatnot'
+        }).catch(function(e) { console.warn('buyer_purchases insert:', e.message); });
+      }
     }
   }
 }
@@ -9033,7 +9058,8 @@ function setupLogHitModal() {
         // New buyer — create placeholder; slip import fills spend at closeout
         const { data: nb, error: insErr } = await sb.from('buyers').insert({
           organization_id: currentProfile.org_id,
-          username: username,
+          platform: 'whatnot',
+          username: username.toLowerCase(),
           case_hits: 1,
           total_spent: 0,
           total_breaks_purchased: 0,
@@ -9055,6 +9081,7 @@ function setupLogHitModal() {
 
       // Write to buyer_hits so it shows in the profile Hit History
       const { error: hitErr } = await sb.from('buyer_hits').insert({
+        organization_id: currentProfile.org_id,
         buyer_id: buyerId,
         hit_description: description,
         hit_type: 'case_hit',

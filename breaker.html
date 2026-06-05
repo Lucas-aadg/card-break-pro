@@ -2999,7 +2999,8 @@ function setupLiveHitModal() {
         // Create placeholder — slip import will fill in spend later
         const { data: nb, error: insErr } = await sb.from('buyers').insert({
           organization_id:           currentProfile.org_id,
-          username:                  username,
+          platform:                  'whatnot',
+          username:                  username.toLowerCase(),
           case_hits:                 hitType === 'case_hit' ? 1 : 0,
           total_spent:               0,
           total_breaks_purchased:    0,
@@ -3274,13 +3275,26 @@ async function submitAllHits() {
 
   try {
     for (var hit of hits) {
-      // Look up buyer_id
+      // Case-insensitive lookup — no platform filter so live-hit-created buyers are found
       var { data: buyer } = await sb.from('buyers')
         .select('id')
         .eq('organization_id', currentProfile.org_id)
-        .eq('platform', 'whatnot')
-        .eq('username', hit.username.toLowerCase())
+        .ilike('username', hit.username)
         .maybeSingle();
+
+      if (!buyer) {
+        // Create placeholder so the hit isn't silently dropped
+        var nbResult = await sb.from('buyers').insert({
+          organization_id: currentProfile.org_id,
+          platform: 'whatnot',
+          username: hit.username.toLowerCase(),
+          total_spent: 0,
+          total_breaks_purchased: 0,
+          total_streams_participated: 0,
+          temperature: 'cold'
+        }).select('id').single();
+        if (nbResult.data) buyer = nbResult.data;
+      }
 
       if (buyer) {
         await sb.from('buyer_hits').insert({
@@ -3290,7 +3304,8 @@ async function submitAllHits() {
           break_name: hit.breakName || null,
           hit_description: hit.desc,
           hit_type: hit.type,
-          submitted_by: currentUser.id
+          submitted_by: currentUser.id,
+          submitted_at: new Date().toISOString()
         }).catch(function(e){ console.warn('Hit insert error:', e.message); });
       }
     }

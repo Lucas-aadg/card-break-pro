@@ -64,38 +64,50 @@ async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
   const uname = username.toLowerCase();
   const totalSpent = Number(buyerData.totalSpent) || 0;
 
-  // Look up existing buyer
+  // Look up existing buyer — case-insensitive via ilike
   const { data: existing } = await sb.from('buyers')
     .select('id, total_spent, total_breaks_purchased, total_streams_participated')
     .eq('organization_id', orgId)
     .eq('platform', 'whatnot')
-    .eq('username', uname)
+    .ilike('username', uname)
     .maybeSingle();
 
   let buyerId;
+  let shouldInsertPurchases = true;
 
   if (existing) {
     buyerId = existing.id;
 
-    // Check if this stream was already counted
-    let streamIncrement = 0;
+    // Dedup: if this stream was already imported, don't re-add spend or purchases
+    let isNewImport = true;
     if (streamId) {
       const { count } = await sb.from('buyer_purchases')
         .select('id', { count: 'exact', head: true })
         .eq('buyer_id', existing.id)
         .eq('stream_id', streamId);
-      if ((count || 0) === 0) streamIncrement = 1;
+      isNewImport = (count || 0) === 0;
     }
 
-    await sb.from('buyers').update({
-      total_spent: (Number(existing.total_spent) || 0) + totalSpent,
-      total_breaks_purchased: (existing.total_breaks_purchased || 0) + (items?.length || 0),
-      total_streams_participated: (existing.total_streams_participated || 0) + streamIncrement,
-      last_purchase_date: purchaseDate,
-      temperature: computeTemp(purchaseDate),
-      ...(realName ? { real_name: realName } : {}),
-      updated_at: new Date().toISOString()
-    }).eq('id', existing.id);
+    shouldInsertPurchases = isNewImport;
+
+    if (isNewImport) {
+      await sb.from('buyers').update({
+        total_spent: (Number(existing.total_spent) || 0) + totalSpent,
+        total_breaks_purchased: (existing.total_breaks_purchased || 0) + (items?.length || 0),
+        total_streams_participated: (existing.total_streams_participated || 0) + (streamId ? 1 : 0),
+        last_purchase_date: purchaseDate,
+        temperature: computeTemp(purchaseDate),
+        ...(realName ? { real_name: realName } : {}),
+        updated_at: new Date().toISOString()
+      }).eq('id', existing.id);
+    } else {
+      // Re-import: still refresh name/temp, but don't touch spend counters
+      await sb.from('buyers').update({
+        temperature: computeTemp(purchaseDate),
+        ...(realName ? { real_name: realName } : {}),
+        updated_at: new Date().toISOString()
+      }).eq('id', existing.id);
+    }
   } else {
     const { data: newBuyer, error } = await sb.from('buyers').insert({
       organization_id: orgId,
@@ -114,18 +126,20 @@ async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
     buyerId = newBuyer.id;
   }
 
-  // Insert purchase records
-  for (const item of (items || [])) {
-    await sb.from('buyer_purchases').insert({
-      organization_id: orgId,
-      buyer_id: buyerId,
-      stream_id: streamId || null,
-      break_name: item.breakName || '',
-      order_number: item.orderNumber || null,
-      amount: Number(item.amount) || 0,
-      purchase_date: purchaseDate,
-      platform: 'whatnot'
-    }).catch(e => console.warn('Purchase insert error:', e.message));
+  // Insert purchase records only for new imports
+  if (shouldInsertPurchases) {
+    for (const item of (items || [])) {
+      await sb.from('buyer_purchases').insert({
+        organization_id: orgId,
+        buyer_id: buyerId,
+        stream_id: streamId || null,
+        break_name: item.breakName || '',
+        order_number: item.orderNumber || null,
+        amount: Number(item.amount) || 0,
+        purchase_date: purchaseDate,
+        platform: 'whatnot'
+      }).catch(e => console.warn('Purchase insert error:', e.message));
+    }
   }
 }
 
