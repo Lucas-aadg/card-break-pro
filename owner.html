@@ -5820,7 +5820,6 @@ async function loadDashboard() {
       tpe.textContent = fmt(0); tpe.className = 'stat-value green';
       document.getElementById('dash-totalBreaks').textContent = 0;
       document.getElementById('dash-totalStreams').textContent = 0;
-      document.getElementById('dashRecentBody').innerHTML = '<tr class="empty-row"><td colspan="6">No breaks yet for this channel.</td></tr>';
       return;
     }
 
@@ -5880,45 +5879,6 @@ async function loadDashboard() {
     // Streams count
     document.getElementById('dash-totalStreams').textContent = chStreamIds ? chStreamIds.length : ((await sb.from('streams').select('id', { count: 'exact', head: true }).eq('org_id', currentProfile.org_id)).count || 0);
 
-    // Recent breaks — compute accurate per-break profit using actual stream fee rate
-    let recentBreaksQ = sb.from('breaks').select('*').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false }).limit(10);
-    if (chStreamIds) recentBreaksQ = recentBreaksQ.in('stream_id', chStreamIds);
-    const { data: recentBreaks, error: rbErr } = await recentBreaksQ;
-    if (rbErr) throw rbErr;
-
-    const sIds = [...new Set((recentBreaks || []).map(function (b) { return b.stream_id; }).filter(Boolean))];
-    let recentStreamMap = {};
-    if (sIds.length) {
-      const { data: rStreams } = await sb.from('streams').select('id, stream_key, status, final_sales, total_submitted_revenue').eq('org_id', currentProfile.org_id).in('id', sIds);
-      (rStreams || []).forEach(function (s) { recentStreamMap[s.id] = s; });
-    }
-
-    const tbody = document.getElementById('dashRecentBody');
-    tbody.innerHTML = '';
-    if (!recentBreaks || recentBreaks.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No breaks yet.</td></tr>';
-    } else {
-      recentBreaks.forEach(function (b) {
-        const stream = recentStreamMap[b.stream_id];
-        let profit;
-        if (stream && stream.status === 'closed' && stream.final_sales != null && (parseFloat(stream.total_submitted_revenue) || 0) > 0) {
-          const actualFeeRate = Math.max(0, (parseFloat(stream.total_submitted_revenue) - parseFloat(stream.final_sales)) / parseFloat(stream.total_submitted_revenue));
-          const rev = parseFloat(b.revenue) || 0;
-          profit = rev - (parseFloat(b.total_product_cost) || 0) - (rev * actualFeeRate) - (parseFloat(b.other_costs) || 0);
-        } else {
-          profit = parseFloat(b.net_profit) || 0;
-        }
-        const tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td>' + escHtml(b.break_date) + '</td>' +
-          '<td>' + escHtml((stream && stream.stream_key) || '—') + '</td>' +
-          '<td style="text-align:center;">' + b.break_number + '</td>' +
-          '<td>' + escHtml(getProfileName(b.breaker_id)) + '</td>' +
-          '<td>' + fmt(b.revenue) + '</td>' +
-          '<td style="color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</td>';
-        tbody.appendChild(tr);
-      });
-    }
   } catch (err) {
     showGlobalError('Dashboard load error: ' + escHtml(err.message));
   }
