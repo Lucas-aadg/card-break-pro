@@ -2930,6 +2930,9 @@ function breakerBtmNav(tab) {
   if (content) content.classList.add('active');
   const btn = document.getElementById('btn-btm-' + tab);
   if (btn) btn.classList.add('active');
+  // Show mobile break header only on the entry tab
+  const mbh = document.getElementById('mobileBreakHeader');
+  if (mbh) mbh.style.display = (tab === 'entry') ? 'flex' : 'none';
   // Trigger tab load functions
   if (tab === 'payouts')        { typeof loadMyPay !== 'undefined' && loadMyPay(); }
   if (tab === 'shifts')         { typeof loadMyScheduleView !== 'undefined' && loadMyScheduleView(); }
