@@ -2934,8 +2934,8 @@ function breakerBtmNav(tab) {
   const mbh = document.getElementById('mobileBreakHeader');
   if (mbh) mbh.style.display = (tab === 'entry') ? 'flex' : 'none';
   // Trigger tab load functions
-  if (tab === 'payouts')        { typeof loadMyPay !== 'undefined' && loadMyPay(); }
-  if (tab === 'shifts')         { typeof loadMyScheduleView !== 'undefined' && loadMyScheduleView(); }
+  if (tab === 'payouts')        { typeof loadPayouts !== 'undefined' && loadPayouts(); }
+  if (tab === 'shifts')         { typeof loadShifts !== 'undefined' && loadShifts(); typeof loadMyScheduleView !== 'undefined' && loadMyScheduleView(); }
   if (tab === 'announcements')  { typeof brkLoadAnnouncements !== 'undefined' && brkLoadAnnouncements(); }
   if (tab === 'milestones')     { typeof brkLoadMilestones !== 'undefined' && brkLoadMilestones(); }
   if (tab === 'leaderboard')    { typeof brkLoadLeaderboard !== 'undefined' && brkLoadLeaderboard(); }
