@@ -12,20 +12,19 @@ module.exports = async (req, res) => {
     const pdfData = await pdfParse(buffer);
     rawText = pdfData.text || '';
 
-    // Debug mode — returns raw text for parser diagnostics
     if (req.query.debug === '1') {
       return res.status(200).json({ raw: rawText, pages: pdfData.numpages });
     }
 
     if (!rawText || rawText.trim().length < 20) {
-      return res.status(500).json({ error: 'This PDF has no extractable text. Make sure it\'s a Whatnot packing slip PDF (not a scanned image).' });
+      return res.status(500).json({ error: 'PDF has no extractable text. Make sure this is a Whatnot packing slip PDF.' });
     }
 
     const result = parseWhatnotSlips(rawText);
     return res.status(200).json(result);
   } catch (err) {
     console.error('import-slip error:', err.message);
-    console.error('import-slip raw sample:', rawText.slice(0, 2000));
+    console.error('raw sample:', rawText.slice(0, 2000));
     return res.status(500).json({ error: err.message || 'Failed to parse PDF', raw_sample: rawText.slice(0, 2000) });
   }
 };
@@ -52,30 +51,18 @@ function extractFileBuffer(req) {
 function parseWhatnotSlips(rawText) {
   const lines = rawText.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
 
-  // ── Strategy 1: split on "PACKING SLIP" headers ──────────────────────────
-  let slipStarts = [];
+  // Split into per-buyer blocks on "Whatnot Packing Slip" or "Packing Slip" headers
+  const slipStarts = [];
   for (let i = 0; i < lines.length; i++) {
-    if (/PACKING[\s\-_]*SLIP/i.test(lines[i])) slipStarts.push(i);
+    if (/(?:Whatnot\s+)?Packing\s+Slip/i.test(lines[i])) slipStarts.push(i);
   }
 
-  // ── Strategy 2: split on repeated "Order" or "#XXXXX" blocks ─────────────
-  if (slipStarts.length === 0) {
-    for (let i = 0; i < lines.length; i++) {
-      if (/^order\s*#?\s*[A-Z0-9]{5,}/i.test(lines[i])) slipStarts.push(i);
-    }
-  }
-
-  // ── Strategy 3: treat whole doc as one slip ───────────────────────────────
-  let slipBlocks = [];
-  if (slipStarts.length === 0) {
-    slipBlocks = [lines];
-  } else {
-    for (let i = 0; i < slipStarts.length; i++) {
-      const start = slipStarts[i];
-      const end = i + 1 < slipStarts.length ? slipStarts[i + 1] : lines.length;
-      slipBlocks.push(lines.slice(start, end));
-    }
-  }
+  let slipBlocks = slipStarts.length > 0
+    ? slipStarts.map(function(start, idx) {
+        const end = idx + 1 < slipStarts.length ? slipStarts[idx + 1] : lines.length;
+        return lines.slice(start, end);
+      })
+    : [lines];
 
   const slipMap = new Map();
   let streamName = '';
@@ -90,6 +77,7 @@ function parseWhatnotSlips(rawText) {
 
       const key = slip.username.toLowerCase();
       if (slipMap.has(key)) {
+        // Merge multi-page / multi-package slips for same buyer
         const existing = slipMap.get(key);
         const existingOrders = new Set(existing.items.map(function(x){ return x.orderNumber; }).filter(Boolean));
         for (const item of slip.items) {
@@ -97,13 +85,14 @@ function parseWhatnotSlips(rawText) {
           existing.items.push(item);
           if (item.orderNumber) existingOrders.add(item.orderNumber);
         }
-        existing.totalSpent = parseFloat(existing.items.reduce(function(s, x){ return s + x.amount; }, 0).toFixed(2));
+        existing.totalSpent = parseFloat(existing.items.reduce(function(s, x){ return s + (x.amount || 0); }, 0).toFixed(2));
+        // Fall back to slip total if no line items found
         if (!existing.totalSpent && slip.totalSpent) existing.totalSpent = slip.totalSpent;
       } else {
         slipMap.set(key, slip);
       }
     } catch (e) {
-      console.warn('Slip block parse error:', e.message);
+      console.warn('Slip block error:', e.message);
     }
   }
 
@@ -123,153 +112,142 @@ function parseWhatnotSlips(rawText) {
 }
 
 function extractSlipData(lines) {
-  let username = '';
-  let isNew = false;
-  let realName = '';
-  let streamName = '';
-  let streamDate = '';
-  const items = [];
-
   const fullText = lines.join(' ');
 
-  // ── USERNAME — multiple strategies ───────────────────────────────────────
+  // ── USERNAME ─────────────────────────────────────────────────────────────
+  // New Whatnot format: "To: username [NEW] From: seller"
+  let username = '';
 
-  // S1: standard @handle
-  let umatch = fullText.match(/@([\w._-]{2,50})/);
-  if (umatch) username = umatch[1];
+  // Primary: "To: username" — handles format with or without @
+  const toColonMatch = fullText.match(/\bTo:\s+@?([\w._-]{2,50})/i);
+  if (toColonMatch) username = toColonMatch[1];
 
-  // S2: "Ship To: username" or "Buyer: username" — with or without @
+  // Fallback: any @handle in text (old format)
   if (!username) {
-    const labelMatch = fullText.match(/(?:ship\s*to|buyer|username)[:\s]+@?([\w._-]{3,50})/i);
-    if (labelMatch) username = labelMatch[1];
+    const atMatch = fullText.match(/@([\w._-]{2,50})/);
+    if (atMatch) username = atMatch[1];
   }
 
-  // S3: line that IS just @username or "username" right after a "To" line
-  if (!username) {
-    const toIdx = lines.findIndex(function(l){ return /^to\s*[:\-]?\s*@?([\w._-]{3,50})\s*$/i.test(l); });
-    if (toIdx >= 0) {
-      const m = lines[toIdx].match(/^to\s*[:\-]?\s*@?([\w._-]{3,50})\s*$/i);
-      if (m) username = m[1];
-    }
-  }
-
-  // S4: line that is just an @handle on its own
+  // Fallback: line that starts with "To " and ends with username
   if (!username) {
     for (const l of lines) {
-      const m = l.match(/^@([\w._-]{2,50})$/);
+      const m = l.match(/^To:\s*@?([\w._-]{2,50})\s*(?:NEW\s*)?(?:From:|$)/i);
       if (m) { username = m[1]; break; }
     }
   }
 
-  // S5: any @-word anywhere (widest net)
   if (!username) {
-    const anyAt = fullText.match(/\s@([\w._-]{2,50})/);
-    if (anyAt) username = anyAt[1];
+    return { username: '', isNew: false, realName: '', streamName: '', streamDate: '', items: [], totalSpent: 0 };
   }
 
-  if (!username) return { username: '', isNew: false, realName: '', streamName: '', streamDate: '', items: [], totalSpent: 0 };
+  // ── NEW BADGE ─────────────────────────────────────────────────────────────
+  const isNew = /\bTo:\s+@?[\w._-]+\s+NEW\b/i.test(fullText) ||
+    lines.some(function(l){ return /\bNEW\b/.test(l) && l.toLowerCase().includes(username.toLowerCase()); });
 
-  // ── NEW buyer badge ───────────────────────────────────────────────────────
-  const userLineIdx = lines.findIndex(function(l){ return l.includes('@' + username) || l.toLowerCase().includes(username.toLowerCase()); });
-  if (userLineIdx >= 0) {
-    const win = lines.slice(Math.max(0, userLineIdx - 1), Math.min(lines.length, userLineIdx + 3));
-    isNew = win.some(function(l){ return /\bNEW\b/.test(l); });
-  }
-
-  // ── REAL NAME ─────────────────────────────────────────────────────────────
-  const toIdx = lines.findIndex(function(l){ return /^To\s*$/i.test(l) || /^To\s+@/i.test(l) || /^To\s*:/i.test(l); });
-  if (toIdx >= 0) {
-    for (let i = toIdx + 1; i < Math.min(toIdx + 7, lines.length); i++) {
+  // ── REAL NAME (line after "To: username" line) ────────────────────────────
+  let realName = '';
+  const toLineIdx = lines.findIndex(function(l){ return /\bTo:\s+/i.test(l) && l.toLowerCase().includes(username.toLowerCase()); });
+  if (toLineIdx >= 0) {
+    for (let i = toLineIdx + 1; i < Math.min(toLineIdx + 5, lines.length); i++) {
       const l = lines[i];
-      if (!l || l.startsWith('@') || /\bNEW\b/i.test(l) || /^(To|From)\b/i.test(l)) continue;
-      if (/^\d/.test(l) || l.includes('$') || l.includes('#')) continue;
-      if (/^[A-Za-z][A-Za-z .'-]{1,59}$/.test(l)) { realName = l; break; }
+      if (!l || /^(From|To|QTY|Order|USPS|■|\d+\s)/i.test(l)) continue;
+      if (l.includes('$') || l.includes('#')) continue;
+      if (/^[A-Za-z][A-Za-z .']{1,59}$/.test(l)) { realName = l; break; }
     }
   }
 
-  // ── STREAM NAME + DATE ────────────────────────────────────────────────────
-  const fromIdx = lines.findIndex(function(l){ return /^From\s*$/i.test(l) || /^From\s+[A-Za-z0-9]/i.test(l); });
-  if (fromIdx >= 0) {
-    const fromLine = lines[fromIdx];
-    if (/^From\s+\S/i.test(fromLine)) {
-      streamName = fromLine.replace(/^From\s+/i, '').trim();
-    } else if (fromIdx + 1 < lines.length) {
-      streamName = lines[fromIdx + 1];
-    }
-    for (let i = fromIdx + 1; i < Math.min(fromIdx + 5, lines.length); i++) {
-      const l = lines[i];
-      if (/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(l)
-          || /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/.test(l)) {
-        streamDate = l; break;
-      }
+  // ── STREAM NAME + DATE from "From:" section ───────────────────────────────
+  let streamName = '';
+  let streamDate = '';
+  const fromMatch = fullText.match(/From:\s+([^\n$]+?)(?:\s+■|$)/i);
+  if (fromMatch) streamName = fromMatch[1].trim();
+  for (const l of lines) {
+    if (/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(l)
+        || /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/.test(l)
+        || /\b\d{2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)/i.test(l)) {
+      streamDate = l; break;
     }
   }
 
-  // ── LINE ITEMS — multiple strategies ─────────────────────────────────────
+  // ── ITEMS ─────────────────────────────────────────────────────────────────
+  // New format: "1 ItemName Order XXXXXXXXXX" on one line, "$XX.00" on own line
+  const items = [];
 
-  // S1: line ending with $XX.XX (original)
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    const moneyMatch = l.match(/\$(\d{1,6}\.?\d{0,2})\s*$/);
-    if (!moneyMatch) continue;
-    const amount = parseFloat(moneyMatch[1]);
-    if (amount === 0) continue;
-    if (/items?\s+total|subtotal|order\s*total|grand\s*total|shipping|tax|discount|total\s*due/i.test(l)) continue;
-    if (/shipped?\s+(via|by)|tracking/i.test(l)) continue;
 
-    let breakName = '';
-    let orderNumber = '';
-    const orderMatch = l.match(/#([A-Z0-9]{5,20})/i);
-    if (orderMatch) {
-      orderNumber = orderMatch[1];
-      breakName = l.substring(0, l.indexOf(orderMatch[0])).trim();
-    } else {
-      breakName = l.substring(0, l.lastIndexOf('$')).trim();
-      for (const adj of [lines[i - 1], lines[i + 1]]) {
-        if (!adj) continue;
-        const adjOrder = adj.match(/#([A-Z0-9]{5,20})/i);
-        if (adjOrder) { orderNumber = adjOrder[1]; break; }
-      }
-    }
+    // Primary pattern: "1 ItemName Order 1234567890" — item + order on same line
+    const itemOrderMatch = l.match(/^\d+\s+(.+?)\s+Order\s+(\d{7,})\s*(.*)$/i);
+    if (itemOrderMatch) {
+      const rawName = itemOrderMatch[1].trim();
+      const orderNumber = itemOrderMatch[2];
+      const afterOrder = itemOrderMatch[3].trim();
 
-    if (!breakName && i > 0) {
-      for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
-        const prev = lines[j];
-        if (prev && !/\$/.test(prev) && !/^(To|From|PACKING|Shipped?|Order|#)/i.test(prev) && prev.length > 3) {
-          breakName = prev; break;
+      // Amount might be inline after order number, or on a later line
+      let amount = 0;
+      const inlineAmountMatch = afterOrder.match(/\$?(\d+\.?\d*)\s*$/);
+      if (inlineAmountMatch) {
+        amount = parseFloat(inlineAmountMatch[1]);
+      } else {
+        // Look forward up to 8 lines for standalone "$XX.XX" or "XX.XX" line
+        for (let j = i + 1; j < Math.min(i + 9, lines.length); j++) {
+          const amtMatch = lines[j].match(/^\$?(\d+\.?\d{0,2})$/);
+          if (amtMatch) { amount = parseFloat(amtMatch[1]); break; }
+          // Stop at next item or total
+          if (/^\d+\s+\S/.test(lines[j]) || /^\d+\s+Items?\s/i.test(lines[j])) break;
         }
       }
+
+      // Skip $0 giveaways only if break name says GIVEAWAY
+      if (amount === 0 && /giveaway/i.test(rawName)) continue;
+
+      const breakName = rawName.replace(/^(QTY|Name|Description|Attributes|Subtotal)\s*/i, '').trim();
+      if (!breakName || breakName.length < 1) continue;
+      if (/^(QTY|Name|Description|Attributes|Subtotal|From|To|USPS|■)/i.test(breakName)) continue;
+
+      items.push({ breakName: breakName.slice(0, 120), orderNumber, amount });
+      continue;
     }
 
-    if (!breakName || /^(packing|from|to|shipped|tracking|order|total|subtotal)/i.test(breakName)) continue;
+    // Fallback: standalone "$XX.XX" line — try to find item name backward
+    const standaloneAmount = l.match(/^\$(\d{1,6}\.?\d{0,2})$/);
+    if (standaloneAmount) {
+      const amount = parseFloat(standaloneAmount[1]);
+      if (amount === 0) continue;
 
-    items.push({ breakName: breakName.slice(0, 120), orderNumber: orderNumber || '', amount });
-  }
+      // Look backward for the item line (starts with digit + space + name)
+      let breakName = '';
+      let orderNumber = '';
+      for (let j = i - 1; j >= Math.max(0, i - 8); j--) {
+        const prev = lines[j];
+        // Item line: starts with digit followed by item name
+        const prevItemMatch = prev.match(/^\d+\s+(.+?)\s+Order\s+(\d{7,})/i);
+        if (prevItemMatch) {
+          breakName = prevItemMatch[1].trim();
+          orderNumber = prevItemMatch[2];
+          break;
+        }
+        // Stop at table headers or new buyer blocks
+        if (/^(QTY|Attributes|Subtotal|To:|From:|Whatnot|USPS|■)/i.test(prev)) break;
+      }
 
-  // S2: if no items found, look for $ amounts anywhere in lines (not just end)
-  if (items.length === 0) {
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i];
-      const inlineMatch = l.match(/\$(\d{1,6}\.?\d{0,2})/);
-      if (!inlineMatch) continue;
-      const amount = parseFloat(inlineMatch[1]);
-      if (amount === 0 || amount > 9999) continue;
-      if (/items?\s+total|subtotal|order\s*total|grand\s*total|shipping|tax|discount|total\s*due/i.test(l)) continue;
-      if (/shipped?\s+(via|by)|tracking/i.test(l)) continue;
-      const breakName = l.replace(/\$[\d.]+/g, '').trim().slice(0, 120);
-      if (!breakName || breakName.length < 2) continue;
-      if (/^(packing|from|to|shipped|tracking|order)/i.test(breakName)) continue;
-      items.push({ breakName, orderNumber: '', amount });
+      if (!breakName) continue;
+      if (/^(QTY|Attributes|Subtotal|From|To|USPS)/i.test(breakName)) continue;
+
+      // Avoid duplicates (this line was already captured by the primary pattern)
+      const alreadyCaptured = items.some(function(it){ return it.orderNumber && it.orderNumber === orderNumber; });
+      if (alreadyCaptured) continue;
+
+      items.push({ breakName: breakName.slice(0, 120), orderNumber, amount });
     }
   }
 
-  // S3: if STILL no items, try to grab the total from an "Order Total" or "Subtotal" line
-  let totalSpent = parseFloat(items.reduce(function(s, x){ return s + x.amount; }, 0).toFixed(2));
+  // ── TOTAL SPENT from "N Items $XX.00" line if no items parsed ─────────────
+  let totalSpent = parseFloat(items.reduce(function(s, x){ return s + (x.amount || 0); }, 0).toFixed(2));
   if (totalSpent === 0) {
-    const totalLine = lines.find(function(l){ return /(?:order\s*total|subtotal|grand\s*total|total\s*due)[:\s]+\$?(\d{1,6}\.?\d{0,2})/i.test(l); });
-    if (totalLine) {
-      const tm = totalLine.match(/\$?(\d{1,6}\.?\d{0,2})\s*$/);
-      if (tm) totalSpent = parseFloat(tm[1]) || 0;
+    for (const l of lines) {
+      const totalMatch = l.match(/\d+\s+Items?\s+\$?(\d+\.?\d{0,2})/i);
+      if (totalMatch) { totalSpent = parseFloat(totalMatch[1]); break; }
     }
   }
 
