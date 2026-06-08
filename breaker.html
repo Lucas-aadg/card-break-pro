@@ -3127,7 +3127,10 @@ async function handleSlipFile(file) {
     formData.append('file', file);
     var resp = await fetch('/api/import-slip', { method: 'POST', body: formData });
     var json = await resp.json();
-    if (!resp.ok) throw new Error(json.error || 'Parse failed');
+    if (!resp.ok) {
+      if (json.raw_sample) console.error('SLIP RAW TEXT:\n' + json.raw_sample);
+      throw new Error(json.error || 'Parse failed');
+    }
     _parsedSlipData = json;
     _parsedSlipData._filename = file.name;
     showSlipPreview(json);

@@ -6,21 +6,26 @@ module.exports.config = { api: { bodyParser: false } };
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  let rawText = '';
   try {
     const buffer = await extractFileBuffer(req);
     const pdfData = await pdfParse(buffer);
+    rawText = pdfData.text || '';
 
     // Debug mode — returns raw extracted text so the parser can be updated
     if (req.query.debug === '1') {
-      return res.status(200).json({ raw: pdfData.text, pages: pdfData.numpages });
+      return res.status(200).json({ raw: rawText, pages: pdfData.numpages });
     }
 
-    const result = parseWhatnotSlips(pdfData.text);
+    const result = parseWhatnotSlips(rawText);
     return res.status(200).json(result);
   } catch (err) {
-    console.error('import-slip error:', err);
-    // If it's a parse failure, include a snippet of extracted text to help diagnose
-    return res.status(500).json({ error: err.message || 'Failed to parse PDF' });
+    console.error('import-slip error:', err.message);
+    console.error('import-slip raw text sample:', rawText.slice(0, 1500));
+    return res.status(500).json({
+      error: err.message || 'Failed to parse PDF',
+      raw_sample: rawText.slice(0, 1500)
+    });
   }
 };
 
