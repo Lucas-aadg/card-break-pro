@@ -9,10 +9,17 @@ module.exports = async (req, res) => {
   try {
     const buffer = await extractFileBuffer(req);
     const pdfData = await pdfParse(buffer);
+
+    // Debug mode — returns raw extracted text so the parser can be updated
+    if (req.query.debug === '1') {
+      return res.status(200).json({ raw: pdfData.text, pages: pdfData.numpages });
+    }
+
     const result = parseWhatnotSlips(pdfData.text);
     return res.status(200).json(result);
   } catch (err) {
     console.error('import-slip error:', err);
+    // If it's a parse failure, include a snippet of extracted text to help diagnose
     return res.status(500).json({ error: err.message || 'Failed to parse PDF' });
   }
 };
