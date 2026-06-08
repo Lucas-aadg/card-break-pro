@@ -31,6 +31,21 @@ module.exports = async (req, res) => {
   const purchaseDate = parseDate(streamDate);
   let importId = null;
 
+  // If reimporting the same stream, wipe the old import record and purchases
+  // so buyers get fresh data rather than being blocked by the dedup check
+  if (streamId) {
+    try {
+      const { data: existingImport } = await sb.from('stream_slip_imports')
+        .select('id').eq('stream_id', streamId).maybeSingle();
+      if (existingImport) {
+        // Remove old purchases for this stream so dedup doesn't block fresh data
+        await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', orgId);
+        // Remove old import record
+        await sb.from('stream_slip_imports').delete().eq('id', existingImport.id);
+      }
+    } catch (e) { console.warn('Reimport cleanup failed:', e.message); }
+  }
+
   // Create import record
   try {
     const { data: imp } = await sb.from('stream_slip_imports').insert({

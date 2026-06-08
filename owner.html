@@ -2568,11 +2568,11 @@
         </div>
         <div id="esBreakList"></div>
 
-        <!-- Slip section — only if no slip on file -->
+        <!-- Slip section — always visible, label changes based on import status -->
         <div id="esSlipSection" style="display:none;margin-top:1.25rem;">
           <div class="es-section-hd">
             <div class="es-section-lbl">Packing Slip</div>
-            <span style="font-size:0.72rem;color:var(--yellow);">No slip on file</span>
+            <span id="esSlipStatusLabel" style="font-size:0.72rem;color:var(--yellow);">No slip on file</span>
           </div>
           <div class="es-slip-drop" id="esSlipDrop" onclick="document.getElementById('esSlipInput').click()">
             <div style="font-size:1.8rem;margin-bottom:0.4rem;">📄</div>
@@ -5756,7 +5756,11 @@ async function openEditStream(streamId) {
     document.getElementById('esTotalRev').value = _esStreamData.total_submitted_revenue || '';
     document.getElementById('esFinalSales').value = _esStreamData.final_sales || '';
     document.getElementById('esNotes').value = _esStreamData.notes || '';
-    document.getElementById('esSlipSection').style.display = _esHasSlip ? 'none' : '';
+    // Always show slip section — label changes based on whether one exists
+    document.getElementById('esSlipSection').style.display = '';
+    const slipLabel = document.getElementById('esSlipStatusLabel');
+    if (slipLabel) slipLabel.textContent = _esHasSlip ? 'Replace existing import' : 'No slip on file';
+    if (slipLabel) slipLabel.style.color = _esHasSlip ? 'var(--muted)' : 'var(--yellow)';
 
     esRenderAllBreaks();
     esUpdateTotals();
