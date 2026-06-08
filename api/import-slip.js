@@ -12,20 +12,21 @@ module.exports = async (req, res) => {
     const pdfData = await pdfParse(buffer);
     rawText = pdfData.text || '';
 
-    // Debug mode — returns raw extracted text so the parser can be updated
+    // Debug mode — returns raw text for parser diagnostics
     if (req.query.debug === '1') {
       return res.status(200).json({ raw: rawText, pages: pdfData.numpages });
+    }
+
+    if (!rawText || rawText.trim().length < 20) {
+      return res.status(500).json({ error: 'This PDF has no extractable text. Make sure it\'s a Whatnot packing slip PDF (not a scanned image).' });
     }
 
     const result = parseWhatnotSlips(rawText);
     return res.status(200).json(result);
   } catch (err) {
     console.error('import-slip error:', err.message);
-    console.error('import-slip raw text sample:', rawText.slice(0, 1500));
-    return res.status(500).json({
-      error: err.message || 'Failed to parse PDF',
-      raw_sample: rawText.slice(0, 1500)
-    });
+    console.error('import-slip raw sample:', rawText.slice(0, 2000));
+    return res.status(500).json({ error: err.message || 'Failed to parse PDF', raw_sample: rawText.slice(0, 2000) });
   }
 };
 
@@ -49,18 +50,25 @@ function extractFileBuffer(req) {
 }
 
 function parseWhatnotSlips(rawText) {
-  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const lines = rawText.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
 
-  // Find all PACKING SLIP boundaries
-  const slipStarts = [];
+  // ── Strategy 1: split on "PACKING SLIP" headers ──────────────────────────
+  let slipStarts = [];
   for (let i = 0; i < lines.length; i++) {
-    if (/PACKING\s*SLIP/i.test(lines[i])) slipStarts.push(i);
+    if (/PACKING[\s\-_]*SLIP/i.test(lines[i])) slipStarts.push(i);
   }
 
-  // Split into blocks
+  // ── Strategy 2: split on repeated "Order" or "#XXXXX" blocks ─────────────
+  if (slipStarts.length === 0) {
+    for (let i = 0; i < lines.length; i++) {
+      if (/^order\s*#?\s*[A-Z0-9]{5,}/i.test(lines[i])) slipStarts.push(i);
+    }
+  }
+
+  // ── Strategy 3: treat whole doc as one slip ───────────────────────────────
   let slipBlocks = [];
   if (slipStarts.length === 0) {
-    slipBlocks = [lines]; // treat entire text as one slip
+    slipBlocks = [lines];
   } else {
     for (let i = 0; i < slipStarts.length; i++) {
       const start = slipStarts[i];
@@ -82,15 +90,15 @@ function parseWhatnotSlips(rawText) {
 
       const key = slip.username.toLowerCase();
       if (slipMap.has(key)) {
-        // Combine: multi-page continuation or second shipment
         const existing = slipMap.get(key);
-        const existingOrders = new Set(existing.items.map(x => x.orderNumber).filter(Boolean));
+        const existingOrders = new Set(existing.items.map(function(x){ return x.orderNumber; }).filter(Boolean));
         for (const item of slip.items) {
           if (item.orderNumber && existingOrders.has(item.orderNumber)) continue;
           existing.items.push(item);
           if (item.orderNumber) existingOrders.add(item.orderNumber);
         }
-        existing.totalSpent = parseFloat(existing.items.reduce((s, x) => s + x.amount, 0).toFixed(2));
+        existing.totalSpent = parseFloat(existing.items.reduce(function(s, x){ return s + x.amount; }, 0).toFixed(2));
+        if (!existing.totalSpent && slip.totalSpent) existing.totalSpent = slip.totalSpent;
       } else {
         slipMap.set(key, slip);
       }
@@ -109,8 +117,8 @@ function parseWhatnotSlips(rawText) {
     streamName: streamName || '',
     streamDate: streamDate || '',
     totalBuyersFound: buyers.length,
-    totalNewBuyers: buyers.filter(b => b.isNew).length,
-    totalRevenueParsed: parseFloat(buyers.reduce((s, b) => s + (b.totalSpent || 0), 0).toFixed(2))
+    totalNewBuyers: buyers.filter(function(b){ return b.isNew; }).length,
+    totalRevenueParsed: parseFloat(buyers.reduce(function(s, b){ return s + (b.totalSpent || 0); }, 0).toFixed(2))
   };
 }
 
@@ -124,21 +132,52 @@ function extractSlipData(lines) {
 
   const fullText = lines.join(' ');
 
-  // 1. Username — first @handle in the text
-  const usernameMatch = fullText.match(/@([\w._-]{2,50})/);
-  if (usernameMatch) username = usernameMatch[1];
+  // ── USERNAME — multiple strategies ───────────────────────────────────────
 
-  // 2. NEW badge — look for "NEW" near the username
-  if (username) {
-    const userLineIdx = lines.findIndex(l => l.includes('@' + username));
-    if (userLineIdx >= 0) {
-      const window = lines.slice(Math.max(0, userLineIdx - 1), Math.min(lines.length, userLineIdx + 3));
-      isNew = window.some(l => /\bNEW\b/.test(l));
+  // S1: standard @handle
+  let umatch = fullText.match(/@([\w._-]{2,50})/);
+  if (umatch) username = umatch[1];
+
+  // S2: "Ship To: username" or "Buyer: username" — with or without @
+  if (!username) {
+    const labelMatch = fullText.match(/(?:ship\s*to|buyer|username)[:\s]+@?([\w._-]{3,50})/i);
+    if (labelMatch) username = labelMatch[1];
+  }
+
+  // S3: line that IS just @username or "username" right after a "To" line
+  if (!username) {
+    const toIdx = lines.findIndex(function(l){ return /^to\s*[:\-]?\s*@?([\w._-]{3,50})\s*$/i.test(l); });
+    if (toIdx >= 0) {
+      const m = lines[toIdx].match(/^to\s*[:\-]?\s*@?([\w._-]{3,50})\s*$/i);
+      if (m) username = m[1];
     }
   }
 
-  // 3. Real name — line after "To" / username block
-  const toIdx = lines.findIndex(l => /^To\s*$/i.test(l) || /^To\s+@/i.test(l));
+  // S4: line that is just an @handle on its own
+  if (!username) {
+    for (const l of lines) {
+      const m = l.match(/^@([\w._-]{2,50})$/);
+      if (m) { username = m[1]; break; }
+    }
+  }
+
+  // S5: any @-word anywhere (widest net)
+  if (!username) {
+    const anyAt = fullText.match(/\s@([\w._-]{2,50})/);
+    if (anyAt) username = anyAt[1];
+  }
+
+  if (!username) return { username: '', isNew: false, realName: '', streamName: '', streamDate: '', items: [], totalSpent: 0 };
+
+  // ── NEW buyer badge ───────────────────────────────────────────────────────
+  const userLineIdx = lines.findIndex(function(l){ return l.includes('@' + username) || l.toLowerCase().includes(username.toLowerCase()); });
+  if (userLineIdx >= 0) {
+    const win = lines.slice(Math.max(0, userLineIdx - 1), Math.min(lines.length, userLineIdx + 3));
+    isNew = win.some(function(l){ return /\bNEW\b/.test(l); });
+  }
+
+  // ── REAL NAME ─────────────────────────────────────────────────────────────
+  const toIdx = lines.findIndex(function(l){ return /^To\s*$/i.test(l) || /^To\s+@/i.test(l) || /^To\s*:/i.test(l); });
   if (toIdx >= 0) {
     for (let i = toIdx + 1; i < Math.min(toIdx + 7, lines.length); i++) {
       const l = lines[i];
@@ -148,8 +187,8 @@ function extractSlipData(lines) {
     }
   }
 
-  // 4. Stream name and date from "From" section
-  const fromIdx = lines.findIndex(l => /^From\s*$/i.test(l) || /^From\s+[A-Za-z0-9]/i.test(l));
+  // ── STREAM NAME + DATE ────────────────────────────────────────────────────
+  const fromIdx = lines.findIndex(function(l){ return /^From\s*$/i.test(l) || /^From\s+[A-Za-z0-9]/i.test(l); });
   if (fromIdx >= 0) {
     const fromLine = lines[fromIdx];
     if (/^From\s+\S/i.test(fromLine)) {
@@ -166,53 +205,73 @@ function extractSlipData(lines) {
     }
   }
 
-  // 5. Line items — lines ending with a dollar amount > $0.00
+  // ── LINE ITEMS — multiple strategies ─────────────────────────────────────
+
+  // S1: line ending with $XX.XX (original)
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    const moneyMatch = l.match(/\$(\d+\.?\d*)\s*$/);
+    const moneyMatch = l.match(/\$(\d{1,6}\.?\d{0,2})\s*$/);
     if (!moneyMatch) continue;
     const amount = parseFloat(moneyMatch[1]);
     if (amount === 0) continue;
-    if (/items?\s+total|subtotal|shipping|tax|discount/i.test(l)) continue;
+    if (/items?\s+total|subtotal|order\s*total|grand\s*total|shipping|tax|discount|total\s*due/i.test(l)) continue;
     if (/shipped?\s+(via|by)|tracking/i.test(l)) continue;
 
-    // Extract order number and break name
     let breakName = '';
     let orderNumber = '';
-    const orderMatch = l.match(/#(\w{5,20})/);
+    const orderMatch = l.match(/#([A-Z0-9]{5,20})/i);
     if (orderMatch) {
       orderNumber = orderMatch[1];
-      breakName = l.substring(0, l.indexOf('#' + orderNumber)).trim();
+      breakName = l.substring(0, l.indexOf(orderMatch[0])).trim();
     } else {
       breakName = l.substring(0, l.lastIndexOf('$')).trim();
-      // Check adjacent line for order number
       for (const adj of [lines[i - 1], lines[i + 1]]) {
         if (!adj) continue;
-        const adjOrder = adj.match(/#(\w{5,20})/);
+        const adjOrder = adj.match(/#([A-Z0-9]{5,20})/i);
         if (adjOrder) { orderNumber = adjOrder[1]; break; }
       }
     }
 
-    // Fallback: if break name empty, use previous non-special line
     if (!breakName && i > 0) {
       for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
         const prev = lines[j];
-        if (prev && !/\$/.test(prev) && !/^(To|From|PACKING|Shipped?)/i.test(prev) && prev.length > 3) {
+        if (prev && !/\$/.test(prev) && !/^(To|From|PACKING|Shipped?|Order|#)/i.test(prev) && prev.length > 3) {
           breakName = prev; break;
         }
       }
     }
 
-    if (!breakName || /^(packing|from|to|shipped|tracking|order)/i.test(breakName)) continue;
+    if (!breakName || /^(packing|from|to|shipped|tracking|order|total|subtotal)/i.test(breakName)) continue;
 
-    items.push({
-      breakName: breakName.slice(0, 120),
-      orderNumber: orderNumber || '',
-      amount
-    });
+    items.push({ breakName: breakName.slice(0, 120), orderNumber: orderNumber || '', amount });
   }
 
-  const totalSpent = parseFloat(items.reduce((s, x) => s + x.amount, 0).toFixed(2));
+  // S2: if no items found, look for $ amounts anywhere in lines (not just end)
+  if (items.length === 0) {
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      const inlineMatch = l.match(/\$(\d{1,6}\.?\d{0,2})/);
+      if (!inlineMatch) continue;
+      const amount = parseFloat(inlineMatch[1]);
+      if (amount === 0 || amount > 9999) continue;
+      if (/items?\s+total|subtotal|order\s*total|grand\s*total|shipping|tax|discount|total\s*due/i.test(l)) continue;
+      if (/shipped?\s+(via|by)|tracking/i.test(l)) continue;
+      const breakName = l.replace(/\$[\d.]+/g, '').trim().slice(0, 120);
+      if (!breakName || breakName.length < 2) continue;
+      if (/^(packing|from|to|shipped|tracking|order)/i.test(breakName)) continue;
+      items.push({ breakName, orderNumber: '', amount });
+    }
+  }
+
+  // S3: if STILL no items, try to grab the total from an "Order Total" or "Subtotal" line
+  let totalSpent = parseFloat(items.reduce(function(s, x){ return s + x.amount; }, 0).toFixed(2));
+  if (totalSpent === 0) {
+    const totalLine = lines.find(function(l){ return /(?:order\s*total|subtotal|grand\s*total|total\s*due)[:\s]+\$?(\d{1,6}\.?\d{0,2})/i.test(l); });
+    if (totalLine) {
+      const tm = totalLine.match(/\$?(\d{1,6}\.?\d{0,2})\s*$/);
+      if (tm) totalSpent = parseFloat(tm[1]) || 0;
+    }
+  }
 
   return { username, isNew, realName, streamName, streamDate, items, totalSpent };
 }
