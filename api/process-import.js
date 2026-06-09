@@ -31,16 +31,44 @@ module.exports = async (req, res) => {
   const purchaseDate = parseDate(streamDate);
   let importId = null;
 
-  // If reimporting the same stream, wipe the old import record and purchases
-  // so buyers get fresh data rather than being blocked by the dedup check
+  // If reimporting the same stream, reverse old buyer totals BEFORE deleting
+  // purchases — otherwise reimport adds on top of stale totals (double-count)
   if (streamId) {
     try {
       const { data: existingImport } = await sb.from('stream_slip_imports')
         .select('id').eq('stream_id', streamId).maybeSingle();
       if (existingImport) {
-        // Remove old purchases for this stream so dedup doesn't block fresh data
+        // Fetch old purchases so we can reverse their amounts from buyer totals
+        const { data: oldPurchases } = await sb.from('buyer_purchases')
+          .select('buyer_id, amount')
+          .eq('stream_id', streamId)
+          .eq('organization_id', orgId);
+
+        if (oldPurchases && oldPurchases.length > 0) {
+          // Group by buyer_id
+          const reversalMap = {};
+          const countMap = {};
+          oldPurchases.forEach(function(p) {
+            reversalMap[p.buyer_id] = (reversalMap[p.buyer_id] || 0) + (parseFloat(p.amount) || 0);
+            countMap[p.buyer_id] = (countMap[p.buyer_id] || 0) + 1;
+          });
+
+          for (const buyerId of Object.keys(reversalMap)) {
+            const { data: buyer } = await sb.from('buyers')
+              .select('total_spent, total_breaks_purchased, total_streams_participated')
+              .eq('id', buyerId).maybeSingle();
+            if (!buyer) continue;
+            await sb.from('buyers').update({
+              total_spent:               Math.max(0, (parseFloat(buyer.total_spent) || 0) - reversalMap[buyerId]),
+              total_breaks_purchased:    Math.max(0, (buyer.total_breaks_purchased || 0) - (countMap[buyerId] || 0)),
+              total_streams_participated: Math.max(0, (buyer.total_streams_participated || 1) - 1),
+              updated_at: new Date().toISOString()
+            }).eq('id', buyerId);
+          }
+        }
+
+        // Now safe to delete old purchases and import record
         await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', orgId);
-        // Remove old import record
         await sb.from('stream_slip_imports').delete().eq('id', existingImport.id);
       }
     } catch (e) { console.warn('Reimport cleanup failed:', e.message); }
