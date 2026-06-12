@@ -52,6 +52,7 @@ module.exports = async (req, res) => {
       case 'goals':         return await goalsHandler(req, res, sb, action);
       case 'notify':        return await notifyHandler(req, res, sb, action);
       case 'analytics':     return await analyticsHandler(req, res, sb, action);
+      case 'stream':        return await streamHandler(req, res, sb, action);
       default:              return fail(res, 400, 'Unknown feature: ' + feature);
     }
   } catch (err) {
@@ -1350,4 +1351,85 @@ async function analyticsHandler(req, res, sb, action) {
       low_stock_items: lowProducts.map(function(p){ return { name: p.name, stock: p.current_stock }; })
     }
   });
+}
+
+// =============================================================================
+// STREAM — DELETE
+// =============================================================================
+async function streamHandler(req, res, sb, action) {
+  if (action === 'delete' && req.method === 'DELETE') {
+    const { err, profile } = await authenticate(req, sb);
+    if (err) return fail(res, err.status, err.msg);
+    if (!['owner', 'manager'].includes(profile.role)) return fail(res, 403, 'Owner or manager only');
+
+    const streamId = req.query.streamId;
+    if (!streamId || !/^[0-9a-f-]{36}$/.test(streamId)) return fail(res, 400, 'Invalid streamId');
+
+    // Verify stream belongs to this org
+    const { data: stream } = await sb.from('streams')
+      .select('id, stream_key').eq('id', streamId).eq('org_id', profile.org_id).maybeSingle();
+    if (!stream) return fail(res, 404, 'Stream not found');
+
+    try {
+      // 1. Restore product stock from breaks
+      const { data: streamBreaks } = await sb.from('breaks')
+        .select('products_used').eq('stream_id', streamId).eq('org_id', profile.org_id);
+      const stockDeltas = {};
+      (streamBreaks || []).forEach(function(b) {
+        (b.products_used || []).forEach(function(p) {
+          if (p.product_id) stockDeltas[p.product_id] = (stockDeltas[p.product_id] || 0) + (p.qty || 0);
+        });
+      });
+      const logEntries = [];
+      for (const [productId, qty] of Object.entries(stockDeltas)) {
+        const { data: prod } = await sb.from('products')
+          .select('current_stock, name, unit_cost').eq('id', productId).eq('org_id', profile.org_id).maybeSingle();
+        if (prod) {
+          await sb.from('products').update({ current_stock: (prod.current_stock || 0) + qty }).eq('id', productId);
+          logEntries.push({ org_id: profile.org_id, product_id: productId, product_name: prod.name,
+            action: 'restored', quantity: qty, unit_cost: prod.unit_cost,
+            notes: 'Stream ' + stream.stream_key + ' deleted — stock restored' });
+        }
+      }
+      if (logEntries.length) await sb.from('inventory_log').insert(logEntries).catch(() => {});
+
+      // 2. Reverse buyer totals before deleting purchases
+      const { data: purchases } = await sb.from('buyer_purchases')
+        .select('buyer_id, amount').eq('stream_id', streamId).eq('organization_id', profile.org_id);
+      if (purchases && purchases.length > 0) {
+        const revMap = {}, cntMap = {};
+        purchases.forEach(function(p) {
+          revMap[p.buyer_id] = (revMap[p.buyer_id] || 0) + (parseFloat(p.amount) || 0);
+          cntMap[p.buyer_id] = (cntMap[p.buyer_id] || 0) + 1;
+        });
+        for (const buyerId of Object.keys(revMap)) {
+          const { data: b } = await sb.from('buyers')
+            .select('total_spent, total_breaks_purchased, total_streams_participated')
+            .eq('id', buyerId).maybeSingle();
+          if (b) {
+            await sb.from('buyers').update({
+              total_spent: Math.max(0, (parseFloat(b.total_spent) || 0) - revMap[buyerId]),
+              total_breaks_purchased: Math.max(0, (b.total_breaks_purchased || 0) - cntMap[buyerId]),
+              total_streams_participated: Math.max(0, (b.total_streams_participated || 1) - 1),
+              updated_at: new Date().toISOString()
+            }).eq('id', buyerId);
+          }
+        }
+      }
+
+      // 3. Delete all dependent records then the stream
+      await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', profile.org_id);
+      await sb.from('sorter_splits').delete().eq('stream_id', streamId);
+      await sb.from('stream_slip_imports').delete().eq('stream_id', streamId);
+      await sb.from('breaks').delete().eq('stream_id', streamId).eq('org_id', profile.org_id);
+      await sb.from('sort_tasks').delete().eq('stream_id', streamId).eq('org_id', profile.org_id);
+      await sb.from('streams').delete().eq('id', streamId).eq('org_id', profile.org_id);
+
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      console.error('stream delete error:', e);
+      return fail(res, 500, e.message);
+    }
+  }
+  return fail(res, 400, 'Unknown stream action: ' + action);
 }
