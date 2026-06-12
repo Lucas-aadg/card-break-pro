@@ -6109,9 +6109,33 @@ async function deleteStream(streamId, streamKey) {
       await sb.from('inventory_log').insert(logEntries);
     }
 
-    // Delete breaks, sort task, then the stream record itself
+    // Reverse buyer totals before deleting purchases
+    const { data: streamPurchases } = await sb.from('buyer_purchases')
+      .select('buyer_id, amount').eq('stream_id', streamId).eq('organization_id', currentProfile.org_id);
+    if (streamPurchases && streamPurchases.length > 0) {
+      const revMap = {}, cntMap = {};
+      streamPurchases.forEach(function(p) {
+        revMap[p.buyer_id] = (revMap[p.buyer_id] || 0) + (parseFloat(p.amount) || 0);
+        cntMap[p.buyer_id] = (cntMap[p.buyer_id] || 0) + 1;
+      });
+      for (const buyerId of Object.keys(revMap)) {
+        const { data: b } = await sb.from('buyers').select('total_spent,total_breaks_purchased,total_streams_participated').eq('id', buyerId).maybeSingle();
+        if (b) {
+          await sb.from('buyers').update({
+            total_spent: Math.max(0, (parseFloat(b.total_spent) || 0) - revMap[buyerId]),
+            total_breaks_purchased: Math.max(0, (b.total_breaks_purchased || 0) - cntMap[buyerId]),
+            total_streams_participated: Math.max(0, (b.total_streams_participated || 1) - 1)
+          }).eq('id', buyerId);
+        }
+      }
+    }
+
+    // Delete all dependent records before deleting the stream itself
     await sb.from('breaks').delete().eq('stream_id', streamId).eq('org_id', currentProfile.org_id);
     await sb.from('sort_tasks').delete().eq('stream_id', streamId).eq('org_id', currentProfile.org_id);
+    await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', currentProfile.org_id);
+    await sb.from('sorter_splits').delete().eq('stream_id', streamId);
+    await sb.from('stream_slip_imports').delete().eq('stream_id', streamId);
     await sb.from('streams').delete().eq('id', streamId).eq('org_id', currentProfile.org_id);
 
     hideLoading();
