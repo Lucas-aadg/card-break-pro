@@ -8931,69 +8931,6 @@ function printTable(title, subtitle, tableId) {
 }
 </script>
 
-<!-- ── Owner Bottom Navigation (mobile only) ── -->
-<nav class="btm-nav" id="ownerBtmNav">
-  <button class="btm-nav-item active" id="btn-btm-home" onclick="ownerBtmNav('home')">
-    <span class="btm-nav-icon">🏠</span><span class="btm-nav-label">Dashboard</span>
-  </button>
-  <button class="btm-nav-item" id="btn-btm-breakEntry" onclick="ownerBtmNav('breakEntry')">
-    <span class="btm-nav-icon">📦</span><span class="btm-nav-label">Breaks</span>
-  </button>
-  <button class="btm-nav-item" id="btn-btm-inventory" onclick="ownerBtmNav('inventory')">
-    <span class="btm-nav-icon">🗂️</span><span class="btm-nav-label">Inventory</span>
-  </button>
-  <button class="btm-nav-item" id="btn-btm-team" onclick="ownerBtmNav('team')">
-    <span class="btm-nav-icon">👥</span><span class="btm-nav-label">Team</span>
-  </button>
-  <button class="btm-nav-item" id="btn-btm-more" onclick="openMoreSheet()">
-    <span class="btm-nav-icon">⋯</span><span class="btm-nav-label">More</span>
-  </button>
-</nav>
-
-<!-- ── Owner "More" Slide-Up Sheet ── -->
-<div id="moreSheet">
-  <div id="moreSheetScrim" onclick="closeMoreSheet()"></div>
-  <div id="moreSheetPanel">
-    <div class="more-sheet-handle"></div>
-    <div class="more-sheet-title">More</div>
-    <button class="more-sheet-item" onclick="ownerBtmNav('dashboard');closeMoreSheet()"><span class="more-sheet-icon">📊</span>Analytics</button>
-    <button class="more-sheet-item" onclick="ownerBtmNav('streamSummary');closeMoreSheet()"><span class="more-sheet-icon">📺</span>Stream Summary</button>
-    <button class="more-sheet-item" onclick="ownerBtmNav('history');closeMoreSheet()"><span class="more-sheet-icon">📜</span>Break History</button>
-    <button class="more-sheet-item" onclick="ownerBtmNav('buyers');closeMoreSheet()"><span class="more-sheet-icon">🏆</span>Buyers</button>
-    <button class="more-sheet-item" onclick="ownerBtmNav('schedule');closeMoreSheet()"><span class="more-sheet-icon">📅</span>Scheduling</button>
-    <button class="more-sheet-item" onclick="ownerBtmNav('payroll');closeMoreSheet()"><span class="more-sheet-icon">💰</span>Payroll</button>
-    <button class="more-sheet-item" id="moreItemInsights" onclick="ownerBtmNav('insights');closeMoreSheet()"><span class="more-sheet-icon">✦</span>AI Insights</button>
-    <button class="more-sheet-item" id="moreItemEmpire" style="display:none;" onclick="ownerBtmNav('empire');closeMoreSheet()"><span class="more-sheet-icon">👑</span>Empire Dashboard</button>
-    <button class="more-sheet-item" onclick="window.location.href='/exports'"><span class="more-sheet-icon">📤</span>Exports</button>
-    <button class="more-sheet-item" onclick="window.location.href='/billing'"><span class="more-sheet-icon">💳</span>Billing</button>
-    <button class="more-sheet-item" onclick="ownerBtmNav('settings');closeMoreSheet()"><span class="more-sheet-icon">⚙️</span>Settings</button>
-  </div>
-</div>
-
-<script>
-function ownerBtmNav(tab) {
-  switchTab(tab);
-  document.querySelectorAll('.btm-nav-item').forEach(function(b){ b.classList.remove('active'); });
-  const map = { home: 'btn-btm-home', breakEntry: 'btn-btm-breakEntry', inventory: 'btn-btm-inventory', team: 'btn-btm-team' };
-  if (map[tab]) document.getElementById(map[tab]).classList.add('active');
-}
-function openMoreSheet() { document.getElementById('moreSheet').classList.add('open'); }
-function closeMoreSheet() { document.getElementById('moreSheet').classList.remove('open'); }
-
-// Show/hide empire and insights in more sheet based on tier
-(function() {
-  function updateMoreSheet() {
-    const tier = window.orgTier || '';
-    const ins = document.getElementById('moreItemInsights');
-    const emp = document.getElementById('moreItemEmpire');
-    if (ins) ins.style.display = (tier === 'pro' || tier === 'empire' || tier === 'exempt') ? '' : 'none';
-    if (emp) emp.style.display = (tier === 'pro' || tier === 'empire' || tier === 'exempt') ? '' : 'none';
-  }
-  // Run after auth loads orgTier
-  setTimeout(updateMoreSheet, 2000);
-  document.addEventListener('cbpTierLoaded', updateMoreSheet);
-})();
-</script>
 
 <!-- ── Buyer Profile Overlay ─────────────────────────────── -->
 <div id="buyerProfileOverlay" style="position:fixed;inset:0;background:var(--bg);z-index:2000;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;">
