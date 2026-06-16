@@ -880,6 +880,15 @@ async function notifyHandler(req, res, sb, action) {
     const { data: sorters } = await sb.from('profiles')
       .select('id, display_name').eq('org_id', org_id).eq('role', 'sorter');
 
+    // Update goal progress regardless of whether there are sorters
+    if (stream_id) {
+      await updateGoalProgress(sb, org_id).catch(e => console.error('updateGoalProgress error:', e.message));
+      const newlyEarned = await updateLeaderboardOnStreamClose(sb, stream_id, org_id).catch(e => { console.error('updateLeaderboard error:', e.message); return []; });
+      if (newlyEarned && newlyEarned.length > 0) {
+        await checkMilestoneTriggers(sb, newlyEarned, org_id).catch(e => console.error('checkMilestones error:', e.message));
+      }
+    }
+
     if (!sorters || sorters.length === 0) return res.status(200).json({ sent: 0, reason: 'no sorters' });
 
     const sortUrl  = APP_URL + '/sorter';
@@ -913,14 +922,6 @@ async function notifyHandler(req, res, sb, action) {
       sent++;
     }
 
-    // After notifying, run the three automated DB processes
-    if (stream_id) {
-      await updateGoalProgress(sb, org_id).catch(e => console.error('updateGoalProgress error:', e.message));
-      const newlEarned = await updateLeaderboardOnStreamClose(sb, stream_id, org_id).catch(e => { console.error('updateLeaderboard error:', e.message); return []; });
-      if (newlEarned && newlEarned.length > 0) {
-        await checkMilestoneTriggers(sb, newlEarned, org_id).catch(e => console.error('checkMilestones error:', e.message));
-      }
-    }
 
     return res.status(200).json({ sent });
   }
@@ -1391,7 +1392,7 @@ async function streamHandler(req, res, sb, action) {
             notes: 'Stream ' + stream.stream_key + ' deleted — stock restored' });
         }
       }
-      if (logEntries.length) await sb.from('inventory_log').insert(logEntries).catch(() => {});
+      if (logEntries.length) await sb.from('inventory_log').insert(logEntries).then(null, () => {});
 
       // 2. Reverse buyer totals before deleting purchases
       const { data: purchases } = await sb.from('buyer_purchases')

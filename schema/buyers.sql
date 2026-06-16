@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.buyers (
   last_purchase_date          date,
   temperature                 text        NOT NULL DEFAULT 'cold',
   is_new_buyer                boolean     NOT NULL DEFAULT false,
+  case_hits                   integer     NOT NULL DEFAULT 0,
   last_cold_alert_at          timestamptz,
   created_at                  timestamptz NOT NULL DEFAULT now(),
   updated_at                  timestamptz NOT NULL DEFAULT now(),

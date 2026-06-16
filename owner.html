@@ -599,38 +599,6 @@
     .my-sched-chip.msc-done{background:linear-gradient(135deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08));border-color:rgba(34,197,94,0.4);}
     .my-sched-chip.msc-live{background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(245,158,11,0.08));border-color:rgba(245,158,11,0.4);}
 
-    /* ── Owner Welcome Modal ── */
-    #ownerWelcomeModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:1rem;}
-    .owm-card{background:#10101e;border:1px solid rgba(79,110,247,0.3);border-radius:18px;width:100%;max-width:540px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,0.7);}
-    .owm-header{background:linear-gradient(135deg,rgba(79,110,247,0.15),rgba(99,102,241,0.05));padding:2rem 2.25rem 1.5rem;border-bottom:1px solid rgba(79,110,247,0.15);}
-    .owm-body{padding:2rem 2.25rem 2.25rem;}
-    .owm-screen{display:none;}.owm-screen.active{display:block;}
-    .owm-orient-item{display:flex;gap:1rem;align-items:flex-start;padding:0.9rem 0;border-bottom:1px solid rgba(79,110,247,0.08);}
-    .owm-orient-item:last-child{border-bottom:none;padding-bottom:0;}
-    .owm-orient-icon{width:38px;height:38px;border-radius:10px;background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
-    .owm-orient-text h4{font-size:0.88rem;font-weight:700;color:var(--text);margin-bottom:0.2rem;}
-    .owm-orient-text p{font-size:0.78rem;color:var(--muted);line-height:1.45;margin:0;}
-    .owm-orient-time{font-size:0.68rem;font-weight:700;color:var(--primary);background:rgba(79,110,247,0.1);border-radius:4px;padding:0.15rem 0.4rem;margin-left:auto;flex-shrink:0;height:fit-content;}
-
-    /* ── Onboarding Checklist Widget ── */
-    #onboardingChecklist{position:fixed;bottom:1.5rem;right:1.5rem;z-index:2500;width:300px;font-family:'Segoe UI',system-ui,sans-serif;}
-    .ocl-collapsed{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:0.75rem 1rem;cursor:pointer;display:flex;align-items:center;gap:0.6rem;box-shadow:0 4px 20px rgba(0,0,0,0.4);}
-    .ocl-collapsed:hover{border-color:var(--primary);}
-    .ocl-progress-ring{width:28px;height:28px;flex-shrink:0;}
-    .ocl-progress-ring circle{transition:stroke-dashoffset 0.4s ease;}
-    .ocl-expanded{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.5);}
-    .ocl-exp-header{display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1rem;border-bottom:1px solid var(--border);cursor:pointer;}
-    .ocl-exp-header:hover{background:rgba(79,110,247,0.04);}
-    .ocl-step{padding:0.75rem 1rem;display:flex;align-items:flex-start;gap:0.65rem;border-bottom:1px solid rgba(255,255,255,0.04);}
-    .ocl-step:last-of-type{border-bottom:1px solid var(--border);}
-    .ocl-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
-    .ocl-check.done{background:var(--green);border-color:var(--green);}
-    .ocl-step-text h5{font-size:0.8rem;font-weight:700;color:var(--text);margin:0 0 0.15rem;}
-    .ocl-step-text p{font-size:0.72rem;color:var(--muted);margin:0;line-height:1.4;}
-    .ocl-go-btn{margin-left:auto;flex-shrink:0;background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.25);color:var(--primary);border-radius:6px;padding:0.25rem 0.6rem;font-size:0.7rem;font-weight:700;cursor:pointer;transition:background 0.15s;}
-    .ocl-go-btn:hover{background:rgba(79,110,247,0.22);}
-    .ocl-complete-banner{padding:1.25rem 1rem;text-align:center;}
-
     /* ── CHAT ── */
     .owner-chat-grid{display:grid;grid-template-columns:240px 1fr;gap:0;height:calc(100vh - 210px);min-height:420px;border:1px solid var(--border);border-radius:14px;overflow:hidden;}
     @media(max-width:700px){
@@ -2747,136 +2715,6 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════
-     OWNER WELCOME MODAL (first login)
-═══════════════════════════════════════════ -->
-<div id="ownerWelcomeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)owmSkip()">
-  <div class="owm-card" style="position:relative;">
-    <button onclick="owmSkip()" style="position:absolute;top:10px;right:10px;background:rgba(45,45,61,0.9);border:1px solid rgba(79,110,247,0.2);color:#e2e8f0;font-size:1rem;cursor:pointer;line-height:1;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;z-index:2;" title="Skip">✕</button>
-    <!-- Screen 1: Welcome -->
-    <div id="owmScreen1" class="owm-screen active">
-      <div class="owm-header">
-        <div style="font-size:0.72rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:2px;margin-bottom:0.5rem;">Card Break Pro</div>
-        <h2 style="font-size:1.5rem;font-weight:900;color:var(--text);margin:0 0 0.5rem;">Welcome to CardBreakPro.</h2>
-        <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;margin:0;">You just replaced every spreadsheet, group chat, and manual calculation your operation runs on.</p>
-      </div>
-      <div class="owm-body">
-        <p style="color:var(--muted);font-size:0.88rem;line-height:1.6;margin:0 0 1.5rem;">Let's get you set up in under 10 minutes. You'll have real-time profit tracking, your team on the platform, and payroll calculated automatically before you close your first stream.</p>
-        <button class="btn btn-primary" style="width:100%;padding:0.9rem;font-size:0.95rem;" onclick="owmNext()">Start Setup →</button>
-      </div>
-    </div>
-    <!-- Screen 2: Orientation overview -->
-    <div id="owmScreen2" class="owm-screen">
-      <div class="owm-header">
-        <div style="font-size:0.72rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:2px;margin-bottom:0.5rem;">Quick Orientation</div>
-        <h2 style="font-size:1.3rem;font-weight:900;color:var(--text);margin:0 0 0.3rem;">Here's what we'll set up.</h2>
-        <p style="color:var(--muted);font-size:0.82rem;margin:0;">Total time: under 10 minutes.</p>
-      </div>
-      <div class="owm-body">
-        <div class="owm-orient-item">
-          <div class="owm-orient-icon">📺</div>
-          <div class="owm-orient-text">
-            <h4>Create your channel</h4>
-            <p>Your breaking channel is where streams are organized. Name it and assign a sport or category.</p>
-          </div>
-          <div class="owm-orient-time">2 min</div>
-        </div>
-        <div class="owm-orient-item">
-          <div class="owm-orient-icon">📦</div>
-          <div class="owm-orient-text">
-            <h4>Add your products</h4>
-            <p>Enter the boxes you break with cost and category. Profit tracking works from the moment you add them.</p>
-          </div>
-          <div class="owm-orient-time">3 min</div>
-        </div>
-        <div class="owm-orient-item">
-          <div class="owm-orient-icon">👥</div>
-          <div class="owm-orient-text">
-            <h4>Invite your team</h4>
-            <p>Share an invite code. Your breakers and sorters join in one click and see their schedule immediately.</p>
-          </div>
-          <div class="owm-orient-time">2 min</div>
-        </div>
-        <div class="owm-orient-item">
-          <div class="owm-orient-icon">💰</div>
-          <div class="owm-orient-text">
-            <h4>Configure payroll</h4>
-            <p>Set commission, hourly, or flat rate for each team member. The platform calculates everything automatically.</p>
-          </div>
-          <div class="owm-orient-time">3 min</div>
-        </div>
-        <button class="btn btn-primary" style="width:100%;padding:0.9rem;font-size:0.95rem;margin-top:1.5rem;" onclick="owmFinish()">Let's Go →</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════
-     ONBOARDING CHECKLIST WIDGET
-═══════════════════════════════════════════ -->
-<div id="onboardingChecklist" style="display:none;">
-  <!-- Collapsed state -->
-  <div id="oclCollapsed" class="ocl-collapsed" onclick="oclExpand()" style="display:none;">
-    <svg class="ocl-progress-ring" viewBox="0 0 28 28">
-      <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(79,110,247,0.2)" stroke-width="2.5"/>
-      <circle id="oclRingFill" cx="14" cy="14" r="11" fill="none" stroke="#4f6ef7" stroke-width="2.5"
-        stroke-dasharray="69.1" stroke-dashoffset="69.1" stroke-linecap="round" transform="rotate(-90 14 14)"/>
-    </svg>
-    <span id="oclCollapsedLabel" style="font-size:0.82rem;font-weight:700;color:var(--text);">Setup: 0 of 4 done</span>
-    <span style="margin-left:auto;color:var(--muted);font-size:0.75rem;">▲</span>
-  </div>
-  <!-- Expanded state -->
-  <div id="oclExpanded" class="ocl-expanded">
-    <div class="ocl-exp-header" onclick="oclCollapse()">
-      <div>
-        <div style="font-size:0.82rem;font-weight:800;color:var(--text);">Setup Checklist</div>
-        <div id="oclExpandedSub" style="font-size:0.72rem;color:var(--muted);margin-top:0.1rem;">0 of 4 steps complete</div>
-      </div>
-      <span style="color:var(--muted);font-size:0.75rem;">▼</span>
-    </div>
-
-    <div class="ocl-step" id="oclStep1">
-      <div class="ocl-check" id="oclCheck1"></div>
-      <div class="ocl-step-text">
-        <h5>Create your first channel</h5>
-        <p>Set up the channel where your breaks happen.</p>
-      </div>
-      <button class="ocl-go-btn" onclick="oclGo(1)">Go</button>
-    </div>
-    <div class="ocl-step" id="oclStep2" style="opacity:0.5;pointer-events:none;">
-      <div class="ocl-check" id="oclCheck2"></div>
-      <div class="ocl-step-text">
-        <h5>Add your products</h5>
-        <p>Enter the boxes you break with cost &amp; category.</p>
-      </div>
-      <button class="ocl-go-btn" onclick="oclGo(2)">Go</button>
-    </div>
-    <div class="ocl-step" id="oclStep3" style="opacity:0.5;pointer-events:none;">
-      <div class="ocl-check" id="oclCheck3"></div>
-      <div class="ocl-step-text">
-        <h5>Invite your team</h5>
-        <p>Send invite codes to your breakers and sorters.</p>
-      </div>
-      <button class="ocl-go-btn" onclick="oclGo(3)">Go</button>
-    </div>
-    <div class="ocl-step" id="oclStep4" style="opacity:0.5;pointer-events:none;">
-      <div class="ocl-check" id="oclCheck4"></div>
-      <div class="ocl-step-text">
-        <h5>Configure payroll settings</h5>
-        <p>Set each team member's pay structure.</p>
-      </div>
-      <button class="ocl-go-btn" onclick="oclGo(4)">Go</button>
-    </div>
-
-    <div id="oclComplete" class="ocl-complete-banner" style="display:none;">
-      <div style="font-size:1.5rem;margin-bottom:0.5rem;">🎉</div>
-      <div style="font-size:0.92rem;font-weight:800;color:var(--text);margin-bottom:0.35rem;">You're live.</div>
-      <div style="font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:1rem;">Your operation is set up and ready to run. Go break some boxes.</div>
-      <button class="btn btn-primary" style="font-size:0.82rem;padding:0.5rem 1.2rem;" onclick="oclDismiss()">Dismiss</button>
-    </div>
-  </div>
-</div>
-
 <!-- CONFIRM MODAL (generic) -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal" style="max-width:400px;">
@@ -3866,7 +3704,7 @@ async function initAuth() {
     document.getElementById('ownerBadge').textContent = escHtml(profile.display_name);
 
     // PostHog: identify user with org/tier context
-    const { data: orgInfo } = await sb.from('organizations').select('name,first_login_shown,checklist_dismissed').eq('id', profile.org_id).maybeSingle();
+    const { data: orgInfo } = await sb.from('organizations').select('name').eq('id', profile.org_id).maybeSingle();
     const daysSince = Math.round((Date.now() - new Date(currentUser.created_at || Date.now()).getTime()) / 86400000);
     cbpIdentify(currentUser.id, {
       organization_id: profile.org_id,
@@ -3909,9 +3747,6 @@ async function initAuth() {
     checkPaymentFailedBanner();
     loadNotifPrefs();
     setupNotifPrefsListeners();
-
-    // Onboarding: welcome modal + checklist widget
-    await checkAndShowWizard(orgInfo);
 
   } catch (err) {
     showGlobalError('Failed to initialize: ' + escHtml(err.message));
@@ -4663,6 +4498,11 @@ function setupCloseOutModal() {
 
       if (error) throw error;
 
+      // Capture before resets below
+      const _closedStreamId   = beCurrentStream.id;
+      const _closedStreamKey  = beCurrentStream.stream_key || '';
+      const _closedBreakCount = beSubmittedBreaks.length;
+
       // Clock out the owner's active shift (if any)
       await sb.from('schedules')
         .update({ status: 'completed', clocked_out_at: new Date().toISOString() })
@@ -4706,6 +4546,15 @@ function setupCloseOutModal() {
 
       showGlobalSuccess('Stream closed! Net Profit: ' + fmt(netProfit));
       cbpTrack('stream_closed', { org_id: currentProfile.org_id, net_profit: netProfit });
+
+      // Notify sorters + update goal progress + leaderboard (fire and forget)
+      ownerAuthToken().then(function(tok) {
+        fetch('/api/notify-stream-closed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+          body: JSON.stringify({ stream_id: _closedStreamId, stream_key: _closedStreamKey, break_count: _closedBreakCount })
+        }).catch(function() {});
+      });
       // Fire first-stream event using a localStorage flag
       if (!localStorage.getItem('cbp_first_stream_' + currentProfile.org_id)) {
         cbpTrack('owner_first_stream_closed', { org_id: currentProfile.org_id });
@@ -8731,167 +8580,6 @@ function updateTimeFormatBtns() {
   btn24.style.border = is24 ? 'none' : '1px solid var(--border)';
 }
 
-// ── Owner Welcome Modal + Onboarding Checklist ───────────
-async function checkAndShowWizard(orgInfo) {
-  const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id);
-  const welcomeDone = localStorage.getItem(welcomeKey) || (orgInfo && orgInfo.first_login_shown);
-
-  if (!welcomeDone) {
-    document.getElementById('ownerWelcomeModal').style.display = 'flex';
-    return; // checklist shows after modal closes via owmFinish()
-  }
-  // Checklist shown until dismissed
-  const checklistKey = 'cbp_owner_checklist_dismissed_' + (currentProfile?.org_id || currentUser?.id);
-  const checklistDone = localStorage.getItem(checklistKey) || (orgInfo && orgInfo.checklist_dismissed);
-  if (!checklistDone) {
-    await oclInit();
-  }
-}
-
-function owmNext() {
-  document.getElementById('owmScreen1').classList.remove('active');
-  document.getElementById('owmScreen2').classList.add('active');
-}
-
-function owmSkip() {
-  document.getElementById('ownerWelcomeModal').style.display = 'none';
-  try {
-    const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id || 'guest');
-    localStorage.setItem(welcomeKey, '1');
-  } catch(e) {}
-  if (currentProfile?.org_id) {
-    sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id).then().catch(() => {});
-  }
-}
-
-async function owmFinish() {
-  document.getElementById('ownerWelcomeModal').style.display = 'none';
-  try {
-    const welcomeKey = 'cbp_owner_welcome_done_' + (currentProfile?.org_id || currentUser?.id || 'guest');
-    localStorage.setItem(welcomeKey, '1');
-  } catch(e) {}
-  if (currentProfile?.org_id) {
-    sb.from('organizations').update({ first_login_shown: true }).eq('id', currentProfile.org_id).then().catch(() => {});
-  }
-  // Start checklist
-  await oclInit();
-}
-
-// ── Onboarding Checklist Widget ───────────────────────────
-let oclState = { s1: false, s2: false, s3: false, s4: false };
-let oclPollTimer = null;
-
-async function oclInit() {
-  const el = document.getElementById('onboardingChecklist');
-  el.style.display = 'block';
-  document.getElementById('oclExpanded').style.display = 'block';
-  document.getElementById('oclCollapsed').style.display = 'none';
-  await oclRefresh();
-  // Poll every 30 seconds while on page
-  if (oclPollTimer) clearInterval(oclPollTimer);
-  oclPollTimer = setInterval(oclRefresh, 30000);
-}
-
-async function oclRefresh() {
-  try {
-    const orgId = currentProfile.org_id;
-    const [chRes, prRes, invRes, payRes] = await Promise.all([
-      sb.from('channels').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
-      sb.from('products').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
-      sb.from('invite_codes').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
-      sb.from('profiles').select('id', { count: 'exact', head: true }).eq('org_id', orgId).not('pay_type', 'is', null).neq('role', 'owner')
-    ]);
-    oclState = {
-      s1: (chRes.count || 0) > 0,
-      s2: (prRes.count || 0) > 0,
-      s3: (invRes.count || 0) > 0,
-      s4: (payRes.count || 0) > 0
-    };
-    oclRender();
-  } catch (e) { /* silent — checklist is non-critical */ }
-}
-
-function oclRender() {
-  const steps = [oclState.s1, oclState.s2, oclState.s3, oclState.s4];
-  const done = steps.filter(Boolean).length;
-  const all = done === 4;
-
-  steps.forEach(function (completed, i) {
-    const n = i + 1;
-    const check = document.getElementById('oclCheck' + n);
-    const step = document.getElementById('oclStep' + n);
-    if (!check || !step) return;
-    if (completed) {
-      check.classList.add('done');
-      check.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      step.style.opacity = '1';
-      step.style.pointerEvents = 'auto';
-    } else {
-      check.classList.remove('done');
-      check.innerHTML = '';
-      // Unlock steps in order (step N unlocks when step N-1 is done)
-      const prev = i === 0 ? true : steps[i - 1];
-      step.style.opacity = prev ? '1' : '0.5';
-      step.style.pointerEvents = prev ? 'auto' : 'none';
-    }
-  });
-
-  // Progress ring (SVG dashoffset)
-  const circumference = 69.1;
-  const offset = circumference - (done / 4) * circumference;
-  const ring = document.getElementById('oclRingFill');
-  if (ring) ring.style.strokeDashoffset = offset;
-
-  // Collapsed label
-  const collLabel = document.getElementById('oclCollapsedLabel');
-  if (collLabel) collLabel.textContent = 'Setup: ' + done + ' of 4 done';
-
-  // Expanded subtitle
-  const expSub = document.getElementById('oclExpandedSub');
-  if (expSub) expSub.textContent = done + ' of 4 steps complete';
-
-  // Completion screen
-  const completeBanner = document.getElementById('oclComplete');
-  if (all && completeBanner) {
-    completeBanner.style.display = 'block';
-    if (!localStorage.getItem('cbp_onboarding_complete_' + currentProfile.org_id)) {
-      cbpTrack('owner_onboarding_complete', { org_id: currentProfile.org_id });
-      localStorage.setItem('cbp_onboarding_complete_' + currentProfile.org_id, '1');
-    }
-    clearInterval(oclPollTimer);
-  }
-}
-
-function oclExpand() {
-  document.getElementById('oclCollapsed').style.display = 'none';
-  document.getElementById('oclExpanded').style.display = 'block';
-}
-function oclCollapse() {
-  document.getElementById('oclExpanded').style.display = 'none';
-  document.getElementById('oclCollapsed').style.display = 'flex';
-}
-function oclDismiss() {
-  const checklistKey = 'cbp_owner_checklist_dismissed_' + (currentProfile?.org_id || currentUser?.id);
-  localStorage.setItem(checklistKey, '1');
-  document.getElementById('onboardingChecklist').style.display = 'none';
-  clearInterval(oclPollTimer);
-  sb.from('organizations').update({ checklist_dismissed: true }).eq('id', currentProfile.org_id).then().catch(() => {});
-}
-
-function oclGo(step) {
-  const tabMap = { 1: 'channels', 2: 'inventory', 3: 'team', 4: 'team' };
-  const tabName = tabMap[step];
-  if (!tabName) return;
-  const btn = document.querySelector('[data-tab="' + tabName + '"]');
-  if (btn) btn.click();
-  // For payroll (step 4), also scroll to pay settings note
-  if (step === 4) {
-    setTimeout(function () {
-      const ps = document.querySelector('#tab-team');
-      if (ps) ps.scrollIntoView({ behavior: 'smooth' });
-    }, 300);
-  }
-}
 
 function showWizard() {
   wizardStep = 1;
@@ -9380,7 +9068,7 @@ async function loadBuyersTab() {
         .select('id,username,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits')
         .eq('organization_id', currentProfile.org_id)
         .order('total_spent', { ascending: false })
-        .limit(15);
+        .limit(50);
       if (error) throw error;
       buyers = data || [];
     } else {
@@ -9400,7 +9088,7 @@ async function loadBuyersTab() {
       if (sorted.length === 0) { el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No purchases in the last 30 days.</div>'; return; }
 
       const ids = sorted.map(x => x[0]);
-      const { data: buyerRows } = await sb.from('buyers').select('id,username,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits').in('id', ids);
+      const { data: buyerRows } = await sb.from('buyers').select('id,username,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits').in('id', ids).limit(50);
       const byId = {};
       (buyerRows || []).forEach(b => { byId[b.id] = b; });
       buyers = sorted.map(([id, recentSpent]) => { const b = byId[id]; if (!b) return null; return { ...b, _recentSpent: recentSpent }; }).filter(Boolean);
@@ -9413,7 +9101,7 @@ async function loadBuyersTab() {
 
     el.innerHTML = buyers.map(function(b, i) {
       const spent = _buyersViewMode === 'recent' ? (b._recentSpent || 0) : Number(b.total_spent || 0);
-      const temp = calcBuyerTemp(b.last_purchase_date);
+      const temp = b.temperature || calcBuyerTemp(b.last_purchase_date);
       const tempColor = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
       const lastDate = b.last_purchase_date ? relativeDate(b.last_purchase_date) : 'Never';
       const hits = b.case_hits || 0;
@@ -9693,16 +9381,22 @@ async function openBuyerProfile(buyerId) {
       sb.from('buyer_purchases').select('*').eq('buyer_id', buyerId).order('purchase_date', { ascending: false })
     ]);
 
+    if (buyerRes.error) throw buyerRes.error;
     const buyer = buyerRes.data;
     if (!buyer) throw new Error('Buyer not found');
+    if (hitsRes.error) console.error('Hit history fetch error:', hitsRes.error.message);
+    if (purchasesRes.error) console.error('Purchase history fetch error:', purchasesRes.error.message);
 
     // Header
     document.getElementById('bpUsername').textContent = '@' + buyer.username;
-    const temp = calcBuyerTemp(buyer.last_purchase_date);
-    const tempColor = temp === 'hot' ? '#22c55e' : temp === 'warm' ? '#f59e0b' : '#64748b';
+    const temp = buyer.temperature || calcBuyerTemp(buyer.last_purchase_date);
+    const tempColor = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
     document.getElementById('bpTempBadge').innerHTML = '<span style="background:' + tempColor + '1a;color:' + tempColor + ';border:1px solid ' + tempColor + '44;border-radius:100px;padding:0.2rem 0.7rem;font-size:0.75rem;font-weight:700;text-transform:capitalize;">' + temp + '</span>';
     if (buyer.is_new_buyer) document.getElementById('bpNewBadge').style.display = '';
-    document.getElementById('bpFirstSeen').textContent = buyer.first_seen_date ? 'First seen ' + buyer.first_seen_date : '';
+    const caseHits = buyer.case_hits || 0;
+    document.getElementById('bpFirstSeen').textContent = (buyer.first_seen_date
+      ? 'First seen ' + new Date(buyer.first_seen_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '') + (caseHits > 0 ? (buyer.first_seen_date ? '  ·  ' : '') + '🎯 ' + caseHits + ' case hit' + (caseHits > 1 ? 's' : '') : '');
 
     // Stats
     const stats = [
@@ -9807,12 +9501,16 @@ function renderBpPurchases() {
 }
 
 async function saveBuyerNotes(buyerId, notes) {
-  await sb.from('buyers').update({ notes, updated_at: new Date().toISOString() }).eq('id', buyerId).catch(() => {});
+  const { error } = await sb.from('buyers').update({ notes, updated_at: new Date().toISOString() }).eq('id', buyerId);
+  if (error) console.error('Notes save failed:', error.message);
 }
 
 function closeBuyerProfile() {
   const overlay = document.getElementById('buyerProfileOverlay');
   overlay.style.transform = 'translateX(100%)';
+  _buyerProfileId = null;
+  _bpPurchases = [];
+  _bpPurchasePage = 0;
 }
 
 // ═══════════════════════════════════════════════════════════

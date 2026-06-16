@@ -120,7 +120,7 @@ async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
 
   // Look up existing buyer — case-insensitive via ilike
   const { data: existing } = await sb.from('buyers')
-    .select('id, total_spent, total_breaks_purchased, total_streams_participated')
+    .select('id, total_spent, total_breaks_purchased, total_streams_participated, is_new_buyer')
     .eq('organization_id', orgId)
     .eq('platform', 'whatnot')
     .ilike('username', uname)
@@ -151,6 +151,8 @@ async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
         total_streams_participated: (existing.total_streams_participated || 0) + (streamId ? 1 : 0),
         last_purchase_date: purchaseDate,
         temperature: computeTemp(purchaseDate),
+        // Clear new-buyer flag once they have confirmed purchase history
+        ...(existing.is_new_buyer ? { is_new_buyer: false } : {}),
         ...(realName ? { real_name: realName } : {}),
         updated_at: new Date().toISOString()
       }).eq('id', existing.id);

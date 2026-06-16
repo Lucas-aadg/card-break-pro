@@ -439,7 +439,7 @@ CREATE TRIGGER on_org_created_seed_defaults
 
 -- Retroactively seed existing orgs that don't yet have defaults
 INSERT INTO chat_channels (name, slug, description, org_id, can_post_roles)
-SELECT name, slug, description, o.id, roles
+SELECT defaults.name, defaults.slug, defaults.description, o.id, defaults.roles
 FROM organizations o
 CROSS JOIN (VALUES
   ('All Team',      'all_team',      'Visible to everyone on the team',        ARRAY['owner','manager','breaker','sorter']),
@@ -452,6 +452,11 @@ ON CONFLICT (org_id, slug) DO NOTHING;
 INSERT INTO leaderboard_settings (org_id)
 SELECT id FROM organizations
 ON CONFLICT (org_id) DO NOTHING;
+
+-- ═══════════════════════════════════════════════════════════════════
+-- BUYER INTELLIGENCE — add case_hits column (idempotent)
+-- ═══════════════════════════════════════════════════════════════════
+ALTER TABLE public.buyers ADD COLUMN IF NOT EXISTS case_hits INTEGER NOT NULL DEFAULT 0;
 
 -- ═══════════════════════════════════════════════════════════════════
 -- SYSTEM MILESTONE SEEDS (org_id NULL = visible to all orgs)
