@@ -53,6 +53,7 @@ module.exports = async (req, res) => {
       case 'notify':        return await notifyHandler(req, res, sb, action);
       case 'analytics':     return await analyticsHandler(req, res, sb, action);
       case 'stream':        return await streamHandler(req, res, sb, action);
+      case 'team':          return await teamHandler(req, res, sb, action);
       default:              return fail(res, 400, 'Unknown feature: ' + feature);
     }
   } catch (err) {
@@ -1433,4 +1434,50 @@ async function streamHandler(req, res, sb, action) {
     }
   }
   return fail(res, 400, 'Unknown stream action: ' + action);
+}
+
+// =============================================================================
+// TEAM — REMOVE MEMBER (soft-remove: revoke access, preserve history)
+// =============================================================================
+// A profile can't be hard-deleted once it has run streams/breaks — streams.breaker_id
+// and breaks.breaker_id are NOT NULL FKs with no ON DELETE rule, and profiles.id
+// cascades from auth.users, so deleting the auth user bounces the same FK error.
+// Instead we orphan the profile from the org (org_id = NULL) and ban the auth user.
+// Their historical streams/breaks/sales stay intact for reports and leaderboards.
+async function teamHandler(req, res, sb, action) {
+  if (action === 'remove' && req.method === 'DELETE') {
+    const { err, profile } = await authenticate(req, sb);
+    if (err) return fail(res, err.status, err.msg);
+    if (profile.role !== 'owner') return fail(res, 403, 'Owner only');
+
+    const memberId = req.query.memberId;
+    if (!memberId || !/^[0-9a-f-]{36}$/.test(memberId)) return fail(res, 400, 'Invalid memberId');
+    if (memberId === profile.id) return fail(res, 400, 'You cannot remove yourself');
+
+    // Verify target is in this owner's org and is not the owner
+    const { data: target } = await sb.from('profiles')
+      .select('id, role, org_id, display_name').eq('id', memberId).maybeSingle();
+    if (!target || target.org_id !== profile.org_id) return fail(res, 404, 'Member not found');
+    if (target.role === 'owner') return fail(res, 400, 'Cannot remove an owner');
+
+    try {
+      // 1. Clean up org-scoped access/assignments (history rows are left untouched)
+      await sb.from('channel_assignments').delete().eq('profile_id', memberId).then(null, () => {});
+
+      // 2. Orphan the profile from the org → drops them from the team list and RLS scope
+      const { error: updErr } = await sb.from('profiles')
+        .update({ org_id: null }).eq('id', memberId);
+      if (updErr) throw updErr;
+
+      // 3. Ban the auth user so they can no longer sign in anywhere (best-effort)
+      await sb.auth.admin.updateUserById(memberId, { ban_duration: '876000h' })
+        .then(null, function (e) { console.error('ban user failed (non-fatal):', e && e.message); });
+
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      console.error('team remove error:', e);
+      return fail(res, 500, e.message);
+    }
+  }
+  return fail(res, 400, 'Unknown team action: ' + action);
 }

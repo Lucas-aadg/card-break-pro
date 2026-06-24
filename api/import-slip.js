@@ -100,7 +100,10 @@ function parseWhatnotSlips(rawText) {
     throw new Error('No buyer data found. Check that this is a Whatnot packing slip PDF.');
   }
 
-  const buyers = Array.from(slipMap.values());
+  // Exclude giveaway-only recipients — zero spend and no parsed items
+  const buyers = Array.from(slipMap.values()).filter(function(b) {
+    return b.items.length > 0 || b.totalSpent > 0;
+  });
   return {
     buyers,
     streamName: streamName || '',

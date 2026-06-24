@@ -5889,26 +5889,31 @@ async function confirmEditStream() {
 
     // ── Process slip if uploaded ─────────────────────────────────────────
     if (_esSlipFile) {
-      try {
-        const tok = (await sb.auth.getSession()).data.session.access_token;
-        const fd = new FormData(); fd.append('file', _esSlipFile);
-        const parseResp = await fetch('/api/import-slip', { method: 'POST', body: fd });
-        const parsed = await parseResp.json();
-        if (parseResp.ok && parsed.buyers && parsed.buyers.length > 0) {
-          await fetch('/api/process-import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-            body: JSON.stringify({
-              orgId: currentProfile.org_id,
-              streamId: _esStreamId,
-              buyers: parsed.buyers,
-              streamDate: parsed.streamDate || _esStreamData.break_date,
-              importedBy: currentUser.id,
-              rawFilename: _esSlipFile.name
-            })
-          });
+      const tok = (await sb.auth.getSession()).data.session.access_token;
+      const fd = new FormData(); fd.append('file', _esSlipFile);
+      btn.textContent = 'Parsing slip…';
+      const parseResp = await fetch('/api/import-slip', { method: 'POST', body: fd });
+      const parsed = await parseResp.json();
+      if (!parseResp.ok) throw new Error('Slip parse failed: ' + (parsed.error || parseResp.status));
+      if (parsed.buyers && parsed.buyers.length > 0) {
+        btn.textContent = 'Importing buyers…';
+        const importResp = await fetch('/api/process-import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+          body: JSON.stringify({
+            orgId: currentProfile.org_id,
+            streamId: _esStreamId,
+            buyers: parsed.buyers,
+            streamDate: parsed.streamDate || _esStreamData.break_date,
+            importedBy: currentUser.id,
+            rawFilename: _esSlipFile.name
+          })
+        });
+        if (!importResp.ok) {
+          const importErr = await importResp.json().catch(() => ({}));
+          throw new Error('Buyer import failed: ' + (importErr.error || importResp.status));
         }
-      } catch (slipErr) { console.warn('Slip import during edit failed:', slipErr.message); }
+      }
     }
 
     closeEditStream();
@@ -6593,11 +6598,16 @@ async function loadTeam() {
       const name = btn.dataset.name;
       openConfirm(
         'Remove Team Member',
-        'Remove "' + name + '" from your team? They will lose access to the platform.',
+        'Remove "' + name + '" from your team? They will immediately lose access to the platform. Their past streams, breaks, and sales history are kept for your reports.',
         async function () {
           try {
-            const { error } = await sb.from('profiles').delete().eq('id', id);
-            if (error) throw error;
+            const token = await ownerAuthToken();
+            const resp = await fetch('/api/team/remove?memberId=' + encodeURIComponent(id), {
+              method: 'DELETE',
+              headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'Remove failed');
             await loadTeam();
             showGlobalSuccess(name + ' has been removed from the team.');
           } catch (err) {

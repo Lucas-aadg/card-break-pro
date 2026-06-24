@@ -58,12 +58,20 @@ module.exports = async (req, res) => {
               .select('total_spent, total_breaks_purchased, total_streams_participated')
               .eq('id', buyerId).maybeSingle();
             if (!buyer) continue;
-            await sb.from('buyers').update({
-              total_spent:               Math.max(0, (parseFloat(buyer.total_spent) || 0) - reversalMap[buyerId]),
-              total_breaks_purchased:    Math.max(0, (buyer.total_breaks_purchased || 0) - (countMap[buyerId] || 0)),
-              total_streams_participated: Math.max(0, (buyer.total_streams_participated || 1) - 1),
-              updated_at: new Date().toISOString()
-            }).eq('id', buyerId);
+            const newSpent   = Math.max(0, (parseFloat(buyer.total_spent) || 0) - reversalMap[buyerId]);
+            const newBreaks  = Math.max(0, (buyer.total_breaks_purchased || 0) - (countMap[buyerId] || 0));
+            const newStreams  = Math.max(0, (buyer.total_streams_participated || 1) - 1);
+            if (newSpent === 0 && newBreaks === 0 && newStreams === 0) {
+              // Giveaway-only buyer — remove them entirely rather than leaving a $0 ghost record
+              await sb.from('buyers').delete().eq('id', buyerId);
+            } else {
+              await sb.from('buyers').update({
+                total_spent: newSpent,
+                total_breaks_purchased: newBreaks,
+                total_streams_participated: newStreams,
+                updated_at: new Date().toISOString()
+              }).eq('id', buyerId);
+            }
           }
         }
 
@@ -94,6 +102,7 @@ module.exports = async (req, res) => {
 
   for (const buyer of buyers) {
     if (!buyer.username) continue;
+    if ((Number(buyer.totalSpent) || 0) === 0 && (!buyer.items || buyer.items.length === 0)) continue;
     try {
       await processBuyer(sb, orgId, streamId, buyer, purchaseDate);
       processed++;
