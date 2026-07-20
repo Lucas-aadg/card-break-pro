@@ -2,7 +2,15 @@ const { createClient } = require('@supabase/supabase-js');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    return await handleImport(req, res);
+  } catch (e) {
+    console.error('process-import fatal:', e);
+    return res.status(500).json({ error: e && e.message ? e.message : 'Import failed' });
+  }
+};
 
+async function handleImport(req, res) {
   let body;
   try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
   catch (e) { return res.status(400).json({ error: 'Invalid JSON' }); }
