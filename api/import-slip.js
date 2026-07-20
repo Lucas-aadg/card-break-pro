@@ -49,210 +49,203 @@ function extractFileBuffer(req) {
 }
 
 function parseWhatnotSlips(rawText) {
-  const lines = rawText.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
+  const rawLines = rawText.split('\n').map(function (l) { return l.trim(); });
+  const lines = rawLines.filter(function (l) { return l.length > 0; });
 
-  // Split into per-buyer blocks on "Whatnot Packing Slip" or "Packing Slip" headers
-  const slipStarts = [];
+  // Split into page-blocks on the "Whatnot Packing Slip" header line.
+  const headerIdx = [];
   for (let i = 0; i < lines.length; i++) {
-    if (/(?:Whatnot\s+)?Packing\s+Slip/i.test(lines[i])) slipStarts.push(i);
+    if (/Whatnot\s*Packing\s*Slip/i.test(lines[i])) headerIdx.push(i);
   }
+  const blocks = headerIdx.map(function (start, idx) {
+    const end = idx + 1 < headerIdx.length ? headerIdx[idx + 1] : lines.length;
+    return lines.slice(start, end);
+  });
 
-  let slipBlocks = slipStarts.length > 0
-    ? slipStarts.map(function(start, idx) {
-        const end = idx + 1 < slipStarts.length ? slipStarts[idx + 1] : lines.length;
-        return lines.slice(start, end);
-      })
-    : [lines];
-
-  const slipMap = new Map();
+  const buyers = [];
+  let current = null;   // buyer currently accumulating (for multi-page orders)
   let streamName = '';
   let streamDate = '';
 
-  for (const block of slipBlocks) {
-    try {
-      const slip = extractSlipData(block);
-      if (!slip.username) continue;
-      if (slip.streamName) streamName = slip.streamName;
-      if (slip.streamDate) streamDate = slip.streamDate;
-
-      const key = slip.username.toLowerCase();
-      if (slipMap.has(key)) {
-        // Merge multi-page / multi-package slips for same buyer
-        const existing = slipMap.get(key);
-        const existingOrders = new Set(existing.items.map(function(x){ return x.orderNumber; }).filter(Boolean));
-        for (const item of slip.items) {
-          if (item.orderNumber && existingOrders.has(item.orderNumber)) continue;
-          existing.items.push(item);
-          if (item.orderNumber) existingOrders.add(item.orderNumber);
-        }
-        existing.totalSpent = parseFloat(existing.items.reduce(function(s, x){ return s + (x.amount || 0); }, 0).toFixed(2));
-        // Fall back to slip total if no line items found
-        if (!existing.totalSpent && slip.totalSpent) existing.totalSpent = slip.totalSpent;
-      } else {
-        slipMap.set(key, slip);
-      }
-    } catch (e) {
-      console.warn('Slip block error:', e.message);
+  for (const block of blocks) {
+    const to = extractBuyerHeader(block);
+    if (to.username) {
+      // New buyer starts
+      current = {
+        username: to.username,
+        isNew: to.isNew,
+        realName: to.realName,
+        items: [],
+        slipTotal: null,     // printed "N Items $Total" (grand total on final page)
+      };
+      buyers.push(current);
+      if (to.streamName) streamName = to.streamName;
+      if (to.streamDate) streamDate = to.streamDate;
     }
+    if (!current) continue; // stray page before any buyer — ignore
+
+    // Items in this block
+    const items = extractItems(block);
+    for (const it of items) current.items.push(it);
+
+    // Grand-total summary on this block (last one seen wins = final page total)
+    const total = extractSlipTotal(block);
+    if (total !== null) current.slipTotal = total;
   }
 
-  if (slipMap.size === 0) {
-    throw new Error('No buyer data found. Check that this is a Whatnot packing slip PDF.');
-  }
+  // Finalize: compute spend, dedupe by order number, validate against printed total
+  const warnings = [];
+  const finalBuyers = buyers.map(function (b) {
+    // Dedupe items by order number (guards against overlap across page merges)
+    const seen = new Set();
+    const uniqueItems = [];
+    for (const it of b.items) {
+      if (it.orderNumber && seen.has(it.orderNumber)) continue;
+      if (it.orderNumber) seen.add(it.orderNumber);
+      uniqueItems.push(it);
+    }
+    const itemSum = round2(uniqueItems.reduce(function (s, it) { return s + (it.amount || 0); }, 0));
+    let totalSpent = itemSum;
 
-  // Exclude giveaway-only recipients — zero spend and no parsed items
-  const buyers = Array.from(slipMap.values()).filter(function(b) {
-    return b.items.length > 0 || b.totalSpent > 0;
+    // Validate against printed grand total; trust the printed total for buyer revenue.
+    if (b.slipTotal !== null && Math.abs(b.slipTotal - itemSum) > 0.001) {
+      warnings.push(b.username + ': parsed items $' + itemSum + ' != slip total $' + b.slipTotal);
+      totalSpent = b.slipTotal; // printed total is authoritative for revenue
+    }
+
+    return {
+      username: b.username,
+      isNew: b.isNew,
+      realName: b.realName,
+      items: uniqueItems,
+      totalSpent: totalSpent,
+    };
   });
+
+  // Exclude giveaway-only recipients (zero spend, no paid items)
+  const paying = finalBuyers.filter(function (b) {
+    return b.totalSpent > 0 || b.items.some(function (it) { return it.amount > 0; });
+  });
+
   return {
-    buyers,
+    buyers: paying,
     streamName: streamName || '',
     streamDate: streamDate || '',
-    totalBuyersFound: buyers.length,
-    totalNewBuyers: buyers.filter(function(b){ return b.isNew; }).length,
-    totalRevenueParsed: parseFloat(buyers.reduce(function(s, b){ return s + (b.totalSpent || 0); }, 0).toFixed(2))
+    totalBuyersFound: paying.length,
+    totalNewBuyers: paying.filter(function (b) { return b.isNew; }).length,
+    totalRevenueParsed: round2(paying.reduce(function (s, b) { return s + (b.totalSpent || 0); }, 0)),
+    _warnings: warnings,
+    _allBuyerCount: finalBuyers.length,
   };
 }
 
-function extractSlipData(lines) {
-  const fullText = lines.join(' ');
+function extractBuyerHeader(block) {
+  const result = { username: '', isNew: false, realName: '', streamName: '', streamDate: '' };
 
-  // ── USERNAME ─────────────────────────────────────────────────────────────
-  // New Whatnot format: "To: username [NEW] From: seller"
-  let username = '';
-
-  // Primary: "To: username" — handles format with or without @
-  const toColonMatch = fullText.match(/\bTo:\s+@?([\w._-]{2,50})/i);
-  if (toColonMatch) username = toColonMatch[1];
-
-  // Fallback: any @handle in text (old format)
-  if (!username) {
-    const atMatch = fullText.match(/@([\w._-]{2,50})/);
-    if (atMatch) username = atMatch[1];
+  // Find the "To:" line and "From:" line (may be same line: "To: xFrom: y")
+  let toLineIdx = -1;
+  for (let i = 0; i < block.length; i++) {
+    if (/To:/i.test(block[i])) { toLineIdx = i; break; }
   }
+  if (toLineIdx === -1) return result; // continuation / summary page
 
-  // Fallback: line that starts with "To " and ends with username
-  if (!username) {
-    for (const l of lines) {
-      const m = l.match(/^To:\s*@?([\w._-]{2,50})\s*(?:NEW\s*)?(?:From:|$)/i);
-      if (m) { username = m[1]; break; }
+  const toLine = block[toLineIdx];
+  // Username = text between "To:" and ("From:" | end). Strip trailing "NEW".
+  let uname = '';
+  const m = toLine.match(/To:\s*@?(.*?)(?:From:|$)/i);
+  if (m) uname = m[1].trim();
+  // "NEW" badge may be inline or on its own following line
+  if (/\bNEW\b\s*$/.test(uname)) { result.isNew = true; }
+  uname = uname.replace(/\s*\bNEW\b\s*$/i, '').trim();
+  // Username has no spaces; if any slipped in, take first token
+  uname = uname.split(/\s+/)[0] || '';
+  result.username = uname;
+
+  // NEW badge on its own line (right after To: line)
+  if (!result.isNew) {
+    for (let i = toLineIdx; i < Math.min(toLineIdx + 3, block.length); i++) {
+      if (/^NEW$/i.test(block[i])) { result.isNew = true; break; }
     }
   }
 
-  if (!username) {
-    return { username: '', isNew: false, realName: '', streamName: '', streamDate: '', items: [], totalSpent: 0 };
+  // Real name = first "name-like" line after the From: line
+  let fromLineIdx = toLineIdx;
+  for (let i = toLineIdx; i < block.length; i++) {
+    if (/From:/i.test(block[i])) { fromLineIdx = i; break; }
+  }
+  for (let i = fromLineIdx + 1; i < Math.min(fromLineIdx + 4, block.length); i++) {
+    const l = block[i];
+    if (!l || /^(NEW|US|USPS|QTY|Order|\d)/i.test(l)) continue;
+    if (l.includes('$') || l.includes('#')) continue;
+    if (/^[A-Za-z][A-Za-z0-9 .'-]{1,59}$/.test(l)) { result.realName = l; break; }
   }
 
-  // ── NEW BADGE ─────────────────────────────────────────────────────────────
-  const isNew = /\bTo:\s+@?[\w._-]+\s+NEW\b/i.test(fullText) ||
-    lines.some(function(l){ return /\bNEW\b/.test(l) && l.toLowerCase().includes(username.toLowerCase()); });
-
-  // ── REAL NAME (line after "To: username" line) ────────────────────────────
-  let realName = '';
-  const toLineIdx = lines.findIndex(function(l){ return /\bTo:\s+/i.test(l) && l.toLowerCase().includes(username.toLowerCase()); });
-  if (toLineIdx >= 0) {
-    for (let i = toLineIdx + 1; i < Math.min(toLineIdx + 5, lines.length); i++) {
-      const l = lines[i];
-      if (!l || /^(From|To|QTY|Order|USPS|■|\d+\s)/i.test(l)) continue;
-      if (l.includes('$') || l.includes('#')) continue;
-      if (/^[A-Za-z][A-Za-z .']{1,59}$/.test(l)) { realName = l; break; }
+  // Stream date: a line like "18 July, 2026" or with month name
+  for (const l of block) {
+    if (/\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)/i.test(l)
+        || /\b(January|February|March|April|May|June|July|August|September|October|November|December)\b.*\d{4}/i.test(l)) {
+      result.streamDate = l; break;
     }
   }
-
-  // ── STREAM NAME + DATE from "From:" section ───────────────────────────────
-  let streamName = '';
-  let streamDate = '';
-  const fromMatch = fullText.match(/From:\s+([^\n$]+?)(?:\s+■|$)/i);
-  if (fromMatch) streamName = fromMatch[1].trim();
-  for (const l of lines) {
-    if (/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(l)
-        || /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/.test(l)
-        || /\b\d{2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)/i.test(l)) {
-      streamDate = l; break;
-    }
-  }
-
-  // ── ITEMS ─────────────────────────────────────────────────────────────────
-  // New format: "1 ItemName Order XXXXXXXXXX" on one line, "$XX.00" on own line
-  const items = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
-
-    // Primary pattern: "1 ItemName Order 1234567890" — item + order on same line
-    const itemOrderMatch = l.match(/^\d+\s+(.+?)\s+Order\s+(\d{7,})\s*(.*)$/i);
-    if (itemOrderMatch) {
-      const rawName = itemOrderMatch[1].trim();
-      const orderNumber = itemOrderMatch[2];
-      const afterOrder = itemOrderMatch[3].trim();
-
-      // Amount might be inline after order number, or on a later line
-      let amount = 0;
-      const inlineAmountMatch = afterOrder.match(/\$?(\d+\.?\d*)\s*$/);
-      if (inlineAmountMatch) {
-        amount = parseFloat(inlineAmountMatch[1]);
-      } else {
-        // Look forward up to 8 lines for standalone "$XX.XX" or "XX.XX" line
-        for (let j = i + 1; j < Math.min(i + 9, lines.length); j++) {
-          const amtMatch = lines[j].match(/^\$?(\d+\.?\d{0,2})$/);
-          if (amtMatch) { amount = parseFloat(amtMatch[1]); break; }
-          // Stop at next item or total
-          if (/^\d+\s+\S/.test(lines[j]) || /^\d+\s+Items?\s/i.test(lines[j])) break;
-        }
-      }
-
-      // Skip $0 giveaways only if break name says GIVEAWAY
-      if (amount === 0 && /giveaway/i.test(rawName)) continue;
-
-      const breakName = rawName.replace(/^(QTY|Name|Description|Attributes|Subtotal)\s*/i, '').trim();
-      if (!breakName || breakName.length < 1) continue;
-      if (/^(QTY|Name|Description|Attributes|Subtotal|From|To|USPS|■)/i.test(breakName)) continue;
-
-      items.push({ breakName: breakName.slice(0, 120), orderNumber, amount });
-      continue;
-    }
-
-    // Fallback: standalone "$XX.XX" line — try to find item name backward
-    const standaloneAmount = l.match(/^\$(\d{1,6}\.?\d{0,2})$/);
-    if (standaloneAmount) {
-      const amount = parseFloat(standaloneAmount[1]);
-      if (amount === 0) continue;
-
-      // Look backward for the item line (starts with digit + space + name)
-      let breakName = '';
-      let orderNumber = '';
-      for (let j = i - 1; j >= Math.max(0, i - 8); j--) {
-        const prev = lines[j];
-        // Item line: starts with digit followed by item name
-        const prevItemMatch = prev.match(/^\d+\s+(.+?)\s+Order\s+(\d{7,})/i);
-        if (prevItemMatch) {
-          breakName = prevItemMatch[1].trim();
-          orderNumber = prevItemMatch[2];
-          break;
-        }
-        // Stop at table headers or new buyer blocks
-        if (/^(QTY|Attributes|Subtotal|To:|From:|Whatnot|USPS|■)/i.test(prev)) break;
-      }
-
-      if (!breakName) continue;
-      if (/^(QTY|Attributes|Subtotal|From|To|USPS)/i.test(breakName)) continue;
-
-      // Avoid duplicates (this line was already captured by the primary pattern)
-      const alreadyCaptured = items.some(function(it){ return it.orderNumber && it.orderNumber === orderNumber; });
-      if (alreadyCaptured) continue;
-
-      items.push({ breakName: breakName.slice(0, 120), orderNumber, amount });
-    }
-  }
-
-  // ── TOTAL SPENT from "N Items $XX.00" line if no items parsed ─────────────
-  let totalSpent = parseFloat(items.reduce(function(s, x){ return s + (x.amount || 0); }, 0).toFixed(2));
-  if (totalSpent === 0) {
-    for (const l of lines) {
-      const totalMatch = l.match(/\d+\s+Items?\s+\$?(\d+\.?\d{0,2})/i);
-      if (totalMatch) { totalSpent = parseFloat(totalMatch[1]); break; }
-    }
-  }
-
-  return { username, isNew, realName, streamName, streamDate, items, totalSpent };
+  // Stream name: line just before the date that isn't address/US — best effort
+  return result;
 }
+
+function extractItems(block) {
+  const items = [];
+  // Locate item-table region: after the "Name & Description" header if present, else whole block.
+  let start = 0;
+  for (let i = 0; i < block.length; i++) {
+    if (/Name\s*&?\s*Description/i.test(block[i])) { start = i + 1; break; }
+  }
+  // Stop region at the "N Items $" summary or USPS shipping line.
+  let end = block.length;
+  for (let i = start; i < block.length; i++) {
+    if (/^\d+\s*Items?\s*\$/i.test(block[i]) || /^USPS/i.test(block[i])) { end = i; break; }
+  }
+  const region = block.slice(start, end);
+
+  // Anchor on "Order <digits>" lines.
+  for (let i = 0; i < region.length; i++) {
+    const om = region[i].match(/^Order\s+(\d{6,})/i);
+    if (!om) continue;
+    const orderNumber = om[1];
+
+    // Amount = first "$<num>" line after the order (skip attribute lines like "New", "2026 TOPPS...")
+    let amount = 0;
+    for (let j = i + 1; j < Math.min(i + 8, region.length); j++) {
+      const am = region[j].match(/^\$?(\d+(?:\.\d{1,2})?)$/);
+      if (am && /\$|\./.test(region[j])) { amount = parseFloat(am[1]); break; }
+      if (/^Order\s+\d/i.test(region[j])) break; // next item, no amount found
+    }
+
+    // Name = lines between the preceding qty marker and this Order line.
+    const nameLines = [];
+    for (let j = i - 1; j >= 0; j--) {
+      const l = region[j];
+      if (/^\d{1,3}$/.test(l)) break;             // qty marker → stop (name is above qty? no—below)
+      if (/^\$/.test(l)) break;                    // previous item's amount
+      if (/^Order\s+\d/i.test(l)) break;           // previous item's order
+      if (/^(GIVEAWAY|GIVVY|New)$/i.test(l)) continue; // badges, keep scanning past
+      nameLines.unshift(l);
+    }
+    let breakName = nameLines.join(' ').replace(/\s+/g, ' ').trim();
+    // Giveaway items carry a $0 amount and GIVEAWAY badge
+    const isGiveaway = amount === 0;
+    if (!breakName) breakName = isGiveaway ? 'Giveaway' : 'Item';
+
+    items.push({ breakName: breakName.slice(0, 120), orderNumber: orderNumber, amount: amount });
+  }
+  return items;
+}
+
+function extractSlipTotal(block) {
+  for (const l of block) {
+    const m = l.match(/^(\d+)\s*Items?\s*\$?(\d+(?:\.\d{1,2})?)/i);
+    if (m) return parseFloat(m[2]);
+  }
+  return null;
+}
+
+function round2(n) { return parseFloat((n || 0).toFixed(2)); }
+
