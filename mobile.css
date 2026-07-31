@@ -208,9 +208,6 @@
   /* ── PANEL HEADERS ── */
   .panel-header { flex-wrap: wrap !important; gap: 0.5rem !important; }
 
-  /* ── ANNOUNCEMENTS ── */
-  #annPostWrap textarea { min-height: 80px !important; }
-
   /* ── FORM GROUPS ── */
   .form-group { margin-bottom: 0.85rem !important; }
 

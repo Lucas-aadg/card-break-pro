@@ -903,7 +903,6 @@
     <div class="nav-group" id="ng-engage">
       <button class="nav-group-btn" id="ngb-engage">Engage ▾</button>
       <div class="nav-dropdown">
-        <button class="nav-dd-item" data-tab="announcements">Announcements</button>
         <button class="nav-dd-item" data-tab="goals">Goals</button>
         <button class="nav-dd-item" data-tab="leaderboard">Leaderboard</button>
       </div>
@@ -2301,24 +2300,6 @@
     </div>
 
   </div>
-
-  <!-- ══ CHAT TAB ═══════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-announcements">
-    <div class="panel" style="max-width:680px;">
-      <!-- Post form — owner/manager only -->
-      <div id="annPostWrap" style="margin-bottom:1.5rem;display:none;">
-        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.5rem;">New Announcement</div>
-        <div style="display:flex;gap:0.75rem;align-items:flex-end;">
-          <textarea id="annInput" placeholder="Write an announcement to your team…" rows="3" maxlength="1000" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.65rem 0.85rem;font-size:0.9rem;font-family:inherit;resize:none;outline:none;" onkeydown="if(event.ctrlKey&&event.key==='Enter')postAnnouncement()"></textarea>
-          <button class="btn btn-primary" id="annPostBtn" onclick="postAnnouncement()" style="white-space:nowrap;align-self:flex-end;">Post</button>
-        </div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.35rem;">Ctrl+Enter to post</div>
-      </div>
-      <!-- Feed -->
-      <div id="annFeed"><div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading announcements…</div></div>
-    </div>
-  </div>
-
 
   <!-- ══ GOALS TAB ══════════════════════════════════════════ -->
   <div class="tab-content" id="tab-goals">
@@ -3796,7 +3777,7 @@ const TAB_GROUP_MAP = {
   dashboard: 'ng-reports', streamSummary: 'ng-reports', history: 'ng-reports', productRoi: 'ng-reports', performance: 'ng-reports', buyers: 'ng-reports',
   schedule: 'ng-manage', inventory: 'ng-manage', invLog: 'ng-manage', team: 'ng-manage', payroll: 'ng-manage', sorting: 'ng-manage',
   settings: 'ng-manage', referEarn: 'ng-manage',
-  announcements: 'ng-engage', goals: 'ng-engage', leaderboard: 'ng-engage'
+  goals: 'ng-engage', leaderboard: 'ng-engage'
 };
 const GROUP_BTN_MAP = {
   'ng-reports': 'ngb-reports', 'ng-manage': 'ngb-manage', 'ng-engage': 'ngb-engage'
@@ -3846,7 +3827,6 @@ async function switchTab(tab) {
     else if (tab === 'settings') { await loadSettings(); await renderSettingsChannelList(); await settLoadMilestonesTab(); }
     else if (tab === 'buyers') openBuyersTab();
     else if (tab === 'referEarn') await loadReferEarn();
-    else if (tab === 'announcements') await loadOwnerAnnouncements();
     else if (tab === 'milestones') await ownerLoadMilestones();
     else if (tab === 'goals') { ownerInitGoalsMonthSelect(); ownerInitGoalStaffSelect(); await ownerLoadGoals(); }
     else if (tab === 'leaderboard') await ownerLoadLeaderboard();
@@ -9949,85 +9929,6 @@ function closeBuyerProfile() {
 async function ownerAuthToken() {
   const { data: { session } } = await sb.auth.getSession();
   return session?.access_token;
-}
-
-// ═══════════════════════════════════════════════════════════
-// OWNER — ANNOUNCEMENTS
-// ═══════════════════════════════════════════════════════════
-let _annChannelId = null;
-
-async function loadOwnerAnnouncements() {
-  const feed = document.getElementById('annFeed');
-  const postWrap = document.getElementById('annPostWrap');
-  if (!feed) return;
-
-  // Show post form for owner/manager
-  if (postWrap) postWrap.style.display = ['owner','manager'].includes(orgTier === 'exempt' ? 'owner' : (currentProfile?.role || '')) ? '' : 'none';
-  if (postWrap) postWrap.style.display = (['owner','manager'].includes(currentProfile?.role)) ? '' : 'none';
-
-  feed.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading…</div>';
-  try {
-    const token = await ownerAuthToken();
-    // Get announcements channel ID
-    if (!_annChannelId) {
-      const chRes = await fetch('/api/chat/channels', { headers: { Authorization: 'Bearer ' + token } });
-      const chData = await chRes.json();
-      const annCh = (chData.channels || []).find(function(c){ return c.slug === 'announcements'; });
-      if (!annCh) { feed.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);">No announcements channel found.</div>'; return; }
-      _annChannelId = annCh.id;
-    }
-    const msgRes = await fetch('/api/chat/channels/' + _annChannelId + '/messages?limit=50', { headers: { Authorization: 'Bearer ' + token } });
-    const msgData = await msgRes.json();
-    annRenderFeed(msgData.messages || [], feed);
-  } catch (e) {
-    feed.innerHTML = '<div style="padding:1rem;color:var(--red);font-size:0.85rem;">Failed to load: ' + escHtml(e.message) + '</div>';
-  }
-}
-
-function annRenderFeed(msgs, feedEl) {
-  const el = feedEl || document.getElementById('annFeed');
-  if (!el) return;
-  if (!msgs.length) {
-    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">No announcements yet.</div>';
-    return;
-  }
-  const sorted = msgs.slice().reverse(); // newest first
-  el.innerHTML = sorted.map(function(m) {
-    const name = (m.sender && m.sender.display_name) || 'Team';
-    const role = (m.sender && m.sender.role) || '';
-    const dateStr = new Date(m.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' · ' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    return '<div style="border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;margin-bottom:0.65rem;background:var(--bg);">' +
-      '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">' +
-        '<span style="font-size:1.1rem;">📢</span>' +
-        '<span style="font-weight:700;font-size:0.88rem;">' + escHtml(name) + '</span>' +
-        (role ? '<span style="font-size:0.65rem;background:rgba(79,110,247,0.12);color:var(--primary);padding:1px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;">' + escHtml(role) + '</span>' : '') +
-        '<span style="font-size:0.72rem;color:var(--muted);margin-left:auto;">' + dateStr + '</span>' +
-      '</div>' +
-      '<div style="font-size:0.92rem;color:var(--text);line-height:1.6;white-space:pre-wrap;">' + escHtml(m.content) + '</div>' +
-    '</div>';
-  }).join('');
-}
-
-async function postAnnouncement() {
-  const input = document.getElementById('annInput');
-  const content = (input.value || '').trim();
-  if (!content) return;
-  const btn = document.getElementById('annPostBtn');
-  btn.disabled = true; btn.textContent = 'Posting…';
-  try {
-    const token = await ownerAuthToken();
-    if (!_annChannelId) { await loadOwnerAnnouncements(); }
-    if (!_annChannelId) throw new Error('Announcements channel not found');
-    const res = await fetch('/api/chat/channels/' + _annChannelId + '/messages', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content })
-    });
-    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Post failed'); }
-    input.value = '';
-    await loadOwnerAnnouncements();
-  } catch (e) { showGlobalError(escHtml(e.message)); }
-  finally { btn.disabled = false; btn.textContent = 'Post'; }
 }
 
 // ═══════════════════════════════════════════════════════════

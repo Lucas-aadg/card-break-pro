@@ -515,7 +515,6 @@
   <button class="breaker-tab-btn" data-tab="buyers">Buyers</button>
   <button class="breaker-tab-btn" data-tab="shifts">My Shifts</button>
   <button class="breaker-tab-btn" data-tab="payouts" id="payoutsTabBtn">My Pay</button>
-  <button class="breaker-tab-btn" data-tab="announcements">Announcements</button>
   <button class="breaker-tab-btn" data-tab="leaderboard">Leaderboard</button>
   <button class="breaker-tab-btn" data-tab="milestones">Achievements</button>
 </div>
@@ -844,14 +843,6 @@
     </div>
   </div>
 
-
-  <!-- ── CHAT TAB ── -->
-  <div class="breaker-tab-content" id="breaker-tab-announcements">
-    <div class="panel" style="max-width:640px;">
-      <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:1rem;">Announcements from your team</div>
-      <div id="brkAnnFeed"><div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading…</div></div>
-    </div>
-  </div>
 
   <!-- ── LEADERBOARD TAB ── -->
   <div class="breaker-tab-content" id="breaker-tab-leaderboard">
@@ -2115,7 +2106,6 @@ function setupBreakerTabs() {
       if (btn.dataset.tab === 'buyers') openBrkBuyersTab();
       if (btn.dataset.tab === 'payouts') loadPayouts();
       if (btn.dataset.tab === 'shifts') { loadShifts(); loadMyScheduleView(); }
-      if (btn.dataset.tab === 'announcements') brkLoadAnnouncements();
       if (btn.dataset.tab === 'leaderboard') brkLoadLeaderboard();
       if (btn.dataset.tab === 'milestones') brkLoadMilestones();
     });
@@ -2946,9 +2936,6 @@ initAuth();
   <button class="btm-nav-item" id="btn-btm-payouts" onclick="breakerBtmNav('payouts')">
     <span class="btm-nav-icon">💰</span><span class="btm-nav-label">My Pay</span>
   </button>
-  <button class="btm-nav-item" id="btn-btm-announcements" onclick="breakerBtmNav('announcements')">
-    <span class="btm-nav-icon">📢</span><span class="btm-nav-label">Updates</span>
-  </button>
   <button class="btm-nav-item" id="btn-btm-milestones" onclick="breakerBtmNav('milestones')">
     <span class="btm-nav-icon">🏅</span><span class="btm-nav-label">Achievements</span>
   </button>
@@ -2980,7 +2967,6 @@ function breakerBtmNav(tab) {
   // Trigger tab load functions
   if (tab === 'payouts')        { typeof loadPayouts !== 'undefined' && loadPayouts(); }
   if (tab === 'shifts')         { typeof loadShifts !== 'undefined' && loadShifts(); typeof loadMyScheduleView !== 'undefined' && loadMyScheduleView(); }
-  if (tab === 'announcements')  { typeof brkLoadAnnouncements !== 'undefined' && brkLoadAnnouncements(); }
   if (tab === 'milestones')     { typeof brkLoadMilestones !== 'undefined' && brkLoadMilestones(); }
   if (tab === 'leaderboard')    { typeof brkLoadLeaderboard !== 'undefined' && brkLoadLeaderboard(); }
   // Sync mobile header
@@ -3654,47 +3640,6 @@ function skipHitLogging() {
 async function brkAuthToken() {
   const { data: { session } } = await sb.auth.getSession();
   return session?.access_token;
-}
-
-// ═══════════════════════════════════════════════════════════
-// BREAKER — ANNOUNCEMENTS
-// ═══════════════════════════════════════════════════════════
-var _brkAnnChannelId = null;
-
-async function brkLoadAnnouncements() {
-  const feed = document.getElementById('brkAnnFeed');
-  if (!feed) return;
-  feed.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:0.85rem;">Loading…</div>';
-  try {
-    const token = await brkAuthToken();
-    if (!_brkAnnChannelId) {
-      const chRes = await fetch('/api/chat/channels', { headers: { Authorization: 'Bearer ' + token } });
-      const chData = await chRes.json();
-      const annCh = (chData.channels || []).find(function(c){ return c.slug === 'announcements'; });
-      if (!annCh) { feed.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);">No announcements yet.</div>'; return; }
-      _brkAnnChannelId = annCh.id;
-    }
-    const msgRes = await fetch('/api/chat/channels/' + _brkAnnChannelId + '/messages?limit=50', { headers: { Authorization: 'Bearer ' + token } });
-    const msgData = await msgRes.json();
-    const msgs = (msgData.messages || []).slice().reverse();
-    if (!msgs.length) { feed.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.85rem;">No announcements yet.</div>'; return; }
-    feed.innerHTML = msgs.map(function(m) {
-      const name = (m.sender && m.sender.display_name) || 'Team';
-      const role = (m.sender && m.sender.role) || '';
-      const dateStr = new Date(m.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' · ' + new Date(m.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-      return '<div style="border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;margin-bottom:0.65rem;background:var(--bg);">' +
-        '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">' +
-          '<span style="font-size:1.1rem;">📢</span>' +
-          '<span style="font-weight:700;font-size:0.88rem;">' + escHtml(name) + '</span>' +
-          (role ? '<span style="font-size:0.65rem;background:rgba(79,110,247,0.12);color:var(--primary);padding:1px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;">' + escHtml(role) + '</span>' : '') +
-          '<span style="font-size:0.72rem;color:var(--muted);margin-left:auto;">' + dateStr + '</span>' +
-        '</div>' +
-        '<div style="font-size:0.92rem;color:var(--text);line-height:1.6;white-space:pre-wrap;">' + escHtml(m.content) + '</div>' +
-      '</div>';
-    }).join('');
-  } catch (e) {
-    feed.innerHTML = '<div style="padding:1rem;color:var(--red);font-size:0.85rem;">Failed to load: ' + escHtml(e.message) + '</div>';
-  }
 }
 
 // ═══════════════════════════════════════════════════════════

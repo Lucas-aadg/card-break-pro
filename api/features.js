@@ -68,15 +68,14 @@ module.exports = async (req, res) => {
 
 // Role → which channel slugs are visible (owner intentionally excluded from role-specific chats)
 const CHANNEL_VISIBILITY = {
-  owner:   ['all_team','announcements'],
-  manager: ['all_team','announcements'],
-  breaker: ['all_team','breakers_only','announcements'],
-  sorter:  ['all_team','sorters_only','announcements'],
+  owner:   ['all_team'],
+  manager: ['all_team'],
+  breaker: ['all_team','breakers_only'],
+  sorter:  ['all_team','sorters_only'],
 };
 
 // Default channels created for every new org
 const DEFAULT_CHANNELS = [
-  { slug: 'announcements',  name: '📢 Announcements', description: 'Important updates from ownership. Read-only for staff.', can_post_roles: ['owner','manager'], sort_order: 1 },
   { slug: 'all_team',       name: '💬 Team Chat',     description: 'Everyone on the team.',                                  can_post_roles: ['owner','manager','breaker','sorter'], sort_order: 2 },
   { slug: 'breakers_only',  name: '🃏 Breaker Chat',  description: 'Breakers only.',                                         can_post_roles: ['breaker'], sort_order: 3 },
   { slug: 'sorters_only',   name: '📦 Sorter Chat',   description: 'Sorters only.',                                          can_post_roles: ['sorter'], sort_order: 4 },
@@ -88,7 +87,7 @@ async function chatHandler(req, res, sb, action) {
 
   // ── GET /api/chat/channels ─────────────────────────────────────────────────
   if (action === 'channels' && req.method === 'GET') {
-    const allowedSlugs = CHANNEL_VISIBILITY[profile.role] || ['all_team','announcements'];
+    const allowedSlugs = CHANNEL_VISIBILITY[profile.role] || ['all_team'];
 
     // Check if org has any channels yet
     const { data: existing } = await sb.from('chat_channels')
@@ -185,10 +184,6 @@ async function chatHandler(req, res, sb, action) {
       if (!content || typeof content !== 'string' || content.trim().length === 0) return fail(res, 400, 'content required');
       if (content.length > 2000) return fail(res, 400, 'content exceeds 2000 character limit');
 
-      // Announcements: only owner/manager can post
-      if (channel.slug === 'announcements' && !['owner','manager'].includes(profile.role)) {
-        return fail(res, 403, 'Only owners and managers can post in Announcements');
-      }
       // Verify role is in can_post_roles
       if (!channel.can_post_roles.includes(profile.role)) {
         return fail(res, 403, 'Your role cannot post in this channel');
