@@ -9022,6 +9022,8 @@ async function fetchAllBuyers() {
     const { data, error } = await sb.from('buyers')
       .select(cols)
       .eq('organization_id', currentProfile.org_id)
+      // Exclude giveaway-only ($0) noise; keep spenders and anyone with a logged hit
+      .or('total_spent.gt.0,case_hits.gt.0')
       .order('total_spent', { ascending: false })
       .range(from, from + size - 1);
     if (error) throw error;
@@ -9113,7 +9115,7 @@ async function loadBuyersTab() {
       const sums = {};
       (purch || []).forEach(p => { sums[p.buyer_id] = (sums[p.buyer_id] || 0) + Number(p.amount || 0); });
       _buyersData = buyersAll
-        .filter(b => sums[b.id] !== undefined)
+        .filter(b => (sums[b.id] || 0) > 0)
         .map(b => Object.assign({}, b, { _recentSpent: sums[b.id] }))
         .sort((a, b) => (b._recentSpent || 0) - (a._recentSpent || 0));
     }
@@ -9160,14 +9162,12 @@ function applyBuyersFilters() {
     const tempColor = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
     const lastDate = b.last_purchase_date ? relativeDate(b.last_purchase_date) : 'Never';
     const hits = b.case_hits || 0;
-    const giveawayOnly = Number(b.total_spent || 0) === 0;
     return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1.25rem;' + (i % 2 === 0 ? '' : 'background:rgba(255,255,255,0.015);') + '">' +
       '<div style="font-size:0.75rem;font-weight:800;color:var(--muted);width:1.5rem;text-align:center;">' + (i+1) + '</div>' +
       '<div style="flex:1;min-width:0;">' +
         '<div style="font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">' +
           '<span>@' + escHtml(b.username) + '</span>' +
           (b.is_new_buyer ? '<span style="font-size:0.62rem;background:rgba(34,197,94,0.12);color:#22c55e;padding:1px 4px;border-radius:3px;font-weight:700;">NEW</span>' : '') +
-          (giveawayOnly ? '<span style="font-size:0.62rem;background:rgba(148,163,184,0.15);color:#94a3b8;padding:1px 5px;border-radius:3px;font-weight:700;">🎁 GIVEAWAY</span>' : '') +
           (hits > 0 ? '<span style="font-size:0.62rem;background:rgba(239,68,68,0.12);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700;">🎯 ' + hits + ' hit' + (hits > 1 ? 's' : '') + '</span>' : '') +
         '</div>' +
         '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.1rem;">' + lastDate + ' · ' + (b.total_breaks_purchased || 0) + ' breaks · ' + (b.total_streams_participated || 0) + ' streams</div>' +

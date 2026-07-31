@@ -122,24 +122,19 @@ function parseWhatnotSlips(rawText) {
     };
   });
 
-  // Keep everyone who actually appears on the slip — including giveaway-only
-  // winners ($0 spend but ≥1 item). They belong in Buyer Intelligence too.
-  // Only drop truly empty parses (no username, or no items and no spend).
-  const kept = finalBuyers.filter(function (b) {
-    return b.username && (b.totalSpent > 0 || (b.items && b.items.length > 0));
-  }).map(function (b) {
-    b.giveawayOnly = b.totalSpent === 0;
-    return b;
+  // Exclude giveaway-only recipients (zero spend, no paid items). Someone who
+  // wins a giveaway AND buys spots still has paid items, so they stay.
+  const paying = finalBuyers.filter(function (b) {
+    return b.username && (b.totalSpent > 0 || b.items.some(function (it) { return it.amount > 0; }));
   });
 
   return {
-    buyers: kept,
+    buyers: paying,
     streamName: streamName || '',
     streamDate: streamDate || '',
-    totalBuyersFound: kept.length,
-    totalNewBuyers: kept.filter(function (b) { return b.isNew; }).length,
-    totalGiveawayOnly: kept.filter(function (b) { return b.giveawayOnly; }).length,
-    totalRevenueParsed: round2(kept.reduce(function (s, b) { return s + (b.totalSpent || 0); }, 0)),
+    totalBuyersFound: paying.length,
+    totalNewBuyers: paying.filter(function (b) { return b.isNew; }).length,
+    totalRevenueParsed: round2(paying.reduce(function (s, b) { return s + (b.totalSpent || 0); }, 0)),
     _warnings: warnings,
     _allBuyerCount: finalBuyers.length,
   };
