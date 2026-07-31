@@ -924,6 +924,7 @@
       <div id="hlSpenderList"></div>
     </div>
     <div style="font-size:0.85rem;color:var(--muted);margin-bottom:0.85rem;">Did anyone pull a big hit tonight?</div>
+    <datalist id="hitBuyerList"></datalist>
     <div id="hitRows"></div>
     <button class="btn btn-outline" style="width:100%;margin-bottom:0.85rem;font-size:0.85rem;" onclick="addHitRow()">+ Add Hit</button>
     <div class="modal-btn-row">
@@ -3226,6 +3227,11 @@ function openHitLoggingModal() {
   document.getElementById('hitRows').innerHTML = '';
   _hitBuyerOptions = _importedBuyers.map(function(b) { return b.username; });
 
+  // Populate the buyer suggestion list (typing is still allowed for anyone not
+  // on the slip — e.g. a giveaway winner who pulled the big hit)
+  var dl = document.getElementById('hitBuyerList');
+  if (dl) dl.innerHTML = _hitBuyerOptions.map(function(u) { return '<option value="' + escHtml(u) + '"></option>'; }).join('');
+
   // Show top spenders panel if we have import data
   var spendersPanel = document.getElementById('hlTopSpenders');
   if (_importedBuyers.length > 0) {
@@ -3252,12 +3258,7 @@ function addHitRow() {
   row.style.cssText = 'background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem;position:relative;';
   row.innerHTML =
     '<button onclick="this.closest(\'.hit-row\').remove()" style="position:absolute;top:0.4rem;right:0.4rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;">✕</button>' +
-    '<select class="hit-buyer" style="' + fld + '">' +
-      '<option value="">Select buyer…</option>' +
-      (_hitBuyerOptions.length > 0
-        ? _hitBuyerOptions.map(function(u){ return '<option value="' + escHtml(u) + '">@' + escHtml(u) + '</option>'; }).join('')
-        : '') +
-    '</select>' +
+    '<input class="hit-buyer" list="hitBuyerList" placeholder="Buyer username (no @)" autocomplete="off" style="' + fld + '" />' +
     '<input class="hit-break-name" placeholder="Break name" style="' + fld + '" />' +
     '<input class="hit-desc" placeholder="Describe the hit (e.g. Luka Doncic 1/1 Logoman Auto)" style="' + fld + '" />' +
     '<select class="hit-type" style="' + fld.replace('margin-bottom:0.4rem;','') + '">' +
@@ -3269,63 +3270,101 @@ function addHitRow() {
 async function submitAllHits() {
   var rows = document.querySelectorAll('.hit-row');
   var hits = [];
+  var incomplete = 0;
   rows.forEach(function(row) {
-    var username = row.querySelector('.hit-buyer').value.trim();
+    var username = row.querySelector('.hit-buyer').value.trim().replace(/^@/, '');
     var breakName = row.querySelector('.hit-break-name').value.trim();
     var desc = row.querySelector('.hit-desc').value.trim();
     var type = row.querySelector('.hit-type').value;
-    if (username && desc) hits.push({ username, breakName, desc, type });
+    if (username && desc) hits.push({ username: username, breakName: breakName, desc: desc, type: type, row: row });
+    else if (username || desc) incomplete++;   // half-filled row — don't drop it silently
   });
 
-  if (hits.length === 0) { skipHitLogging(); return; }
+  if (hits.length === 0) {
+    if (incomplete > 0) { showGlobalError('Each hit needs both a buyer username and a description.'); return; }
+    skipHitLogging();
+    return;
+  }
 
   var btn = document.getElementById('submitHitsBtn');
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
-  try {
-    for (var hit of hits) {
+  var now = new Date().toISOString();
+  var saved = 0;
+  var failed = [];
+
+  for (var hit of hits) {
+    try {
       // Case-insensitive lookup — no platform filter so live-hit-created buyers are found
-      var { data: buyer } = await sb.from('buyers')
-        .select('id')
+      var lookup = await sb.from('buyers')
+        .select('id, case_hits')
         .eq('organization_id', currentProfile.org_id)
         .ilike('username', hit.username)
         .maybeSingle();
+      if (lookup.error) throw lookup.error;
+      var buyer = lookup.data;
 
+      var buyerId;
       if (!buyer) {
-        // Create placeholder so the hit isn't silently dropped
-        var nbResult = await sb.from('buyers').insert({
+        // Create placeholder — a later slip import fills in spend
+        var ins = await sb.from('buyers').insert({
           organization_id: currentProfile.org_id,
           platform: 'whatnot',
           username: hit.username.toLowerCase(),
+          case_hits: hit.type === 'case_hit' ? 1 : 0,
           total_spent: 0,
           total_breaks_purchased: 0,
           total_streams_participated: 0,
-          temperature: 'cold'
+          is_new_buyer: true,
+          temperature: 'cold',
+          created_at: now,
+          updated_at: now
         }).select('id').single();
-        if (nbResult.data) buyer = nbResult.data;
+        if (ins.error) throw ins.error;
+        buyerId = ins.data.id;
+      } else {
+        buyerId = buyer.id;
+        // Keep the 🎯 badge in sync (matches the live-hit path)
+        if (hit.type === 'case_hit') {
+          var upd = await sb.from('buyers').update({
+            case_hits: (buyer.case_hits || 0) + 1,
+            updated_at: now
+          }).eq('id', buyerId);
+          if (upd.error) throw upd.error;
+        }
       }
 
-      if (buyer) {
-        await sb.from('buyer_hits').insert({
-          organization_id: currentProfile.org_id,
-          buyer_id: buyer.id,
-          stream_id: currentStream ? currentStream.id : null,
-          break_name: hit.breakName || null,
-          hit_description: hit.desc,
-          hit_type: hit.type,
-          submitted_by: currentUser.id,
-          submitted_at: new Date().toISOString()
-        }).catch(function(e){ console.warn('Hit insert error:', e.message); });
-      }
+      var hitIns = await sb.from('buyer_hits').insert({
+        organization_id: currentProfile.org_id,
+        buyer_id: buyerId,
+        stream_id: currentStream ? currentStream.id : null,
+        break_name: hit.breakName || null,
+        hit_description: hit.desc,
+        hit_type: hit.type,
+        submitted_by: currentUser.id,
+        submitted_at: now
+      });
+      if (hitIns.error) throw hitIns.error;
+      saved++;
+      if (hit.row) hit.row.remove();   // drop saved rows so a retry only re-sends failures
+    } catch (e) {
+      console.error('Hit save failed for @' + hit.username + ':', e && e.message);
+      failed.push(hit.username);
     }
-  } catch (err) {
-    console.error('submitAllHits error:', err);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Submit Hits';
   }
 
+  btn.disabled = false;
+  btn.textContent = 'Submit Hits';
+
+  if (failed.length > 0) {
+    // Do NOT advance — keep the modal open so the breaker can retry the failures
+    // instead of losing them silently.
+    showGlobalError(saved + ' saved · ' + failed.length + ' FAILED: @' + failed.join(', @') + '. Fix and submit again.');
+    return;
+  }
+
+  showGlobalSuccess(saved + ' hit' + (saved !== 1 ? 's' : '') + ' logged!');
   document.getElementById('hitLoggingModal').classList.remove('active');
   openFinalCloseout();
 }
