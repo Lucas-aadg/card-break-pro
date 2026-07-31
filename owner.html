@@ -9013,6 +9013,11 @@ function printTable(title, subtitle, tableId) {
     </div>
     <!-- Stats row -->
     <div id="bpStats" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.65rem;margin-bottom:1.25rem;"></div>
+    <!-- Spend trend -->
+    <div class="panel" id="bpTrendPanel" style="margin-bottom:1rem;display:none;">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:baseline;"><span>Spend Trend</span><span id="bpTrendLabel" style="font-size:0.72rem;font-weight:700;"></span></div>
+      <div id="bpTrend"></div>
+    </div>
     <!-- Preferred Products -->
     <div class="panel" style="margin-bottom:1rem;">
       <div class="panel-title">Buys Most Often</div>
@@ -9768,6 +9773,7 @@ async function openBuyerProfile(buyerId) {
     // Preferred products
     const purchases = purchasesRes.data || [];
     _bpPurchases = purchases;
+    renderBpTrend(purchases);
     const nameCounts = {};
     purchases.forEach(p => { if (p.break_name) nameCounts[p.break_name] = (nameCounts[p.break_name] || 0) + 1; });
     const top3 = Object.entries(nameCounts).sort((a,b) => b[1]-a[1]).slice(0,3);
@@ -9802,6 +9808,40 @@ async function openBuyerProfile(buyerId) {
     document.getElementById('bpUsername').textContent = 'Error loading profile';
     console.error('openBuyerProfile error:', err);
   }
+}
+
+function renderBpTrend(purchases) {
+  const panel = document.getElementById('bpTrendPanel');
+  const el = document.getElementById('bpTrend');
+  const labelEl = document.getElementById('bpTrendLabel');
+  if (!panel || !el) return;
+  const byDate = {};
+  purchases.forEach(p => { if (p.purchase_date) byDate[p.purchase_date] = (byDate[p.purchase_date] || 0) + Number(p.amount || 0); });
+  const dates = Object.keys(byDate).sort();
+  if (dates.length < 2) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const pts = dates.slice(-10).map(d => byDate[d]);
+  const max = Math.max.apply(null, pts) || 1;
+  const W = 320, H = 60, n = pts.length;
+  const step = n > 1 ? W / (n - 1) : 0;
+  const coords = pts.map((v, i) => [Math.round(i * step), Math.round(H - (v / max) * (H - 8) - 4)]);
+  const line = coords.map((c, i) => (i ? 'L' : 'M') + c[0] + ',' + c[1]).join(' ');
+  const area = line + ' L' + W + ',' + H + ' L0,' + H + ' Z';
+  const half = Math.floor(n / 2);
+  const firstAvg = pts.slice(0, half).reduce((s, v) => s + v, 0) / (half || 1);
+  const lastAvg = pts.slice(half).reduce((s, v) => s + v, 0) / ((n - half) || 1);
+  let label, color;
+  if (lastAvg > firstAvg * 1.15) { label = '▲ heating up'; color = '#22c55e'; }
+  else if (lastAvg < firstAvg * 0.85) { label = '▼ cooling off'; color = '#f59e0b'; }
+  else { label = 'steady'; color = 'var(--muted)'; }
+  labelEl.textContent = label; labelEl.style.color = color;
+  const last = coords[coords.length - 1];
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:64px;display:block;">' +
+    '<defs><linearGradient id="bpTrendGrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#4f6ef7" stop-opacity="0.35"/><stop offset="1" stop-color="#4f6ef7" stop-opacity="0"/></linearGradient></defs>' +
+    '<path d="' + area + '" fill="url(#bpTrendGrad)"/>' +
+    '<path d="' + line + '" fill="none" stroke="#4f6ef7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="3" fill="#4f6ef7"/></svg>' +
+    '<div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">Spend across your last ' + pts.length + ' purchase days</div>';
 }
 
 function renderBpPurchases() {
