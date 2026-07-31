@@ -9022,8 +9022,6 @@ async function fetchAllBuyers() {
     const { data, error } = await sb.from('buyers')
       .select(cols)
       .eq('organization_id', currentProfile.org_id)
-      // Exclude giveaway-only ($0) noise; keep spenders and anyone with a logged hit
-      .or('total_spent.gt.0,case_hits.gt.0')
       .order('total_spent', { ascending: false })
       .range(from, from + size - 1);
     if (error) throw error;
@@ -9032,6 +9030,22 @@ async function fetchAllBuyers() {
     from += size;
   }
   return all;
+}
+
+// Single source of truth for hit counts: derive from the buyer_hits rows so the
+// count can never disagree with the actual history. Returns { buyer_id: count }.
+async function fetchBuyerHitCounts() {
+  const map = {};
+  let from = 0; const size = 1000;
+  while (true) {
+    const { data, error } = await sb.from('buyer_hits')
+      .select('buyer_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
+    if (error) throw error;
+    (data || []).forEach(h => { map[h.buyer_id] = (map[h.buyer_id] || 0) + 1; });
+    if (!data || data.length < size) break;
+    from += size;
+  }
+  return map;
 }
 
 // Build buyer_id -> Set(channel_id) from purchases → streams. Cached until reload.
@@ -9100,9 +9114,13 @@ async function loadBuyersTab() {
   populateBuyersChannelSelect();
 
   try {
-    const buyersAll = await fetchAllBuyers();
+    const [buyersAll, hitCounts] = await Promise.all([fetchAllBuyers(), fetchBuyerHitCounts()]);
+    // Attach derived hit counts and keep buyers who spent money OR have any logged
+    // hit (a giveaway winner who pulled a big card belongs here even at $0).
+    buyersAll.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
+    const visible = buyersAll.filter(b => Number(b.total_spent || 0) > 0 || b._hitCount > 0);
     if (_buyersViewMode === 'alltime') {
-      _buyersData = buyersAll;
+      _buyersData = visible;
     } else {
       // Recent: sum purchases from last 30 days, keep buyers with recent activity
       const cutoff = new Date();
@@ -9161,7 +9179,7 @@ function applyBuyersFilters() {
     const temp = b.temperature || calcBuyerTemp(b.last_purchase_date);
     const tempColor = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
     const lastDate = b.last_purchase_date ? relativeDate(b.last_purchase_date) : 'Never';
-    const hits = b.case_hits || 0;
+    const hits = b._hitCount || 0;
     return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1.25rem;' + (i % 2 === 0 ? '' : 'background:rgba(255,255,255,0.015);') + '">' +
       '<div style="font-size:0.75rem;font-weight:800;color:var(--muted);width:1.5rem;text-align:center;">' + (i+1) + '</div>' +
       '<div style="flex:1;min-width:0;">' +
@@ -9447,10 +9465,11 @@ async function openBuyerProfile(buyerId) {
     const tempColor = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
     document.getElementById('bpTempBadge').innerHTML = '<span style="background:' + tempColor + '1a;color:' + tempColor + ';border:1px solid ' + tempColor + '44;border-radius:100px;padding:0.2rem 0.7rem;font-size:0.75rem;font-weight:700;text-transform:capitalize;">' + temp + '</span>';
     if (buyer.is_new_buyer) document.getElementById('bpNewBadge').style.display = '';
-    const caseHits = buyer.case_hits || 0;
+    // Derive the hit count from the actual hit rows, not the buyers.case_hits counter
+    const caseHits = (hitsRes.data || []).length;
     document.getElementById('bpFirstSeen').textContent = (buyer.first_seen_date
       ? 'First seen ' + new Date(buyer.first_seen_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      : '') + (caseHits > 0 ? (buyer.first_seen_date ? '  ·  ' : '') + '🎯 ' + caseHits + ' case hit' + (caseHits > 1 ? 's' : '') : '');
+      : '') + (caseHits > 0 ? (buyer.first_seen_date ? '  ·  ' : '') + '🎯 ' + caseHits + ' hit' + (caseHits > 1 ? 's' : '') : '');
 
     // Stats
     const stats = [
@@ -9556,7 +9575,10 @@ function renderBpPurchases() {
 
 async function saveBuyerNotes(buyerId, notes) {
   const { error } = await sb.from('buyers').update({ notes, updated_at: new Date().toISOString() }).eq('id', buyerId);
-  if (error) console.error('Notes save failed:', error.message);
+  if (error) {
+    console.error('Notes save failed:', error.message);
+    showGlobalError('Note didn\'t save: ' + error.message);
+  }
 }
 
 function closeBuyerProfile() {

@@ -3203,8 +3203,15 @@ async function confirmSlipImport() {
     if (!resp.ok) throw new Error(result.error || 'Import failed');
     _currentImportId = result.importId;
     _importedBuyers = _parsedSlipData.buyers || [];
+    // Don't hide partial failures — tell the breaker exactly what didn't save
+    if (result.errors && result.errors > 0) {
+      showGlobalError(result.errors + ' of ' + (result.processed + result.errors) + ' buyers failed to import. Re-import this stream to retry.');
+    } else {
+      showGlobalSuccess((result.processed || _importedBuyers.length) + ' buyers imported.');
+    }
   } catch (err) {
-    console.warn('Import process error:', err.message);
+    console.error('Import process error:', err.message);
+    showGlobalError('Import failed: ' + err.message + '. Your slip was parsed but not saved — try Confirm Import again.');
     _importedBuyers = _parsedSlipData ? (_parsedSlipData.buyers || []) : [];
   } finally {
     btn.disabled = false;

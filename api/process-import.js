@@ -87,7 +87,11 @@ async function handleImport(req, res) {
         await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', orgId);
         await sb.from('stream_slip_imports').delete().eq('id', existingImport.id);
       }
-    } catch (e) { console.warn('Reimport cleanup failed:', e.message); }
+    } catch (e) {
+      // Abort rather than proceed — a half-finished reversal would double-count revenue
+      console.error('Reimport cleanup failed:', e.message);
+      return res.status(500).json({ error: 'Reimport cleanup failed — aborted to prevent double-counting. ' + e.message });
+    }
   }
 
   // Create import record
@@ -202,7 +206,7 @@ async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
   // Insert purchase records only for new imports
   if (shouldInsertPurchases) {
     for (const item of (items || [])) {
-      await sb.from('buyer_purchases').insert({
+      const { error: purchErr } = await sb.from('buyer_purchases').insert({
         organization_id: orgId,
         buyer_id: buyerId,
         stream_id: streamId || null,
@@ -211,7 +215,10 @@ async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
         amount: Number(item.amount) || 0,
         purchase_date: purchaseDate,
         platform: 'whatnot'
-      }).catch(e => console.warn('Purchase insert error:', e.message));
+      });
+      // Surface it — a dropped purchase line means the buyer's totals and this
+      // detail disagree. Caller records this buyer under errors[].
+      if (purchErr) throw new Error('purchase insert failed for order ' + (item.orderNumber || '?') + ': ' + purchErr.message);
     }
   }
 }
