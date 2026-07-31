@@ -4346,13 +4346,17 @@ async function beHandleSubmit() {
     const newOtherTotal = (parseFloat(stream.total_other_costs) || 0) + otherCosts;
     const newBreakCount = (stream.break_count || 0) + 1;
 
-    await sb.from('streams').update({
+    const { error: stUpdErr } = await sb.from('streams').update({
       total_submitted_revenue: newRevTotal,
       total_product_cost: newBoxTotal,
       total_fees: newFeesTotal,
       total_other_costs: newOtherTotal,
       break_count: newBreakCount
     }).eq('id', stream.id);
+    if (stUpdErr) {
+      console.error('Stream total update error:', stUpdErr);
+      showGlobalError('Break saved, but the stream running total didn\'t update — refresh to re-sync your totals.');
+    }
 
     beSubmittedBreaks.push({ break_number: beBreakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed });
     beLastBreakProducts = productsUsed;
@@ -4777,16 +4781,18 @@ async function coSaveBuyers(list, orgId) {
         .eq('purchase_date', today)
         .eq('amount', b.total || 0);
       if (!dupCheck.count || dupCheck.count === 0) {
-        await sb.from('buyers').update({
+        var uRes = await sb.from('buyers').update({
           total_spent: (parseFloat(existing.total_spent) || 0) + (b.total || 0),
           total_breaks_purchased: (existing.total_breaks_purchased || 0) + 1,
           total_streams_participated: (existing.total_streams_participated || 0) + 1,
           last_purchase_date: today, is_new_buyer: false, updated_at: now
         }).eq('id', buyerId);
-        await sb.from('buyer_purchases').insert({
+        if (uRes.error) throw new Error('@' + uname + ' spend update failed: ' + uRes.error.message);
+        var pRes = await sb.from('buyer_purchases').insert({
           organization_id: orgId, buyer_id: buyerId,
           amount: b.total || 0, purchase_date: today, platform: 'whatnot'
-        }).catch(function(e) { console.warn('buyer_purchases insert:', e.message); });
+        });
+        if (pRes.error) throw new Error('@' + uname + ' purchase insert failed: ' + pRes.error.message);
       }
     } else {
       var ins = await sb.from('buyers').insert({
@@ -4803,12 +4809,14 @@ async function coSaveBuyers(list, orgId) {
         created_at: now,
         updated_at: now
       }).select('id').single();
+      if (ins.error) throw new Error('@' + uname + ' create failed: ' + ins.error.message);
       buyerId = ins.data ? ins.data.id : null;
       if (buyerId) {
-        await sb.from('buyer_purchases').insert({
+        var pRes2 = await sb.from('buyer_purchases').insert({
           organization_id: orgId, buyer_id: buyerId,
           amount: b.total || 0, purchase_date: today, platform: 'whatnot'
-        }).catch(function(e) { console.warn('buyer_purchases insert:', e.message); });
+        });
+        if (pRes2.error) throw new Error('@' + uname + ' purchase insert failed: ' + pRes2.error.message);
       }
     }
   }
@@ -5455,12 +5463,13 @@ async function confirmEditBreak() {
         return acc;
       }, { revenue: 0, box: 0, fees: 0, other: 0 });
 
-      await sb.from('streams').update({
+      const aggRes = await sb.from('streams').update({
         total_submitted_revenue: agg.revenue,
         total_product_cost: agg.box,
         total_fees: agg.fees,
         total_other_costs: agg.other
       }).eq('id', streamId).eq('org_id', currentProfile.org_id);
+      if (aggRes.error) throw new Error('Stream totals failed to re-sync: ' + aggRes.error.message);
     }
 
     document.getElementById('editBreakModal').classList.remove('active');
@@ -5848,13 +5857,14 @@ async function confirmEditStream() {
     for (const b of currentBreaks) {
       const boxCost = b.products_used.reduce(function(s, p){ return s + p.ext_cost; }, 0);
       if (b.id) {
-        await sb.from('breaks').update({
+        const buRes = await sb.from('breaks').update({
           products_used: b.products_used,
           total_product_cost: boxCost,
           updated_at: new Date().toISOString()
         }).eq('id', b.id).eq('org_id', currentProfile.org_id);
+        if (buRes.error) throw new Error('Break #' + b.break_number + ' failed to save: ' + buRes.error.message);
       } else {
-        await sb.from('breaks').insert({
+        const biRes = await sb.from('breaks').insert({
           org_id: currentProfile.org_id,
           stream_id: _esStreamId,
           breaker_id: _esStreamData.breaker_id || null,
@@ -5866,6 +5876,7 @@ async function confirmEditStream() {
           net_profit: 0,
           status: 'completed'
         });
+        if (biRes.error) throw new Error('New break #' + b.break_number + ' failed to save: ' + biRes.error.message);
       }
     }
 
@@ -5876,13 +5887,14 @@ async function confirmEditStream() {
       for (const b of (allBreaks || [])) {
         const rev = parseFloat(b.revenue) || 0;
         const np = rev - (parseFloat(b.total_product_cost) || 0) - (rev * feeRate) - (parseFloat(b.other_costs) || 0);
-        await sb.from('breaks').update({ net_profit: np }).eq('id', b.id).eq('org_id', currentProfile.org_id);
+        const npRes = await sb.from('breaks').update({ net_profit: np }).eq('id', b.id).eq('org_id', currentProfile.org_id);
+        if (npRes.error) throw new Error('Per-break profit sync failed: ' + npRes.error.message);
       }
     }
 
     // ── Update stream record ─────────────────────────────────────────────
     const breakCount = currentBreaks.length;
-    await sb.from('streams').update({
+    const esStreamRes = await sb.from('streams').update({
       total_submitted_revenue: totalRev,
       final_sales: finalSales,
       total_product_cost: totalBoxCost,
@@ -5893,6 +5905,8 @@ async function confirmEditStream() {
       notes: notes || null,
       updated_at: new Date().toISOString()
     }).eq('id', _esStreamId);
+    // Money + breaker commission — never report success if this didn't save
+    if (esStreamRes.error) throw new Error('Stream totals/commission failed to save: ' + esStreamRes.error.message);
 
     // ── Process slip if uploaded ─────────────────────────────────────────
     if (_esSlipFile) {

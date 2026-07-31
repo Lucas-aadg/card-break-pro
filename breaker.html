@@ -1687,7 +1687,10 @@ async function handleSubmitBreak() {
       })
       .eq('id', stream.id);
 
-    if (streamErr) console.warn('Stream update error:', streamErr);
+    if (streamErr) {
+      console.error('Stream total update error:', streamErr);
+      showGlobalError('Break saved, but the stream running total didn\'t update — refresh to re-sync your totals.');
+    }
 
     // Update local state — store individual revenue, cumulative total, and products used for repeat
     submittedBreaks.push({ break_number: breakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed });
