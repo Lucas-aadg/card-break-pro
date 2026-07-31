@@ -982,6 +982,30 @@
   </div>
 </div>
 
+<!-- BUYER TAG EDIT MODAL (breaker notes a buyer's fav team / chase) -->
+<div class="modal-overlay" id="brkTagModal">
+  <div class="modal" style="max-width:420px;">
+    <h2 style="margin:0 0 0.2rem;">🏷 Tag <span id="brkTagUser">@buyer</span></h2>
+    <p style="font-size:0.8rem;color:var(--muted);margin:0 0 1rem;">What does this buyer collect? Shows on their card so you can shout them out.</p>
+    <div class="form-group">
+      <label for="brkTagTeam">Favorite team</label>
+      <input type="text" id="brkTagTeam" placeholder="e.g. Bulls" autocomplete="off" />
+    </div>
+    <div class="form-group">
+      <label for="brkTagPlayer">Favorite player / chase</label>
+      <input type="text" id="brkTagPlayer" placeholder="e.g. Michael Jordan" autocomplete="off" />
+    </div>
+    <div class="form-group">
+      <label for="brkTagSport">Sport / category</label>
+      <input type="text" id="brkTagSport" placeholder="e.g. NBA" autocomplete="off" />
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-outline" onclick="document.getElementById('brkTagModal').classList.remove('active')">Cancel</button>
+      <button class="btn" id="brkTagSaveBtn" onclick="saveBrkTags()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- CLOSE OUT MODAL -->
 <div class="modal-overlay" id="closeOutModal">
   <div class="modal">
@@ -3252,6 +3276,7 @@ function brkWhaleChip(b) {
     '<div style="display:flex;align-items:center;gap:6px;">' +
       '<span style="width:15px;height:15px;border-radius:4px;border:1px solid ' + (sel ? '#e9b949' : 'var(--border)') + ';background:' + (sel ? '#e9b949' : 'transparent') + ';display:inline-flex;align-items:center;justify-content:center;font-size:0.62rem;color:#0a0a11;flex-shrink:0;">' + (sel ? '✓' : '') + '</span>' +
       '<span style="font-weight:800;font-size:0.85rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@' + escHtml(b.username) + '</span>' +
+      '<span onclick="event.stopPropagation();openBrkTagEdit(\'' + b.id + '\')" title="Edit tags" style="cursor:pointer;font-size:0.72rem;opacity:0.55;flex-shrink:0;">✏️</span>' +
     '</div>' +
     '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b.total_spent || 0).toFixed(0) + ' · $' + Math.round(b._avgStream || 0) + '/str' + ((b._hitCount || 0) > 0 ? ' · 🎯' + b._hitCount : '') + '</div>' +
     (tags ? '<div style="font-size:0.68rem;color:#93a6ff;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(tags) + '</div>' : '') +
@@ -3305,9 +3330,43 @@ function brkFactsCard(b) {
   ];
   return '<div style="background:var(--card);border:1px solid ' + (b._tier === 'whale' ? 'rgba(233,185,73,0.4)' : 'var(--border)') + ';border-radius:12px;padding:13px 15px;margin-bottom:0.6rem;">' +
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;"><span style="font-size:1.05rem;font-weight:800;">@' + escHtml(b.username) + '</span>' + brkTierBadge(b._tier) + '</div>' +
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;' + (tags ? 'margin-bottom:9px;' : '') + '">' + stats.map(function(s) { return '<div style="flex:1;min-width:56px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;padding:7px 4px;text-align:center;"><div style="font-weight:800;font-size:0.88rem;">' + s[0] + '</div><div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">' + s[1] + '</div></div>'; }).join('') + '</div>' +
-    (tags ? '<div style="font-size:0.78rem;color:#93a6ff;">🏷 ' + escHtml(tags) + '</div>' : '') +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px;">' + stats.map(function(s) { return '<div style="flex:1;min-width:56px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;padding:7px 4px;text-align:center;"><div style="font-weight:800;font-size:0.88rem;">' + s[0] + '</div><div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">' + s[1] + '</div></div>'; }).join('') + '</div>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+      (tags ? '<span style="font-size:0.78rem;color:#93a6ff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🏷 ' + escHtml(tags) + '</span>' : '<span style="font-size:0.75rem;color:var(--muted);">No collect tags yet</span>') +
+      '<button onclick="openBrkTagEdit(\'' + b.id + '\')" class="btn btn-sm btn-outline" style="padding:0.28rem 0.65rem;font-size:0.7rem;flex-shrink:0;">✏️ ' + (tags ? 'Edit tags' : 'Add fav team') + '</button>' +
+    '</div>' +
   '</div>';
+}
+
+var _brkTagBuyerId = null;
+function openBrkTagEdit(buyerId) {
+  const b = _brkAllBuyers.find(x => x.id === buyerId);
+  if (!b) return;
+  _brkTagBuyerId = buyerId;
+  document.getElementById('brkTagUser').textContent = '@' + b.username;
+  document.getElementById('brkTagTeam').value = b.fav_team || '';
+  document.getElementById('brkTagPlayer').value = b.fav_player || '';
+  document.getElementById('brkTagSport').value = b.fav_sport || '';
+  document.getElementById('brkTagModal').classList.add('active');
+  setTimeout(function() { document.getElementById('brkTagTeam').focus(); }, 80);
+}
+
+async function saveBrkTags() {
+  if (!_brkTagBuyerId) return;
+  const btn = document.getElementById('brkTagSaveBtn');
+  const team   = document.getElementById('brkTagTeam').value.trim() || null;
+  const player = document.getElementById('brkTagPlayer').value.trim() || null;
+  const sport  = document.getElementById('brkTagSport').value.trim() || null;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const { error } = await sb.from('buyers').update({ fav_team: team, fav_player: player, fav_sport: sport, updated_at: new Date().toISOString() }).eq('id', _brkTagBuyerId);
+  btn.disabled = false; btn.textContent = 'Save';
+  if (error) { showGlobalError('Couldn\'t save tags: ' + error.message); return; }
+  const b = _brkAllBuyers.find(x => x.id === _brkTagBuyerId);
+  if (b) { b.fav_team = team; b.fav_player = player; b.fav_sport = sport; }
+  document.getElementById('brkTagModal').classList.remove('active');
+  showGlobalSuccess('Tags saved for @' + (b ? b.username : 'buyer') + '.');
+  renderBrkSell();
+  renderBrkSearch();
 }
 
 async function loadBrkHitBoard() {
