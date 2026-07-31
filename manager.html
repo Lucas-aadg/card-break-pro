@@ -2638,28 +2638,77 @@ async function loadMgrBuyersBoard() {
     rising.sort((a, b) => (b._recent30 || 0) - (a._recent30 || 0));
     fresh.sort((a, b)  => Number(b.total_spent) - Number(a.total_spent));
 
-    el.innerHTML =
-      mgrBoardSegment('❄️', 'Going Cold', cold,   'No purchase in ' + MGR_COLD_MIN + '+ days — flag for the owner', true,  'cold') +
-      mgrBoardSegment('🔥', 'Whales',     whales, 'Top spenders — protect these',                                  false, 'whale') +
-      mgrBoardSegment('📈', 'Rising',     rising, 'Spend climbing fast',                                           false, 'rising') +
-      mgrBoardSegment('🆕', 'New',        fresh,  'First purchase in the last ' + MGR_NEW_DAYS + ' days',          false, 'new');
+    const whaleTotal = whales.length + cold.length;
+    const coldAtRisk = cold.reduce((s, b) => s + Number(b.total_spent || 0), 0);
+    const rev30 = Object.values(recent).reduce((s, v) => s + v, 0);
+    _mgrBoardData = { spenders: spenders.length, whaleTotal, coldAtRisk, rev30, cold, whales, rising, fresh };
+    renderMgrBuyersBoard();
   } catch (err) {
     el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load board: ' + escHtml(err.message) + '</div>';
   }
 }
 
-function mgrBoardSegment(icon, title, list, why, hero, kind) {
-  const heroStyle = hero ? 'border:1px solid var(--primary);box-shadow:0 0 0 1px rgba(79,110,247,0.12);' : '';
-  const hd = '<div style="display:flex;align-items:center;gap:0.6rem;padding:0.8rem 1rem;border-bottom:1px solid var(--border);' + (hero ? 'background:linear-gradient(90deg,rgba(79,110,247,0.10),transparent);' : '') + '">' +
-      '<span style="font-size:1rem;">' + icon + '</span>' +
-      '<span style="font-weight:800;font-size:0.92rem;">' + title + '</span>' +
-      '<span style="font-size:0.68rem;color:var(--muted);font-weight:700;background:var(--card);border:1px solid var(--border);padding:1px 8px;border-radius:100px;">' + list.length + '</span>' +
-      '<span style="margin-left:auto;font-size:0.72rem;color:var(--muted);text-align:right;">' + why + '</span>' +
+var _mgrBoardData = null;
+var _mgrBoardCollapsed = {};
+var _mgrBoardShowAll = {};
+const MGR_BOARD_CAP = 6;
+function toggleMgrBoardCollapse(kind) { _mgrBoardCollapsed[kind] = !_mgrBoardCollapsed[kind]; renderMgrBuyersBoard(); }
+function toggleMgrBoardShowAll(kind) { _mgrBoardShowAll[kind] = !_mgrBoardShowAll[kind]; renderMgrBuyersBoard(); }
+function mgrBoardMono(u) { const s = (u || '').replace(/[^a-z0-9]/gi, ''); return (s.slice(0, 2) || '?').toUpperCase(); }
+function mgrBoardMoney(n) { n = Number(n) || 0; return '$' + (n >= 1000 ? (n / 1000).toFixed(1) + 'k' : Math.round(n)); }
+
+function renderMgrBuyersBoard() {
+  const el = document.getElementById('mgrBuyersBoard');
+  if (!el || !_mgrBoardData) return;
+  const d = _mgrBoardData;
+  el.innerHTML =
+    mgrBoardKpis(d) +
+    mgrBoardSegment('❄️', 'Going Cold', d.cold,   'No purchase in ' + MGR_COLD_MIN + '+ days — flag for the owner', true,  'cold') +
+    mgrBoardSegment('👑', 'Whales',     d.whales, 'Top spenders — protect these',                                  false, 'whale') +
+    mgrBoardSegment('📈', 'Rising',     d.rising, 'Spend climbing fast',                                           false, 'rising') +
+    mgrBoardSegment('🆕', 'New',        d.fresh,  'First purchase in the last ' + MGR_NEW_DAYS + ' days',          false, 'new');
+}
+
+function mgrBoardKpis(d) {
+  const kpi = (rail, lab, val, sub, subColor) =>
+    '<div style="background:linear-gradient(180deg,var(--card),var(--bg));border:1px solid var(--border);border-radius:14px;padding:13px 15px;position:relative;overflow:hidden;">' +
+      '<span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + rail + ';"></span>' +
+      '<div style="font-size:0.6rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">' + lab + '</div>' +
+      '<div style="font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;margin-top:4px;line-height:1;">' + val + '</div>' +
+      '<div style="font-size:0.66rem;font-weight:700;margin-top:5px;color:' + (subColor || 'var(--muted)') + ';">' + sub + '</div>' +
     '</div>';
-  const body = list.length
-    ? list.map(function(b) { return mgrBoardRow(b, kind); }).join('')
-    : '<div style="padding:1rem;text-align:center;color:var(--muted);font-size:0.8rem;">' + (kind === 'cold' ? 'Nobody going cold — nice. 🎉' : 'Nobody here right now.') + '</div>';
-  return '<div class="panel" style="padding:0;overflow:hidden;margin-bottom:0.85rem;' + heroStyle + '">' + hd + body + '</div>';
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.6rem;margin-bottom:1rem;">' +
+    kpi('var(--primary)', 'Buyers', d.spenders, 'with purchases') +
+    kpi('#eab945', 'Whales', '<span style="color:#eab945;">' + d.whaleTotal + '</span>', 'top 20% by spend') +
+    kpi('#f0603f', 'Going Cold', '<span style="color:#f0603f;">' + d.cold.length + '</span>', mgrBoardMoney(d.coldAtRisk) + ' at risk', '#f0603f') +
+    kpi('#2fbf71', '30-day rev', mgrBoardMoney(d.rev30), 'last 30 days') +
+  '</div>';
+}
+
+function mgrBoardSegment(icon, title, list, why, hero, kind) {
+  const collapsed = !!_mgrBoardCollapsed[kind];
+  const showAll = !!_mgrBoardShowAll[kind];
+  const softBg = kind === 'cold' ? 'rgba(240,96,63,0.10)' : kind === 'whale' ? 'rgba(234,185,69,0.10)' : kind === 'rising' ? 'rgba(47,191,113,0.10)' : 'rgba(58,160,255,0.10)';
+  const heroStyle = hero ? 'border-color:rgba(240,96,63,0.32);box-shadow:0 0 0 1px rgba(240,96,63,0.12);' : '';
+  const hd = '<div onclick="toggleMgrBoardCollapse(\'' + kind + '\')" style="display:flex;align-items:center;gap:0.7rem;padding:0.85rem 1rem;cursor:pointer;' + (collapsed ? '' : 'border-bottom:1px solid var(--border);') + (hero && !collapsed ? 'background:linear-gradient(90deg,rgba(240,96,63,0.08),transparent);' : '') + '">' +
+      '<div style="width:32px;height:32px;border-radius:9px;background:' + softBg + ';display:flex;align-items:center;justify-content:center;font-size:0.95rem;flex-shrink:0;">' + icon + '</div>' +
+      '<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:0.98rem;letter-spacing:-0.01em;">' + title + '</div>' +
+        '<div style="font-size:0.72rem;color:var(--muted);margin-top:1px;">' + why + '</div></div>' +
+      '<span style="font-size:0.7rem;font-weight:800;color:var(--text,inherit);background:var(--bg);border:1px solid var(--border);padding:3px 10px;border-radius:100px;">' + list.length + '</span>' +
+      '<span style="color:var(--muted);font-size:0.8rem;width:14px;text-align:center;">' + (collapsed ? '▸' : '▾') + '</span>' +
+    '</div>';
+  if (collapsed) return '<div class="panel" style="padding:0;overflow:hidden;margin-bottom:0.7rem;' + heroStyle + '">' + hd + '</div>';
+  let body;
+  if (!list.length) {
+    body = '<div style="padding:1.1rem;text-align:center;color:var(--muted);font-size:0.82rem;">' + (kind === 'cold' ? 'Nobody going cold — nice. 🎉' : 'Nobody here right now.') + '</div>';
+  } else {
+    const shown = showAll ? list : list.slice(0, MGR_BOARD_CAP);
+    body = shown.map(function(b) { return mgrBoardRow(b, kind); }).join('');
+    if (list.length > MGR_BOARD_CAP) {
+      body += '<div onclick="toggleMgrBoardShowAll(\'' + kind + '\')" style="padding:0.7rem;text-align:center;color:var(--primary);font-size:0.76rem;font-weight:700;cursor:pointer;border-top:1px solid var(--border);">' + (showAll ? 'Show less ▴' : 'Show all ' + list.length + ' ▾') + '</div>';
+    }
+  }
+  return '<div class="panel" style="padding:0;overflow:hidden;margin-bottom:0.7rem;' + heroStyle + '">' + hd + body + '</div>';
 }
 
 function mgrBuyerTagChip(b) {
@@ -2669,32 +2718,45 @@ function mgrBuyerTagChip(b) {
 
 function mgrBoardRow(b, kind) {
   const spent = Number(b.total_spent || 0);
-  const temp = b.temperature || 'cold';
-  const tc = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
   const hits = b._hitCount || 0;
+  const avg = b.total_streams_participated > 0 ? spent / b.total_streams_participated : spent;
+  const av = kind === 'whale' ? 'linear-gradient(135deg,#eab945,#d98e2b);color:#0a0a11;'
+           : kind === 'rising' ? 'linear-gradient(135deg,#2fbf71,#1f9d67);color:#04140c;'
+           : kind === 'new'    ? 'linear-gradient(135deg,#3aa0ff,#4f6ef7);color:#fff;'
+           :                     'linear-gradient(135deg,#f0603f,#c23b6b);color:#fff;';
   const since = b._since != null ? b._since : mgrDaysSince(b.last_purchase_date);
-  let sub;
-  if (kind === 'cold')        sub = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
-  else if (kind === 'rising') sub = 'Last 30d $' + (b._recent30 || 0).toFixed(0) + (b._growth != null ? ' · +' + b._growth + '%' : ' · new momentum');
-  else if (kind === 'new')    sub = 'First seen ' + mgrDaysSince(b.first_seen_date) + 'd ago · ' + (b.total_breaks_purchased || 0) + ' breaks';
-  else                        sub = mgrRelativeDate(b.last_purchase_date) + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
   const uname = (b.username || '').replace(/'/g, "\\'");
   const contactedDays = (kind === 'cold' && b.last_cold_alert_at) ? mgrDaysSince(b.last_cold_alert_at) : null;
   const contacted = contactedDays != null && contactedDays <= 7;
-  const action = kind === 'cold'
-    ? '<button onclick="mgrCopyWinback(\'' + b.id + '\',\'' + uname + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.3rem 0.7rem;font-size:0.72rem;flex-shrink:0;">' + (contacted ? 'Copy again' : 'Copy win-back') + '</button>'
-    : '';
-  return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border);' + (contacted ? 'opacity:0.62;' : '') + '">' +
+  let meta;
+  if (kind === 'cold')        meta = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
+  else if (kind === 'rising') meta = 'Last 30d $' + (b._recent30 || 0).toFixed(0) + (b._growth != null ? ' · ▲ +' + b._growth + '%' : '');
+  else if (kind === 'new')    meta = 'First seen ' + mgrDaysSince(b.first_seen_date) + 'd ago · ' + (b.total_breaks_purchased || 0) + ' breaks';
+  else                        meta = mgrRelativeDate(b.last_purchase_date) + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
+
+  let right;
+  if (kind === 'cold') {
+    right = '<div style="text-align:right;flex-shrink:0;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div><div style="font-size:0.66rem;color:var(--muted);">$' + Math.round(avg) + '/str</div></div>' +
+      '<button onclick="mgrCopyWinback(\'' + b.id + '\',\'' + uname + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.35rem 0.65rem;font-size:0.7rem;flex-shrink:0;">' + (contacted ? 'Again' : 'Win-back') + '</button>';
+  } else if (kind === 'whale') {
+    const top = (_mgrBoardData && _mgrBoardData.whales.length) ? Number(_mgrBoardData.whales[0].total_spent || 0) : spent;
+    const pct = top > 0 ? Math.max(8, Math.round(spent / top * 100)) : 100;
+    right = '<div style="text-align:right;flex-shrink:0;min-width:66px;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div>' +
+      '<div style="width:72px;height:5px;border-radius:3px;background:rgba(255,255,255,0.07);overflow:hidden;margin-top:5px;margin-left:auto;"><i style="display:block;height:100%;width:' + pct + '%;background:#eab945;border-radius:3px;"></i></div></div>';
+  } else {
+    right = '<div style="text-align:right;flex-shrink:0;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div><div style="font-size:0.66rem;color:var(--muted);">$' + Math.round(avg) + '/str</div></div>';
+  }
+
+  return '<div style="display:flex;align-items:center;gap:0.7rem;padding:0.7rem 1rem;border-bottom:1px solid var(--border);' + (contacted ? 'opacity:0.6;' : '') + '">' +
+    '<div style="width:38px;height:38px;border-radius:10px;background:' + av + 'display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;flex-shrink:0;">' + mgrBoardMono(b.username) + '</div>' +
     '<div style="flex:1;min-width:0;">' +
-      '<div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">@' + escHtml(b.username) + mgrBuyerTagChip(b) +
-        (hits > 0 ? ' <span style="font-size:0.6rem;background:rgba(239,68,68,0.12);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700;">🎯 ' + hits + '</span>' : '') +
-        (contacted ? ' <span style="font-size:0.6rem;background:rgba(34,197,94,0.14);color:#22c55e;padding:1px 6px;border-radius:3px;font-weight:700;">✓ reached out ' + (contactedDays === 0 ? 'today' : contactedDays + 'd ago') + '</span>' : '') +
+      '<div style="font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">@' + escHtml(b.username) + mgrBuyerTagChip(b) +
+        (hits > 0 ? ' <span style="font-size:0.58rem;background:rgba(240,96,63,0.13);color:#f0603f;padding:1px 5px;border-radius:4px;font-weight:800;">🎯 ' + hits + '</span>' : '') +
+        (contacted ? ' <span style="font-size:0.58rem;background:rgba(47,191,113,0.14);color:#2fbf71;padding:1px 6px;border-radius:4px;font-weight:800;">✓ ' + (contactedDays === 0 ? 'today' : contactedDays + 'd') + '</span>' : '') +
       '</div>' +
-      '<div style="font-size:0.72rem;color:var(--muted);margin-top:1px;">' + sub + '</div>' +
+      '<div style="font-size:0.72rem;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + meta + '</div>' +
     '</div>' +
-    '<span style="width:8px;height:8px;border-radius:50%;background:' + tc + ';flex-shrink:0;"></span>' +
-    '<div style="font-weight:800;font-size:0.92rem;color:var(--primary);min-width:56px;text-align:right;">$' + spent.toFixed(0) + '</div>' +
-    action +
+    right +
   '</div>';
 }
 
