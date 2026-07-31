@@ -1637,7 +1637,7 @@ async function handleSubmitBreak() {
         .update({ current_stock: newStock })
         .eq('id', used.product_id)
         .eq('org_id', currentProfile.org_id);
-      if (stockErr) console.warn('Stock update error:', stockErr);
+      if (stockErr) { console.error('Stock update error:', stockErr); showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.'); }
       product.current_stock = newStock;
       try {
         await sb.from('inventory_log').insert({
@@ -1870,7 +1870,7 @@ async function handleConfirmClose() {
           await sb.from('breaks').update({ net_profit: np }).eq('id', b.id).eq('org_id', currentProfile.org_id);
         }
       }
-    } catch (syncErr) { console.warn('Break profit sync failed:', syncErr); }
+    } catch (syncErr) { console.error('Break profit sync failed:', syncErr); showGlobalError('Stream closed, but per-break profit didn\'t re-sync — figures may be off until you edit & save the stream.'); }
 
     // Clock out active shift — prefer specific ID, fall back to broad query
     const clockOutTime = new Date().toISOString();
@@ -1915,7 +1915,8 @@ async function handleConfirmClose() {
         await sb.from('sort_tasks').insert({ org_id: currentProfile.org_id, stream_id: closedStreamId, status: 'pending' });
       }
     } catch (taskErr) {
-      console.warn('Sort task creation failed:', taskErr);
+      console.error('Sort task creation failed:', taskErr);
+      showGlobalError('Stream closed, but the sort task wasn\'t created — your sorters won\'t see it to sort/ship.');
     }
 
     // Notify sorters that stream is closed (fire and forget)

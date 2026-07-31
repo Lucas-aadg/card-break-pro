@@ -131,12 +131,15 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: 'Self-referral not allowed' });
       }
 
-      await sb.from('referral_uses').insert({
+      const { error: useErr } = await sb.from('referral_uses').insert({
         referral_code_id:         refCode.id,
         referred_organization_id: referredOrgId,
         status:                   'pending',
         referred_trial_extended:  true
       });
+      // Must surface — if this row isn't written, the conversion webhook never
+      // finds it and the referrer silently never gets their free month.
+      if (useErr) return res.status(500).json({ error: 'Failed to record referral: ' + useErr.message });
 
       await sb.from('referral_codes').update({
         times_used: (refCode.times_used || 0) + 1

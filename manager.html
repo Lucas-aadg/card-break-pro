@@ -1454,7 +1454,8 @@ function calPopupRemove() {
   const shiftId = calPopupShiftId;
   calHidePopup();
   openConfirm('Remove Shift', 'Permanently delete this scheduled shift?', async function() {
-    await sb.from('schedules').delete().eq('id', shiftId).eq('org_id', currentProfile.org_id);
+    const { error } = await sb.from('schedules').delete().eq('id', shiftId).eq('org_id', currentProfile.org_id);
+    if (error) { showGlobalError('Couldn\'t remove shift: ' + error.message); return; }
     showGlobalSuccess('Shift removed.');
     await loadSchedule();
     loadCalendar();

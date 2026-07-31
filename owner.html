@@ -3598,7 +3598,8 @@ async function renderSettingsChannelList() {
 
 function deleteChannel(channelId, name) {
   openConfirm('Delete Account', 'Delete "' + name + '"? This will NOT delete existing streams or products — they just won\'t be linked to this account anymore.', async function() {
-    await sb.from('channels').delete().eq('id', channelId);
+    const { error: chDelErr } = await sb.from('channels').delete().eq('id', channelId);
+    if (chDelErr) { showGlobalError('Couldn\'t delete "' + name + '": ' + chDelErr.message); return; }
     await loadChannels();
     populateChannelDropdowns();
     renderSettingsChannelList();
@@ -4325,7 +4326,8 @@ async function beHandleSubmit() {
       const product = orgProducts.find(function (p) { return p.id === used.product_id; });
       if (!product) continue;
       const newStock = Math.max(0, product.current_stock - used.qty);
-      await sb.from('products').update({ current_stock: newStock }).eq('id', used.product_id);
+      const { error: stkErr } = await sb.from('products').update({ current_stock: newStock }).eq('id', used.product_id);
+      if (stkErr) { console.error('Stock update error:', stkErr); showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.'); }
       product.current_stock = newStock;
       // Log box usage
       await sb.from('inventory_log').insert({
@@ -4522,11 +4524,12 @@ function setupCloseOutModal() {
         .eq('status', 'in_progress');
 
       // Create sort task for sorters
-      await sb.from('sort_tasks').insert({
+      const { error: sortTaskErr } = await sb.from('sort_tasks').insert({
         org_id: currentProfile.org_id,
         stream_id: beCurrentStream.id,
         status: 'pending'
       });
+      if (sortTaskErr) { console.error('sort task create failed:', sortTaskErr); showGlobalError('Stream closed, but the sort task wasn\'t created — your sorters won\'t see it to sort/ship.'); }
 
       document.getElementById('closeOutModal').classList.remove('active');
 
@@ -5843,14 +5846,16 @@ async function confirmEditStream() {
       const product = (orgProducts || []).find(function(p){ return p.id === prodId; });
       if (!product) continue;
       const newStock = Math.max(0, (product.current_stock || 0) + delta);
-      await sb.from('products').update({ current_stock: newStock, updated_at: new Date().toISOString() }).eq('id', prodId).eq('org_id', currentProfile.org_id);
+      const { error: esStkErr } = await sb.from('products').update({ current_stock: newStock, updated_at: new Date().toISOString() }).eq('id', prodId).eq('org_id', currentProfile.org_id);
+      if (esStkErr) throw new Error('Inventory update failed for ' + product.name + ': ' + esStkErr.message);
       product.current_stock = newStock; // update local cache
     }
 
     // ── Delete removed breaks ────────────────────────────────────────────
     const deletedIds = _esEditBreaks.filter(function(b){ return b._deleted && b.id; }).map(function(b){ return b.id; });
     if (deletedIds.length) {
-      await sb.from('breaks').delete().in('id', deletedIds).eq('org_id', currentProfile.org_id);
+      const { error: brkDelErr } = await sb.from('breaks').delete().in('id', deletedIds).eq('org_id', currentProfile.org_id);
+      if (brkDelErr) throw new Error('Removing deleted breaks failed: ' + brkDelErr.message);
     }
 
     // ── Update / Insert breaks ───────────────────────────────────────────
@@ -7995,7 +8000,8 @@ function calPopupRemove() {
   const shiftId = calPopupShiftId;
   calHidePopup();
   openConfirm('Delete Shift', 'Permanently delete this scheduled shift?', async function() {
-    await sb.from('schedules').delete().eq('id', shiftId).eq('org_id', currentProfile.org_id);
+    const { error: shDelErr } = await sb.from('schedules').delete().eq('id', shiftId).eq('org_id', currentProfile.org_id);
+    if (shDelErr) { showGlobalError('Couldn\'t delete shift: ' + shDelErr.message); return; }
     await loadSchedules();
     showGlobalSuccess('Shift deleted.');
   });
@@ -8237,7 +8243,8 @@ function renderSchedTable() {
   tbody.querySelectorAll('.sched-del-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       openConfirm('Delete Shift', 'Permanently delete this scheduled shift?', async function () {
-        await sb.from('schedules').delete().eq('id', btn.dataset.schedid);
+        const { error: schDelErr } = await sb.from('schedules').delete().eq('id', btn.dataset.schedid);
+        if (schDelErr) { showGlobalError('Couldn\'t delete shift: ' + schDelErr.message); return; }
         await loadSchedules();
         showGlobalSuccess('Shift deleted.');
       });
@@ -8262,12 +8269,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!date) { showGlobalError('Date is required.'); return; }
     showLoading('Saving…');
     try {
-      await sb.from('schedules').update({
+      const { error: schUpdErr } = await sb.from('schedules').update({
         scheduled_date: date,
         scheduled_time: time || null,
         stream_key: streamKey || null,
         notes: notes || null
       }).eq('id', id);
+      if (schUpdErr) throw schUpdErr;
       hideLoading();
       document.getElementById('editSchedModal').classList.remove('active');
       await loadSchedules();
@@ -10016,7 +10024,8 @@ async function ownerDeleteGoal(goalId) {
   if (!confirm('Remove this goal?')) return;
   try {
     const token = await ownerAuthToken();
-    await fetch('/api/goals/manage?id=' + goalId, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+    const gResp = await fetch('/api/goals/manage?id=' + goalId, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+    if (!gResp.ok) { const ge = await gResp.json().catch(() => ({})); throw new Error(ge.error || 'Delete failed (' + gResp.status + ')'); }
     await ownerLoadGoals();
   } catch (e) { showGlobalError(e.message); }
 }
