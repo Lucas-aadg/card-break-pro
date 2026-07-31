@@ -3,6 +3,17 @@
    All rules are inside media queries — zero desktop impact
    ================================================================ */
 
+/* ── DESKTOP GUARD ──────────────────────────────────────────────────
+   Mobile-only chrome (bottom nav, mobile break header) exists in the
+   markup but is only *styled* inside the max-width query below — so on
+   desktop it fell back to display:block and leaked to the bottom of the
+   page. Hide it explicitly on desktop. (The close-stream confirm gets a
+   proper hidden default in each page's own styles.) */
+@media (min-width: 769px) {
+  .btm-nav,
+  #mobileBreakHeader { display: none !important; }
+}
+
 /* ── GLOBAL ──────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
 
