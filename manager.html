@@ -2593,10 +2593,18 @@ async function loadMgrBuyersBoard() {
     const d30 = new Date(); d30.setDate(d30.getDate() - 30);
     const d60 = new Date(); d60.setDate(d60.getDate() - 60);
     const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-    const { data: purch } = await sb.from('buyer_purchases')
-      .select('buyer_id, amount, purchase_date')
-      .eq('organization_id', currentProfile.org_id)
-      .gte('purchase_date', s60);
+    let purch = [], _pf = 0;
+    while (true) {
+      const { data, error } = await sb.from('buyer_purchases')
+        .select('buyer_id, amount, purchase_date')
+        .eq('organization_id', currentProfile.org_id)
+        .gte('purchase_date', s60)
+        .range(_pf, _pf + 999);
+      if (error) throw error;
+      purch = purch.concat(data || []);
+      if (!data || data.length < 1000) break;
+      _pf += 1000;
+    }
     const recent = {}, prior = {};
     (purch || []).forEach(p => {
       const amt = Number(p.amount || 0);
@@ -2721,7 +2729,7 @@ function mgrRelativeDate(dateStr) {
 }
 
 async function fetchAllMgrBuyers() {
-  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits,last_cold_alert_at,fav_team,fav_player,fav_sport';
+  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,first_seen_date,temperature,is_new_buyer,case_hits,last_cold_alert_at,fav_team,fav_player,fav_sport';
   let all = [], from = 0; const size = 1000;
   while (true) {
     const { data, error } = await sb.from('buyers')
@@ -2822,11 +2830,19 @@ async function loadMgrBuyersTab() {
       _mgrBuyersData = visible;
     } else {
       const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-      const { data: purch, error } = await sb.from('buyer_purchases')
-        .select('buyer_id, amount')
-        .eq('organization_id', currentProfile.org_id)
-        .gte('purchase_date', cutoff.toISOString().split('T')[0]);
-      if (error) throw error;
+      const cutoffStr = cutoff.toISOString().split('T')[0];
+      let purch = [], _pf = 0;
+      while (true) {
+        const { data, error } = await sb.from('buyer_purchases')
+          .select('buyer_id, amount')
+          .eq('organization_id', currentProfile.org_id)
+          .gte('purchase_date', cutoffStr)
+          .range(_pf, _pf + 999);
+        if (error) throw error;
+        purch = purch.concat(data || []);
+        if (!data || data.length < 1000) break;
+        _pf += 1000;
+      }
       const sums = {};
       (purch || []).forEach(p => { sums[p.buyer_id] = (sums[p.buyer_id] || 0) + Number(p.amount || 0); });
       _mgrBuyersData = buyersAll

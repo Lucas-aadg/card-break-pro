@@ -1,14 +1,25 @@
 const { createClient } = require('@supabase/supabase-js');
 
+// Idempotent, batched slip importer.
+// buyer_purchases is the source of truth; buyers.total_* is a cache RECOMPUTED
+// from it. Re-importing the same stream deletes that stream's purchases, inserts
+// the new set, then recomputes each affected buyer's totals from ALL their
+// remaining purchases. Running it twice yields the same result (no double-count),
+// a partial failure is fixed by simply retrying, and there's no read-modify-write
+// on totals so concurrent imports can't lose each other's revenue.
+
+const MAX_BUYERS = 2000;   // slips can be big; batched writes keep us well under the serverless time limit
+const CHUNK = 400;         // rows per bulk insert
+const IN_CHUNK = 100;      // ids per .in() filter
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  try {
-    return await handleImport(req, res);
-  } catch (e) {
-    console.error('process-import fatal:', e);
-    return res.status(500).json({ error: e && e.message ? e.message : 'Import failed' });
-  }
+  try { return await handleImport(req, res); }
+  catch (e) { console.error('process-import fatal:', e); return res.status(500).json({ error: e && e.message ? e.message : 'Import failed' }); }
 };
+
+function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
+function round2(n) { return Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100; }
 
 async function handleImport(req, res) {
   let body;
@@ -16,17 +27,13 @@ async function handleImport(req, res) {
   catch (e) { return res.status(400).json({ error: 'Invalid JSON' }); }
 
   const { orgId, streamId, buyers, streamDate, importedBy, rawFilename } = body;
-  if (!orgId || !Array.isArray(buyers) || buyers.length === 0) {
-    return res.status(400).json({ error: 'Missing required fields: orgId, buyers' });
-  }
+  if (!orgId || !Array.isArray(buyers) || buyers.length === 0) return res.status(400).json({ error: 'Missing required fields: orgId, buyers' });
   if (!/^[0-9a-f-]{36}$/.test(orgId)) return res.status(400).json({ error: 'Invalid orgId' });
-  if (streamId && !/^[0-9a-f-]{36}$/.test(streamId)) return res.status(400).json({ error: 'Invalid streamId' });
-  if (buyers.length > 500) return res.status(400).json({ error: 'Too many buyers in single import (max 500)' });
+  // streamId is REQUIRED — imports are keyed to a stream so a re-import stays idempotent.
+  if (!streamId || !/^[0-9a-f-]{36}$/.test(streamId)) return res.status(400).json({ error: 'A valid streamId is required for import.' });
+  if (buyers.length > MAX_BUYERS) return res.status(400).json({ error: 'Too many buyers in a single import (max ' + MAX_BUYERS + ').' });
 
-  const sb = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
-  );
+  const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY);
 
   // Verify caller is authenticated and belongs to the claimed org
   const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
@@ -37,198 +44,150 @@ async function handleImport(req, res) {
   if (!callerProfile || callerProfile.org_id !== orgId) return res.status(403).json({ error: 'Forbidden' });
 
   const purchaseDate = parseDate(streamDate);
-  let importId = null;
 
-  // If reimporting the same stream, reverse old buyer totals BEFORE deleting
-  // purchases — otherwise reimport adds on top of stale totals (double-count)
-  if (streamId) {
-    try {
-      const { data: existingImport } = await sb.from('stream_slip_imports')
-        .select('id').eq('stream_id', streamId).maybeSingle();
-      if (existingImport) {
-        // Fetch old purchases so we can reverse their amounts from buyer totals
-        const { data: oldPurchases } = await sb.from('buyer_purchases')
-          .select('buyer_id, amount')
-          .eq('stream_id', streamId)
-          .eq('organization_id', orgId);
-
-        if (oldPurchases && oldPurchases.length > 0) {
-          // Group by buyer_id
-          const reversalMap = {};
-          const countMap = {};
-          oldPurchases.forEach(function(p) {
-            reversalMap[p.buyer_id] = (reversalMap[p.buyer_id] || 0) + (parseFloat(p.amount) || 0);
-            countMap[p.buyer_id] = (countMap[p.buyer_id] || 0) + 1;
-          });
-
-          for (const buyerId of Object.keys(reversalMap)) {
-            const { data: buyer } = await sb.from('buyers')
-              .select('total_spent, total_breaks_purchased, total_streams_participated')
-              .eq('id', buyerId).maybeSingle();
-            if (!buyer) continue;
-            const newSpent   = Math.max(0, (parseFloat(buyer.total_spent) || 0) - reversalMap[buyerId]);
-            const newBreaks  = Math.max(0, (buyer.total_breaks_purchased || 0) - (countMap[buyerId] || 0));
-            const newStreams  = Math.max(0, (buyer.total_streams_participated || 1) - 1);
-            if (newSpent === 0 && newBreaks === 0 && newStreams === 0) {
-              // Giveaway-only buyer — remove them entirely rather than leaving a $0 ghost record
-              const { error: delErr } = await sb.from('buyers').delete().eq('id', buyerId);
-              if (delErr) throw new Error('reversal delete buyer failed: ' + delErr.message);
-            } else {
-              const { error: updErr } = await sb.from('buyers').update({
-                total_spent: newSpent,
-                total_breaks_purchased: newBreaks,
-                total_streams_participated: newStreams,
-                updated_at: new Date().toISOString()
-              }).eq('id', buyerId);
-              // Must throw — otherwise a failed reversal falls through to the
-              // destructive delete below and double-counts revenue on reimport
-              if (updErr) throw new Error('reversal update buyer failed: ' + updErr.message);
-            }
-          }
-        }
-
-        // Now safe to delete old purchases and import record
-        const { error: bpDelErr } = await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', orgId);
-        if (bpDelErr) throw new Error('delete old purchases failed: ' + bpDelErr.message);
-        const { error: siDelErr } = await sb.from('stream_slip_imports').delete().eq('id', existingImport.id);
-        if (siDelErr) throw new Error('delete old import record failed: ' + siDelErr.message);
-      }
-    } catch (e) {
-      // Abort rather than proceed — a half-finished reversal would double-count revenue
-      console.error('Reimport cleanup failed:', e.message);
-      return res.status(500).json({ error: 'Reimport cleanup failed — aborted to prevent double-counting. ' + e.message });
-    }
+  // ── Normalize + de-dupe incoming buyers by username; merge their items ──
+  const byUname = {};
+  for (const b of buyers) {
+    if (!b || !b.username) continue;
+    const uname = String(b.username).toLowerCase().trim();
+    if (!uname) continue;
+    const items = Array.isArray(b.items) ? b.items : [];
+    const spent = Number(b.totalSpent) || 0;
+    if (spent === 0 && items.length === 0) continue; // truly empty row
+    if (!byUname[uname]) byUname[uname] = { realName: b.realName || null, isNew: !!b.isNew, items: [] };
+    for (const it of items) byUname[uname].items.push({ breakName: (it.breakName || '').slice(0, 120), orderNumber: it.orderNumber || null, amount: Number(it.amount) || 0 });
+    if (b.realName && !byUname[uname].realName) byUname[uname].realName = b.realName;
   }
+  const unames = Object.keys(byUname);
+  if (!unames.length) return res.status(400).json({ error: 'No valid buyers to import.' });
 
-  // Create import record
   try {
-    const { data: imp } = await sb.from('stream_slip_imports').insert({
-      organization_id: orgId,
-      stream_id: streamId || null,
-      imported_by: importedBy || null,
-      buyers_found: buyers.length,
-      new_buyers_found: buyers.filter(b => b.isNew).length,
-      total_revenue_parsed: buyers.reduce((s, b) => s + (Number(b.totalSpent) || 0), 0),
-      raw_filename: rawFilename || null,
-      status: 'processing'
+    // ── 1. Buyers previously tied to this stream (so removed ones also recompute) ──
+    const oldBuyerIds = new Set();
+    let f = 0;
+    while (true) {
+      const { data, error } = await sb.from('buyer_purchases').select('buyer_id').eq('organization_id', orgId).eq('stream_id', streamId).range(f, f + 999);
+      if (error) throw new Error('read old purchases failed: ' + error.message);
+      (data || []).forEach(r => oldBuyerIds.add(r.buyer_id));
+      if (!data || data.length < 1000) break;
+      f += 1000;
+    }
+
+    // ── 2. Idempotent reset: drop this stream's purchases + old import record ──
+    const { error: delErr } = await sb.from('buyer_purchases').delete().eq('organization_id', orgId).eq('stream_id', streamId);
+    if (delErr) throw new Error('clear old purchases failed: ' + delErr.message);
+    await sb.from('stream_slip_imports').delete().eq('organization_id', orgId).eq('stream_id', streamId).then(null, () => {});
+
+    // ── 3. Resolve buyer ids (fetch existing, bulk-create the new ones) ──
+    const unameToId = {};
+    for (const grp of chunk(unames, 200)) {
+      const { data, error } = await sb.from('buyers').select('id, username').eq('organization_id', orgId).eq('platform', 'whatnot').in('username', grp);
+      if (error) throw new Error('lookup buyers failed: ' + error.message);
+      (data || []).forEach(r => { unameToId[r.username] = r.id; });
+    }
+    const newUnames = unames.filter(u => !unameToId[u]);
+    if (newUnames.length) {
+      const rows = newUnames.map(u => ({
+        organization_id: orgId, platform: 'whatnot', username: u,
+        real_name: byUname[u].realName || null,
+        first_seen_date: purchaseDate,
+        total_spent: 0, total_breaks_purchased: 0, total_streams_participated: 0,
+        last_purchase_date: purchaseDate, temperature: computeTemp(purchaseDate), is_new_buyer: !!byUname[u].isNew
+      }));
+      for (const grp of chunk(rows, CHUNK)) {
+        const { error } = await sb.from('buyers').insert(grp);
+        // A concurrent import may have created the same username — ignore and re-fetch below
+        if (error && !/duplicate key|unique/i.test(error.message)) throw new Error('create buyers failed: ' + error.message);
+      }
+      for (const grp of chunk(newUnames, 200)) {
+        const { data, error } = await sb.from('buyers').select('id, username').eq('organization_id', orgId).eq('platform', 'whatnot').in('username', grp);
+        if (error) throw new Error('lookup new buyers failed: ' + error.message);
+        (data || []).forEach(r => { unameToId[r.username] = r.id; });
+      }
+    }
+
+    // ── 4. Bulk-insert this stream's purchases ──
+    const purchRows = [];
+    for (const u of unames) {
+      const id = unameToId[u]; if (!id) continue;
+      for (const it of byUname[u].items) {
+        purchRows.push({ organization_id: orgId, buyer_id: id, stream_id: streamId, break_name: it.breakName, order_number: it.orderNumber, amount: it.amount, purchase_date: purchaseDate, platform: 'whatnot' });
+      }
+    }
+    for (const grp of chunk(purchRows, CHUNK)) {
+      const { error } = await sb.from('buyer_purchases').insert(grp);
+      if (error) throw new Error('insert purchases failed: ' + error.message);
+    }
+
+    // ── 5. Recompute totals from buyer_purchases (idempotent, concurrency-safe) ──
+    const affected = new Set();
+    unames.forEach(u => { if (unameToId[u]) affected.add(unameToId[u]); });
+    oldBuyerIds.forEach(id => affected.add(id));
+    const affectedIds = Array.from(affected);
+
+    const agg = {};
+    affectedIds.forEach(id => { agg[id] = { spent: 0, breaks: 0, streams: new Set(), last: null }; });
+    for (const grp of chunk(affectedIds, IN_CHUNK)) {
+      let pf = 0;
+      while (true) {
+        const { data, error } = await sb.from('buyer_purchases').select('buyer_id, amount, purchase_date, stream_id').in('buyer_id', grp).range(pf, pf + 999);
+        if (error) throw new Error('recompute read failed: ' + error.message);
+        (data || []).forEach(p => {
+          const a = agg[p.buyer_id]; if (!a) return;
+          a.spent += Number(p.amount) || 0;
+          a.breaks += 1;
+          if (p.stream_id) a.streams.add(p.stream_id);
+          if (p.purchase_date && (!a.last || p.purchase_date > a.last)) a.last = p.purchase_date;
+        });
+        if (!data || data.length < 1000) break;
+        pf += 1000;
+      }
+    }
+
+    const idToRealName = {};
+    unames.forEach(u => { if (byUname[u].realName && unameToId[u]) idToRealName[unameToId[u]] = byUname[u].realName; });
+
+    const nowIso = new Date().toISOString();
+    const updateOne = async (id) => {
+      const a = agg[id];
+      const patch = {
+        total_spent: round2(a.spent),
+        total_breaks_purchased: a.breaks,
+        total_streams_participated: a.streams.size,
+        last_purchase_date: a.last,
+        temperature: computeTemp(a.last),
+        updated_at: nowIso
+      };
+      if (a.breaks > 0) patch.is_new_buyer = false;
+      if (idToRealName[id]) patch.real_name = idToRealName[id];
+      const { error } = await sb.from('buyers').update(patch).eq('id', id).eq('organization_id', orgId);
+      if (error) throw new Error('recompute update failed: ' + error.message);
+    };
+    // Parallel in small batches — many single-row updates, but wall-clock stays low.
+    for (const grp of chunk(affectedIds, 25)) await Promise.all(grp.map(updateOne));
+
+    // ── 6. Record the import ──
+    let importId = null;
+    const impRes = await sb.from('stream_slip_imports').insert({
+      organization_id: orgId, stream_id: streamId, imported_by: importedBy || null,
+      buyers_found: unames.length,
+      new_buyers_found: newUnames.length,
+      total_revenue_parsed: round2(purchRows.reduce((s, r) => s + (r.amount || 0), 0)),
+      raw_filename: rawFilename || null, status: 'complete'
     }).select('id').single();
-    if (imp) importId = imp.id;
-  } catch (e) { console.warn('Import record failed:', e.message); }
+    if (!impRes.error && impRes.data) importId = impRes.data.id;
 
-  const errors = [];
-  let processed = 0;
-
-  for (const buyer of buyers) {
-    if (!buyer.username) continue;
-    if ((Number(buyer.totalSpent) || 0) === 0 && (!buyer.items || buyer.items.length === 0)) continue;
-    try {
-      await processBuyer(sb, orgId, streamId, buyer, purchaseDate);
-      processed++;
-    } catch (e) {
-      errors.push({ username: buyer.username, error: e.message });
-      console.error('Buyer process error for', buyer.username, e);
-    }
-  }
-
-  if (importId) {
-    await sb.from('stream_slip_imports').update({
-      status: 'complete',
-      error_message: errors.length > 0 ? JSON.stringify(errors.slice(0, 5)) : null
-    }).eq('id', importId).catch(() => {});
-  }
-
-  return res.status(200).json({ success: true, processed, errors: errors.length, importId });
-};
-
-async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
-  const { username, isNew, realName, items } = buyerData;
-  const uname = username.toLowerCase();
-  const totalSpent = Number(buyerData.totalSpent) || 0;
-
-  // Look up existing buyer — case-insensitive via ilike
-  const { data: existing } = await sb.from('buyers')
-    .select('id, total_spent, total_breaks_purchased, total_streams_participated, is_new_buyer')
-    .eq('organization_id', orgId)
-    .eq('platform', 'whatnot')
-    .ilike('username', uname)
-    .maybeSingle();
-
-  let buyerId;
-  let shouldInsertPurchases = true;
-
-  if (existing) {
-    buyerId = existing.id;
-
-    // Dedup: if this stream was already imported, don't re-add spend or purchases
-    let isNewImport = true;
-    if (streamId) {
-      const { count } = await sb.from('buyer_purchases')
-        .select('id', { count: 'exact', head: true })
-        .eq('buyer_id', existing.id)
-        .eq('stream_id', streamId);
-      isNewImport = (count || 0) === 0;
-    }
-
-    shouldInsertPurchases = isNewImport;
-
-    if (isNewImport) {
-      const { error: aggErr } = await sb.from('buyers').update({
-        total_spent: (Number(existing.total_spent) || 0) + totalSpent,
-        total_breaks_purchased: (existing.total_breaks_purchased || 0) + (items?.length || 0),
-        total_streams_participated: (existing.total_streams_participated || 0) + (streamId ? 1 : 0),
-        last_purchase_date: purchaseDate,
-        temperature: computeTemp(purchaseDate),
-        // Clear new-buyer flag once they have confirmed purchase history
-        ...(existing.is_new_buyer ? { is_new_buyer: false } : {}),
-        ...(realName ? { real_name: realName } : {}),
-        updated_at: new Date().toISOString()
-      }).eq('id', existing.id);
-      // Throw so this buyer lands in errors[] instead of silently understating totals
-      if (aggErr) throw new Error('buyer totals update failed: ' + aggErr.message);
-    } else {
-      // Re-import: still refresh name/temp, but don't touch spend counters
-      const { error: refreshErr } = await sb.from('buyers').update({
-        temperature: computeTemp(purchaseDate),
-        ...(realName ? { real_name: realName } : {}),
-        updated_at: new Date().toISOString()
-      }).eq('id', existing.id);
-      if (refreshErr) throw new Error('buyer refresh failed: ' + refreshErr.message);
-    }
-  } else {
-    const { data: newBuyer, error } = await sb.from('buyers').insert({
-      organization_id: orgId,
-      platform: 'whatnot',
-      username: uname,
-      real_name: realName || null,
-      first_seen_date: purchaseDate,
-      total_spent: totalSpent,
-      total_breaks_purchased: items?.length || 0,
-      total_streams_participated: 1,
-      last_purchase_date: purchaseDate,
-      temperature: computeTemp(purchaseDate),
-      is_new_buyer: isNew || false
-    }).select('id').single();
-    if (error) throw error;
-    buyerId = newBuyer.id;
-  }
-
-  // Insert purchase records only for new imports
-  if (shouldInsertPurchases) {
-    for (const item of (items || [])) {
-      const { error: purchErr } = await sb.from('buyer_purchases').insert({
-        organization_id: orgId,
-        buyer_id: buyerId,
-        stream_id: streamId || null,
-        break_name: item.breakName || '',
-        order_number: item.orderNumber || null,
-        amount: Number(item.amount) || 0,
-        purchase_date: purchaseDate,
-        platform: 'whatnot'
-      });
-      // Surface it — a dropped purchase line means the buyer's totals and this
-      // detail disagree. Caller records this buyer under errors[].
-      if (purchErr) throw new Error('purchase insert failed for order ' + (item.orderNumber || '?') + ': ' + purchErr.message);
-    }
+    return res.status(200).json({
+      success: true,
+      processed: unames.length,
+      newBuyers: newUnames.length,
+      purchases: purchRows.length,
+      importId
+    });
+  } catch (e) {
+    console.error('process-import error:', e);
+    // Idempotent by design: the client can safely retry the same import.
+    return res.status(500).json({ error: (e && e.message ? e.message : 'Import failed') + ' — safe to try the import again.' });
   }
 }
 

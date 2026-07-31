@@ -3171,7 +3171,14 @@ async function brkEnrichBuyers() {
   const d30 = new Date(); d30.setDate(d30.getDate() - 30);
   const d60 = new Date(); d60.setDate(d60.getDate() - 60);
   const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-  const { data: purch } = await sb.from('buyer_purchases').select('buyer_id,amount,purchase_date').eq('organization_id', currentProfile.org_id).gte('purchase_date', s60);
+  let purch = [], _pf = 0;
+  while (true) {
+    const { data, error } = await sb.from('buyer_purchases').select('buyer_id,amount,purchase_date').eq('organization_id', currentProfile.org_id).gte('purchase_date', s60).range(_pf, _pf + 999);
+    if (error) throw error;
+    purch = purch.concat(data || []);
+    if (!data || data.length < 1000) break;
+    _pf += 1000;
+  }
   const recent = {}, prior = {};
   (purch || []).forEach(p => { const a = Number(p.amount || 0); if (p.purchase_date >= s30) recent[p.buyer_id] = (recent[p.buyer_id] || 0) + a; else prior[p.buyer_id] = (prior[p.buyer_id] || 0) + a; });
   const spends = spenders.map(b => Number(b.total_spent || 0)).sort((a, b) => a - b);

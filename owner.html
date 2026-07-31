@@ -4537,15 +4537,18 @@ function setupCloseOutModal() {
 
       document.getElementById('closeOutModal').classList.remove('active');
 
-      // Process packing slip PDF for buyer intelligence (optional)
+      // Process packing slip PDF for buyer intelligence (optional).
+      // Uses the SAME server parser + importer as the breaker so totals match.
       if (_coSlipFile) {
+        const slipFile = _coSlipFile;
+        coResetSlipDrop();
         try {
           btn.textContent = 'Parsing slip…';
-          const slipFile = _coSlipFile;
-          const slipOrgId = currentProfile.org_id;
-          coResetSlipDrop();
-          const parsed = await coParseSlipPDF(slipFile);
-          coShowSlipPreview(parsed, slipOrgId);
+          const fd = new FormData(); fd.append('file', slipFile);
+          const parseResp = await fetch('/api/import-slip', { method: 'POST', body: fd });
+          const parsed = await parseResp.json();
+          if (!parseResp.ok) throw new Error(parsed.error || 'Slip parse failed');
+          coShowSlipPreview(parsed, currentProfile.org_id, _closedStreamId, slipFile.name);
         } catch (slipErr) {
           showGlobalError('Slip parse failed: ' + escHtml(slipErr.message));
         }
@@ -4705,34 +4708,39 @@ async function coParseSlipPDF(file) {
   return { list: Object.values(buyers), page1Text: page1Text, totalPages: pdf.numPages };
 }
 
-// Show preview modal with parsed results — user confirms before anything saves
+// Show preview modal with SERVER-parsed results — user confirms before saving.
 var _coPreviewOrgId = null;
-var _coPreviewList  = null;
+var _coPreviewBuyers = null;
+var _coPreviewStreamId = null;
+var _coPreviewStreamDate = null;
+var _coPreviewFilename = null;
 
-function coShowSlipPreview(parsed, orgId) {
+function coShowSlipPreview(parsed, orgId, streamId, filename) {
   _coPreviewOrgId = orgId;
-  _coPreviewList  = parsed.list;
+  _coPreviewBuyers = parsed.buyers || [];
+  _coPreviewStreamId = streamId;
+  _coPreviewStreamDate = parsed.streamDate || null;
+  _coPreviewFilename = filename || null;
   var msg        = document.getElementById('slipPreviewMsg');
   var listEl     = document.getElementById('slipPreviewList');
   var dbg        = document.getElementById('slipRawDebug');
   var confirmBtn = document.getElementById('slipPreviewConfirmBtn');
 
-  if (!parsed.list.length) {
-    msg.textContent = 'No buyers detected in this PDF (' + parsed.totalPages + ' pages). The raw text from page 1 is shown below — screenshot it and share so the parser can be fixed.';
+  if (!_coPreviewBuyers.length) {
+    msg.textContent = 'No buyers detected in this PDF. Make sure it\'s a Whatnot packing slip.';
     listEl.style.display = 'none';
-    dbg.style.display = 'block';
-    dbg.textContent = parsed.page1Text || '(empty — PDF may use image-only rendering)';
+    if (dbg) dbg.style.display = 'none';
     confirmBtn.style.display = 'none';
   } else {
-    msg.textContent = 'Found ' + parsed.list.length + ' buyer' + (parsed.list.length !== 1 ? 's' : '') + ' across ' + parsed.totalPages + ' pages. Review and confirm to save.';
+    msg.textContent = 'Found ' + _coPreviewBuyers.length + ' buyer' + (_coPreviewBuyers.length !== 1 ? 's' : '') + '. Review and confirm to save.';
     listEl.style.display = 'block';
-    dbg.style.display = 'none';
+    if (dbg) dbg.style.display = 'none';
     confirmBtn.style.display = '';
-    listEl.innerHTML = parsed.list.map(function(b) {
+    listEl.innerHTML = _coPreviewBuyers.map(function(b) {
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.9rem;border-bottom:1px solid var(--border);font-size:0.85rem;">' +
         '<span style="font-weight:600;color:var(--text);">@' + escHtml(b.username) +
         (b.isNew ? ' <span style="background:rgba(79,110,247,0.15);color:var(--primary);font-size:0.7rem;padding:1px 6px;border-radius:4px;font-weight:700;">NEW</span>' : '') +
-        '</span><span style="color:var(--green);font-weight:700;">' + fmt(b.total) + '</span></div>';
+        '</span><span style="color:var(--green);font-weight:700;">' + fmt(Number(b.totalSpent) || 0) + '</span></div>';
     }).join('');
   }
   document.getElementById('slipPreviewModal').classList.add('active');
@@ -4741,22 +4749,36 @@ function coShowSlipPreview(parsed, orgId) {
 function setupSlipPreviewModal() {
   document.getElementById('slipPreviewSkipBtn').addEventListener('click', function() {
     document.getElementById('slipPreviewModal').classList.remove('active');
-    _coPreviewList = null; _coPreviewOrgId = null;
+    _coPreviewBuyers = null; _coPreviewOrgId = null; _coPreviewStreamId = null;
   });
   document.getElementById('slipPreviewConfirmBtn').addEventListener('click', async function() {
     var btn = this;
-    if (!_coPreviewList || !_coPreviewOrgId) return;
+    if (!_coPreviewBuyers || !_coPreviewOrgId || !_coPreviewStreamId) { showGlobalError('Missing stream — close the stream again to import its slip.'); return; }
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      await coSaveBuyers(_coPreviewList, _coPreviewOrgId);
-      cbpTrack('slip_imported', { org_id: _coPreviewOrgId, buyer_count: _coPreviewList.length });
+      const tok = await ownerAuthToken();
+      const resp = await fetch('/api/process-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({
+          orgId: _coPreviewOrgId,
+          streamId: _coPreviewStreamId,
+          buyers: _coPreviewBuyers,
+          streamDate: _coPreviewStreamDate,
+          importedBy: currentUser ? currentUser.id : null,
+          rawFilename: _coPreviewFilename
+        })
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'Import failed');
+      cbpTrack('slip_imported', { org_id: _coPreviewOrgId, buyer_count: result.processed || _coPreviewBuyers.length });
       document.getElementById('slipPreviewModal').classList.remove('active');
-      showGlobalSuccess(_coPreviewList.length + ' buyers imported from packing slip.');
+      showGlobalSuccess((result.processed || _coPreviewBuyers.length) + ' buyers imported from packing slip.');
     } catch (e) {
       showGlobalError('Save failed: ' + escHtml(e.message));
     } finally {
       btn.disabled = false; btn.textContent = 'Import Buyers';
-      _coPreviewList = null; _coPreviewOrgId = null;
+      _coPreviewBuyers = null; _coPreviewOrgId = null; _coPreviewStreamId = null;
     }
   });
 }
@@ -9169,10 +9191,18 @@ async function loadBuyersBoard() {
     const d30 = new Date(); d30.setDate(d30.getDate() - 30);
     const d60 = new Date(); d60.setDate(d60.getDate() - 60);
     const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-    const { data: purch } = await sb.from('buyer_purchases')
-      .select('buyer_id, amount, purchase_date')
-      .eq('organization_id', currentProfile.org_id)
-      .gte('purchase_date', s60);
+    let purch = [], _pf = 0;
+    while (true) {
+      const { data, error } = await sb.from('buyer_purchases')
+        .select('buyer_id, amount, purchase_date')
+        .eq('organization_id', currentProfile.org_id)
+        .gte('purchase_date', s60)
+        .range(_pf, _pf + 999);
+      if (error) throw error;
+      purch = purch.concat(data || []);
+      if (!data || data.length < 1000) break;
+      _pf += 1000;
+    }
     const recent = {}, prior = {};
     (purch || []).forEach(p => {
       const amt = Number(p.amount || 0);
@@ -9288,7 +9318,7 @@ function setBuyersView(mode) {
 
 // Fetch ALL buyers, paging past PostgREST's 1000-row cap
 async function fetchAllBuyers() {
-  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits,last_cold_alert_at,fav_team,fav_player,fav_sport';
+  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,first_seen_date,temperature,is_new_buyer,case_hits,last_cold_alert_at,fav_team,fav_player,fav_sport';
   let all = [], from = 0; const size = 1000;
   while (true) {
     const { data, error } = await sb.from('buyers')
@@ -9403,11 +9433,19 @@ async function loadBuyersTab() {
       // Recent: sum purchases from last 30 days, keep buyers with recent activity
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 30);
-      const { data: purch, error } = await sb.from('buyer_purchases')
-        .select('buyer_id, amount')
-        .eq('organization_id', currentProfile.org_id)
-        .gte('purchase_date', cutoff.toISOString().split('T')[0]);
-      if (error) throw error;
+      const cutoffStr = cutoff.toISOString().split('T')[0];
+      let purch = [], _pf = 0;
+      while (true) {
+        const { data, error } = await sb.from('buyer_purchases')
+          .select('buyer_id, amount')
+          .eq('organization_id', currentProfile.org_id)
+          .gte('purchase_date', cutoffStr)
+          .range(_pf, _pf + 999);
+        if (error) throw error;
+        purch = purch.concat(data || []);
+        if (!data || data.length < 1000) break;
+        _pf += 1000;
+      }
       const sums = {};
       (purch || []).forEach(p => { sums[p.buyer_id] = (sums[p.buyer_id] || 0) + Number(p.amount || 0); });
       _buyersData = buyersAll
