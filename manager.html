@@ -586,8 +586,9 @@
   <div class="tab-content" id="tab-buyers">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
       <h2 style="margin:0;font-size:1.1rem;font-weight:800;">Buyer Intelligence</h2>
-      <div style="display:flex;gap:0.5rem;">
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
         <button class="btn btn-sm" id="mgrBuyersModeBoard" onclick="setMgrBuyersMode('board')" style="padding:0.35rem 0.9rem;">📋 Board</button>
+        <button class="btn btn-sm btn-outline" id="mgrBuyersModeHits" onclick="setMgrBuyersMode('hits')" style="padding:0.35rem 0.9rem;">🎯 Hit Board</button>
         <button class="btn btn-sm btn-outline" id="mgrBuyersModeList" onclick="setMgrBuyersMode('list')" style="padding:0.35rem 0.9rem;">📇 All Buyers</button>
       </div>
     </div>
@@ -595,6 +596,13 @@
     <div id="mgrBuyersBoardWrap">
       <div id="mgrBuyersBoard">
         <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>
+      </div>
+    </div>
+
+    <div id="mgrBuyersHitsWrap" style="display:none;">
+      <div id="mgrBuyersHitsFilter" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;"></div>
+      <div id="mgrBuyersHits">
+        <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading hits…</div>
       </div>
     </div>
 
@@ -2476,11 +2484,91 @@ function openMgrBuyersTab() {
 function setMgrBuyersMode(mode) {
   _mgrBuyersMode = mode;
   document.getElementById('mgrBuyersModeBoard').className = mode === 'board' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('mgrBuyersModeHits').className  = mode === 'hits'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
   document.getElementById('mgrBuyersModeList').className  = mode === 'list'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
   document.getElementById('mgrBuyersBoardWrap').style.display = mode === 'board' ? '' : 'none';
+  document.getElementById('mgrBuyersHitsWrap').style.display  = mode === 'hits'  ? '' : 'none';
   document.getElementById('mgrBuyersListWrap').style.display  = mode === 'list'  ? '' : 'none';
   if (mode === 'board') loadMgrBuyersBoard();
+  else if (mode === 'hits') loadMgrBuyersHitBoard();
   else loadMgrBuyersTab();
+}
+
+// ── Hit Board (gallery of big pulls) ──────────────────────
+var _mgrHitBoardData = [];
+var _mgrHitBoardFilter = 'all';
+const MGR_HIT_TYPE_META = { case_hit:{label:'Case Hit',icon:'🎯'}, auto:{label:'Auto',icon:'✍️'}, patch:{label:'Patch',icon:'🧵'}, rookie:{label:'Rookie',icon:'🌟'}, other:{label:'Other',icon:'💎'} };
+
+async function loadMgrBuyersHitBoard() {
+  const el = document.getElementById('mgrBuyersHits');
+  if (!el || !currentProfile) return;
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading hits…</div>';
+  try {
+    let all = [], from = 0; const size = 1000;
+    while (true) {
+      const { data, error } = await sb.from('buyer_hits')
+        .select('id,hit_description,hit_type,break_name,submitted_at,buyer_id,buyers(username)')
+        .eq('organization_id', currentProfile.org_id)
+        .order('submitted_at', { ascending: false })
+        .range(from, from + size - 1);
+      if (error) throw error;
+      all = all.concat(data || []);
+      if (!data || data.length < size) break;
+      from += size;
+    }
+    _mgrHitBoardData = all;
+    renderMgrHitFilter();
+    renderMgrHitBoard();
+  } catch (err) {
+    el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load hits: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+function renderMgrHitFilter() {
+  const el = document.getElementById('mgrBuyersHitsFilter');
+  if (!el) return;
+  const counts = { all: _mgrHitBoardData.length };
+  _mgrHitBoardData.forEach(h => { const t = h.hit_type || 'other'; counts[t] = (counts[t] || 0) + 1; });
+  const types = ['all'].concat(Object.keys(MGR_HIT_TYPE_META).filter(t => counts[t]));
+  el.innerHTML = types.map(function(t) {
+    const active = _mgrHitBoardFilter === t;
+    const label = t === 'all' ? 'All' : MGR_HIT_TYPE_META[t].label;
+    return '<button onclick="setMgrHitFilter(\'' + t + '\')" class="btn btn-sm' + (active ? '' : ' btn-outline') + '" style="padding:0.28rem 0.7rem;font-size:0.74rem;">' + label + ' (' + (counts[t] || 0) + ')</button>';
+  }).join('');
+}
+
+function setMgrHitFilter(t) { _mgrHitBoardFilter = t; renderMgrHitFilter(); renderMgrHitBoard(); }
+
+function renderMgrHitBoard() {
+  const el = document.getElementById('mgrBuyersHits');
+  if (!el) return;
+  let list = _mgrHitBoardData;
+  if (_mgrHitBoardFilter !== 'all') list = list.filter(h => (h.hit_type || 'other') === _mgrHitBoardFilter);
+  if (!list.length) {
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">' +
+      (_mgrHitBoardData.length ? 'No hits of this type.' : 'No hits logged yet.') + '</div>';
+    return;
+  }
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:0.75rem;">' +
+    list.map(function(h) {
+      const meta = MGR_HIT_TYPE_META[h.hit_type] || MGR_HIT_TYPE_META.other;
+      const uname = h.buyers && h.buyers.username ? h.buyers.username : 'unknown';
+      const date = h.submitted_at ? new Date(h.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">' +
+        '<div style="aspect-ratio:5/3;background:radial-gradient(120% 120% at 30% 10%,rgba(79,110,247,0.18),rgba(0,0,0,0.25));display:flex;align-items:center;justify-content:center;font-size:1.9rem;position:relative;">' +
+          meta.icon +
+          '<span style="position:absolute;top:8px;left:8px;font-size:0.58rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;background:rgba(0,0,0,0.5);color:#fff;padding:3px 7px;border-radius:5px;">' + meta.label + '</span>' +
+        '</div>' +
+        '<div style="padding:0.7rem 0.75rem;">' +
+          '<div style="font-weight:700;font-size:0.85rem;line-height:1.3;">' + escHtml(h.hit_description || '') + '</div>' +
+          (h.break_name ? '<div style="font-size:0.7rem;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(h.break_name) + '</div>' : '') +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem;font-size:0.72rem;color:var(--muted);">' +
+            '<span style="color:var(--primary);font-weight:700;">@' + escHtml(uname) + '</span>' +
+            '<span>' + date + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
 }
 
 function mgrDaysSince(dateStr) {
