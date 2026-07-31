@@ -509,6 +509,7 @@
 
 <div class="breaker-tabs">
   <button class="breaker-tab-btn active" data-tab="entry">Break Entry</button>
+  <button class="breaker-tab-btn" data-tab="buyers">Buyers</button>
   <button class="breaker-tab-btn" data-tab="shifts">My Shifts</button>
   <button class="breaker-tab-btn" data-tab="payouts" id="payoutsTabBtn">My Pay</button>
   <button class="breaker-tab-btn" data-tab="announcements">Announcements</button>
@@ -692,6 +693,34 @@
   </div>
 
   </div><!-- end breaker-tab-entry -->
+
+  <!-- BUYERS TAB -->
+  <div class="breaker-tab-content" id="breaker-tab-buyers">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+      <h2 style="margin:0;font-size:1.1rem;font-weight:800;">Buyers</h2>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-sm" id="brkBuyersModeBoard" onclick="setBrkBuyersMode('board')" style="padding:0.35rem 0.9rem;">📋 Board</button>
+        <button class="btn btn-sm btn-outline" id="brkBuyersModeHits" onclick="setBrkBuyersMode('hits')" style="padding:0.35rem 0.9rem;">🎯 Hit Board</button>
+        <button class="btn btn-sm btn-outline" id="brkBuyersModeList" onclick="setBrkBuyersMode('list')" style="padding:0.35rem 0.9rem;">🔎 Look up</button>
+      </div>
+    </div>
+
+    <div id="brkBuyersBoardWrap">
+      <div id="brkBuyersBoard"><div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div></div>
+    </div>
+
+    <div id="brkBuyersHitsWrap" style="display:none;">
+      <div id="brkBuyersHitsFilter" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;"></div>
+      <div id="brkBuyersHits"><div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading hits…</div></div>
+    </div>
+
+    <div id="brkBuyersListWrap" style="display:none;">
+      <input type="text" id="brkBuyersSearch" placeholder="🔎  Who is @… — type a username" oninput="renderBrkList()" autocomplete="off" style="width:100%;padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text,inherit);font-size:0.95rem;margin-bottom:0.75rem;">
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div id="brkBuyersList" style="padding:0.25rem 0;"><div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyers…</div></div>
+      </div>
+    </div>
+  </div>
 
   <!-- PAYOUTS TAB -->
   <div class="breaker-tab-content" id="breaker-tab-payouts">
@@ -1080,6 +1109,12 @@ function hideMessages() {
   document.getElementById('errorBox').style.display = 'none';
   document.getElementById('successBox').style.display = 'none';
 }
+
+// Shared buyer/hit code (and this file's hit logging) call the global-toast
+// names used on the owner/manager dashboards. Breaker uses show{Error,Success};
+// alias so those calls resolve instead of throwing ReferenceError.
+function showGlobalError(msg) { return showError(msg); }
+function showGlobalSuccess(msg) { return showSuccess(msg); }
 
 // ── Auth ─────────────────────────────────────────────────
 async function initAuth() {
@@ -2074,6 +2109,7 @@ function setupBreakerTabs() {
       document.querySelectorAll('.breaker-tab-content').forEach(function (c) { c.classList.remove('active'); });
       btn.classList.add('active');
       document.getElementById('breaker-tab-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'buyers') openBrkBuyersTab();
       if (btn.dataset.tab === 'payouts') loadPayouts();
       if (btn.dataset.tab === 'shifts') { loadShifts(); loadMyScheduleView(); }
       if (btn.dataset.tab === 'announcements') brkLoadAnnouncements();
@@ -3091,6 +3127,225 @@ if (typeof _origShowSuccess === 'function') {
 
 // Initial sync
 setTimeout(updateMobileBreakHeader, 1500);
+</script>
+
+<!-- ── Breaker Buyers (Board / Hit Board / Look up) ───────── -->
+<script>
+'use strict';
+var _brkBuyersMode = 'board';
+var _brkAllBuyers = [];
+var _brkBuyersLoaded = false;
+var _brkHitData = [];
+var _brkHitFilter = 'all';
+const BRK_COLD_MIN = 21, BRK_COLD_MAX = 120, BRK_NEW_DAYS = 14, BRK_RISING_MIN = 50;
+const BRK_HIT_META = { case_hit:{label:'Case Hit',icon:'🎯'}, auto:{label:'Auto',icon:'✍️'}, patch:{label:'Patch',icon:'🧵'}, rookie:{label:'Rookie',icon:'🌟'}, other:{label:'Other',icon:'💎'} };
+
+function brkDaysSince(d) { if (!d) return Infinity; return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); }
+function brkRelDate(d) { if (!d) return 'Never'; const n = brkDaysSince(d); if (n===0) return 'Today'; if (n===1) return '1 day ago'; if (n<7) return n+' days ago'; if (n<30) return Math.floor(n/7)+'w ago'; if (n<365) return Math.floor(n/30)+'mo ago'; return Math.floor(n/365)+'y ago'; }
+function brkTemp(d) { if (!d) return 'cold'; const n = brkDaysSince(d); return n<=7 ? 'hot' : n<=20 ? 'warm' : 'cold'; }
+
+function openBrkBuyersTab() { setBrkBuyersMode(_brkBuyersMode); }
+
+function setBrkBuyersMode(mode) {
+  _brkBuyersMode = mode;
+  document.getElementById('brkBuyersModeBoard').className = mode==='board' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('brkBuyersModeHits').className  = mode==='hits'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('brkBuyersModeList').className  = mode==='list'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('brkBuyersBoardWrap').style.display = mode==='board' ? '' : 'none';
+  document.getElementById('brkBuyersHitsWrap').style.display  = mode==='hits'  ? '' : 'none';
+  document.getElementById('brkBuyersListWrap').style.display  = mode==='list'  ? '' : 'none';
+  if (mode==='board') loadBrkBoard();
+  else if (mode==='hits') loadBrkHitBoard();
+  else loadBrkList();
+}
+
+async function brkFetchAllBuyers() {
+  if (_brkBuyersLoaded) return;
+  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,first_seen_date,temperature,is_new_buyer,case_hits,last_cold_alert_at';
+  let all = [], from = 0; const size = 1000;
+  while (true) {
+    const { data, error } = await sb.from('buyers').select(cols).eq('organization_id', currentProfile.org_id).order('total_spent', { ascending: false }).range(from, from + size - 1);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < size) break;
+    from += size;
+  }
+  const map = {}; from = 0;
+  while (true) {
+    const { data, error } = await sb.from('buyer_hits').select('buyer_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
+    if (error) throw error;
+    (data || []).forEach(h => { map[h.buyer_id] = (map[h.buyer_id] || 0) + 1; });
+    if (!data || data.length < size) break;
+    from += size;
+  }
+  all.forEach(b => { b._hitCount = map[b.id] || 0; });
+  _brkAllBuyers = all; _brkBuyersLoaded = true;
+}
+
+async function loadBrkBoard() {
+  const el = document.getElementById('brkBuyersBoard');
+  if (!el || !currentProfile) return;
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>';
+  try {
+    await brkFetchAllBuyers();
+    const spenders = _brkAllBuyers.filter(b => Number(b.total_spent || 0) > 0);
+    if (!spenders.length) { el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No spending buyers yet.</div>'; return; }
+    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+    const d60 = new Date(); d60.setDate(d60.getDate() - 60);
+    const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
+    const { data: purch } = await sb.from('buyer_purchases').select('buyer_id,amount,purchase_date').eq('organization_id', currentProfile.org_id).gte('purchase_date', s60);
+    const recent = {}, prior = {};
+    (purch || []).forEach(p => { const a = Number(p.amount || 0); if (p.purchase_date >= s30) recent[p.buyer_id] = (recent[p.buyer_id] || 0) + a; else prior[p.buyer_id] = (prior[p.buyer_id] || 0) + a; });
+    const spends = spenders.map(b => Number(b.total_spent || 0)).sort((a, b) => a - b);
+    const whaleThresh = spends[Math.floor(spends.length * 0.8)] || 0;
+    const cold = [], rising = [], fresh = [], whales = [];
+    spenders.forEach(b => {
+      const spent = Number(b.total_spent || 0);
+      const isWhale = spent >= whaleThresh && spent > 0;
+      const since = brkDaysSince(b.last_purchase_date);
+      const age = brkDaysSince(b.first_seen_date);
+      const rec = recent[b.id] || 0, pri = prior[b.id] || 0;
+      b._since = since; b._recent30 = rec;
+      if (isWhale && since >= BRK_COLD_MIN && since <= BRK_COLD_MAX) { cold.push(b); return; }
+      if (age <= BRK_NEW_DAYS) { fresh.push(b); return; }
+      if (rec >= BRK_RISING_MIN && rec > pri * 1.5) { b._growth = pri > 0 ? Math.round((rec - pri) / pri * 100) : null; rising.push(b); return; }
+      if (isWhale) { whales.push(b); return; }
+    });
+    cold.sort((a, b) => { const ac = a.last_cold_alert_at && brkDaysSince(a.last_cold_alert_at) <= 7 ? 1 : 0; const bc = b.last_cold_alert_at && brkDaysSince(b.last_cold_alert_at) <= 7 ? 1 : 0; if (ac !== bc) return ac - bc; return Number(b.total_spent) - Number(a.total_spent); });
+    whales.sort((a, b) => Number(b.total_spent) - Number(a.total_spent));
+    rising.sort((a, b) => (b._recent30 || 0) - (a._recent30 || 0));
+    fresh.sort((a, b) => Number(b.total_spent) - Number(a.total_spent));
+    el.innerHTML =
+      brkSegment('❄️', 'Going Cold', cold,   'Silent ' + BRK_COLD_MIN + '+ days — win them back', true,  'cold') +
+      brkSegment('🔥', 'Whales',     whales, 'Your top spenders — take care of them',             false, 'whale') +
+      brkSegment('📈', 'Rising',     rising, 'Heating up fast',                                    false, 'rising') +
+      brkSegment('🆕', 'New',        fresh,  'New in the last ' + BRK_NEW_DAYS + ' days',          false, 'new');
+  } catch (err) { el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load board: ' + escHtml(err.message) + '</div>'; }
+}
+
+function brkSegment(icon, title, list, why, hero, kind) {
+  const heroStyle = hero ? 'border:1px solid var(--primary);box-shadow:0 0 0 1px rgba(79,110,247,0.12);' : '';
+  const hd = '<div style="display:flex;align-items:center;gap:0.6rem;padding:0.8rem 1rem;border-bottom:1px solid var(--border);' + (hero ? 'background:linear-gradient(90deg,rgba(79,110,247,0.10),transparent);' : '') + '">' +
+    '<span style="font-size:1rem;">' + icon + '</span><span style="font-weight:800;font-size:0.92rem;">' + title + '</span>' +
+    '<span style="font-size:0.68rem;color:var(--muted);font-weight:700;background:var(--card);border:1px solid var(--border);padding:1px 8px;border-radius:100px;">' + list.length + '</span>' +
+    '<span style="margin-left:auto;font-size:0.72rem;color:var(--muted);text-align:right;">' + why + '</span></div>';
+  const body = list.length ? list.map(function(b) { return brkBoardRow(b, kind); }).join('') : '<div style="padding:1rem;text-align:center;color:var(--muted);font-size:0.8rem;">' + (kind === 'cold' ? 'Nobody going cold — nice. 🎉' : 'Nobody here right now.') + '</div>';
+  return '<div class="panel" style="padding:0;overflow:hidden;margin-bottom:0.85rem;' + heroStyle + '">' + hd + body + '</div>';
+}
+
+function brkBoardRow(b, kind) {
+  const spent = Number(b.total_spent || 0);
+  const temp = b.temperature || brkTemp(b.last_purchase_date);
+  const tc = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
+  const hits = b._hitCount || 0;
+  const since = b._since != null ? b._since : brkDaysSince(b.last_purchase_date);
+  let sub;
+  if (kind === 'cold')        sub = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
+  else if (kind === 'rising') sub = 'Last 30d $' + (b._recent30 || 0).toFixed(0) + (b._growth != null ? ' · +' + b._growth + '%' : ' · new momentum');
+  else if (kind === 'new')    sub = 'First seen ' + brkDaysSince(b.first_seen_date) + 'd ago · ' + (b.total_breaks_purchased || 0) + ' breaks';
+  else                        sub = brkRelDate(b.last_purchase_date) + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
+  const uname = (b.username || '').replace(/'/g, "\\'");
+  const contactedDays = (kind === 'cold' && b.last_cold_alert_at) ? brkDaysSince(b.last_cold_alert_at) : null;
+  const contacted = contactedDays != null && contactedDays <= 7;
+  const action = kind === 'cold'
+    ? '<button onclick="brkCopyWinback(\'' + b.id + '\',\'' + uname + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.3rem 0.7rem;font-size:0.72rem;flex-shrink:0;">' + (contacted ? 'Copy again' : 'Copy win-back') + '</button>'
+    : '';
+  return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border);' + (contacted ? 'opacity:0.62;' : '') + '">' +
+    '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">@' + escHtml(b.username) +
+      (hits > 0 ? ' <span style="font-size:0.6rem;background:rgba(239,68,68,0.12);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700;">🎯 ' + hits + '</span>' : '') +
+      (contacted ? ' <span style="font-size:0.6rem;background:rgba(34,197,94,0.14);color:#22c55e;padding:1px 6px;border-radius:3px;font-weight:700;">✓ reached out ' + (contactedDays === 0 ? 'today' : contactedDays + 'd ago') + '</span>' : '') +
+      '</div><div style="font-size:0.72rem;color:var(--muted);margin-top:1px;">' + sub + '</div></div>' +
+    '<span style="width:8px;height:8px;border-radius:50%;background:' + tc + ';flex-shrink:0;"></span>' +
+    '<div style="font-weight:800;font-size:0.92rem;color:var(--primary);min-width:56px;text-align:right;">$' + spent.toFixed(0) + '</div>' + action + '</div>';
+}
+
+async function brkCopyWinback(buyerId, username) {
+  const msg = 'Hey @' + username + '! Haven\'t seen you in a bit — we\'ve got some fire breaks coming up I think you\'d love. Come hang soon 🔥';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(msg); showGlobalSuccess('Win-back copied — paste into a Whatnot DM to @' + username + '.'); }
+    catch (e) { showGlobalError('Couldn\'t copy. Message: ' + msg); }
+  } else { showGlobalError('Copy not supported here. Message: ' + msg); }
+  const { error } = await sb.from('buyers').update({ last_cold_alert_at: new Date().toISOString() }).eq('id', buyerId);
+  if (error) { console.error('mark contacted failed:', error.message); return; }
+  const b = _brkAllBuyers.find(x => x.id === buyerId); if (b) b.last_cold_alert_at = new Date().toISOString();
+  loadBrkBoard();
+}
+
+async function loadBrkHitBoard() {
+  const el = document.getElementById('brkBuyersHits');
+  if (!el || !currentProfile) return;
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading hits…</div>';
+  try {
+    let all = [], from = 0; const size = 1000;
+    while (true) {
+      const { data, error } = await sb.from('buyer_hits').select('id,hit_description,hit_type,break_name,submitted_at,buyer_id,buyers(username)').eq('organization_id', currentProfile.org_id).order('submitted_at', { ascending: false }).range(from, from + size - 1);
+      if (error) throw error;
+      all = all.concat(data || []);
+      if (!data || data.length < size) break;
+      from += size;
+    }
+    _brkHitData = all; brkRenderHitFilter(); brkRenderHitBoard();
+  } catch (err) { el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load hits: ' + escHtml(err.message) + '</div>'; }
+}
+
+function brkRenderHitFilter() {
+  const el = document.getElementById('brkBuyersHitsFilter'); if (!el) return;
+  const counts = { all: _brkHitData.length };
+  _brkHitData.forEach(h => { const t = h.hit_type || 'other'; counts[t] = (counts[t] || 0) + 1; });
+  const types = ['all'].concat(Object.keys(BRK_HIT_META).filter(t => counts[t]));
+  el.innerHTML = types.map(function(t) { const active = _brkHitFilter === t; const label = t === 'all' ? 'All' : BRK_HIT_META[t].label; return '<button onclick="brkSetHitFilter(\'' + t + '\')" class="btn btn-sm' + (active ? '' : ' btn-outline') + '" style="padding:0.28rem 0.7rem;font-size:0.74rem;">' + label + ' (' + (counts[t] || 0) + ')</button>'; }).join('');
+}
+
+function brkSetHitFilter(t) { _brkHitFilter = t; brkRenderHitFilter(); brkRenderHitBoard(); }
+
+function brkRenderHitBoard() {
+  const el = document.getElementById('brkBuyersHits'); if (!el) return;
+  let list = _brkHitData;
+  if (_brkHitFilter !== 'all') list = list.filter(h => (h.hit_type || 'other') === _brkHitFilter);
+  if (!list.length) { el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">' + (_brkHitData.length ? 'No hits of this type.' : 'No hits logged yet.') + '</div>'; return; }
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.75rem;">' + list.map(function(h) {
+    const meta = BRK_HIT_META[h.hit_type] || BRK_HIT_META.other;
+    const uname = h.buyers && h.buyers.username ? h.buyers.username : 'unknown';
+    const date = h.submitted_at ? new Date(h.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">' +
+      '<div style="aspect-ratio:5/3;background:radial-gradient(120% 120% at 30% 10%,rgba(79,110,247,0.18),rgba(0,0,0,0.25));display:flex;align-items:center;justify-content:center;font-size:1.9rem;position:relative;">' + meta.icon +
+      '<span style="position:absolute;top:8px;left:8px;font-size:0.58rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;background:rgba(0,0,0,0.5);color:#fff;padding:3px 7px;border-radius:5px;">' + meta.label + '</span></div>' +
+      '<div style="padding:0.7rem 0.75rem;"><div style="font-weight:700;font-size:0.85rem;line-height:1.3;">' + escHtml(h.hit_description || '') + '</div>' +
+      (h.break_name ? '<div style="font-size:0.7rem;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(h.break_name) + '</div>' : '') +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem;font-size:0.72rem;color:var(--muted);"><span style="color:var(--primary);font-weight:700;">@' + escHtml(uname) + '</span><span>' + date + '</span></div></div></div>';
+  }).join('') + '</div>';
+}
+
+async function loadBrkList() {
+  const el = document.getElementById('brkBuyersList');
+  if (!el || !currentProfile) return;
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyers…</div>';
+  try { await brkFetchAllBuyers(); renderBrkList(); }
+  catch (err) { el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load buyers: ' + escHtml(err.message) + '</div>'; }
+}
+
+function renderBrkList() {
+  const el = document.getElementById('brkBuyersList'); if (!el) return;
+  const q = (document.getElementById('brkBuyersSearch').value || '').trim().toLowerCase().replace(/^@/, '');
+  let list = _brkAllBuyers.filter(b => Number(b.total_spent || 0) > 0 || (b._hitCount || 0) > 0);
+  if (q) list = list.filter(b => (b.username || '').toLowerCase().includes(q) || (b.real_name || '').toLowerCase().includes(q));
+  const total = list.length;
+  list = list.slice(0, 60);
+  if (!list.length) { el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">' + (q ? 'No buyer matches that.' : 'No buyers yet.') + '</div>'; return; }
+  el.innerHTML = list.map(function(b) {
+    const spent = Number(b.total_spent || 0);
+    const temp = b.temperature || brkTemp(b.last_purchase_date);
+    const tc = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
+    const hits = b._hitCount || 0;
+    return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border);">' +
+      '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">@' + escHtml(b.username) +
+        (b.is_new_buyer ? ' <span style="font-size:0.6rem;background:rgba(34,197,94,0.12);color:#22c55e;padding:1px 5px;border-radius:3px;font-weight:700;">NEW</span>' : '') +
+        (hits > 0 ? ' <span style="font-size:0.6rem;background:rgba(239,68,68,0.12);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700;">🎯 ' + hits + '</span>' : '') +
+        '</div><div style="font-size:0.72rem;color:var(--muted);margin-top:1px;">' + brkRelDate(b.last_purchase_date) + ' · ' + (b.total_breaks_purchased || 0) + ' breaks · ' + (b.total_streams_participated || 0) + ' streams</div></div>' +
+      '<span style="width:8px;height:8px;border-radius:50%;background:' + tc + ';flex-shrink:0;"></span>' +
+      '<div style="font-weight:800;font-size:0.92rem;color:var(--primary);min-width:56px;text-align:right;">$' + spent.toFixed(0) + '</div></div>';
+  }).join('') + (total > 60 ? '<div style="padding:0.6rem;text-align:center;color:var(--muted);font-size:0.72rem;">Showing first 60 of ' + total + ' — type to narrow.</div>' : '');
+}
 </script>
 
 <!-- ── Buyer Intelligence ─────────────────────────────────── -->
