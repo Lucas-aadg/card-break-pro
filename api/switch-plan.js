@@ -130,13 +130,20 @@ module.exports = async (req, res) => {
     });
 
     const limits = TIER_LIMITS[targetTier] || {};
-    await sb.from('subscriptions').update({
+    const { error: dbErr } = await sb.from('subscriptions').update({
       tier:         targetTier,
       max_breakers: limits.max_breakers !== undefined ? limits.max_breakers : null,
       max_sorters:  limits.max_sorters  !== undefined ? limits.max_sorters  : null,
       max_managers: limits.max_managers !== undefined ? limits.max_managers : null,
       updated_at:   new Date().toISOString()
     }).eq('org_id', profile.org_id);
+    // Stripe already switched the plan. If our record didn't sync, do NOT claim
+    // clean success — the customer's tier/seats would be wrong. The subscription
+    // webhook reconciles shortly; tell the client to refresh.
+    if (dbErr) {
+      console.error('switch-plan DB sync failed after Stripe update:', dbErr.message);
+      return res.status(202).json({ success: true, syncPending: true, targetTier, isUpgrade, charge_today: chargeToday, renewal_date: renewalDate, message: 'Plan changed with your card, but our records are still syncing. Refresh in a minute.' });
+    }
 
     return res.status(200).json({
       success:      true,

@@ -84,11 +84,17 @@ module.exports = async (req, res) => {
       billing_cycle_anchor: 'now'
     });
 
-    await sb.from('subscriptions').update({
+    const { error: dbErr } = await sb.from('subscriptions').update({
       billing_cycle:       'annual',
       annual_renewal_date: renewalDateStr,
       updated_at:          new Date().toISOString()
     }).eq('org_id', profile.org_id);
+    // Stripe already charged the annual switch. If our record didn't sync, don't
+    // claim clean success — the webhook reconciles shortly.
+    if (dbErr) {
+      console.error('switch-to-annual DB sync failed after Stripe update:', dbErr.message);
+      return res.status(202).json({ success: true, syncPending: true, renewal_date: renewalDateStr, charge_today: chargeToday, message: 'Switched to annual on your card, but our records are still syncing. Refresh in a minute.' });
+    }
 
     return res.status(200).json({ success: true, renewal_date: renewalDateStr, charge_today: chargeToday });
   } catch (err) {

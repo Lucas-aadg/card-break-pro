@@ -110,7 +110,9 @@ module.exports = async (req, res) => {
         }
 
         const { error } = await sb.from('subscriptions').upsert(upsertData, { onConflict: 'org_id' });
-        if (error) console.error('Supabase upsert error (checkout.session.completed):', error);
+        // Throw so the handler 500s and Stripe RETRIES — never leave a paying
+        // customer without an entitlement row. Upsert is idempotent, retry-safe.
+        if (error) throw new Error('subscriptions.upsert failed (checkout.session.completed): ' + error.message);
 
         // ── Referral conversion trigger ──
         if (tier !== 'exempt') {
@@ -153,7 +155,7 @@ module.exports = async (req, res) => {
         }
 
         const { error } = await sb.from('subscriptions').update(updateFields).eq('stripe_subscription_id', sub.id);
-        if (error) console.error('Supabase update error (customer.subscription.updated):', error);
+        if (error) throw new Error('subscriptions.update failed (customer.subscription.updated): ' + error.message);
         break;
       }
 
@@ -163,7 +165,7 @@ module.exports = async (req, res) => {
         const { error } = await sb.from('subscriptions')
           .update({ status: 'cancelled', updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', sub.id);
-        if (error) console.error('Supabase update error (customer.subscription.deleted):', error);
+        if (error) throw new Error('subscriptions.update failed (customer.subscription.deleted): ' + error.message);
         break;
       }
 
@@ -173,7 +175,7 @@ module.exports = async (req, res) => {
         const { error } = await sb.from('subscriptions')
           .update({ status: 'past_due', updated_at: new Date().toISOString() })
           .eq('stripe_customer_id', invoice.customer);
-        if (error) console.error('Supabase update error (invoice.payment_failed):', error);
+        if (error) throw new Error('subscriptions.update failed (invoice.payment_failed): ' + error.message);
 
         const { orgId: pfOrgId, ownerId: pfOwnerId } = await getOrgAndOwner(sb, { customerId: invoice.customer });
         if (pfOrgId && pfOwnerId) {
@@ -223,7 +225,7 @@ module.exports = async (req, res) => {
             updated_at:           new Date().toISOString()
           })
           .eq('stripe_customer_id', sub.customer);
-        if (error) console.error('Supabase update error (customer.subscription.created):', error);
+        if (error) throw new Error('subscriptions.update failed (customer.subscription.created): ' + error.message);
         break;
       }
 
@@ -234,7 +236,7 @@ module.exports = async (req, res) => {
         const { error } = await sb.from('subscriptions')
           .update({ status: 'active', updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', invoice.subscription);
-        if (error) console.error('Supabase update error (invoice.payment_succeeded):', error);
+        if (error) throw new Error('subscriptions.update failed (invoice.payment_succeeded): ' + error.message);
 
         // Annual renewal confirmation email
         const { orgId, ownerId } = await getOrgAndOwner(sb, { subscriptionId: invoice.subscription });
@@ -313,7 +315,7 @@ module.exports = async (req, res) => {
         const { error } = await sb.from('subscriptions')
           .update({ status: 'past_due', updated_at: new Date().toISOString() })
           .eq('stripe_customer_id', pi.customer);
-        if (error) console.error('Supabase update error (payment_intent.payment_failed):', error);
+        if (error) throw new Error('subscriptions.update failed (payment_intent.payment_failed): ' + error.message);
         break;
       }
 
