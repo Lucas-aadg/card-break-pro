@@ -71,21 +71,27 @@ async function handleImport(req, res) {
             const newStreams  = Math.max(0, (buyer.total_streams_participated || 1) - 1);
             if (newSpent === 0 && newBreaks === 0 && newStreams === 0) {
               // Giveaway-only buyer — remove them entirely rather than leaving a $0 ghost record
-              await sb.from('buyers').delete().eq('id', buyerId);
+              const { error: delErr } = await sb.from('buyers').delete().eq('id', buyerId);
+              if (delErr) throw new Error('reversal delete buyer failed: ' + delErr.message);
             } else {
-              await sb.from('buyers').update({
+              const { error: updErr } = await sb.from('buyers').update({
                 total_spent: newSpent,
                 total_breaks_purchased: newBreaks,
                 total_streams_participated: newStreams,
                 updated_at: new Date().toISOString()
               }).eq('id', buyerId);
+              // Must throw — otherwise a failed reversal falls through to the
+              // destructive delete below and double-counts revenue on reimport
+              if (updErr) throw new Error('reversal update buyer failed: ' + updErr.message);
             }
           }
         }
 
         // Now safe to delete old purchases and import record
-        await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', orgId);
-        await sb.from('stream_slip_imports').delete().eq('id', existingImport.id);
+        const { error: bpDelErr } = await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', orgId);
+        if (bpDelErr) throw new Error('delete old purchases failed: ' + bpDelErr.message);
+        const { error: siDelErr } = await sb.from('stream_slip_imports').delete().eq('id', existingImport.id);
+        if (siDelErr) throw new Error('delete old import record failed: ' + siDelErr.message);
       }
     } catch (e) {
       // Abort rather than proceed — a half-finished reversal would double-count revenue
@@ -166,7 +172,7 @@ async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
     shouldInsertPurchases = isNewImport;
 
     if (isNewImport) {
-      await sb.from('buyers').update({
+      const { error: aggErr } = await sb.from('buyers').update({
         total_spent: (Number(existing.total_spent) || 0) + totalSpent,
         total_breaks_purchased: (existing.total_breaks_purchased || 0) + (items?.length || 0),
         total_streams_participated: (existing.total_streams_participated || 0) + (streamId ? 1 : 0),
@@ -177,13 +183,16 @@ async function processBuyer(sb, orgId, streamId, buyerData, purchaseDate) {
         ...(realName ? { real_name: realName } : {}),
         updated_at: new Date().toISOString()
       }).eq('id', existing.id);
+      // Throw so this buyer lands in errors[] instead of silently understating totals
+      if (aggErr) throw new Error('buyer totals update failed: ' + aggErr.message);
     } else {
       // Re-import: still refresh name/temp, but don't touch spend counters
-      await sb.from('buyers').update({
+      const { error: refreshErr } = await sb.from('buyers').update({
         temperature: computeTemp(purchaseDate),
         ...(realName ? { real_name: realName } : {}),
         updated_at: new Date().toISOString()
       }).eq('id', existing.id);
+      if (refreshErr) throw new Error('buyer refresh failed: ' + refreshErr.message);
     }
   } else {
     const { data: newBuyer, error } = await sb.from('buyers').insert({

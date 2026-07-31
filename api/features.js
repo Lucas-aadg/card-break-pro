@@ -1409,23 +1409,32 @@ async function streamHandler(req, res, sb, action) {
             .select('total_spent, total_breaks_purchased, total_streams_participated')
             .eq('id', buyerId).maybeSingle();
           if (b) {
-            await sb.from('buyers').update({
+            const { error: revErr } = await sb.from('buyers').update({
               total_spent: Math.max(0, (parseFloat(b.total_spent) || 0) - revMap[buyerId]),
               total_breaks_purchased: Math.max(0, (b.total_breaks_purchased || 0) - cntMap[buyerId]),
               total_streams_participated: Math.max(0, (b.total_streams_participated || 1) - 1),
               updated_at: new Date().toISOString()
             }).eq('id', buyerId);
+            if (revErr) throw new Error('buyer total reversal failed: ' + revErr.message);
           }
         }
       }
 
-      // 3. Delete all dependent records then the stream
-      await sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', profile.org_id);
-      await sb.from('sorter_splits').delete().eq('stream_id', streamId);
-      await sb.from('stream_slip_imports').delete().eq('stream_id', streamId);
-      await sb.from('breaks').delete().eq('stream_id', streamId).eq('org_id', profile.org_id);
-      await sb.from('sort_tasks').delete().eq('stream_id', streamId).eq('org_id', profile.org_id);
-      await sb.from('streams').delete().eq('id', streamId).eq('org_id', profile.org_id);
+      // 3. Delete all dependent records then the stream. Check every delete —
+      // a swallowed failure leaves orphaned rows or a stream whose buyer totals
+      // were already reversed, and the user was told it deleted cleanly.
+      const delSteps = [
+        ['buyer_purchases', sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', profile.org_id)],
+        ['sorter_splits',   sb.from('sorter_splits').delete().eq('stream_id', streamId)],
+        ['stream_slip_imports', sb.from('stream_slip_imports').delete().eq('stream_id', streamId)],
+        ['breaks',          sb.from('breaks').delete().eq('stream_id', streamId).eq('org_id', profile.org_id)],
+        ['sort_tasks',      sb.from('sort_tasks').delete().eq('stream_id', streamId).eq('org_id', profile.org_id)],
+        ['streams',         sb.from('streams').delete().eq('id', streamId).eq('org_id', profile.org_id)]
+      ];
+      for (const [name, q] of delSteps) {
+        const { error: dErr } = await q;
+        if (dErr) throw new Error('delete ' + name + ' failed: ' + dErr.message);
+      }
 
       return res.status(200).json({ ok: true });
     } catch (e) {
