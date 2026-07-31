@@ -591,6 +591,13 @@
         <button class="btn btn-sm btn-outline" id="mgrBuyersViewRecent" onclick="setMgrBuyersView('recent')" style="padding:0.35rem 0.9rem;">Last 30 Days</button>
       </div>
     </div>
+    <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;align-items:center;">
+      <input type="text" id="mgrBuyersSearch" placeholder="Search @username or name…" oninput="applyMgrBuyersFilters()" autocomplete="off" style="flex:1;min-width:180px;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+      <select id="mgrBuyersChannelFilter" onchange="onMgrBuyersChannelChange()" style="padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+        <option value="">All channels</option>
+      </select>
+    </div>
+    <div id="mgrBuyersCount" style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;"></div>
     <div class="panel" style="padding:0;overflow:hidden;">
       <div id="mgrBuyersLeaderboard" style="padding:0.25rem 0;">
         <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer data…</div>
@@ -2439,6 +2446,9 @@ function managerBtmActive(tab) {
 <script>
 'use strict';
 var _mgrBuyersViewMode = 'alltime';
+var _mgrBuyersData = [];
+var _mgrBuyerChannelMap = null;
+var _mgrBuyersChannelSelPopulated = false;
 
 function setMgrBuyersView(mode) {
   _mgrBuyersViewMode = mode;
@@ -2457,21 +2467,89 @@ function mgrRelativeDate(dateStr) {
   return Math.floor(days / 30) + 'mo ago';
 }
 
+async function fetchAllMgrBuyers() {
+  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits';
+  let all = [], from = 0; const size = 1000;
+  while (true) {
+    const { data, error } = await sb.from('buyers')
+      .select(cols)
+      .eq('organization_id', currentProfile.org_id)
+      .order('total_spent', { ascending: false })
+      .range(from, from + size - 1);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < size) break;
+    from += size;
+  }
+  return all;
+}
+
+async function buildMgrBuyerChannelMap() {
+  if (_mgrBuyerChannelMap) return _mgrBuyerChannelMap;
+  const org = currentProfile.org_id;
+  const streamCh = {};
+  let from = 0; const size = 1000;
+  while (true) {
+    const { data, error } = await sb.from('streams')
+      .select('id,channel_id').eq('org_id', org).range(from, from + size - 1);
+    if (error) throw error;
+    (data || []).forEach(s => { if (s.channel_id) streamCh[s.id] = s.channel_id; });
+    if (!data || data.length < size) break;
+    from += size;
+  }
+  const map = new Map();
+  from = 0;
+  while (true) {
+    const { data, error } = await sb.from('buyer_purchases')
+      .select('buyer_id,stream_id').eq('organization_id', org).range(from, from + size - 1);
+    if (error) throw error;
+    (data || []).forEach(p => {
+      const ch = p.stream_id ? streamCh[p.stream_id] : null;
+      if (!ch) return;
+      if (!map.has(p.buyer_id)) map.set(p.buyer_id, new Set());
+      map.get(p.buyer_id).add(ch);
+    });
+    if (!data || data.length < size) break;
+    from += size;
+  }
+  _mgrBuyerChannelMap = map;
+  return map;
+}
+
+function populateMgrBuyersChannelSelect() {
+  if (_mgrBuyersChannelSelPopulated) return;
+  const sel = document.getElementById('mgrBuyersChannelFilter');
+  if (!sel || !orgChannels || !orgChannels.length) return;
+  orgChannels.forEach(function(ch) {
+    const opt = document.createElement('option');
+    opt.value = ch.id;
+    opt.textContent = (ch.icon ? ch.icon + ' ' : '') + ch.name;
+    sel.appendChild(opt);
+  });
+  _mgrBuyersChannelSelPopulated = true;
+}
+
+async function onMgrBuyersChannelChange() {
+  const chId = document.getElementById('mgrBuyersChannelFilter').value;
+  if (chId && !_mgrBuyerChannelMap) {
+    const el = document.getElementById('mgrBuyersLeaderboard');
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading channel data…</div>';
+    try { await buildMgrBuyerChannelMap(); }
+    catch (err) { el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load channel data: ' + escHtml(err.message) + '</div>'; return; }
+  }
+  applyMgrBuyersFilters();
+}
+
 async function loadMgrBuyersTab() {
   const el = document.getElementById('mgrBuyersLeaderboard');
   if (!el || !currentProfile) return;
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading…</div>';
+  populateMgrBuyersChannelSelect();
 
   try {
-    let buyers;
+    const buyersAll = await fetchAllMgrBuyers();
     if (_mgrBuyersViewMode === 'alltime') {
-      const { data, error } = await sb.from('buyers')
-        .select('id,username,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits')
-        .eq('organization_id', currentProfile.org_id)
-        .order('total_spent', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      buyers = data || [];
+      _mgrBuyersData = buyersAll;
     } else {
       const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
       const { data: purch, error } = await sb.from('buyer_purchases')
@@ -2481,45 +2559,70 @@ async function loadMgrBuyersTab() {
       if (error) throw error;
       const sums = {};
       (purch || []).forEach(p => { sums[p.buyer_id] = (sums[p.buyer_id] || 0) + Number(p.amount || 0); });
-      const sorted = Object.entries(sums).sort((a,b) => b[1]-a[1]).slice(0,15);
-      if (!sorted.length) { el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No purchases in the last 30 days.</div>'; return; }
-      const ids = sorted.map(x => x[0]);
-      const { data: rows } = await sb.from('buyers').select('id,username,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits').in('id', ids).limit(50);
-      const byId = {};
-      (rows || []).forEach(b => { byId[b.id] = b; });
-      buyers = sorted.map(([id, rs]) => { const b = byId[id]; return b ? { ...b, _recentSpent: rs } : null; }).filter(Boolean);
+      _mgrBuyersData = buyersAll
+        .filter(b => sums[b.id] !== undefined)
+        .map(b => Object.assign({}, b, { _recentSpent: sums[b.id] }))
+        .sort((a, b) => (b._recentSpent || 0) - (a._recentSpent || 0));
     }
-
-    if (!buyers.length) {
-      el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No buyer data yet.</div>';
-      return;
-    }
-
-    el.innerHTML = buyers.map(function(b, i) {
-      const spent = _mgrBuyersViewMode === 'recent' ? (b._recentSpent || 0) : Number(b.total_spent || 0);
-      const temp = b.temperature || 'cold';
-      const tc = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
-      const hits = b.case_hits || 0;
-      return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1.25rem;' + (i%2===0?'':'background:rgba(255,255,255,0.015);') + '">' +
-        '<div style="font-size:0.75rem;font-weight:800;color:var(--muted);width:1.5rem;text-align:center;">' + (i+1) + '</div>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;">' +
-            '<span>@' + escHtml(b.username) + '</span>' +
-            (b.is_new_buyer ? '<span style="font-size:0.62rem;background:rgba(34,197,94,0.12);color:#22c55e;padding:1px 4px;border-radius:3px;font-weight:700;">NEW</span>' : '') +
-            (hits > 0 ? '<span style="font-size:0.62rem;background:rgba(239,68,68,0.12);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700;">🎯 ' + hits + ' hit' + (hits > 1 ? 's' : '') + '</span>' : '') +
-          '</div>' +
-          '<div style="font-size:0.75rem;color:var(--muted);">' + mgrRelativeDate(b.last_purchase_date) + ' · ' + (b.total_breaks_purchased||0) + ' breaks</div>' +
-        '</div>' +
-        '<div style="display:flex;align-items:center;gap:0.35rem;flex-shrink:0;">' +
-          '<span style="width:8px;height:8px;border-radius:50%;background:' + tc + ';display:inline-block;"></span>' +
-          '<span style="font-size:0.72rem;color:' + tc + ';font-weight:700;text-transform:capitalize;">' + temp + '</span>' +
-        '</div>' +
-        '<div style="font-size:0.95rem;font-weight:800;color:var(--primary);min-width:60px;text-align:right;">$' + spent.toFixed(2) + '</div>' +
-      '</div>';
-    }).join('');
+    applyMgrBuyersFilters();
   } catch (err) {
     el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load: ' + escHtml(err.message) + '</div>';
   }
+}
+
+function applyMgrBuyersFilters() {
+  const el = document.getElementById('mgrBuyersLeaderboard');
+  const countEl = document.getElementById('mgrBuyersCount');
+  if (!el) return;
+
+  const q = (document.getElementById('mgrBuyersSearch').value || '').trim().toLowerCase().replace(/^@/, '');
+  const chId = document.getElementById('mgrBuyersChannelFilter').value;
+
+  let list = _mgrBuyersData;
+  if (chId && _mgrBuyerChannelMap) {
+    list = list.filter(b => { const s = _mgrBuyerChannelMap.get(b.id); return s && s.has(chId); });
+  }
+  if (q) {
+    list = list.filter(b =>
+      (b.username || '').toLowerCase().includes(q) ||
+      (b.real_name || '').toLowerCase().includes(q));
+  }
+
+  if (countEl) {
+    countEl.textContent = 'Showing ' + list.length + (list.length === 1 ? ' buyer' : ' buyers') +
+      (list.length !== _mgrBuyersData.length ? ' of ' + _mgrBuyersData.length : '');
+  }
+
+  if (list.length === 0) {
+    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">' +
+      (_mgrBuyersData.length === 0 ? 'No buyer data yet.' : 'No buyers match your filters.') + '</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(function(b, i) {
+    const spent = _mgrBuyersViewMode === 'recent' ? (b._recentSpent || 0) : Number(b.total_spent || 0);
+    const temp = b.temperature || 'cold';
+    const tc = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
+    const hits = b.case_hits || 0;
+    const giveawayOnly = Number(b.total_spent || 0) === 0;
+    return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1.25rem;' + (i%2===0?'':'background:rgba(255,255,255,0.015);') + '">' +
+      '<div style="font-size:0.75rem;font-weight:800;color:var(--muted);width:1.5rem;text-align:center;">' + (i+1) + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">' +
+          '<span>@' + escHtml(b.username) + '</span>' +
+          (b.is_new_buyer ? '<span style="font-size:0.62rem;background:rgba(34,197,94,0.12);color:#22c55e;padding:1px 4px;border-radius:3px;font-weight:700;">NEW</span>' : '') +
+          (giveawayOnly ? '<span style="font-size:0.62rem;background:rgba(148,163,184,0.15);color:#94a3b8;padding:1px 5px;border-radius:3px;font-weight:700;">🎁 GIVEAWAY</span>' : '') +
+          (hits > 0 ? '<span style="font-size:0.62rem;background:rgba(239,68,68,0.12);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700;">🎯 ' + hits + ' hit' + (hits > 1 ? 's' : '') + '</span>' : '') +
+        '</div>' +
+        '<div style="font-size:0.75rem;color:var(--muted);">' + mgrRelativeDate(b.last_purchase_date) + ' · ' + (b.total_breaks_purchased||0) + ' breaks</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:0.35rem;flex-shrink:0;">' +
+        '<span style="width:8px;height:8px;border-radius:50%;background:' + tc + ';display:inline-block;"></span>' +
+        '<span style="font-size:0.72rem;color:' + tc + ';font-weight:700;text-transform:capitalize;">' + temp + '</span>' +
+      '</div>' +
+      '<div style="font-size:0.95rem;font-weight:800;color:var(--primary);min-width:60px;text-align:right;">$' + spent.toFixed(2) + '</div>' +
+    '</div>';
+  }).join('');
 }
 </script>
 
