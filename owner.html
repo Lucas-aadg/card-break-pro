@@ -9203,7 +9203,13 @@ async function loadBuyersBoard() {
       if (rec >= RISING_MIN && rec > pri * 1.5) { b._growth = pri > 0 ? Math.round((rec - pri) / pri * 100) : null; rising.push(b); return; }
       if (isWhale) { whales.push(b); return; }
     });
-    cold.sort((a, b)   => Number(b.total_spent) - Number(a.total_spent));
+    // Un-contacted whales first (act on them); already-reached ones sink
+    cold.sort((a, b) => {
+      const ac = a.last_cold_alert_at && daysSince(a.last_cold_alert_at) <= 7 ? 1 : 0;
+      const bc = b.last_cold_alert_at && daysSince(b.last_cold_alert_at) <= 7 ? 1 : 0;
+      if (ac !== bc) return ac - bc;
+      return Number(b.total_spent) - Number(a.total_spent);
+    });
     whales.sort((a, b) => Number(b.total_spent) - Number(a.total_spent));
     rising.sort((a, b) => (b._recent30 || 0) - (a._recent30 || 0));
     fresh.sort((a, b)  => Number(b.total_spent) - Number(a.total_spent));
@@ -9244,13 +9250,16 @@ function boardRow(b, kind, i) {
   else if (kind === 'new')    sub = 'First seen ' + daysSince(b.first_seen_date) + 'd ago · ' + (b.total_breaks_purchased || 0) + ' breaks';
   else                        sub = relativeDate(b.last_purchase_date) + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
   const uname = (b.username || '').replace(/'/g, "\\'");
+  const contactedDays = (kind === 'cold' && b.last_cold_alert_at) ? daysSince(b.last_cold_alert_at) : null;
+  const contacted = contactedDays != null && contactedDays <= 7;
   const action = kind === 'cold'
-    ? '<button onclick="event.stopPropagation();copyWinback(\'' + uname + '\')" class="btn btn-sm" style="padding:0.3rem 0.7rem;font-size:0.72rem;flex-shrink:0;">Copy win-back</button>'
+    ? '<button onclick="event.stopPropagation();copyWinback(\'' + b.id + '\',\'' + uname + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.3rem 0.7rem;font-size:0.72rem;flex-shrink:0;">' + (contacted ? 'Copy again' : 'Copy win-back') + '</button>'
     : '<button onclick="event.stopPropagation();openBuyerProfile(\'' + b.id + '\')" class="btn btn-sm btn-outline" style="padding:0.3rem 0.7rem;font-size:0.72rem;flex-shrink:0;">View</button>';
-  return '<div onclick="openBuyerProfile(\'' + b.id + '\')" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border);cursor:pointer;">' +
+  return '<div onclick="openBuyerProfile(\'' + b.id + '\')" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border);cursor:pointer;' + (contacted ? 'opacity:0.62;' : '') + '">' +
     '<div style="flex:1;min-width:0;">' +
       '<div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">@' + escHtml(b.username) +
         (hits > 0 ? ' <span style="font-size:0.6rem;background:rgba(239,68,68,0.12);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700;">🎯 ' + hits + '</span>' : '') +
+        (contacted ? ' <span style="font-size:0.6rem;background:rgba(34,197,94,0.14);color:#22c55e;padding:1px 6px;border-radius:3px;font-weight:700;">✓ reached out ' + (contactedDays === 0 ? 'today' : contactedDays + 'd ago') + '</span>' : '') +
       '</div>' +
       '<div style="font-size:0.72rem;color:var(--muted);margin-top:1px;">' + sub + '</div>' +
     '</div>' +
@@ -9260,16 +9269,18 @@ function boardRow(b, kind, i) {
   '</div>';
 }
 
-function copyWinback(username) {
+async function copyWinback(buyerId, username) {
   const msg = 'Hey @' + username + '! Haven\'t seen you in a bit — we\'ve got some fire breaks coming up I think you\'d love. Come hang soon 🔥';
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(msg).then(
-      function() { showGlobalSuccess('Win-back message copied — paste it into a Whatnot DM to @' + username + '.'); },
-      function() { showGlobalError('Couldn\'t copy automatically. Message: ' + msg); }
-    );
+    try { await navigator.clipboard.writeText(msg); showGlobalSuccess('Win-back copied — paste it into a Whatnot DM to @' + username + '.'); }
+    catch (e) { showGlobalError('Couldn\'t copy automatically. Message: ' + msg); }
   } else {
     showGlobalError('Copy not supported here. Message: ' + msg);
   }
+  // Record the outreach so this buyer drops down the list and shows "reached out"
+  const { error } = await sb.from('buyers').update({ last_cold_alert_at: new Date().toISOString() }).eq('id', buyerId);
+  if (error) { console.error('mark contacted failed:', error.message); return; }
+  loadBuyersBoard();
 }
 
 // ── Buyers Tab ────────────────────────────────────────────
@@ -9282,7 +9293,7 @@ function setBuyersView(mode) {
 
 // Fetch ALL buyers, paging past PostgREST's 1000-row cap
 async function fetchAllBuyers() {
-  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits';
+  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,temperature,is_new_buyer,case_hits,last_cold_alert_at';
   let all = [], from = 0; const size = 1000;
   while (true) {
     const { data, error } = await sb.from('buyers')
