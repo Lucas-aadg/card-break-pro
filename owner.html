@@ -9018,6 +9018,16 @@ function printTable(title, subtitle, tableId) {
       <div class="panel-title" style="display:flex;justify-content:space-between;align-items:baseline;"><span>Spend Trend</span><span id="bpTrendLabel" style="font-size:0.72rem;font-weight:700;"></span></div>
       <div id="bpTrend"></div>
     </div>
+    <!-- What they collect (manual tags) -->
+    <div class="panel" style="margin-bottom:1rem;">
+      <div class="panel-title">What They Collect</div>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;">
+        <input id="bpFavTeam" placeholder="Favorite team (e.g. Bulls)" autocomplete="off" style="width:100%;padding:0.55rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+        <input id="bpFavPlayer" placeholder="Favorite player (e.g. Michael Jordan)" autocomplete="off" style="width:100%;padding:0.55rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+        <input id="bpFavSport" placeholder="Sport / category (e.g. NBA)" autocomplete="off" style="width:100%;padding:0.55rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+      </div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:0.45rem;">Saved automatically. Shows on the buyer's card so you can shout them out by name.</div>
+    </div>
     <!-- Preferred Products -->
     <div class="panel" style="margin-bottom:1rem;">
       <div class="panel-title">Buys Most Often</div>
@@ -9770,6 +9780,14 @@ async function openBuyerProfile(buyerId) {
     document.getElementById('bpNotes').value = buyer.notes || '';
     document.getElementById('bpNotes').onblur = function() { saveBuyerNotes(buyerId, this.value); };
 
+    // Collect tags (manual)
+    [['bpFavTeam', 'fav_team'], ['bpFavPlayer', 'fav_player'], ['bpFavSport', 'fav_sport']].forEach(function(pair) {
+      const inp = document.getElementById(pair[0]);
+      if (!inp) return;
+      inp.value = buyer[pair[1]] || '';
+      inp.onblur = function() { saveBuyerTag(buyerId, pair[1], this.value); };
+    });
+
     // Preferred products
     const purchases = purchasesRes.data || [];
     _bpPurchases = purchases;
@@ -9887,6 +9905,19 @@ function renderBpPurchases() {
       next.onclick = function() { _bpPurchasePage++; renderBpPurchases(); };
       pager.appendChild(next);
     }
+  }
+}
+
+async function saveBuyerTag(buyerId, field, value) {
+  const patch = { updated_at: new Date().toISOString() };
+  patch[field] = value.trim() || null;
+  const { error } = await sb.from('buyers').update(patch).eq('id', buyerId);
+  if (error) {
+    console.error('tag save failed:', error.message);
+    // If the columns aren't there yet, point the owner at the migration
+    showGlobalError(/column .* does not exist/i.test(error.message)
+      ? 'Tags need a quick DB update first — run migrations/006_buyer_tags.sql in Supabase.'
+      : 'Couldn\'t save tag: ' + error.message);
   }
 }
 
