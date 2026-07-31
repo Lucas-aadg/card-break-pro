@@ -587,20 +587,33 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
       <h2 style="margin:0;font-size:1.1rem;font-weight:800;">Buyer Intelligence</h2>
       <div style="display:flex;gap:0.5rem;">
-        <button class="btn btn-sm" id="mgrBuyersViewAllTime" onclick="setMgrBuyersView('alltime')" style="padding:0.35rem 0.9rem;">All Time</button>
-        <button class="btn btn-sm btn-outline" id="mgrBuyersViewRecent" onclick="setMgrBuyersView('recent')" style="padding:0.35rem 0.9rem;">Last 30 Days</button>
+        <button class="btn btn-sm" id="mgrBuyersModeBoard" onclick="setMgrBuyersMode('board')" style="padding:0.35rem 0.9rem;">📋 Board</button>
+        <button class="btn btn-sm btn-outline" id="mgrBuyersModeList" onclick="setMgrBuyersMode('list')" style="padding:0.35rem 0.9rem;">📇 All Buyers</button>
       </div>
     </div>
-    <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;align-items:center;">
-      <input type="text" id="mgrBuyersSearch" placeholder="Search @username or name…" oninput="applyMgrBuyersFilters()" autocomplete="off" style="flex:1;min-width:180px;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
-      <select id="mgrBuyersChannelFilter" onchange="onMgrBuyersChannelChange()" style="padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
-        <option value="">All channels</option>
-      </select>
+
+    <div id="mgrBuyersBoardWrap">
+      <div id="mgrBuyersBoard">
+        <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>
+      </div>
     </div>
-    <div id="mgrBuyersCount" style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;"></div>
-    <div class="panel" style="padding:0;overflow:hidden;">
-      <div id="mgrBuyersLeaderboard" style="padding:0.25rem 0;">
-        <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer data…</div>
+
+    <div id="mgrBuyersListWrap" style="display:none;">
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;align-items:center;">
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-sm" id="mgrBuyersViewAllTime" onclick="setMgrBuyersView('alltime')" style="padding:0.35rem 0.9rem;">All Time</button>
+          <button class="btn btn-sm btn-outline" id="mgrBuyersViewRecent" onclick="setMgrBuyersView('recent')" style="padding:0.35rem 0.9rem;">Last 30 Days</button>
+        </div>
+        <input type="text" id="mgrBuyersSearch" placeholder="Search @username or name…" oninput="applyMgrBuyersFilters()" autocomplete="off" style="flex:1;min-width:160px;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+        <select id="mgrBuyersChannelFilter" onchange="onMgrBuyersChannelChange()" style="padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+          <option value="">All channels</option>
+        </select>
+      </div>
+      <div id="mgrBuyersCount" style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;"></div>
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div id="mgrBuyersLeaderboard" style="padding:0.25rem 0;">
+          <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer data…</div>
+        </div>
       </div>
     </div>
   </div>
@@ -841,7 +854,7 @@ function switchTab(tab) {
   else if (tab === 'invLog') loadInvLog();
   else if (tab === 'sorting') loadSorting();
   else if (tab === 'team') loadTeam();
-  else if (tab === 'buyers') loadMgrBuyersTab();
+  else if (tab === 'buyers') openMgrBuyersTab();
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -2450,6 +2463,143 @@ var _mgrBuyersViewMode = 'alltime';
 var _mgrBuyersData = [];
 var _mgrBuyerChannelMap = null;
 var _mgrBuyersChannelSelPopulated = false;
+
+// ── Buyer Board (segmented, action-first) ─────────────────
+var _mgrBuyersMode = 'board';
+const MGR_COLD_MIN = 21, MGR_COLD_MAX = 120, MGR_NEW_DAYS = 14, MGR_RISING_MIN = 50;
+
+function openMgrBuyersTab() {
+  populateMgrBuyersChannelSelect();
+  setMgrBuyersMode(_mgrBuyersMode);
+}
+
+function setMgrBuyersMode(mode) {
+  _mgrBuyersMode = mode;
+  document.getElementById('mgrBuyersModeBoard').className = mode === 'board' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('mgrBuyersModeList').className  = mode === 'list'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('mgrBuyersBoardWrap').style.display = mode === 'board' ? '' : 'none';
+  document.getElementById('mgrBuyersListWrap').style.display  = mode === 'list'  ? '' : 'none';
+  if (mode === 'board') loadMgrBuyersBoard();
+  else loadMgrBuyersTab();
+}
+
+function mgrDaysSince(dateStr) {
+  if (!dateStr) return Infinity;
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+async function loadMgrBuyersBoard() {
+  const el = document.getElementById('mgrBuyersBoard');
+  if (!el || !currentProfile) return;
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>';
+  try {
+    const [allBuyers, hitCounts] = await Promise.all([fetchAllMgrBuyers(), fetchMgrBuyerHitCounts()]);
+    const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0);
+    spenders.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
+
+    if (!spenders.length) {
+      el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No spending buyers yet.</div>';
+      return;
+    }
+
+    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+    const d60 = new Date(); d60.setDate(d60.getDate() - 60);
+    const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
+    const { data: purch } = await sb.from('buyer_purchases')
+      .select('buyer_id, amount, purchase_date')
+      .eq('organization_id', currentProfile.org_id)
+      .gte('purchase_date', s60);
+    const recent = {}, prior = {};
+    (purch || []).forEach(p => {
+      const amt = Number(p.amount || 0);
+      if (p.purchase_date >= s30) recent[p.buyer_id] = (recent[p.buyer_id] || 0) + amt;
+      else prior[p.buyer_id] = (prior[p.buyer_id] || 0) + amt;
+    });
+
+    const spends = spenders.map(b => Number(b.total_spent || 0)).sort((a, b) => a - b);
+    const whaleThresh = spends[Math.floor(spends.length * 0.8)] || 0;
+
+    const cold = [], rising = [], fresh = [], whales = [];
+    spenders.forEach(b => {
+      const spent = Number(b.total_spent || 0);
+      const isWhale = spent >= whaleThresh && spent > 0;
+      const since = mgrDaysSince(b.last_purchase_date);
+      const age = mgrDaysSince(b.first_seen_date);
+      const rec = recent[b.id] || 0, pri = prior[b.id] || 0;
+      b._since = since; b._recent30 = rec;
+      if (isWhale && since >= MGR_COLD_MIN && since <= MGR_COLD_MAX) { cold.push(b); return; }
+      if (age <= MGR_NEW_DAYS) { fresh.push(b); return; }
+      if (rec >= MGR_RISING_MIN && rec > pri * 1.5) { b._growth = pri > 0 ? Math.round((rec - pri) / pri * 100) : null; rising.push(b); return; }
+      if (isWhale) { whales.push(b); return; }
+    });
+    cold.sort((a, b)   => Number(b.total_spent) - Number(a.total_spent));
+    whales.sort((a, b) => Number(b.total_spent) - Number(a.total_spent));
+    rising.sort((a, b) => (b._recent30 || 0) - (a._recent30 || 0));
+    fresh.sort((a, b)  => Number(b.total_spent) - Number(a.total_spent));
+
+    el.innerHTML =
+      mgrBoardSegment('❄️', 'Going Cold', cold,   'No purchase in ' + MGR_COLD_MIN + '+ days — flag for the owner', true,  'cold') +
+      mgrBoardSegment('🔥', 'Whales',     whales, 'Top spenders — protect these',                                  false, 'whale') +
+      mgrBoardSegment('📈', 'Rising',     rising, 'Spend climbing fast',                                           false, 'rising') +
+      mgrBoardSegment('🆕', 'New',        fresh,  'First purchase in the last ' + MGR_NEW_DAYS + ' days',          false, 'new');
+  } catch (err) {
+    el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load board: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+function mgrBoardSegment(icon, title, list, why, hero, kind) {
+  const heroStyle = hero ? 'border:1px solid var(--primary);box-shadow:0 0 0 1px rgba(79,110,247,0.12);' : '';
+  const hd = '<div style="display:flex;align-items:center;gap:0.6rem;padding:0.8rem 1rem;border-bottom:1px solid var(--border);' + (hero ? 'background:linear-gradient(90deg,rgba(79,110,247,0.10),transparent);' : '') + '">' +
+      '<span style="font-size:1rem;">' + icon + '</span>' +
+      '<span style="font-weight:800;font-size:0.92rem;">' + title + '</span>' +
+      '<span style="font-size:0.68rem;color:var(--muted);font-weight:700;background:var(--card);border:1px solid var(--border);padding:1px 8px;border-radius:100px;">' + list.length + '</span>' +
+      '<span style="margin-left:auto;font-size:0.72rem;color:var(--muted);text-align:right;">' + why + '</span>' +
+    '</div>';
+  const body = list.length
+    ? list.map(function(b) { return mgrBoardRow(b, kind); }).join('')
+    : '<div style="padding:1rem;text-align:center;color:var(--muted);font-size:0.8rem;">' + (kind === 'cold' ? 'Nobody going cold — nice. 🎉' : 'Nobody here right now.') + '</div>';
+  return '<div class="panel" style="padding:0;overflow:hidden;margin-bottom:0.85rem;' + heroStyle + '">' + hd + body + '</div>';
+}
+
+function mgrBoardRow(b, kind) {
+  const spent = Number(b.total_spent || 0);
+  const temp = b.temperature || 'cold';
+  const tc = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
+  const hits = b._hitCount || 0;
+  const since = b._since != null ? b._since : mgrDaysSince(b.last_purchase_date);
+  let sub;
+  if (kind === 'cold')        sub = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
+  else if (kind === 'rising') sub = 'Last 30d $' + (b._recent30 || 0).toFixed(0) + (b._growth != null ? ' · +' + b._growth + '%' : ' · new momentum');
+  else if (kind === 'new')    sub = 'First seen ' + mgrDaysSince(b.first_seen_date) + 'd ago · ' + (b.total_breaks_purchased || 0) + ' breaks';
+  else                        sub = mgrRelativeDate(b.last_purchase_date) + ' · ' + (b.total_breaks_purchased || 0) + ' breaks';
+  const uname = (b.username || '').replace(/'/g, "\\'");
+  const action = kind === 'cold'
+    ? '<button onclick="mgrCopyWinback(\'' + uname + '\')" class="btn btn-sm" style="padding:0.3rem 0.7rem;font-size:0.72rem;flex-shrink:0;">Copy win-back</button>'
+    : '';
+  return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border);">' +
+    '<div style="flex:1;min-width:0;">' +
+      '<div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">@' + escHtml(b.username) +
+        (hits > 0 ? ' <span style="font-size:0.6rem;background:rgba(239,68,68,0.12);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700;">🎯 ' + hits + '</span>' : '') +
+      '</div>' +
+      '<div style="font-size:0.72rem;color:var(--muted);margin-top:1px;">' + sub + '</div>' +
+    '</div>' +
+    '<span style="width:8px;height:8px;border-radius:50%;background:' + tc + ';flex-shrink:0;"></span>' +
+    '<div style="font-weight:800;font-size:0.92rem;color:var(--primary);min-width:56px;text-align:right;">$' + spent.toFixed(0) + '</div>' +
+    action +
+  '</div>';
+}
+
+function mgrCopyWinback(username) {
+  const msg = 'Hey @' + username + '! Haven\'t seen you in a bit — we\'ve got some fire breaks coming up I think you\'d love. Come hang soon 🔥';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(msg).then(
+      function() { showGlobalSuccess('Win-back message copied — paste it into a Whatnot DM to @' + username + '.'); },
+      function() { showGlobalError('Couldn\'t copy automatically. Message: ' + msg); }
+    );
+  } else {
+    showGlobalError('Copy not supported here. Message: ' + msg);
+  }
+}
 
 function setMgrBuyersView(mode) {
   _mgrBuyersViewMode = mode;
