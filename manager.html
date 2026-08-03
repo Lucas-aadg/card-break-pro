@@ -593,6 +593,14 @@
       </div>
     </div>
 
+    <!-- Global account/channel filter — applies to Board, Hit Board, and List -->
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.85rem;flex-wrap:wrap;">
+      <span style="font-size:0.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Account</span>
+      <select id="mgrBuyersChannelFilter" onchange="onMgrBuyersChannelChange()" style="padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+        <option value="">All accounts</option>
+      </select>
+    </div>
+
     <div id="mgrBuyersBoardWrap">
       <div id="mgrBuyersBoard">
         <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>
@@ -613,9 +621,6 @@
           <button class="btn btn-sm btn-outline" id="mgrBuyersViewRecent" onclick="setMgrBuyersView('recent')" style="padding:0.35rem 0.9rem;">Last 30 Days</button>
         </div>
         <input type="text" id="mgrBuyersSearch" placeholder="Search @username or name…" oninput="applyMgrBuyersFilters()" autocomplete="off" style="flex:1;min-width:160px;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
-        <select id="mgrBuyersChannelFilter" onchange="onMgrBuyersChannelChange()" style="padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
-          <option value="">All channels</option>
-        </select>
       </div>
       <div id="mgrBuyersCount" style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;"></div>
       <div class="panel" style="padding:0;overflow:hidden;">
@@ -2470,6 +2475,7 @@ function managerBtmActive(tab) {
 var _mgrBuyersViewMode = 'alltime';
 var _mgrBuyersData = [];
 var _mgrBuyerChannelMap = null;
+var _mgrStreamChannelMap = null;
 var _mgrBuyersChannelSelPopulated = false;
 
 // ── Buyer Board (segmented, action-first) ─────────────────
@@ -2507,7 +2513,7 @@ async function loadMgrBuyersHitBoard() {
     let all = [], from = 0; const size = 1000;
     while (true) {
       const { data, error } = await sb.from('buyer_hits')
-        .select('id,hit_description,hit_type,break_name,submitted_at,buyer_id,buyers(username)')
+        .select('id,hit_description,hit_type,break_name,submitted_at,buyer_id,stream_id,buyers(username)')
         .eq('organization_id', currentProfile.org_id)
         .order('submitted_at', { ascending: false })
         .range(from, from + size - 1);
@@ -2527,8 +2533,9 @@ async function loadMgrBuyersHitBoard() {
 function renderMgrHitFilter() {
   const el = document.getElementById('mgrBuyersHitsFilter');
   if (!el) return;
-  const counts = { all: _mgrHitBoardData.length };
-  _mgrHitBoardData.forEach(h => { const t = h.hit_type || 'other'; counts[t] = (counts[t] || 0) + 1; });
+  const base = _mgrHitBoardData.filter(mgrHitInChannel);
+  const counts = { all: base.length };
+  base.forEach(h => { const t = h.hit_type || 'other'; counts[t] = (counts[t] || 0) + 1; });
   const types = ['all'].concat(Object.keys(MGR_HIT_TYPE_META).filter(t => counts[t]));
   el.innerHTML = types.map(function(t) {
     const active = _mgrHitBoardFilter === t;
@@ -2542,7 +2549,7 @@ function setMgrHitFilter(t) { _mgrHitBoardFilter = t; renderMgrHitFilter(); rend
 function renderMgrHitBoard() {
   const el = document.getElementById('mgrBuyersHits');
   if (!el) return;
-  let list = _mgrHitBoardData;
+  let list = _mgrHitBoardData.filter(mgrHitInChannel);
   if (_mgrHitBoardFilter !== 'all') list = list.filter(h => (h.hit_type || 'other') === _mgrHitBoardFilter);
   if (!list.length) {
     el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">' +
@@ -2582,7 +2589,7 @@ async function loadMgrBuyersBoard() {
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>';
   try {
     const [allBuyers, hitCounts] = await Promise.all([fetchAllMgrBuyers(), fetchMgrBuyerHitCounts()]);
-    const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0);
+    const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0 && mgrBuyerInChannel(b.id));
     spenders.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
 
     if (!spenders.length) {
@@ -2851,6 +2858,7 @@ async function buildMgrBuyerChannelMap() {
     from += size;
   }
   _mgrBuyerChannelMap = map;
+  _mgrStreamChannelMap = streamCh;
   return map;
 }
 
@@ -2867,15 +2875,31 @@ function populateMgrBuyersChannelSelect() {
   _mgrBuyersChannelSelPopulated = true;
 }
 
+function mgrBuyerInChannel(id) {
+  const sel = document.getElementById('mgrBuyersChannelFilter');
+  const ch = sel ? sel.value : '';
+  if (!ch) return true;
+  const s = _mgrBuyerChannelMap && _mgrBuyerChannelMap.get(id);
+  return !!(s && s.has(ch));
+}
+function mgrHitInChannel(h) {
+  const sel = document.getElementById('mgrBuyersChannelFilter');
+  const ch = sel ? sel.value : '';
+  if (!ch) return true;
+  return !!(h.stream_id && _mgrStreamChannelMap && _mgrStreamChannelMap[h.stream_id] === ch);
+}
+
 async function onMgrBuyersChannelChange() {
   const chId = document.getElementById('mgrBuyersChannelFilter').value;
   if (chId && !_mgrBuyerChannelMap) {
-    const el = document.getElementById('mgrBuyersLeaderboard');
-    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading channel data…</div>';
+    const el = document.getElementById(_mgrBuyersMode === 'board' ? 'mgrBuyersBoard' : _mgrBuyersMode === 'hits' ? 'mgrBuyersHits' : 'mgrBuyersLeaderboard');
+    if (el) el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading account data…</div>';
     try { await buildMgrBuyerChannelMap(); }
-    catch (err) { el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load channel data: ' + escHtml(err.message) + '</div>'; return; }
+    catch (err) { if (el) el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load account data: ' + escHtml(err.message) + '</div>'; return; }
   }
-  applyMgrBuyersFilters();
+  if (_mgrBuyersMode === 'board') loadMgrBuyersBoard();
+  else if (_mgrBuyersMode === 'hits') { renderMgrHitFilter(); renderMgrHitBoard(); }
+  else applyMgrBuyersFilters();
 }
 
 async function loadMgrBuyersTab() {

@@ -1983,6 +1983,14 @@
       </div>
     </div>
 
+    <!-- Global account/channel filter — applies to Board, Hit Board, and List -->
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.85rem;flex-wrap:wrap;">
+      <span style="font-size:0.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Account</span>
+      <select id="buyersChannelFilter" onchange="onBuyersChannelChange()" style="padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
+        <option value="">All accounts</option>
+      </select>
+    </div>
+
     <!-- BOARD (segmented, action-first) -->
     <div id="buyersBoardWrap">
       <div id="buyersBoard">
@@ -2006,9 +2014,6 @@
           <button class="btn btn-sm btn-outline" id="buyersViewRecent" onclick="setBuyersView('recent')" style="padding:0.35rem 0.9rem;">Last 30 Days</button>
         </div>
         <input type="text" id="buyersSearch" placeholder="Search @username or name…" oninput="applyBuyersFilters()" autocomplete="off" style="flex:1;min-width:160px;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
-        <select id="buyersChannelFilter" onchange="onBuyersChannelChange()" style="padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
-          <option value="">All channels</option>
-        </select>
       </div>
       <div id="buyersCount" style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;"></div>
       <div class="panel" style="padding:0;overflow:hidden;">
@@ -9067,6 +9072,7 @@ const BP_PAGE_SIZE = 25;
 
 var _buyersData = [];            // full loaded set for the current view mode
 var _buyerChannelMap = null;     // Map buyer_id -> Set(channel_id), built lazily
+var _streamChannelMap = null;    // { stream_id: channel_id }, set alongside the buyer map
 var _buyersChannelSelPopulated = false;
 
 // ── Buyer Board (segmented, action-first) ─────────────────
@@ -9104,7 +9110,7 @@ async function loadBuyersHitBoard() {
     let all = [], from = 0; const size = 1000;
     while (true) {
       const { data, error } = await sb.from('buyer_hits')
-        .select('id,hit_description,hit_type,break_name,submitted_at,buyer_id,buyers(username)')
+        .select('id,hit_description,hit_type,break_name,submitted_at,buyer_id,stream_id,buyers(username)')
         .eq('organization_id', currentProfile.org_id)
         .order('submitted_at', { ascending: false })
         .range(from, from + size - 1);
@@ -9121,11 +9127,20 @@ async function loadBuyersHitBoard() {
   }
 }
 
+// Does this hit belong to the selected account? (via its stream's channel)
+function hitInChannel(h) {
+  const sel = document.getElementById('buyersChannelFilter');
+  const ch = sel ? sel.value : '';
+  if (!ch) return true;
+  return !!(h.stream_id && _streamChannelMap && _streamChannelMap[h.stream_id] === ch);
+}
+
 function renderHitFilter() {
   const el = document.getElementById('buyersHitsFilter');
   if (!el) return;
-  const counts = { all: _hitBoardData.length };
-  _hitBoardData.forEach(h => { const t = h.hit_type || 'other'; counts[t] = (counts[t] || 0) + 1; });
+  const base = _hitBoardData.filter(hitInChannel);
+  const counts = { all: base.length };
+  base.forEach(h => { const t = h.hit_type || 'other'; counts[t] = (counts[t] || 0) + 1; });
   const types = ['all'].concat(Object.keys(HIT_TYPE_META).filter(t => counts[t]));
   el.innerHTML = types.map(function(t) {
     const active = _hitBoardFilter === t;
@@ -9139,7 +9154,7 @@ function setHitFilter(t) { _hitBoardFilter = t; renderHitFilter(); renderHitBoar
 function renderHitBoard() {
   const el = document.getElementById('buyersHits');
   if (!el) return;
-  let list = _hitBoardData;
+  let list = _hitBoardData.filter(hitInChannel);
   if (_hitBoardFilter !== 'all') list = list.filter(h => (h.hit_type || 'other') === _hitBoardFilter);
   if (!list.length) {
     el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">' +
@@ -9179,7 +9194,7 @@ async function loadBuyersBoard() {
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>';
   try {
     const [allBuyers, hitCounts] = await Promise.all([fetchAllBuyers(), fetchBuyerHitCounts()]);
-    const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0);
+    const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0 && buyerInChannel(b.id));
     spenders.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
 
     if (!spenders.length) {
@@ -9451,6 +9466,7 @@ async function buildBuyerChannelMap() {
     from += size;
   }
   _buyerChannelMap = map;
+  _streamChannelMap = streamCh;
   return map;
 }
 
@@ -9467,15 +9483,27 @@ function populateBuyersChannelSelect() {
   _buyersChannelSelPopulated = true;
 }
 
+// Does this buyer belong to the currently-selected account/channel? (true if none selected)
+function buyerInChannel(id) {
+  const sel = document.getElementById('buyersChannelFilter');
+  const ch = sel ? sel.value : '';
+  if (!ch) return true;
+  const s = _buyerChannelMap && _buyerChannelMap.get(id);
+  return !!(s && s.has(ch));
+}
+
 async function onBuyersChannelChange() {
   const chId = document.getElementById('buyersChannelFilter').value;
   if (chId && !_buyerChannelMap) {
-    const el = document.getElementById('buyersLeaderboard');
-    el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading channel data…</div>';
+    const el = document.getElementById(_buyersMode === 'board' ? 'buyersBoard' : _buyersMode === 'hits' ? 'buyersHits' : 'buyersLeaderboard');
+    if (el) el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading account data…</div>';
     try { await buildBuyerChannelMap(); }
-    catch (err) { el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load channel data: ' + escHtml(err.message) + '</div>'; return; }
+    catch (err) { if (el) el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load account data: ' + escHtml(err.message) + '</div>'; return; }
   }
-  applyBuyersFilters();
+  // Re-render whichever view is active
+  if (_buyersMode === 'board') loadBuyersBoard();
+  else if (_buyersMode === 'hits') { renderHitFilter(); renderHitBoard(); }
+  else applyBuyersFilters();
 }
 
 async function loadBuyersTab() {
