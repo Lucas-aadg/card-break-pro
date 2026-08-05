@@ -3249,16 +3249,29 @@ async function brkFetchAllBuyers() {
     if (!data || data.length < size) break;
     from += size;
   }
-  const map = {}; from = 0;
+  const map = {}; _brkBuyerHitStreams = {}; from = 0;
   while (true) {
-    const { data, error } = await sb.from('buyer_hits').select('buyer_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
+    const { data, error } = await sb.from('buyer_hits').select('buyer_id,stream_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
     if (error) throw error;
-    (data || []).forEach(h => { map[h.buyer_id] = (map[h.buyer_id] || 0) + 1; });
+    (data || []).forEach(h => {
+      map[h.buyer_id] = (map[h.buyer_id] || 0) + 1;
+      (_brkBuyerHitStreams[h.buyer_id] = _brkBuyerHitStreams[h.buyer_id] || []).push(h.stream_id || null);
+    });
     if (!data || data.length < size) break;
     from += size;
   }
   all.forEach(b => { b._hitCount = map[b.id] || 0; });
   _brkAllBuyers = all; _brkBuyersLoaded = true;
+}
+
+var _brkBuyerHitStreams = {};
+function brkHitBadge(b) {
+  const sel = document.getElementById('brkBuyersChannelFilter');
+  const ch = sel ? sel.value : '';
+  if (!ch) return b._hitCount || 0;
+  const streams = _brkBuyerHitStreams[b.id];
+  if (!streams) return 0;
+  return streams.filter(s => s && _brkStreamChannelMap && _brkStreamChannelMap[s] === ch).length;
 }
 
 // Tag each buyer whale/rising/new + compute avg-per-stream
@@ -3350,7 +3363,7 @@ function brkWhaleChip(b) {
       '<span style="font-weight:800;font-size:0.85rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@' + escHtml(b.username) + '</span>' +
       '<span onclick="event.stopPropagation();openBrkTagEdit(\'' + b.id + '\')" title="Edit tags" style="cursor:pointer;font-size:0.72rem;opacity:0.55;flex-shrink:0;">✏️</span>' +
     '</div>' +
-    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b.total_spent || 0).toFixed(0) + ' · $' + Math.round(b._avgStream || 0) + '/str' + ((b._hitCount || 0) > 0 ? ' · 🎯' + b._hitCount : '') + '</div>' +
+    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b.total_spent || 0).toFixed(0) + ' · $' + Math.round(b._avgStream || 0) + '/str' + (brkHitBadge(b) > 0 ? ' · 🎯' + brkHitBadge(b) : '') + '</div>' +
     (tags ? '<div style="font-size:0.68rem;color:#93a6ff;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(tags) + '</div>' : '') +
   '</div>';
 }
@@ -3397,7 +3410,7 @@ function brkFactsCard(b) {
     ['$' + Number(b.total_spent || 0).toFixed(0), 'Lifetime'],
     ['$' + Math.round(b._avgStream || 0), 'Avg/str'],
     [(b.total_breaks_purchased || 0), 'Breaks'],
-    ['🎯 ' + (b._hitCount || 0), 'Hits'],
+    ['🎯 ' + brkHitBadge(b), 'Hits'],
     [b.last_purchase_date ? brkRelDate(b.last_purchase_date) : '—', 'Last buy']
   ];
   return '<div style="background:var(--card);border:1px solid ' + (b._tier === 'whale' ? 'rgba(233,185,73,0.4)' : 'var(--border)') + ';border-radius:12px;padding:13px 15px;margin-bottom:0.6rem;">' +

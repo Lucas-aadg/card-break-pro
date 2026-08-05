@@ -9073,6 +9073,7 @@ const BP_PAGE_SIZE = 25;
 var _buyersData = [];            // full loaded set for the current view mode
 var _buyerChannelMap = null;     // Map buyer_id -> Set(channel_id), built lazily
 var _streamChannelMap = null;    // { stream_id: channel_id }, set alongside the buyer map
+var _buyerHitStreams = {};       // { buyer_id: [stream_id,...] } for channel-aware hit badges
 var _buyersChannelSelPopulated = false;
 
 // ── Buyer Board (segmented, action-first) ─────────────────
@@ -9330,7 +9331,7 @@ function boardSegment(icon, title, list, why, hero, kind) {
 
 function boardRow(b, kind, i) {
   const spent = Number(b.total_spent || 0);
-  const hits = b._hitCount || 0;
+  const hits = ownerHitBadge(b);
   const avg = b.total_streams_participated > 0 ? spent / b.total_streams_participated : spent;
   const av = kind === 'whale' ? 'linear-gradient(135deg,#eab945,#d98e2b);color:#0a0a11;'
            : kind === 'rising' ? 'linear-gradient(135deg,#2fbf71,#1f9d67);color:#04140c;'
@@ -9422,16 +9423,31 @@ function buyerTagChip(b) {
 // count can never disagree with the actual history. Returns { buyer_id: count }.
 async function fetchBuyerHitCounts() {
   const map = {};
+  _buyerHitStreams = {};
   let from = 0; const size = 1000;
   while (true) {
     const { data, error } = await sb.from('buyer_hits')
-      .select('buyer_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
+      .select('buyer_id,stream_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
     if (error) throw error;
-    (data || []).forEach(h => { map[h.buyer_id] = (map[h.buyer_id] || 0) + 1; });
+    (data || []).forEach(h => {
+      map[h.buyer_id] = (map[h.buyer_id] || 0) + 1;
+      (_buyerHitStreams[h.buyer_id] = _buyerHitStreams[h.buyer_id] || []).push(h.stream_id || null);
+    });
     if (!data || data.length < size) break;
     from += size;
   }
   return map;
+}
+
+// Hit count for the 🎯 badge — respects the selected account (a buyer's football
+// hits under Football, disney hits under Disney; total when no account chosen).
+function ownerHitBadge(b) {
+  const sel = document.getElementById('buyersChannelFilter');
+  const ch = sel ? sel.value : '';
+  if (!ch) return b._hitCount || 0;
+  const streams = _buyerHitStreams[b.id];
+  if (!streams) return 0;
+  return streams.filter(s => s && _streamChannelMap && _streamChannelMap[s] === ch).length;
 }
 
 // Build buyer_id -> Set(channel_id) from purchases → streams. Cached until reload.
@@ -9586,7 +9602,7 @@ function applyBuyersFilters() {
     const temp = b.temperature || calcBuyerTemp(b.last_purchase_date);
     const tempColor = temp === 'hot' ? '#ef4444' : temp === 'warm' ? '#f59e0b' : '#64748b';
     const lastDate = b.last_purchase_date ? relativeDate(b.last_purchase_date) : 'Never';
-    const hits = b._hitCount || 0;
+    const hits = ownerHitBadge(b);
     return '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1.25rem;' + (i % 2 === 0 ? '' : 'background:rgba(255,255,255,0.015);') + '">' +
       '<div style="font-size:0.75rem;font-weight:800;color:var(--muted);width:1.5rem;text-align:center;">' + (i+1) + '</div>' +
       '<div style="flex:1;min-width:0;">' +
