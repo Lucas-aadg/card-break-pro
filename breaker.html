@@ -3167,6 +3167,7 @@ function openBrkBuyersTab() { brkLoadChannels(); setBrkBuyersMode(_brkBuyersMode
 var _brkChannelsLoaded = false;
 var _brkBuyerChannelMap = null;
 var _brkStreamChannelMap = null;
+var _brkBuyerChannelStats = {};
 
 async function brkLoadChannels() {
   if (_brkChannelsLoaded || !currentProfile) return;
@@ -3192,15 +3193,27 @@ async function brkBuildChannelMap() {
     if (!data || data.length < size) break;
     from += size;
   }
-  const map = new Map(); from = 0;
+  const map = new Map(); const stats = {}; from = 0;
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const d60 = new Date(); d60.setDate(d60.getDate() - 60);
+  const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
   while (true) {
-    const { data, error } = await sb.from('buyer_purchases').select('buyer_id,stream_id').eq('organization_id', org).range(from, from + size - 1);
+    const { data, error } = await sb.from('buyer_purchases').select('buyer_id,stream_id,amount,purchase_date').eq('organization_id', org).range(from, from + size - 1);
     if (error) throw error;
-    (data || []).forEach(p => { const ch = p.stream_id ? streamCh[p.stream_id] : null; if (!ch) return; if (!map.has(p.buyer_id)) map.set(p.buyer_id, new Set()); map.get(p.buyer_id).add(ch); });
+    (data || []).forEach(p => {
+      const ch = p.stream_id ? streamCh[p.stream_id] : null; if (!ch) return;
+      if (!map.has(p.buyer_id)) map.set(p.buyer_id, new Set()); map.get(p.buyer_id).add(ch);
+      const bs = stats[p.buyer_id] = stats[p.buyer_id] || {};
+      const cs = bs[ch] = bs[ch] || { spent: 0, breaks: 0, streams: new Set(), first: null, last: null, recent30: 0, prior30: 0 };
+      const amt = Number(p.amount) || 0;
+      cs.spent += amt; cs.breaks += 1; if (p.stream_id) cs.streams.add(p.stream_id);
+      const d = p.purchase_date;
+      if (d) { if (!cs.first || d < cs.first) cs.first = d; if (!cs.last || d > cs.last) cs.last = d; if (d >= s30) cs.recent30 += amt; else if (d >= s60) cs.prior30 += amt; }
+    });
     if (!data || data.length < size) break;
     from += size;
   }
-  _brkBuyerChannelMap = map; _brkStreamChannelMap = streamCh;
+  _brkBuyerChannelMap = map; _brkStreamChannelMap = streamCh; _brkBuyerChannelStats = stats;
   return map;
 }
 
@@ -3225,7 +3238,7 @@ async function onBrkChannelChange() {
     catch (err) { showGlobalError('Failed to load account data: ' + err.message); return; }
   }
   if (_brkBuyersMode === 'hits') { brkRenderHitFilter(); brkRenderHitBoard(); }
-  else { renderBrkSell(); renderBrkSearch(); }
+  else { await brkEnrichBuyers(); renderBrkSell(); renderBrkSearch(); }
 }
 
 function setBrkBuyersMode(mode) {
@@ -3274,33 +3287,46 @@ function brkHitBadge(b) {
   return streams.filter(s => s && _brkStreamChannelMap && _brkStreamChannelMap[s] === ch).length;
 }
 
-// Tag each buyer whale/rising/new + compute avg-per-stream
+// Tag each buyer whale/rising/new + compute effective spend — per-account when
+// an account is selected, lifetime otherwise.
 async function brkEnrichBuyers() {
-  const spenders = _brkAllBuyers.filter(b => Number(b.total_spent || 0) > 0);
-  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
-  const d60 = new Date(); d60.setDate(d60.getDate() - 60);
-  const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-  let purch = [], _pf = 0;
-  while (true) {
-    const { data, error } = await sb.from('buyer_purchases').select('buyer_id,amount,purchase_date').eq('organization_id', currentProfile.org_id).gte('purchase_date', s60).range(_pf, _pf + 999);
-    if (error) throw error;
-    purch = purch.concat(data || []);
-    if (!data || data.length < 1000) break;
-    _pf += 1000;
-  }
+  const selCh = (document.getElementById('brkBuyersChannelFilter') || {}).value || '';
   const recent = {}, prior = {};
-  (purch || []).forEach(p => { const a = Number(p.amount || 0); if (p.purchase_date >= s30) recent[p.buyer_id] = (recent[p.buyer_id] || 0) + a; else prior[p.buyer_id] = (prior[p.buyer_id] || 0) + a; });
-  const spends = spenders.map(b => Number(b.total_spent || 0)).sort((a, b) => a - b);
+  if (!selCh) {
+    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+    const d60 = new Date(); d60.setDate(d60.getDate() - 60);
+    const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
+    let purch = [], _pf = 0;
+    while (true) {
+      const { data, error } = await sb.from('buyer_purchases').select('buyer_id,amount,purchase_date').eq('organization_id', currentProfile.org_id).gte('purchase_date', s60).range(_pf, _pf + 999);
+      if (error) throw error;
+      purch = purch.concat(data || []);
+      if (!data || data.length < 1000) break;
+      _pf += 1000;
+    }
+    (purch || []).forEach(p => { const a = Number(p.amount || 0); if (p.purchase_date >= s30) recent[p.buyer_id] = (recent[p.buyer_id] || 0) + a; else prior[p.buyer_id] = (prior[p.buyer_id] || 0) + a; });
+  }
+  const eff = {};
+  _brkAllBuyers.forEach(b => {
+    if (selCh) {
+      const cs = (_brkBuyerChannelStats[b.id] || {})[selCh];
+      eff[b.id] = cs ? { spent: cs.spent, breaks: cs.breaks, streams: cs.streams ? cs.streams.size : 0, first: cs.first, last: cs.last, rec: cs.recent30, pri: cs.prior30 }
+                     : { spent: 0, breaks: 0, streams: 0, first: null, last: null, rec: 0, pri: 0 };
+    } else {
+      eff[b.id] = { spent: Number(b.total_spent || 0), breaks: b.total_breaks_purchased || 0, streams: b.total_streams_participated || 0, first: b.first_seen_date, last: b.last_purchase_date, rec: recent[b.id] || 0, pri: prior[b.id] || 0 };
+    }
+  });
+  const spends = _brkAllBuyers.filter(b => eff[b.id].spent > 0).map(b => eff[b.id].spent).sort((a, b) => a - b);
   _brkWhaleThresh = spends.length ? (spends[Math.floor(spends.length * 0.8)] || 0) : 0;
   _brkAllBuyers.forEach(b => {
-    const spent = Number(b.total_spent || 0);
-    b._avgStream = (b.total_streams_participated > 0) ? spent / b.total_streams_participated : spent;
-    const rec = recent[b.id] || 0, pri = prior[b.id] || 0;
-    b._recent30 = rec;
-    if (spent <= 0) { b._tier = 'none'; return; }
-    if (spent >= _brkWhaleThresh) b._tier = 'whale';
-    else if (brkDaysSince(b.first_seen_date) <= BRK_NEW_DAYS) b._tier = 'new';
-    else if (rec >= BRK_RISING_MIN && rec > pri * 1.5) { b._tier = 'rising'; b._growth = pri > 0 ? Math.round((rec - pri) / pri * 100) : null; }
+    const e = eff[b.id];
+    b._eSpent = e.spent; b._eBreaks = e.breaks; b._eLast = e.last;
+    b._avgStream = e.streams > 0 ? e.spent / e.streams : e.spent;
+    b._recent30 = e.rec;
+    if (e.spent <= 0) { b._tier = 'none'; return; }
+    if (e.spent >= _brkWhaleThresh) b._tier = 'whale';
+    else if (brkDaysSince(e.first) <= BRK_NEW_DAYS) b._tier = 'new';
+    else if (e.rec >= BRK_RISING_MIN && e.rec > e.pri * 1.5) { b._tier = 'rising'; b._growth = e.pri > 0 ? Math.round((e.rec - e.pri) / e.pri * 100) : null; }
     else b._tier = 'regular';
   });
 }
@@ -3363,7 +3389,7 @@ function brkWhaleChip(b) {
       '<span style="font-weight:800;font-size:0.85rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@' + escHtml(b.username) + '</span>' +
       '<span onclick="event.stopPropagation();openBrkTagEdit(\'' + b.id + '\')" title="Edit tags" style="cursor:pointer;font-size:0.72rem;opacity:0.55;flex-shrink:0;">✏️</span>' +
     '</div>' +
-    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b.total_spent || 0).toFixed(0) + ' · $' + Math.round(b._avgStream || 0) + '/str' + (brkHitBadge(b) > 0 ? ' · 🎯' + brkHitBadge(b) : '') + '</div>' +
+    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b._eSpent != null ? b._eSpent : (b.total_spent || 0)).toFixed(0) + ' · $' + Math.round(b._avgStream || 0) + '/str' + (brkHitBadge(b) > 0 ? ' · 🎯' + brkHitBadge(b) : '') + '</div>' +
     (tags ? '<div style="font-size:0.68rem;color:#93a6ff;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(tags) + '</div>' : '') +
   '</div>';
 }
@@ -3372,7 +3398,7 @@ function brkRisingCard(b) {
   const tags = brkTagText(b);
   return '<div style="background:var(--card);border:1px solid rgba(40,199,111,0.3);border-radius:11px;padding:10px 11px;">' +
     '<div style="font-weight:800;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@' + escHtml(b.username) + '</div>' +
-    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b.total_spent || 0).toFixed(0) + ' · 30d $' + (b._recent30 || 0).toFixed(0) + (b._growth != null ? ' (+' + b._growth + '%)' : '') + '</div>' +
+    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b._eSpent != null ? b._eSpent : (b.total_spent || 0)).toFixed(0) + ' · 30d $' + (b._recent30 || 0).toFixed(0) + (b._growth != null ? ' (+' + b._growth + '%)' : '') + '</div>' +
     (tags ? '<div style="font-size:0.68rem;color:#93a6ff;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(tags) + '</div>' : '') +
   '</div>';
 }
@@ -3406,12 +3432,16 @@ function renderBrkSearch() {
 
 function brkFactsCard(b) {
   const tags = [b.fav_sport, b.fav_team, b.fav_player].filter(Boolean).join(' · ');
+  const acct = (document.getElementById('brkBuyersChannelFilter') || {}).value || '';
+  const eSpent = b._eSpent != null ? b._eSpent : Number(b.total_spent || 0);
+  const eBreaks = b._eBreaks != null ? b._eBreaks : (b.total_breaks_purchased || 0);
+  const eLast = b._eLast || b.last_purchase_date;
   const stats = [
-    ['$' + Number(b.total_spent || 0).toFixed(0), 'Lifetime'],
+    ['$' + Number(eSpent).toFixed(0), acct ? 'On account' : 'Lifetime'],
     ['$' + Math.round(b._avgStream || 0), 'Avg/str'],
-    [(b.total_breaks_purchased || 0), 'Breaks'],
+    [eBreaks, 'Breaks'],
     ['🎯 ' + brkHitBadge(b), 'Hits'],
-    [b.last_purchase_date ? brkRelDate(b.last_purchase_date) : '—', 'Last buy']
+    [eLast ? brkRelDate(eLast) : '—', 'Last buy']
   ];
   return '<div style="background:var(--card);border:1px solid ' + (b._tier === 'whale' ? 'rgba(233,185,73,0.4)' : 'var(--border)') + ';border-radius:12px;padding:13px 15px;margin-bottom:0.6rem;">' +
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;"><span style="font-size:1.05rem;font-weight:800;">@' + escHtml(b.username) + '</span>' + brkTierBadge(b._tier) + '</div>' +
