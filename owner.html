@@ -3175,6 +3175,11 @@ function showGlobalSuccess(msg) {
   setTimeout(function () { el.style.display = 'none'; }, 4000);
 }
 
+// Left over from a refactor: 6 setup actions (add product, invite, create
+// channel, set pay) call oclRefresh() but the function was removed. Each of
+// those already reloads its own data first, so a no-op restores them safely.
+function oclRefresh() {}
+
 function hideGlobalMessages() {
   document.getElementById('globalError').style.display = 'none';
   document.getElementById('globalSuccess').style.display = 'none';
