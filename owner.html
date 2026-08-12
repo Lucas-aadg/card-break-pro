@@ -9084,7 +9084,9 @@ var _buyersChannelSelPopulated = false;
 
 // ── Buyer Board (segmented, action-first) ─────────────────
 var _buyersMode = 'board';
-const COLD_MIN_DAYS = 21, COLD_MAX_DAYS = 120, NEW_DAYS = 14, RISING_MIN = 50;
+const COLD_MIN_DAYS = 21, COLD_MAX_DAYS = 120, RISING_MIN = 50;
+const WHALE_MULT = 3;    // whale = spends this many x the typical (median) buyer
+const WHALE_TOPN = 10;   // ...or is one of the top-N spenders (safety net)
 
 function openBuyersTab() {
   populateBuyersChannelSelect();
@@ -9246,23 +9248,28 @@ async function loadBuyersBoard() {
       }
     });
 
-    // Whale bar = 80th percentile of effective spend among spenders
-    const spends = spenders.map(b => b._eSpent).sort((a, b) => a - b);
-    const whaleThresh = spends[Math.floor(spends.length * 0.8)] || 0;
+    // Whale bar = WHALE_MULT x the TYPICAL (median) buyer's spend, with a
+    // top-N safety net so the list is never empty. Self-tunes per account.
+    const sortedAsc = spenders.map(b => b._eSpent).sort((a, b) => a - b);
+    const med = sortedAsc.length ? sortedAsc[Math.floor(sortedAsc.length / 2)] : 0;
+    const whaleFloor = med > 0 ? med * WHALE_MULT : 0;
+    const topIds = new Set(spenders.slice().sort((a, b) => b._eSpent - a._eSpent).slice(0, WHALE_TOPN).map(b => b.id));
 
     const cold = [], rising = [], fresh = [], whales = [];
     spenders.forEach(b => {
       const spent = b._eSpent;
-      const isWhale = spent >= whaleThresh && spent > 0;
+      const isWhale = spent > 0 && (spent >= whaleFloor || topIds.has(b.id));
       const since = daysSince(b._eLast);
-      const age = daysSince(b._eFirst);
       const rec = b._eRec, pri = b._ePri;
       b._since = since; b._recent30 = rec;
-      // One bucket per buyer, most actionable first
+      b._newBig = isWhale && (b._eStreams || 0) <= 1;   // 🔥 big spender, first stream
+      // Whale wins over new/rising — a big spender is a whale even if brand new.
       if (isWhale && since >= COLD_MIN_DAYS && since <= COLD_MAX_DAYS) { cold.push(b); return; }
-      if (age <= NEW_DAYS) { fresh.push(b); return; }
-      if (rec >= RISING_MIN && rec > pri * 1.5) { b._growth = pri > 0 ? Math.round((rec - pri) / pri * 100) : null; rising.push(b); return; }
       if (isWhale) { whales.push(b); return; }
+      // Rising = an established buyer (prior spend) whose spend is climbing.
+      if ((b._eStreams || 0) > 1 && pri > 0 && rec >= RISING_MIN && rec > pri * 1.5) { b._growth = Math.round((rec - pri) / pri * 100); rising.push(b); return; }
+      // New = has only bought in one stream (a genuine first-timer).
+      if ((b._eStreams || 0) <= 1) { fresh.push(b); return; }
     });
     // Un-contacted whales first (act on them); already-reached ones sink
     cold.sort((a, b) => {
@@ -9304,7 +9311,7 @@ function renderBuyersBoard() {
     boardSegment('❄️', 'Going Cold', d.cold,   'No purchase in ' + COLD_MIN_DAYS + '+ days — reach out now', true,  'cold') +
     boardSegment('👑', 'Whales',     d.whales, 'Your top spenders — protect these',                          false, 'whale') +
     boardSegment('📈', 'Rising',     d.rising, 'Spend climbing fast — court them',                           false, 'rising') +
-    boardSegment('🆕', 'New',        d.fresh,  'First purchase in the last ' + NEW_DAYS + ' days',           false, 'new');
+    boardSegment('🆕', 'New',        d.fresh,  'Bought in just one stream — convert them into regulars',      false, 'new');
 }
 
 function boardKpis(d) {
@@ -9386,6 +9393,7 @@ function boardRow(b, kind, i) {
     '<div style="width:38px;height:38px;border-radius:10px;background:' + av + 'display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;flex-shrink:0;">' + boardMono(b.username) + '</div>' +
     '<div style="flex:1;min-width:0;">' +
       '<div style="font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">@' + escHtml(b.username) + buyerTagChip(b) +
+        (b._newBig ? ' <span style="font-size:0.58rem;background:rgba(234,185,69,0.16);color:#eab945;padding:1px 6px;border-radius:4px;font-weight:800;">🔥 NEW BIG BUYER</span>' : '') +
         (hits > 0 ? ' <span style="font-size:0.58rem;background:rgba(240,96,63,0.13);color:#f0603f;padding:1px 5px;border-radius:4px;font-weight:800;">🎯 ' + hits + '</span>' : '') +
         (contacted ? ' <span style="font-size:0.58rem;background:rgba(47,191,113,0.14);color:#2fbf71;padding:1px 6px;border-radius:4px;font-weight:800;">✓ ' + (contactedDays === 0 ? 'today' : contactedDays + 'd') + '</span>' : '') +
       '</div>' +
