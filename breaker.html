@@ -3156,7 +3156,13 @@ var _brkWhaleThresh = 0;
 var _brkTagSel = {};          // username -> selected for chat-tagging
 var _brkHitData = [];
 var _brkHitFilter = 'all';
-const BRK_NEW_DAYS = 14, BRK_RISING_MIN = 50;
+var BRK_WHALE_MIN = 1000, _brkWhaleMinLoaded = false;
+async function brkEnsureWhaleMin() {
+  if (_brkWhaleMinLoaded) return;
+  _brkWhaleMinLoaded = true;
+  const { data, error } = await sb.from('organizations').select('whale_threshold').eq('id', currentProfile.org_id).maybeSingle();
+  if (!error && data && data.whale_threshold != null) BRK_WHALE_MIN = Number(data.whale_threshold) || 1000;
+}
 const BRK_HIT_META = { case_hit:{label:'Case Hit',icon:'🎯'}, auto:{label:'Auto',icon:'✍️'}, patch:{label:'Patch',icon:'🧵'}, rookie:{label:'Rookie',icon:'🌟'}, other:{label:'Other',icon:'💎'} };
 
 function brkDaysSince(d) { if (!d) return Infinity; return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); }
@@ -3316,17 +3322,17 @@ async function brkEnrichBuyers() {
       eff[b.id] = { spent: Number(b.total_spent || 0), breaks: b.total_breaks_purchased || 0, streams: b.total_streams_participated || 0, first: b.first_seen_date, last: b.last_purchase_date, rec: recent[b.id] || 0, pri: prior[b.id] || 0 };
     }
   });
-  const spends = _brkAllBuyers.filter(b => eff[b.id].spent > 0).map(b => eff[b.id].spent).sort((a, b) => a - b);
-  _brkWhaleThresh = spends.length ? (spends[Math.floor(spends.length * 0.8)] || 0) : 0;
   _brkAllBuyers.forEach(b => {
     const e = eff[b.id];
     b._eSpent = e.spent; b._eBreaks = e.breaks; b._eLast = e.last;
     b._avgStream = e.streams > 0 ? e.spent / e.streams : e.spent;
     b._recent30 = e.rec;
+    // Whale = spent >= threshold in last 30d. New = one-stream. Rest = regular.
     if (e.spent <= 0) { b._tier = 'none'; return; }
-    if (e.spent >= _brkWhaleThresh) b._tier = 'whale';
-    else if (brkDaysSince(e.first) <= BRK_NEW_DAYS) b._tier = 'new';
-    else if (e.rec >= BRK_RISING_MIN && e.rec > e.pri * 1.5) { b._tier = 'rising'; b._growth = e.pri > 0 ? Math.round((e.rec - e.pri) / e.pri * 100) : null; }
+    const activeWhale = e.rec >= BRK_WHALE_MIN;
+    b._newBig = activeWhale && (e.streams || 0) <= 1;
+    if (activeWhale) b._tier = 'whale';
+    else if ((e.streams || 0) <= 1) b._tier = 'new';
     else b._tier = 'regular';
   });
 }
@@ -3336,6 +3342,7 @@ async function loadBrkSell() {
   if (!body || !currentProfile) return;
   body.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyers…</div>';
   try {
+    await brkEnsureWhaleMin();
     await brkFetchAllBuyers();
     await brkEnrichBuyers();
     renderBrkSell();
@@ -3355,37 +3362,43 @@ function brkTagText(b) { return [b.fav_sport, b.fav_team].filter(Boolean).join('
 function renderBrkSell() {
   const body = document.getElementById('brkSellBody');
   if (!body) return;
-  const whales = _brkAllBuyers.filter(b => b._tier === 'whale' && brkBuyerInChannel(b.id)).sort((a, b) => Number(b.total_spent) - Number(a.total_spent));
-  const rising = _brkAllBuyers.filter(b => b._tier === 'rising' && brkBuyerInChannel(b.id)).sort((a, b) => (b._recent30 || 0) - (a._recent30 || 0));
+  const whales = _brkAllBuyers.filter(b => b._tier === 'whale' && brkBuyerInChannel(b.id)).sort((a, b) => (b._eSpent || 0) - (a._eSpent || 0));
+  const regulars = _brkAllBuyers.filter(b => b._tier === 'regular' && brkBuyerInChannel(b.id)).sort((a, b) => (b._eSpent || 0) - (a._eSpent || 0));
   const selCount = Object.keys(_brkTagSel).filter(u => _brkTagSel[u]).length;
-  const copyLabel = selCount > 0 ? '📋 Copy ' + selCount + ' @tag' + (selCount > 1 ? 's' : '') : '📋 Copy all @tags';
+  const copyLabel = selCount > 0 ? '📋 Copy ' + selCount + ' @tag' + (selCount > 1 ? 's' : '') : '📋 Copy @tags';
 
-  let html = '';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.55rem;">' +
-      '<span style="font-size:0.7rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:#e9b949;">👑 Whales · tap to tag into chat</span>' +
+  const tagBar = (label, color, selectFn) =>
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.55rem;">' +
+      '<span style="font-size:0.7rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:' + color + ';">' + label + '</span>' +
       '<div style="display:flex;gap:0.35rem;">' +
-        '<button onclick="brkSelectAllWhales()" class="btn btn-sm btn-outline" style="padding:0.25rem 0.6rem;font-size:0.7rem;">All</button>' +
+        '<button onclick="' + selectFn + '" class="btn btn-sm btn-outline" style="padding:0.25rem 0.6rem;font-size:0.7rem;">All</button>' +
         '<button onclick="brkClearTags()" class="btn btn-sm btn-outline" style="padding:0.25rem 0.6rem;font-size:0.7rem;">Clear</button>' +
         '<button onclick="brkCopyTags()" class="btn btn-sm" style="padding:0.25rem 0.7rem;font-size:0.72rem;">' + copyLabel + '</button>' +
       '</div>' +
     '</div>';
+
+  let html = '';
+  // Whales
+  html += tagBar('👑 Whales · tap to tag into chat', '#e9b949', "brkSelectAllTier('whale')");
   html += whales.length
-    ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.5rem;margin-bottom:1.25rem;">' + whales.map(brkWhaleChip).join('') + '</div>'
+    ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.5rem;margin-bottom:1.25rem;">' + whales.map(function(b) { return brkTagChip(b, '#e9b949', 'rgba(233,185,73,0.45)'); }).join('') + '</div>'
     : '<div style="padding:1.25rem;text-align:center;color:var(--muted);font-size:0.85rem;margin-bottom:1.25rem;">No whales yet — import some slips to build them.</div>';
-  if (rising.length) {
-    html += '<div style="font-size:0.7rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:#28c76f;margin-bottom:0.55rem;">📈 Rising · heating up</div>';
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.5rem;">' + rising.map(brkRisingCard).join('') + '</div>';
-  }
+  // Regulars — same tap-to-tag treatment
+  html += tagBar('📊 Regulars · tap to tag into chat', '#93a6ff', "brkSelectAllTier('regular')");
+  html += regulars.length
+    ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.5rem;">' + regulars.map(function(b) { return brkTagChip(b, '#5b7cfa', 'rgba(91,124,250,0.4)'); }).join('') + '</div>'
+    : '<div style="padding:1.25rem;text-align:center;color:var(--muted);font-size:0.85rem;">No regulars yet.</div>';
   body.innerHTML = html;
 }
 
-function brkWhaleChip(b) {
+// Selectable buyer chip — accent color per group (gold whales / blue regulars)
+function brkTagChip(b, accent, glow) {
   const sel = !!_brkTagSel[b.username];
   const tags = brkTagText(b);
   const u = (b.username || '').replace(/'/g, "\\'");
-  return '<div onclick="brkToggleTag(\'' + u + '\')" style="cursor:pointer;background:var(--card);border:1px solid ' + (sel ? '#e9b949' : 'var(--border)') + ';border-radius:11px;padding:10px 11px;' + (sel ? 'box-shadow:0 0 0 1px rgba(233,185,73,0.45);' : '') + '">' +
+  return '<div onclick="brkToggleTag(\'' + u + '\')" style="cursor:pointer;background:var(--card);border:1px solid ' + (sel ? accent : 'var(--border)') + ';border-radius:11px;padding:10px 11px;' + (sel ? 'box-shadow:0 0 0 1px ' + glow + ';' : '') + '">' +
     '<div style="display:flex;align-items:center;gap:6px;">' +
-      '<span style="width:15px;height:15px;border-radius:4px;border:1px solid ' + (sel ? '#e9b949' : 'var(--border)') + ';background:' + (sel ? '#e9b949' : 'transparent') + ';display:inline-flex;align-items:center;justify-content:center;font-size:0.62rem;color:#0a0a11;flex-shrink:0;">' + (sel ? '✓' : '') + '</span>' +
+      '<span style="width:15px;height:15px;border-radius:4px;border:1px solid ' + (sel ? accent : 'var(--border)') + ';background:' + (sel ? accent : 'transparent') + ';display:inline-flex;align-items:center;justify-content:center;font-size:0.62rem;color:#0a0a11;flex-shrink:0;">' + (sel ? '✓' : '') + '</span>' +
       '<span style="font-weight:800;font-size:0.85rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@' + escHtml(b.username) + '</span>' +
       '<span onclick="event.stopPropagation();openBrkTagEdit(\'' + b.id + '\')" title="Edit tags" style="cursor:pointer;font-size:0.72rem;opacity:0.55;flex-shrink:0;">✏️</span>' +
     '</div>' +
@@ -3394,17 +3407,8 @@ function brkWhaleChip(b) {
   '</div>';
 }
 
-function brkRisingCard(b) {
-  const tags = brkTagText(b);
-  return '<div style="background:var(--card);border:1px solid rgba(40,199,111,0.3);border-radius:11px;padding:10px 11px;">' +
-    '<div style="font-weight:800;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@' + escHtml(b.username) + '</div>' +
-    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b._eSpent != null ? b._eSpent : (b.total_spent || 0)).toFixed(0) + ' · 30d $' + (b._recent30 || 0).toFixed(0) + (b._growth != null ? ' (+' + b._growth + '%)' : '') + '</div>' +
-    (tags ? '<div style="font-size:0.68rem;color:#93a6ff;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(tags) + '</div>' : '') +
-  '</div>';
-}
-
 function brkToggleTag(u) { if (_brkTagSel[u]) delete _brkTagSel[u]; else _brkTagSel[u] = true; renderBrkSell(); }
-function brkSelectAllWhales() { _brkAllBuyers.filter(b => b._tier === 'whale').forEach(b => { _brkTagSel[b.username] = true; }); renderBrkSell(); }
+function brkSelectAllTier(tier) { _brkAllBuyers.filter(b => b._tier === tier && brkBuyerInChannel(b.id)).forEach(b => { _brkTagSel[b.username] = true; }); renderBrkSell(); }
 function brkClearTags() { _brkTagSel = {}; renderBrkSell(); }
 
 async function brkCopyTags() {
