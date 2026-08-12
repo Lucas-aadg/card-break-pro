@@ -5900,8 +5900,7 @@ async function confirmEditStream() {
       if (b.id) {
         const buRes = await sb.from('breaks').update({
           products_used: b.products_used,
-          total_product_cost: boxCost,
-          updated_at: new Date().toISOString()
+          total_product_cost: boxCost
         }).eq('id', b.id).eq('org_id', currentProfile.org_id);
         if (buRes.error) throw new Error('Break #' + b.break_number + ' failed to save: ' + buRes.error.message);
       } else {
