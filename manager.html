@@ -2482,7 +2482,14 @@ var _mgrBuyersChannelSelPopulated = false;
 
 // ── Buyer Board (segmented, action-first) ─────────────────
 var _mgrBuyersMode = 'board';
-const MGR_COLD_MIN = 21, MGR_COLD_MAX = 120, MGR_NEW_DAYS = 14, MGR_RISING_MIN = 50;
+const MGR_COLD_MIN = 21, MGR_COLD_MAX = 120;
+var MGR_WHALE_MIN = 1000, _mgrWhaleMinLoaded = false;
+async function mgrEnsureWhaleMin() {
+  if (_mgrWhaleMinLoaded) return;
+  _mgrWhaleMinLoaded = true;
+  const { data, error } = await sb.from('organizations').select('whale_threshold').eq('id', currentProfile.org_id).maybeSingle();
+  if (!error && data && data.whale_threshold != null) MGR_WHALE_MIN = Number(data.whale_threshold) || 1000;
+}
 
 function openMgrBuyersTab() {
   populateMgrBuyersChannelSelect();
@@ -2590,6 +2597,7 @@ async function loadMgrBuyersBoard() {
   if (!el || !currentProfile) return;
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>';
   try {
+    await mgrEnsureWhaleMin();
     const [allBuyers, hitCounts] = await Promise.all([fetchAllMgrBuyers(), fetchMgrBuyerHitCounts()]);
     const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0 && mgrBuyerInChannel(b.id));
     spenders.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
@@ -2634,21 +2642,19 @@ async function loadMgrBuyersBoard() {
       }
     });
 
-    const spends = spenders.map(b => b._eSpent).sort((a, b) => a - b);
-    const whaleThresh = spends[Math.floor(spends.length * 0.8)] || 0;
-
-    const cold = [], rising = [], fresh = [], whales = [];
+    const cold = [], regulars = [], fresh = [], whales = [];
     spenders.forEach(b => {
-      const spent = b._eSpent;
-      const isWhale = spent >= whaleThresh && spent > 0;
-      const since = mgrDaysSince(b._eLast);
-      const age = mgrDaysSince(b._eFirst);
+      const spent = b._eSpent;                 // effective (per-account or lifetime)
       const rec = b._eRec, pri = b._ePri;
+      const since = mgrDaysSince(b._eLast);
+      const streams = b._eStreams || 0;
       b._since = since; b._recent30 = rec;
-      if (isWhale && since >= MGR_COLD_MIN && since <= MGR_COLD_MAX) { cold.push(b); return; }
-      if (age <= MGR_NEW_DAYS) { fresh.push(b); return; }
-      if (rec >= MGR_RISING_MIN && rec > pri * 1.5) { b._growth = pri > 0 ? Math.round((rec - pri) / pri * 100) : null; rising.push(b); return; }
-      if (isWhale) { whales.push(b); return; }
+      const activeWhale = rec >= MGR_WHALE_MIN;
+      b._newBig = activeWhale && streams <= 1;  // new buyer who dropped big on their first stream
+      if (activeWhale) { whales.push(b); return; }
+      if (spent >= MGR_WHALE_MIN && since >= MGR_COLD_MIN && since <= MGR_COLD_MAX) { cold.push(b); return; }
+      if (streams <= 1) { fresh.push(b); return; }
+      regulars.push(b);
     });
     cold.sort((a, b) => {
       const ac = a.last_cold_alert_at && mgrDaysSince(a.last_cold_alert_at) <= 7 ? 1 : 0;
@@ -2657,13 +2663,13 @@ async function loadMgrBuyersBoard() {
       return b._eSpent - a._eSpent;
     });
     whales.sort((a, b) => b._eSpent - a._eSpent);
-    rising.sort((a, b) => (b._eRec || 0) - (a._eRec || 0));
+    regulars.sort((a, b) => (b._eRec || 0) - (a._eRec || 0));
     fresh.sort((a, b)  => b._eSpent - a._eSpent);
 
     const whaleTotal = whales.length + cold.length;
     const coldAtRisk = cold.reduce((s, b) => s + (b._eSpent || 0), 0);
     const rev30 = spenders.reduce((s, b) => s + (b._eRec || 0), 0);
-    _mgrBoardData = { spenders: spenders.length, whaleTotal, coldAtRisk, rev30, cold, whales, rising, fresh };
+    _mgrBoardData = { spenders: spenders.length, whaleTotal, coldAtRisk, rev30, cold, whales, rising: regulars, fresh };
     renderMgrBuyersBoard();
   } catch (err) {
     el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load board: ' + escHtml(err.message) + '</div>';
@@ -2685,10 +2691,10 @@ function renderMgrBuyersBoard() {
   const d = _mgrBoardData;
   el.innerHTML =
     mgrBoardKpis(d) +
-    mgrBoardSegment('❄️', 'Going Cold', d.cold,   'No purchase in ' + MGR_COLD_MIN + '+ days — flag for the owner', true,  'cold') +
-    mgrBoardSegment('👑', 'Whales',     d.whales, 'Top spenders — protect these',                                  false, 'whale') +
-    mgrBoardSegment('📈', 'Rising',     d.rising, 'Spend climbing fast',                                           false, 'rising') +
-    mgrBoardSegment('🆕', 'New',        d.fresh,  'First purchase in the last ' + MGR_NEW_DAYS + ' days',          false, 'new');
+    mgrBoardSegment('❄️', 'Going Cold', d.cold,   'Big buyers gone quiet ' + MGR_COLD_MIN + '+ days — flag for the owner', true,  'cold') +
+    mgrBoardSegment('👑', 'Whales',     d.whales, '$' + MGR_WHALE_MIN.toLocaleString() + '+ in the last 30 days — protect these', false, 'whale') +
+    mgrBoardSegment('📊', 'Regulars',   d.rising, 'Your steady buyers',                                            false, 'rising') +
+    mgrBoardSegment('🆕', 'New',        d.fresh,  'New buyers — convert them into regulars',                       false, 'new');
 }
 
 function mgrBoardKpis(d) {
@@ -2701,7 +2707,7 @@ function mgrBoardKpis(d) {
     '</div>';
   return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.6rem;margin-bottom:1rem;">' +
     kpi('var(--primary)', 'Buyers', d.spenders, 'with purchases') +
-    kpi('#eab945', 'Whales', '<span style="color:#eab945;">' + d.whaleTotal + '</span>', 'top 20% by spend') +
+    kpi('#eab945', 'Whales', '<span style="color:#eab945;">' + d.whaleTotal + '</span>', '$' + MGR_WHALE_MIN.toLocaleString() + '+ / 30d') +
     kpi('#f0603f', 'Going Cold', '<span style="color:#f0603f;">' + d.cold.length + '</span>', mgrBoardMoney(d.coldAtRisk) + ' at risk', '#f0603f') +
     kpi('#2fbf71', '30-day rev', mgrBoardMoney(d.rev30), 'last 30 days') +
   '</div>';
@@ -2745,7 +2751,7 @@ function mgrBoardRow(b, kind) {
   const eBreaks = b._eBreaks != null ? b._eBreaks : (b.total_breaks_purchased || 0);
   const avg = eStreams > 0 ? spent / eStreams : spent;
   const av = kind === 'whale' ? 'linear-gradient(135deg,#eab945,#d98e2b);color:#0a0a11;'
-           : kind === 'rising' ? 'linear-gradient(135deg,#2fbf71,#1f9d67);color:#04140c;'
+           : kind === 'rising' ? 'linear-gradient(135deg,#64748b,#475569);color:#fff;'
            : kind === 'new'    ? 'linear-gradient(135deg,#3aa0ff,#4f6ef7);color:#fff;'
            :                     'linear-gradient(135deg,#f0603f,#c23b6b);color:#fff;';
   const since = b._since != null ? b._since : mgrDaysSince(b._eLast || b.last_purchase_date);
@@ -2754,7 +2760,7 @@ function mgrBoardRow(b, kind) {
   const contacted = contactedDays != null && contactedDays <= 7;
   let meta;
   if (kind === 'cold')        meta = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + eBreaks + ' breaks';
-  else if (kind === 'rising') meta = 'Last 30d $' + (b._eRec || 0).toFixed(0) + (b._growth != null ? ' · ▲ +' + b._growth + '%' : '');
+  else if (kind === 'rising') meta = 'Last 30d $' + (b._eRec || 0).toFixed(0) + ' · ' + eBreaks + ' breaks';
   else if (kind === 'new')    meta = 'First seen ' + mgrDaysSince(b._eFirst || b.first_seen_date) + 'd ago · ' + eBreaks + ' breaks';
   else                        meta = mgrRelativeDate(b._eLast || b.last_purchase_date) + ' · ' + eBreaks + ' breaks';
 
@@ -2775,6 +2781,7 @@ function mgrBoardRow(b, kind) {
     '<div style="width:38px;height:38px;border-radius:10px;background:' + av + 'display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;flex-shrink:0;">' + mgrBoardMono(b.username) + '</div>' +
     '<div style="flex:1;min-width:0;">' +
       '<div style="font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">@' + escHtml(b.username) + mgrBuyerTagChip(b) +
+        (b._newBig ? ' <span style="font-size:0.55rem;background:rgba(234,185,69,0.16);color:#eab945;padding:1px 6px;border-radius:4px;font-weight:800;">🔥 NEW BIG</span>' : '') +
         (hits > 0 ? ' <span style="font-size:0.58rem;background:rgba(240,96,63,0.13);color:#f0603f;padding:1px 5px;border-radius:4px;font-weight:800;">🎯 ' + hits + '</span>' : '') +
         (contacted ? ' <span style="font-size:0.58rem;background:rgba(47,191,113,0.14);color:#2fbf71;padding:1px 6px;border-radius:4px;font-weight:800;">✓ ' + (contactedDays === 0 ? 'today' : contactedDays + 'd') + '</span>' : '') +
       '</div>' +
