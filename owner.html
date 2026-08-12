@@ -5958,8 +5958,7 @@ async function confirmEditStream() {
       net_profit: netProfit,
       commission_payout: commPayout,
       break_count: breakCount,
-      notes: notes || null,
-      updated_at: new Date().toISOString()
+      notes: notes || null
     }).eq('id', _esStreamId);
     // Money + breaker commission — never report success if this didn't save
     if (esStreamRes.error) throw new Error('Stream totals/commission failed to save: ' + esStreamRes.error.message);
@@ -9348,7 +9347,7 @@ function renderBuyersBoard() {
     boardSegment('❄️', 'Going Cold', d.cold,     'Big buyers gone quiet 21+ days — reach out now',            true,  'cold') +
     boardSegment('👑', 'Whales',     d.whales,   '$' + WHALE_MIN.toLocaleString() + '+ in the last 30 days — protect these', false, 'whale') +
     boardSegment('📊', 'Regulars',   d.regulars, 'Your steady buyers',                                        false, 'regular') +
-    boardSegment('🆕', 'New',        d.fresh,    'Bought in just one stream — convert them into regulars',     false, 'new');
+    boardSegment('🆕', 'New',        d.fresh,    'New buyers — convert them into regulars',                    false, 'new');
 }
 
 function boardKpis(d) {
