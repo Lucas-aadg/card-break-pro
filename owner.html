@@ -5882,7 +5882,7 @@ async function confirmEditStream() {
       const product = (orgProducts || []).find(function(p){ return p.id === prodId; });
       if (!product) continue;
       const newStock = Math.max(0, (product.current_stock || 0) + delta);
-      const { error: esStkErr } = await sb.from('products').update({ current_stock: newStock, updated_at: new Date().toISOString() }).eq('id', prodId).eq('org_id', currentProfile.org_id);
+      const { error: esStkErr } = await sb.from('products').update({ current_stock: newStock }).eq('id', prodId).eq('org_id', currentProfile.org_id);
       if (esStkErr) throw new Error('Inventory update failed for ' + product.name + ': ' + esStkErr.message);
       product.current_stock = newStock; // update local cache
     }
