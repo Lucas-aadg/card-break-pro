@@ -2047,6 +2047,22 @@
       </div>
     </div>
 
+    <!-- Buyer Intelligence settings -->
+    <div class="panel">
+      <div class="panel-title">Buyer Intelligence</div>
+      <div style="font-size:0.82rem;color:var(--muted);margin-bottom:0.85rem;">Tune the Buyer Board to your scale. Bigger operations should raise this.</div>
+      <div class="form-group" style="max-width:320px;">
+        <label for="settWhaleMin">A "whale" spends this much in the last 30 days</label>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="font-weight:800;color:var(--muted);">$</span>
+          <input type="number" id="settWhaleMin" min="0" step="50" placeholder="1000" style="flex:1;" />
+        </div>
+      </div>
+      <div style="margin-top:0.75rem;">
+        <button class="btn btn-primary btn-sm" id="settSaveWhaleMin" onclick="saveWhaleMin()" style="padding:0.5rem 1.25rem;">Save</button>
+      </div>
+    </div>
+
     <!-- Email -->
     <div class="panel">
       <div class="panel-title">Change Email</div>
@@ -8576,6 +8592,11 @@ async function loadSettings() {
     document.getElementById('settPhone').value = currentProfile.phone || '';
   }
 
+  // Buyer Intelligence: current whale threshold
+  await ensureWhaleMin();
+  const wm = document.getElementById('settWhaleMin');
+  if (wm) wm.value = WHALE_MIN;
+
   // Load current email
   const { data: { user } } = await sb.auth.getUser();
   if (user) {
@@ -9085,6 +9106,31 @@ var _buyersChannelSelPopulated = false;
 var _buyersMode = 'board';
 const COLD_MIN_DAYS = 21, COLD_MAX_DAYS = 120;
 var WHALE_MIN = 1000;    // whale = spent >= this in the last 30 days. Owner-configurable (default $1,000).
+var _whaleMinLoaded = false;
+
+// Load the org's whale threshold once. Safe before migration 008 — a missing
+// column just leaves the $1,000 default in place.
+async function ensureWhaleMin() {
+  if (_whaleMinLoaded) return;
+  _whaleMinLoaded = true;
+  const { data, error } = await sb.from('organizations').select('whale_threshold').eq('id', currentProfile.org_id).maybeSingle();
+  if (!error && data && data.whale_threshold != null) WHALE_MIN = Number(data.whale_threshold) || 1000;
+}
+
+async function saveWhaleMin() {
+  const btn = document.getElementById('settSaveWhaleMin');
+  const val = Math.max(0, Math.round(Number(document.getElementById('settWhaleMin').value) || 0));
+  if (!val) { showGlobalError('Enter a dollar amount (e.g. 1000).'); return; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const { error } = await sb.from('organizations').update({ whale_threshold: val }).eq('id', currentProfile.org_id);
+  btn.disabled = false; btn.textContent = 'Save';
+  if (error) {
+    showGlobalError(/whale_threshold|column/i.test(error.message) ? 'Run migration 008_whale_threshold.sql in Supabase first, then try again.' : 'Couldn\'t save: ' + error.message);
+    return;
+  }
+  WHALE_MIN = val;
+  showGlobalSuccess('Whale threshold set to $' + val.toLocaleString() + '. It\'ll apply next time you open the Board.');
+}
 
 function openBuyersTab() {
   populateBuyersChannelSelect();
@@ -9200,6 +9246,7 @@ async function loadBuyersBoard() {
   if (!el || !currentProfile) return;
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>';
   try {
+    await ensureWhaleMin();
     const [allBuyers, hitCounts] = await Promise.all([fetchAllBuyers(), fetchBuyerHitCounts()]);
     const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0 && buyerInChannel(b.id));
     spenders.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
