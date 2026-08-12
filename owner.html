@@ -9083,9 +9083,8 @@ var _buyersChannelSelPopulated = false;
 
 // ── Buyer Board (segmented, action-first) ─────────────────
 var _buyersMode = 'board';
-const COLD_MIN_DAYS = 21, COLD_MAX_DAYS = 120, RISING_MIN = 50;
-const WHALE_MULT = 3;    // whale = spends this many x the typical (median) buyer
-const WHALE_TOPN = 10;   // ...or is one of the top-N spenders (safety net)
+const COLD_MIN_DAYS = 21, COLD_MAX_DAYS = 120;
+var WHALE_MIN = 1000;    // whale = spent >= this in the last 30 days. Owner-configurable (default $1,000).
 
 function openBuyersTab() {
   populateBuyersChannelSelect();
@@ -9247,28 +9246,20 @@ async function loadBuyersBoard() {
       }
     });
 
-    // Whale bar = WHALE_MULT x the TYPICAL (median) buyer's spend, with a
-    // top-N safety net so the list is never empty. Self-tunes per account.
-    const sortedAsc = spenders.map(b => b._eSpent).sort((a, b) => a - b);
-    const med = sortedAsc.length ? sortedAsc[Math.floor(sortedAsc.length / 2)] : 0;
-    const whaleFloor = med > 0 ? med * WHALE_MULT : 0;
-    const topIds = new Set(spenders.slice().sort((a, b) => b._eSpent - a._eSpent).slice(0, WHALE_TOPN).map(b => b.id));
-
-    const cold = [], rising = [], fresh = [], whales = [];
+    // Whale = spent >= WHALE_MIN in the last 30 days. Cold = a buyer who's been
+    // that valuable (lifetime) but has gone quiet. New = one-stream first-timer.
+    // Everyone else with history is a Regular.
+    const cold = [], regulars = [], fresh = [], whales = [];
     spenders.forEach(b => {
-      const spent = b._eSpent;
-      const isWhale = spent > 0 && (spent >= whaleFloor || topIds.has(b.id));
+      const lifetime = b._eSpent, last30 = b._eRec;
       const since = daysSince(b._eLast);
-      const rec = b._eRec, pri = b._ePri;
-      b._since = since; b._recent30 = rec;
-      b._newBig = isWhale && (b._eStreams || 0) <= 1;   // 🔥 big spender, first stream
-      // Whale wins over new/rising — a big spender is a whale even if brand new.
-      if (isWhale && since >= COLD_MIN_DAYS && since <= COLD_MAX_DAYS) { cold.push(b); return; }
-      if (isWhale) { whales.push(b); return; }
-      // Rising = an established buyer (prior spend) whose spend is climbing.
-      if ((b._eStreams || 0) > 1 && pri > 0 && rec >= RISING_MIN && rec > pri * 1.5) { b._growth = Math.round((rec - pri) / pri * 100); rising.push(b); return; }
-      // New = has only bought in one stream (a genuine first-timer).
+      b._since = since; b._recent30 = last30;
+      const activeWhale = last30 >= WHALE_MIN;
+      b._newBig = activeWhale && (b._eStreams || 0) <= 1;   // 🔥 big spender, first stream
+      if (lifetime >= WHALE_MIN && since >= COLD_MIN_DAYS && since <= COLD_MAX_DAYS) { cold.push(b); return; }
+      if (activeWhale) { whales.push(b); return; }
       if ((b._eStreams || 0) <= 1) { fresh.push(b); return; }
+      regulars.push(b);
     });
     // Un-contacted whales first (act on them); already-reached ones sink
     cold.sort((a, b) => {
@@ -9278,13 +9269,13 @@ async function loadBuyersBoard() {
       return b._eSpent - a._eSpent;
     });
     whales.sort((a, b) => b._eSpent - a._eSpent);
-    rising.sort((a, b) => (b._eRec || 0) - (a._eRec || 0));
+    regulars.sort((a, b) => b._eSpent - a._eSpent);
     fresh.sort((a, b)  => b._eSpent - a._eSpent);
 
     const whaleTotal = whales.length + cold.length;
     const coldAtRisk = cold.reduce((s, b) => s + (b._eSpent || 0), 0);
     const rev30 = spenders.reduce((s, b) => s + (b._eRec || 0), 0);
-    _boardData = { spenders: spenders.length, whaleTotal, coldAtRisk, rev30, cold, whales, rising, fresh };
+    _boardData = { spenders: spenders.length, whaleTotal, coldAtRisk, rev30, cold, whales, regulars, fresh };
     renderBuyersBoard();
   } catch (err) {
     el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load board: ' + escHtml(err.message) + '</div>';
@@ -9307,10 +9298,10 @@ function renderBuyersBoard() {
   const d = _boardData;
   el.innerHTML =
     boardKpis(d) +
-    boardSegment('❄️', 'Going Cold', d.cold,   'No purchase in ' + COLD_MIN_DAYS + '+ days — reach out now', true,  'cold') +
-    boardSegment('👑', 'Whales',     d.whales, 'Your top spenders — protect these',                          false, 'whale') +
-    boardSegment('📈', 'Rising',     d.rising, 'Spend climbing fast — court them',                           false, 'rising') +
-    boardSegment('🆕', 'New',        d.fresh,  'Bought in just one stream — convert them into regulars',      false, 'new');
+    boardSegment('❄️', 'Going Cold', d.cold,     'Big buyers gone quiet 21+ days — reach out now',            true,  'cold') +
+    boardSegment('👑', 'Whales',     d.whales,   '$' + WHALE_MIN.toLocaleString() + '+ in the last 30 days — protect these', false, 'whale') +
+    boardSegment('📊', 'Regulars',   d.regulars, 'Your steady buyers',                                        false, 'regular') +
+    boardSegment('🆕', 'New',        d.fresh,    'Bought in just one stream — convert them into regulars',     false, 'new');
 }
 
 function boardKpis(d) {
@@ -9332,7 +9323,7 @@ function boardKpis(d) {
 function boardSegment(icon, title, list, why, hero, kind) {
   const collapsed = !!_boardCollapsed[kind];
   const showAll = !!_boardShowAll[kind];
-  const softBg = kind === 'cold' ? 'rgba(240,96,63,0.10)' : kind === 'whale' ? 'rgba(234,185,69,0.10)' : kind === 'rising' ? 'rgba(47,191,113,0.10)' : 'rgba(58,160,255,0.10)';
+  const softBg = kind === 'cold' ? 'rgba(240,96,63,0.10)' : kind === 'whale' ? 'rgba(234,185,69,0.10)' : kind === 'new' ? 'rgba(58,160,255,0.10)' : 'rgba(100,116,139,0.12)';
   const heroStyle = hero ? 'border-color:rgba(240,96,63,0.32);box-shadow:0 0 0 1px rgba(240,96,63,0.12);' : '';
   const hd = '<div onclick="toggleBoardCollapse(\'' + kind + '\')" style="display:flex;align-items:center;gap:0.7rem;padding:0.85rem 1rem;cursor:pointer;' + (collapsed ? '' : 'border-bottom:1px solid var(--border);') + (hero && !collapsed ? 'background:linear-gradient(90deg,rgba(240,96,63,0.08),transparent);' : '') + '">' +
       '<div style="width:32px;height:32px;border-radius:9px;background:' + softBg + ';display:flex;align-items:center;justify-content:center;font-size:0.95rem;flex-shrink:0;">' + icon + '</div>' +
@@ -9362,9 +9353,9 @@ function boardRow(b, kind, i) {
   const eBreaks = b._eBreaks != null ? b._eBreaks : (b.total_breaks_purchased || 0);
   const avg = eStreams > 0 ? spent / eStreams : spent;
   const av = kind === 'whale' ? 'linear-gradient(135deg,#eab945,#d98e2b);color:#0a0a11;'
-           : kind === 'rising' ? 'linear-gradient(135deg,#2fbf71,#1f9d67);color:#04140c;'
+           : kind === 'cold'  ? 'linear-gradient(135deg,#f0603f,#c23b6b);color:#fff;'
            : kind === 'new'    ? 'linear-gradient(135deg,#3aa0ff,#4f6ef7);color:#fff;'
-           :                     'linear-gradient(135deg,#f0603f,#c23b6b);color:#fff;';
+           :                     'linear-gradient(135deg,#64748b,#475569);color:#fff;';
   const since = b._since != null ? b._since : daysSince(b._eLast || b.last_purchase_date);
   const uname = (b.username || '').replace(/'/g, "\\'");
   const contactedDays = (kind === 'cold' && b.last_cold_alert_at) ? daysSince(b.last_cold_alert_at) : null;
