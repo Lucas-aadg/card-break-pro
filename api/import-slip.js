@@ -212,13 +212,26 @@ function extractItems(block) {
     if (!om) continue;
     const orderNumber = om[1];
 
-    // Amount = first "$<num>" line after the order (skip attribute lines like "New", "2026 TOPPS...")
+    // Amount = the price line after the order. Prefer a definite price (has a
+    // "$" or a decimal). Only if none exists in the row do we fall back to a
+    // bare whole-dollar integer — Whatnot sometimes drops the "$" on whole
+    // amounts (e.g. "45"), and the old code silently parsed those as $0, which
+    // made real buyers look like giveaway-only and vanish from the import.
     let amount = 0;
+    let bareInt = null;
+    let looksGiveaway = false;
     for (let j = i + 1; j < Math.min(i + 8, region.length); j++) {
+      if (/^Order\s+\d/i.test(region[j])) break; // reached next item
+      if (/GIVEAWAY|GIVVY/i.test(region[j])) looksGiveaway = true;
       const am = region[j].match(/^\$?(\d+(?:\.\d{1,2})?)$/);
-      if (am && /\$|\./.test(region[j])) { amount = parseFloat(am[1]); break; }
-      if (/^Order\s+\d/i.test(region[j])) break; // next item, no amount found
+      if (!am) continue;
+      if (/[\$.]/.test(region[j])) { amount = parseFloat(am[1]); break; } // definite price
+      if (bareInt === null) bareInt = parseFloat(am[1]);                  // remember first bare integer
     }
+    // Fall back to a bare whole-dollar integer only when no definite price was
+    // found AND this isn't a flagged giveaway — so a qty column on a $0 giveaway
+    // can't be misread as a $1 purchase (giveaway-only buyers must stay excluded).
+    if (amount === 0 && bareInt !== null && !looksGiveaway) amount = bareInt;
 
     // Name = lines between the preceding qty marker and this Order line.
     const nameLines = [];

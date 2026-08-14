@@ -3667,6 +3667,15 @@ function siStatCard(value, label) {
 
 async function confirmSlipImport() {
   if (!_parsedSlipData || !currentProfile) { skipSlipImport(); return; }
+  // Clear, specific reasons the import can't proceed — beats a vague downstream error.
+  if (!_parsedSlipData.buyers || !_parsedSlipData.buyers.length) {
+    showGlobalError('This slip parsed 0 paying buyers — the PDF may not be a standard Whatnot packing slip, or it only had giveaways. Nothing to import.');
+    return;
+  }
+  if (!currentStream || !currentStream.id) {
+    showGlobalError('No active stream is loaded, so the slip can\'t be tied to a stream. Re-enter the Stream Key, then try again.');
+    return;
+  }
   var btn = document.getElementById('siConfirmBtn');
   btn.disabled = true;
   btn.textContent = 'Importing…';
