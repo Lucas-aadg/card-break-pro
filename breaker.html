@@ -575,6 +575,11 @@
       </div>
     </div>
     <div id="productsSummaryBar" style="display:none;font-size:0.83rem;color:var(--muted);padding:0.35rem 0;"></div>
+    <div id="productSearchWrap" style="display:none;position:relative;margin-bottom:0.75rem;">
+      <span style="position:absolute;left:0.7rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:0.9rem;pointer-events:none;">🔍</span>
+      <input id="productSearch" type="text" autocomplete="off" placeholder="Search products…" oninput="onProductSearch()" style="width:100%;padding:0.55rem 2.1rem;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text,inherit);font-size:0.9rem;" />
+      <span id="productSearchClear" onclick="clearProductSearch()" style="display:none;position:absolute;right:0.6rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:1rem;cursor:pointer;line-height:1;">✕</span>
+    </div>
     <div id="categoryFilter" style="display:none;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;"></div>
     <div id="productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
     <div id="productsWrap" style="display:none;overflow-x:auto;">
@@ -1263,12 +1268,34 @@ async function loadProducts() {
     renderProductTable();
     loadingEl.style.display = 'none';
     wrapEl.style.display = 'block';
+    var srchWrap = document.getElementById('productSearchWrap');
+    if (srchWrap) srchWrap.style.display = products.length > 5 ? 'block' : 'none';
   } catch (err) {
     loadingEl.textContent = 'Failed to load products: ' + escHtml(err.message);
   }
 }
 
 let activeCategory = 'All';
+let productSearchTerm = '';
+// Source of truth for entered box quantities (product index -> qty). Survives
+// search/category filtering, which re-renders the table and drops DOM inputs.
+let selectedQtys = {};
+
+function onProductSearch() {
+  const el = document.getElementById('productSearch');
+  productSearchTerm = (el ? el.value : '').trim().toLowerCase();
+  const clr = document.getElementById('productSearchClear');
+  if (clr) clr.style.display = productSearchTerm ? 'block' : 'none';
+  renderProductTable();
+}
+function clearProductSearch() {
+  const el = document.getElementById('productSearch');
+  if (el) el.value = '';
+  productSearchTerm = '';
+  const clr = document.getElementById('productSearchClear');
+  if (clr) clr.style.display = 'none';
+  renderProductTable();
+}
 
 function buildCategoryFilter() {
   const categories = ['All', ...new Set(products.map(function (p) { return p.category || 'Uncategorized'; }))];
@@ -1299,9 +1326,17 @@ function renderProductTable() {
   tbody.innerHTML = '';
 
   const filtered = products.filter(function (p) {
-    if (activeCategory === 'All') return true;
-    return (p.category || 'Uncategorized') === activeCategory;
+    const catOk = activeCategory === 'All' || (p.category || 'Uncategorized') === activeCategory;
+    if (!catOk) return false;
+    if (!productSearchTerm) return true;
+    return (p.name || '').toLowerCase().includes(productSearchTerm) ||
+           (p.category || '').toLowerCase().includes(productSearchTerm);
   });
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1.1rem;font-size:0.85rem;">No products match "' + escHtml(productSearchTerm) + '"</td></tr>';
+    return;
+  }
 
   filtered.forEach(function (p) {
     const idx = products.indexOf(p);
@@ -1320,13 +1355,18 @@ function renderProductTable() {
     tbody.appendChild(tr);
   });
 
-  // Attach qty input listeners
+  // Attach qty input listeners + restore any previously-entered quantities
   tbody.querySelectorAll('.qty-input').forEach(function (input) {
     input.addEventListener('input', function () {
       updateProductRow(input);
       recalcTotals();
     });
+    if (selectedQtys[input.dataset.idx]) {
+      input.value = selectedQtys[input.dataset.idx];
+      updateProductRow(input);
+    }
   });
+  recalcTotals();
 }
 
 function updateProductRow(input) {
@@ -1335,6 +1375,7 @@ function updateProductRow(input) {
   const stock = parseInt(input.dataset.stock, 10) || 0;
   const qty = Math.max(0, Math.min(parseInt(input.value, 10) || 0, stock));
   input.value = qty;
+  if (qty > 0) selectedQtys[idx] = qty; else delete selectedQtys[idx];
 
   const extCost = qty * unitCost;
   document.getElementById('extCost_' + idx).textContent = fmt(extCost);
@@ -1345,12 +1386,14 @@ function updateProductRow(input) {
   stockCell.className = remaining === 0 ? 'stock-out' : remaining <= products[idx].min_stock_alert ? 'stock-low' : 'stock-ok';
 }
 
+// All three read from selectedQtys (source of truth) so quantities on rows
+// hidden by search/category filtering are still counted.
 function getProductsUsed() {
   const used = [];
-  document.querySelectorAll('.qty-input').forEach(function (input) {
-    const idx = parseInt(input.dataset.idx, 10);
-    const qty = parseInt(input.value, 10) || 0;
-    if (qty > 0) {
+  Object.keys(selectedQtys).forEach(function (k) {
+    const idx = parseInt(k, 10);
+    const qty = selectedQtys[k] || 0;
+    if (qty > 0 && products[idx]) {
       used.push({
         product_id: products[idx].id,
         name: products[idx].name,
@@ -1365,19 +1408,16 @@ function getProductsUsed() {
 
 function getTotalBoxCost() {
   let total = 0;
-  document.querySelectorAll('.qty-input').forEach(function (input) {
-    const qty = parseInt(input.value, 10) || 0;
-    const unitCost = parseFloat(input.dataset.unitCost) || 0;
-    total += qty * unitCost;
+  Object.keys(selectedQtys).forEach(function (k) {
+    const idx = parseInt(k, 10);
+    if (products[idx]) total += (selectedQtys[k] || 0) * (products[idx].unit_cost || 0);
   });
   return total;
 }
 
 function getTotalUnitsUsed() {
   let total = 0;
-  document.querySelectorAll('.qty-input').forEach(function (input) {
-    total += parseInt(input.value, 10) || 0;
-  });
+  Object.keys(selectedQtys).forEach(function (k) { total += selectedQtys[k] || 0; });
   return total;
 }
 
@@ -1759,10 +1799,7 @@ async function handleSubmitBreak() {
 
     // Clear inputs
     document.getElementById('revenueInput').value = '';
-    document.querySelectorAll('.qty-input').forEach(function (inp) {
-      inp.value = 0;
-      updateProductRow(inp);
-    });
+    selectedQtys = {};
 
     updateBreakDisplay();
     renderRunningTotal();
@@ -1959,7 +1996,7 @@ async function handleConfirmClose() {
     recalcTotals();
 
     document.getElementById('revenueInput').value = '';
-    document.querySelectorAll('.qty-input').forEach(function (inp) { inp.value = 0; updateProductRow(inp); });
+    selectedQtys = {};
 
     await loadProducts();
 
@@ -2017,7 +2054,8 @@ function setupEventListeners() {
 
   document.getElementById('resetEntryBtn').addEventListener('click', function () {
     document.getElementById('revenueInput').value = '';
-    document.querySelectorAll('.qty-input').forEach(function (inp) { inp.value = 0; updateProductRow(inp); });
+    selectedQtys = {};
+    renderProductTable();
     recalcTotals();
     renderRunningTotal();
   });
@@ -2027,15 +2065,14 @@ function setupEventListeners() {
   // Repeat Last Break
   document.getElementById('repeatBreakBtn').addEventListener('click', function () {
     if (!lastBreakProducts.length) return;
-    // Clear all qty inputs first
-    document.querySelectorAll('.qty-input').forEach(function (inp) { inp.value = 0; updateProductRow(inp); });
-    // Re-apply quantities from last break
+    // Rebuild the selection from the last break (works even if some rows are
+    // currently hidden by search/category filtering).
+    selectedQtys = {};
     lastBreakProducts.forEach(function (used) {
       const idx = products.findIndex(function (p) { return p.id === used.product_id; });
-      if (idx === -1) return;
-      const inp = document.querySelector('.qty-input[data-idx="' + idx + '"]');
-      if (inp) { inp.value = used.qty; updateProductRow(inp); }
+      if (idx > -1) selectedQtys[idx] = used.qty;
     });
+    renderProductTable();
     recalcTotals();
   });
 
@@ -2048,10 +2085,12 @@ function setupEventListeners() {
     const noProductsMsg = document.getElementById('noProductsMsg');
     const summaryBar = document.getElementById('productsSummaryBar');
 
+    const searchWrap = document.getElementById('productSearchWrap');
     if (productsCollapsed) {
       categoryFilter.style.display = 'none';
       productsWrap.style.display = 'none';
       noProductsMsg.style.display = 'none';
+      if (searchWrap) searchWrap.style.display = 'none';
       const boxCost = getTotalBoxCost();
       const totalUnits = getTotalUnitsUsed();
       summaryBar.textContent = totalUnits + ' box' + (totalUnits !== 1 ? 'es' : '') + ' selected · ' + fmt(boxCost) + ' box cost';
@@ -2063,6 +2102,7 @@ function setupEventListeners() {
       const hasProducts = products.length > 0;
       if (hasProducts) {
         productsWrap.style.display = '';
+        if (searchWrap) searchWrap.style.display = products.length > 5 ? 'block' : 'none';
         const hasCats = document.getElementById('categoryFilter').children.length > 0;
         if (hasCats) categoryFilter.style.display = 'flex';
       } else {
