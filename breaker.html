@@ -3190,16 +3190,14 @@ async function brkLoadChannels() {
 async function brkBuildChannelMap() {
   if (_brkBuyerChannelMap) return _brkBuyerChannelMap;
   const org = currentProfile.org_id;
-  const streamCh = {};
-  let from = 0; const size = 1000;
-  while (true) {
-    const { data, error } = await sb.from('streams').select('id,channel_id').eq('org_id', org).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(s => { if (s.channel_id) streamCh[s.id] = s.channel_id; });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  const map = new Map(); const stats = {}; from = 0;
+  // Breakers can only read their OWN streams under RLS, so build the org-wide
+  // stream→channel map on the server (service role). Without this the map is
+  // empty and every account filter shows 0.
+  const tok = await brkAuthToken();
+  const resp = await fetch('/api/features?feature=stream&action=channelmap', { headers: { Authorization: 'Bearer ' + tok } });
+  if (!resp.ok) { let m = 'HTTP ' + resp.status; try { m = (await resp.json()).error || m; } catch (e) {} throw new Error(m); }
+  const streamCh = (await resp.json()).streamChannels || {};
+  const map = new Map(); const stats = {}; let from = 0; const size = 1000;
   const d30 = new Date(); d30.setDate(d30.getDate() - 30);
   const d60 = new Date(); d60.setDate(d60.getDate() - 60);
   const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];

@@ -1354,6 +1354,26 @@ async function analyticsHandler(req, res, sb, action) {
 // STREAM — DELETE
 // =============================================================================
 async function streamHandler(req, res, sb, action) {
+  // Org-wide stream -> channel_id map. Breakers can only read their OWN streams
+  // under RLS, so they can't build the buyer→account mapping client-side. This
+  // returns every stream's channel for the caller's org via the service role,
+  // so account filtering works the same for breakers as it does for owners.
+  if (action === 'channelmap' && req.method === 'GET') {
+    const { err, profile } = await authenticate(req, sb);
+    if (err) return fail(res, err.status, err.msg);
+    const out = {};
+    let from = 0; const size = 1000;
+    while (true) {
+      const { data, error } = await sb.from('streams')
+        .select('id, channel_id').eq('org_id', profile.org_id).range(from, from + size - 1);
+      if (error) throw error;
+      (data || []).forEach(function (s) { if (s.channel_id) out[s.id] = s.channel_id; });
+      if (!data || data.length < size) break;
+      from += size;
+    }
+    return res.status(200).json({ streamChannels: out });
+  }
+
   if (action === 'delete' && req.method === 'DELETE') {
     const { err, profile } = await authenticate(req, sb);
     if (err) return fail(res, err.status, err.msg);
