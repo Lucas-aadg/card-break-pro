@@ -717,6 +717,7 @@
       <select id="brkBuyersChannelFilter" onchange="onBrkChannelChange()" style="padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
         <option value="">All accounts</option>
       </select>
+      <span id="brkChannelDiag" style="font-size:0.7rem;color:var(--muted);"></span>
     </div>
 
     <!-- SELL: search-first, then whales to tag + rising -->
@@ -3281,8 +3282,25 @@ async function onBrkChannelChange() {
     try { await brkBuildChannelMap(); }
     catch (err) { showGlobalError('Failed to load account data: ' + err.message); return; }
   }
+  brkUpdateChannelDiag(chId);
   if (_brkBuyersMode === 'hits') { brkRenderHitFilter(); brkRenderHitBoard(); }
   else { await brkEnrichBuyers(); renderBrkSell(); renderBrkSearch(); }
+}
+
+// On-screen diagnostic: shows how the account map resolved so a "not filtering"
+// problem is visible instead of silent (e.g. no streams tagged to the account).
+function brkUpdateChannelDiag(chId) {
+  const el = document.getElementById('brkChannelDiag');
+  if (!el) return;
+  if (!chId) { el.textContent = ''; return; }
+  const streamsInCh = _brkStreamChannelMap
+    ? Object.keys(_brkStreamChannelMap).filter(function (sid) { return _brkStreamChannelMap[sid] === chId; }).length : 0;
+  let buyersInCh = 0;
+  if (_brkBuyerChannelMap) _brkBuyerChannelMap.forEach(function (set) { if (set.has(chId)) buyersInCh++; });
+  const totalStreamsMapped = _brkStreamChannelMap ? Object.keys(_brkStreamChannelMap).length : 0;
+  if (totalStreamsMapped === 0) el.textContent = '⚠ no streams are tagged to any account yet';
+  else if (streamsInCh === 0) el.textContent = '⚠ 0 streams tagged to this account';
+  else el.textContent = buyersInCh + ' buyers · ' + streamsInCh + ' streams in this account';
 }
 
 function setBrkBuyersMode(mode) {
