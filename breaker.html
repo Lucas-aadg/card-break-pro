@@ -1578,6 +1578,9 @@ async function getOrCreateStream() {
     .limit(1)
     .maybeSingle();
   if (schedMatch) channelId = schedMatch.channel_id;
+  // Fallback: inherit the account from the shift the breaker clocked into, so
+  // ad-hoc streams (stream_key not yet matched to a schedule) still get tagged.
+  if (!channelId && activeShiftChannelId) channelId = activeShiftChannelId;
 
   // Create new stream
   const { data: newStream, error: createErr } = await sb
@@ -1972,6 +1975,7 @@ async function handleConfirmClose() {
     if (activeShiftId) {
       await sb.from('schedules').update({ status: 'completed', clocked_out_at: clockOutTime }).eq('id', activeShiftId);
       activeShiftId = null;
+      activeShiftChannelId = null;
       const clockedInBanner = document.getElementById('clockedInBanner');
       if (clockedInBanner) clockedInBanner.remove();
     } else {
@@ -2391,6 +2395,7 @@ function formatShiftDate(dateStr) {
 }
 
 let activeShiftId = null;
+let activeShiftChannelId = null;  // account tied to the clocked-in shift; new streams inherit it
 
 async function checkTodayShiftAndNotify() {
   const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
@@ -2412,6 +2417,7 @@ async function checkTodayShiftAndNotify() {
   // If already clocked in, just restore state silently
   if (shift.status === 'in_progress') {
     activeShiftId = shift.id;
+    activeShiftChannelId = shift.channel_id || null;
     showClockedInBanner(shift);
     return;
   }
@@ -2469,6 +2475,7 @@ async function checkTodayShiftAndNotify() {
     }).eq('id', shift.id).eq('org_id', currentProfile.org_id);
     if (cinErr) { showError('Clock-in failed: ' + cinErr.message); this.disabled = false; this.textContent = 'Clock In'; return; }
     activeShiftId = shift.id;
+    activeShiftChannelId = shift.channel_id || null;
     // Pre-fill stream key
     if (shift.stream_key) {
       document.getElementById('streamKey').value = shift.stream_key;
