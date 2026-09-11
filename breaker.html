@@ -1739,7 +1739,7 @@ async function handleSubmitBreak() {
         .eq('id', used.product_id)
         .eq('org_id', currentProfile.org_id);
       if (stockErr) { console.error('Stock update error:', stockErr); showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.'); }
-      product.current_stock = newStock;
+      else { product.current_stock = newStock; } // only trust the cache when the write actually landed
       try {
         await sb.from('inventory_log').insert({
           org_id: currentProfile.org_id,
@@ -3236,7 +3236,7 @@ async function brkLoadChannels() {
 }
 
 async function brkBuildChannelMap() {
-  if (_brkBuyerChannelMap) return _brkBuyerChannelMap;
+  if (_brkBuyerChannelMap && _brkBuyerChannelMap.size > 0) return _brkBuyerChannelMap;  // rebuild if a prior build came back empty
   const org = currentProfile.org_id;
   // Breakers can only read their OWN streams under RLS, so build the org-wide
   // stream→channel map on the server (service role). Without this the map is
@@ -3285,7 +3285,7 @@ function brkHitInChannel(h) {
 
 async function onBrkChannelChange() {
   const chId = document.getElementById('brkBuyersChannelFilter').value;
-  if (chId && !_brkBuyerChannelMap) {
+  if (chId && !(_brkBuyerChannelMap && _brkBuyerChannelMap.size > 0)) {
     try { await brkBuildChannelMap(); }
     catch (err) { showGlobalError('Failed to load account data: ' + err.message); return; }
   }

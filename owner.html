@@ -4356,9 +4356,9 @@ async function beHandleSubmit() {
       const product = orgProducts.find(function (p) { return p.id === used.product_id; });
       if (!product) continue;
       const newStock = Math.max(0, product.current_stock - used.qty);
-      const { error: stkErr } = await sb.from('products').update({ current_stock: newStock }).eq('id', used.product_id);
+      const { error: stkErr } = await sb.from('products').update({ current_stock: newStock }).eq('id', used.product_id).eq('org_id', currentProfile.org_id);
       if (stkErr) { console.error('Stock update error:', stkErr); showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.'); }
-      product.current_stock = newStock;
+      else { product.current_stock = newStock; } // only trust the cache when the write actually landed
       // Log box usage
       await sb.from('inventory_log').insert({
         org_id: currentProfile.org_id,
@@ -5225,6 +5225,9 @@ function invOpenEditModal(id) {
   document.getElementById('pm-category').value = product.category || '';
   document.getElementById('pm-unitCost').value = product.unit_cost;
   document.getElementById('pm-stock').value = product.current_stock;
+  // Remember the value shown so save can tell an intentional correction from a
+  // stale-cache overwrite (breaks may decrement this product while the modal is open).
+  document.getElementById('pm-stock').dataset.opened = String(product.current_stock);
   document.getElementById('pm-minAlert').value = product.min_stock_alert;
   document.getElementById('pm-displayOrder').value = product.display_order || 0;
   document.getElementById('pm-notes').value = product.notes || '';
@@ -5257,16 +5260,27 @@ async function pmHandleSave() {
 
   if (!name) { showGlobalError('Product name is required.'); return; }
 
+  // Guard against clobbering stock with a stale cached number. Re-read the live
+  // stock; only treat the stock field as an intentional correction if the owner
+  // actually changed it from what the modal opened with.
+  const openedStock = parseInt(document.getElementById('pm-stock').dataset.opened, 10);
+  const stockManuallyEdited = !Number.isNaN(openedStock) && existingStock !== openedStock;
+  let baseStock = existingStock;
+  if (!stockManuallyEdited) {
+    const { data: fresh, error: freshErr } = await sb.from('products').select('current_stock').eq('id', id).eq('org_id', currentProfile.org_id).maybeSingle();
+    if (!freshErr && fresh && fresh.current_stock != null) baseStock = fresh.current_stock;
+  }
+
   // Compute final stock and unit cost
-  let finalStock = existingStock;
+  let finalStock = baseStock;
   let finalUnitCost = existingUnitCost;
   let logEntry = null;
 
   if (restock > 0) {
-    finalStock = existingStock + restock;
-    if (avgCost && (existingStock + restock) > 0) {
+    finalStock = baseStock + restock;
+    if (avgCost && (baseStock + restock) > 0) {
       // Weighted average: blend existing stock cost with new batch cost
-      finalUnitCost = ((existingStock * existingUnitCost) + (restock * restockCost)) / (existingStock + restock);
+      finalUnitCost = ((baseStock * existingUnitCost) + (restock * restockCost)) / (baseStock + restock);
       finalUnitCost = Math.round(finalUnitCost * 100) / 100; // round to cents
     }
     logEntry = {
@@ -9518,7 +9532,7 @@ function ownerHitBadge(b) {
 
 // Build buyer_id -> Set(channel_id) from purchases → streams. Cached until reload.
 async function buildBuyerChannelMap() {
-  if (_buyerChannelMap) return _buyerChannelMap;
+  if (_buyerChannelMap && _buyerChannelMap.size > 0) return _buyerChannelMap;  // rebuild if a prior build came back empty (e.g. before streams were tagged)
   const org = currentProfile.org_id;
   // stream_id -> channel_id
   const streamCh = {};
@@ -9591,7 +9605,7 @@ function buyerInChannel(id) {
 
 async function onBuyersChannelChange() {
   const chId = document.getElementById('buyersChannelFilter').value;
-  if (chId && !_buyerChannelMap) {
+  if (chId && !(_buyerChannelMap && _buyerChannelMap.size > 0)) {
     const el = document.getElementById(_buyersMode === 'board' ? 'buyersBoard' : _buyersMode === 'hits' ? 'buyersHits' : 'buyersLeaderboard');
     if (el) el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading account data…</div>';
     try { await buildBuyerChannelMap(); }

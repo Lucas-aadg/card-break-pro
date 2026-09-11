@@ -1853,6 +1853,9 @@ function invOpenEdit(id) {
   document.getElementById('pm-cost').value = p.unit_cost || '';
   document.getElementById('pm-category').value = p.category || '';
   document.getElementById('pm-stock').value = p.current_stock || 0;
+  // Remember opened value so save can distinguish a real correction from a
+  // stale-cache overwrite while breaks decrement this product.
+  document.getElementById('pm-stock').dataset.opened = String(p.current_stock || 0);
   document.getElementById('pm-restock').value = '';
   document.getElementById('pm-restockCost').value = '';
   document.getElementById('pm-avgCost').style.display = 'none';
@@ -1893,22 +1896,33 @@ async function pmHandleSave() {
 
   try {
     const updates = { name, unit_cost: cost, category: category || null };
-    let newStock = stock;
 
+    // Re-read live stock; only treat the stock field as an intentional
+    // correction if the manager actually changed it from what the modal opened.
+    const openedStock = parseInt(document.getElementById('pm-stock').dataset.opened, 10);
+    const stockManuallyEdited = !Number.isNaN(openedStock) && stock !== openedStock;
+    let baseStock = stock;
+    if (!stockManuallyEdited) {
+      const { data: fresh, error: freshErr } = await sb.from('products').select('current_stock').eq('id', id).eq('org_id', currentProfile.org_id).maybeSingle();
+      if (!freshErr && fresh && fresh.current_stock != null) baseStock = fresh.current_stock;
+    }
+
+    // Only write current_stock when it actually changes (restock or manual
+    // correction) — never blindly overwrite with a stale value.
     if (restock > 0) {
-      newStock = stock + restock;
-      const existing = p.current_stock || 0;
+      updates.current_stock = baseStock + restock;
       const existingCost = p.unit_cost || cost;
-      if (existingCost > 0 && (existing + restock) > 0) {
-        updates.unit_cost = (existing * existingCost + restock * restockCost) / (existing + restock);
+      if (existingCost > 0 && (baseStock + restock) > 0) {
+        updates.unit_cost = (baseStock * existingCost + restock * restockCost) / (baseStock + restock);
       }
       await sb.from('inventory_log').insert({
         org_id: currentProfile.org_id, product_id: id, product_name: name,
-        action: 'restock', qty: restock, cost_per_unit: restockCost,
+        action: 'restock', quantity: restock, unit_cost: restockCost,
         notes: 'Restock by manager'
       });
+    } else if (stockManuallyEdited) {
+      updates.current_stock = baseStock; // owner-style manual correction
     }
-    updates.current_stock = newStock;
 
     const { error } = await sb.from('products').update(updates).eq('id', id);
     if (error) throw error;
@@ -2867,7 +2881,7 @@ function mgrHitBadge(b) {
 }
 
 async function buildMgrBuyerChannelMap() {
-  if (_mgrBuyerChannelMap) return _mgrBuyerChannelMap;
+  if (_mgrBuyerChannelMap && _mgrBuyerChannelMap.size > 0) return _mgrBuyerChannelMap;  // rebuild if a prior build came back empty
   const org = currentProfile.org_id;
   const streamCh = {};
   let from = 0; const size = 1000;
@@ -2939,7 +2953,7 @@ function mgrHitInChannel(h) {
 
 async function onMgrBuyersChannelChange() {
   const chId = document.getElementById('mgrBuyersChannelFilter').value;
-  if (chId && !_mgrBuyerChannelMap) {
+  if (chId && !(_mgrBuyerChannelMap && _mgrBuyerChannelMap.size > 0)) {
     const el = document.getElementById(_mgrBuyersMode === 'board' ? 'mgrBuyersBoard' : _mgrBuyersMode === 'hits' ? 'mgrBuyersHits' : 'mgrBuyersLeaderboard');
     if (el) el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading account data…</div>';
     try { await buildMgrBuyerChannelMap(); }
