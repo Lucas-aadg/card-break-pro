@@ -2,14 +2,15 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 
 const ANNUAL_PRICE_IDS = {
+  standard: process.env.STRIPE_PRICE_ID_STANDARD_ANNUAL,
   starter: process.env.STRIPE_PRICE_ID_STARTER_ANNUAL,
   pro:     process.env.STRIPE_PRICE_ID_PRO_ANNUAL,
   empire:  process.env.STRIPE_PRICE_ID_EMPIRE_ANNUAL
 };
 
 // Monthly prices in cents for proration calculation
-const MONTHLY_PRICES_CENTS = { starter: 12999, pro: 39999, empire: 99999 };
-const ANNUAL_PRICES_CENTS  = { starter: 129990, pro: 399990, empire: 999990 };
+const MONTHLY_PRICES_CENTS = { standard: 9900,  starter: 12999, pro: 39999, empire: 99999 };
+const ANNUAL_PRICES_CENTS  = { standard: 99000, starter: 129990, pro: 399990, empire: 999990 };
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
