@@ -184,8 +184,8 @@
 
       <div class="spacer"></div>
       <div class="section-title">
-        Choose Your Plan
-        <span class="cycle-save-badge" id="annualBadgeHeader" style="display:none;">Save up to $1,999/yr</span>
+        Your Plan
+        <span class="cycle-save-badge" id="annualBadgeHeader" style="display:none;">Save $198/yr — 2 months free</span>
       </div>
 
       <!-- Billing cycle toggle -->
@@ -194,25 +194,13 @@
         <button type="button" class="cycle-btn" id="cycleAnnual" onclick="setCycle('annual')">Annual</button>
       </div>
 
-      <!-- Plan cards -->
-      <div class="plan-selector" id="planSelector">
-        <div class="plan-opt selected" data-tier="starter" onclick="selectPlan('starter')">
-          <div class="plan-opt-name">Starter</div>
-          <div class="plan-opt-price" id="price-starter">$129.99/mo</div>
-          <div class="plan-opt-sub" id="sub-starter">14-day free trial</div>
-          <div class="plan-opt-save" id="save-starter" style="display:none;"></div>
-        </div>
-        <div class="plan-opt" data-tier="pro" onclick="selectPlan('pro')">
-          <div class="plan-opt-name">Pro ✦</div>
-          <div class="plan-opt-price" id="price-pro">$399.99/mo</div>
-          <div class="plan-opt-sub" id="sub-pro">7-day free trial</div>
-          <div class="plan-opt-save" id="save-pro" style="display:none;"></div>
-        </div>
-        <div class="plan-opt" data-tier="empire" onclick="selectPlan('empire')">
-          <div class="plan-opt-name">Empire</div>
-          <div class="plan-opt-price" id="price-empire">$999.99/mo</div>
-          <div class="plan-opt-sub" id="sub-empire">Book a Demo</div>
-          <div class="plan-opt-save" id="save-empire" style="display:none;"></div>
+      <!-- Single plan — everything included -->
+      <div class="plan-selector" id="planSelector" style="grid-template-columns:1fr;">
+        <div class="plan-opt selected" data-tier="standard">
+          <div class="plan-opt-name">CardBreakPro — Everything Included</div>
+          <div class="plan-opt-price" id="price-standard">$99/mo</div>
+          <div class="plan-opt-sub" id="sub-standard">30-day free trial · every feature, unlimited team</div>
+          <div class="plan-opt-save" id="save-standard" style="display:none;"></div>
         </div>
       </div>
 
@@ -245,22 +233,18 @@
     const registerBtn = document.getElementById('registerBtn');
     const registerForm = document.getElementById('registerForm');
 
-    let selectedTier = 'starter';
+    let selectedTier = 'standard';
     let selectedCycle = 'monthly';
     let referralValid = null; // null = unchecked, true = valid, false = invalid
     let referralCodeValue = '';
 
-    // ── Plan data ──
+    // ── Plan data — one plan, everything included ──
     const PLANS = {
       monthly: {
-        starter: { price: '$129.99/mo',   sub: '14-day free trial', save: '' },
-        pro:     { price: '$399.99/mo',   sub: '7-day free trial',  save: '' },
-        empire:  { price: '$999.99/mo',   sub: 'Book a Demo',       save: '' }
+        standard: { price: '$99/mo', sub: '30-day free trial · every feature, unlimited team', save: '' }
       },
       annual: {
-        starter: { price: '$1,299.90/yr',  sub: '$108.33/mo equivalent', save: 'Save $259.98/yr — 2 months free' },
-        pro:     { price: '$3,999.90/yr',  sub: '$333.33/mo equivalent', save: 'Save $799.98/yr — 2 months free' },
-        empire:  { price: '$9,999.90/yr',  sub: '$833.33/mo equivalent', save: 'Save $1,999.98/yr — 2 months free' }
+        standard: { price: '$990/yr', sub: '$82.50/mo equivalent · every feature, unlimited team', save: 'Save $198/yr — 2 months free' }
       }
     };
 
@@ -270,64 +254,24 @@
       document.getElementById('cycleAnnual').classList.toggle('active', cycle === 'annual');
       document.getElementById('annualBadgeHeader').style.display = cycle === 'annual' ? '' : 'none';
 
-      const data = PLANS[cycle];
-      ['starter','pro','empire'].forEach(function(tier) {
-        document.getElementById('price-' + tier).textContent = data[tier].price;
-        document.getElementById('sub-' + tier).textContent   = data[tier].sub;
-        const saveEl = document.getElementById('save-' + tier);
-        if (data[tier].save) {
-          saveEl.textContent    = data[tier].save;
-          saveEl.style.display  = '';
-        } else {
-          saveEl.style.display  = 'none';
-        }
-      });
+      const plan = PLANS[cycle].standard;
+      document.getElementById('price-standard').textContent = plan.price;
+      document.getElementById('sub-standard').textContent   = plan.sub;
+      const saveEl = document.getElementById('save-standard');
+      if (plan.save) { saveEl.textContent = plan.save; saveEl.style.display = ''; }
+      else { saveEl.style.display = 'none'; }
 
-      // BEST VALUE badge on Pro Annual only
-      const proOpt = document.querySelector('[data-tier="pro"]');
-      const existingBadge = proOpt.querySelector('.best-value-badge');
-      if (cycle === 'annual') {
-        proOpt.classList.add('best-value');
-        if (!existingBadge) {
-          const badge = document.createElement('div');
-          badge.className = 'best-value-badge';
-          badge.textContent = 'BEST VALUE';
-          proOpt.appendChild(badge);
-        }
-      } else {
-        proOpt.classList.remove('best-value');
-        if (existingBadge) existingBadge.remove();
-      }
-
-      updateRegisterBtn();
-    }
-
-    function selectPlan(tier) {
-      selectedTier = tier;
-      document.querySelectorAll('.plan-opt').forEach(function(el) {
-        el.classList.toggle('selected', el.dataset.tier === tier);
-      });
       updateRegisterBtn();
     }
 
     function updateRegisterBtn() {
-      if (selectedTier === 'empire') {
-        registerBtn.textContent = 'Create Account & Book Demo';
-      } else if (selectedCycle === 'annual') {
+      if (selectedCycle === 'annual') {
         registerBtn.textContent = 'Start Annual Subscription';
-      } else if (selectedTier === 'pro') {
-        registerBtn.textContent = 'Start 7-Day Free Trial';
       } else {
-        const days = referralValid ? '21' : '14';
+        const days = referralValid ? '37' : '30';
         registerBtn.textContent = 'Start ' + days + '-Day Free Trial';
       }
     }
-
-    // Pre-select tier from query param
-    (function() {
-      const p = new URLSearchParams(window.location.search).get('plan');
-      if (p && ['starter','pro','empire'].includes(p)) selectPlan(p);
-    })();
 
     // ── Referral code validation ──
     let referralCheckTimer = null;
@@ -479,21 +423,11 @@
           } catch (e) { /* non-fatal */ }
         }
 
-        // Empire: redirect to mailto (no self-serve checkout)
-        if (selectedTier === 'empire') {
-          showSuccess('Account created! Redirecting to book your demo…');
-          registerBtn.textContent = 'Redirecting…';
-          const annualNote = selectedCycle === 'annual' ? '%0AAnnual+billing+option+requested.' : '';
-          setTimeout(function() {
-            window.location.href = 'mailto:hello@cardbreakpro.com?subject=Empire%20Plan%20Setup&body=Hi%2C%20I%20just%20registered%20for%20Card%20Break%20Pro.%20Email%3A%20' + encodeURIComponent(email) + '%0AOrgId%3A%20' + encodeURIComponent(orgId) + annualNote;
-          }, 1000);
-          return;
-        }
-
         showSuccess('Account created! Redirecting to checkout…');
         registerBtn.textContent = 'Redirecting…';
 
-        const trialOverride = referralValid ? (selectedTier === 'pro' ? 14 : 21) : undefined;
+        // Base trial is 30 days; a valid referral adds 7 (→ 37).
+        const trialOverride = referralValid ? 37 : undefined;
 
         const response = await fetch('/api/create-checkout', {
           method: 'POST',
