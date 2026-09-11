@@ -7283,13 +7283,17 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
   if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
     const rate = (parseFloat(p.commission_rate) || 0) / 100;
     const periodTotal = ((p.category_rates || {}).__commission_method || p.commission_method || 'per_stream') === 'period_total';
+    // Filter by break_date (the stream's business day) — consistent with the
+    // net-profit figure and the rest of the app. Using closed_at silently
+    // dropped streams whose closed_at was null or on a different calendar day,
+    // making commission come out low and not reconcile with net profit.
     let commStreamsQ = sb.from('streams')
       .select('final_sales, total_product_cost, total_other_costs')
       .eq('breaker_id', p.id)
       .eq('org_id', currentProfile.org_id)
       .eq('status', 'closed')
-      .gte('closed_at', fromTs)
-      .lte('closed_at', toTs);
+      .gte('break_date', prCurrentRange.from)
+      .lte('break_date', prCurrentRange.to);
     if (activeChannel) commStreamsQ = commStreamsQ.eq('channel_id', activeChannel.id);
     const { data: streams } = await commStreamsQ;
     const streamList = streams || [];
@@ -7341,8 +7345,8 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
       .eq('breaker_id', p.id)
       .eq('org_id', currentProfile.org_id)
       .eq('status', 'closed')
-      .gte('closed_at', fromTs)
-      .lte('closed_at', toTs);
+      .gte('break_date', prCurrentRange.from)
+      .lte('break_date', prCurrentRange.to);
     if (activeChannel) perBreakStreamsQ = perBreakStreamsQ.eq('channel_id', activeChannel.id);
     const { data: streams } = await perBreakStreamsQ;
 
