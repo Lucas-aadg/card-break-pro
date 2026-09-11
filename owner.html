@@ -3464,16 +3464,7 @@ async function loadInsights() {
   const btn = document.getElementById('insightsRefreshBtn');
   if (!el) return;
   cbpTrack('ai_insights_viewed', { org_id: currentProfile && currentProfile.org_id });
-  if (orgTier === 'starter') {
-    el.innerHTML = '<div style="padding:1.5rem;text-align:center;">' +
-      '<div style="font-size:1.5rem;margin-bottom:0.5rem;">✦</div>' +
-      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:0.4rem;color:var(--text);">AI Insights</div>' +
-      '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:1rem;line-height:1.5;">AI-powered business intelligence is available on Pro and Empire plans.</div>' +
-      '<a href="/billing.html" style="display:inline-block;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);color:#a855f7;padding:0.4rem 1.2rem;border-radius:8px;font-weight:700;font-size:0.82rem;text-decoration:none;">Upgrade to Pro →</a>' +
-      '</div>';
-    if (btn) btn.style.display = 'none';
-    return;
-  }
+  // Single plan — every feature included, no tier gate.
   el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:1.5rem 0;"><div style="font-size:1.5rem;margin-bottom:0.5rem;animation:spin 1s linear infinite;display:inline-block;">✦</div><br>Analyzing your operation…</div>';
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
@@ -10825,13 +10816,7 @@ async function loadAnalytics(period) {
     b.classList.toggle('active', b.dataset.p === anPeriod);
   });
 
-  // Tier gate — starter sees locked overlay
-  if (orgTier === 'starter') {
-    document.getElementById('anLockedWrap').style.display = '';
-    document.getElementById('anBody').style.display = 'none';
-    return;
-  }
-
+  // Single plan — analytics included for everyone, no tier gate.
   document.getElementById('anLockedWrap').style.display = 'none';
   document.getElementById('anBody').style.display = '';
   document.getElementById('anLoading').style.display = 'block';

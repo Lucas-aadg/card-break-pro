@@ -25,6 +25,7 @@ async function getOrgAndOwner(sb, { subscriptionId, customerId }) {
 }
 
 const TIER_LIMITS = {
+  standard:{ max_breakers: null, max_sorters: null, max_managers: null }, // single plan — unlimited seats
   starter: { max_breakers: 3,    max_sorters: 2, max_managers: 1 },
   pro:     { max_breakers: 8,    max_sorters: 4, max_managers: 2 },
   empire:  { max_breakers: null, max_sorters: null, max_managers: null },
@@ -32,6 +33,8 @@ const TIER_LIMITS = {
 };
 
 const PRICE_TIER_MAP = {
+  [process.env.STRIPE_PRICE_ID_STANDARD]:        'standard',
+  [process.env.STRIPE_PRICE_ID_STANDARD_ANNUAL]: 'standard',
   [process.env.STRIPE_PRICE_ID_STARTER]:        'starter',
   'price_1TcA00AQv5DHthFTUHf8QFvL':             'starter',
   [process.env.STRIPE_PRICE_ID_PRO]:            'pro',

@@ -1,7 +1,13 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 
+// Single plan: "standard" — every feature, $99/mo (or annual). The old
+// starter/pro/empire keys are kept so existing subscribers and any old links
+// keep resolving, but new signups all use `standard`.
 const PRICE_IDS = {
+  standard:        process.env.STRIPE_PRICE_ID_STANDARD,
+  standard_annual: process.env.STRIPE_PRICE_ID_STANDARD_ANNUAL,
+  // legacy tiers (do not remove — keeps existing subscriptions/links working)
   starter:        process.env.STRIPE_PRICE_ID_STARTER || 'price_1TcA00AQv5DHthFTUHf8QFvL',
   pro:            process.env.STRIPE_PRICE_ID_PRO,
   empire:         process.env.STRIPE_PRICE_ID_EMPIRE,
@@ -11,7 +17,7 @@ const PRICE_IDS = {
 };
 
 // Trial days for monthly plans only. Annual plans have no trial — paid upfront.
-const TRIAL_DAYS = { starter: 14, pro: 7 };
+const TRIAL_DAYS = { standard: 30, starter: 14, pro: 7 };
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,7 +27,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   try {
-    const { userId, email, orgId, tier = 'starter', billingCycle = 'monthly', trialDaysOverride } = req.body;
+    const { userId, email, orgId, tier = 'standard', billingCycle = 'monthly', trialDaysOverride } = req.body;
     if (!userId || !email || !orgId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
