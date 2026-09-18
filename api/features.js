@@ -33,6 +33,37 @@ async function authenticate(req, sb) {
 
 function fail(res, status, msg) { return res.status(status).json({ error: msg }); }
 
+// Page past PostgREST's 1,000-row cap (AUDIT AB-1). makeQuery must return a fresh builder each call.
+async function pageAll(makeQuery, pageSize) {
+  const PAGE = pageSize || 1000;
+  let all = [], from = 0;
+  while (true) {
+    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+function isMissingSchema(err) {
+  return !!err && (/^(42P01|42883|42703|PGRST202|PGRST204|PGRST205)$/.test(err.code || '') || /does not exist|could not find|schema cache/i.test(String(err.message || '')));
+}
+// Insert notifications; if the ref_id column (migration 013) isn't there yet, retry without it.
+async function insertNotifications(sb, rows) {
+  if (!rows.length) return { error: null };
+  let r = await sb.from('notifications').insert(rows);
+  if (r.error && isMissingSchema(r.error) && rows.some(x => 'ref_id' in x)) {
+    r = await sb.from('notifications').insert(rows.map(x => { const y = Object.assign({}, x); delete y.ref_id; return y; }));
+  }
+  return r;
+}
+function monthRange(year, month) {
+  const start = year + '-' + String(month).padStart(2, '0') + '-01';
+  const end = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);   // last day of month
+  return { start, end };
+}
+
 // ─── Main dispatcher ──────────────────────────────────────────────────────────
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -48,7 +79,6 @@ module.exports = async (req, res) => {
       case 'chat':          return await chatHandler(req, res, sb, action);
       case 'leaderboard':   return await leaderboardHandler(req, res, sb, action);
       case 'milestones':    return await milestonesHandler(req, res, sb, action);
-      case 'sorter-splits': return await sorterSplitsHandler(req, res, sb, action);
       case 'goals':         return await goalsHandler(req, res, sb, action);
       case 'notify':        return await notifyHandler(req, res, sb, action);
       case 'analytics':     return await analyticsHandler(req, res, sb, action);
@@ -317,54 +347,29 @@ async function leaderboardHandler(req, res, sb, action) {
     if (error) return fail(res, 500, error.message);
 
     // ── Live fallback: if no snapshots, compute from breaks table ─────────────
+    // Bucketed by break_date (the stream's business day) like the rest of the
+    // app — not by created_at in the server's UTC month.
     if (!rows || rows.length === 0) {
-      const monthStart = new Date(year, month - 1, 1).toISOString();
-      const monthEnd   = new Date(year, month,     0, 23, 59, 59).toISOString();
+      const { start: monthStart, end: monthEnd } = monthRange(year, month);
 
       const { data: breakers } = await sb.from('profiles')
         .select('id, display_name, role')
         .eq('org_id', profile.org_id)
         .in('role', ['breaker', 'breaker/manager']);
 
+      // One paged query for the whole month, then aggregate per breaker
+      const monthBreaks = await pageAll(() => sb.from('breaks').select('breaker_id, revenue')
+        .eq('org_id', profile.org_id).gte('break_date', monthStart).lte('break_date', monthEnd));
+      const agg = {};
+      for (const b of monthBreaks) {
+        if (!b.breaker_id) continue;
+        const a = agg[b.breaker_id] = agg[b.breaker_id] || { count: 0, revenue: 0 };
+        a.count++; a.revenue += parseFloat(b.revenue) || 0;
+      }
       const computed = [];
       for (const breaker of (breakers || [])) {
-        let value = 0;
-        if (category === 'breaks_completed') {
-          const { count } = await sb.from('breaks').select('id', { count: 'exact', head: true })
-            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
-            .gte('created_at', monthStart).lte('created_at', monthEnd);
-          value = count || 0;
-        } else if (category === 'revenue_generated') {
-          const { data: revData } = await sb.from('breaks').select('revenue')
-            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
-            .gte('created_at', monthStart).lte('created_at', monthEnd);
-          value = (revData || []).reduce((s, b) => s + (parseFloat(b.revenue) || 0), 0);
-        } else if (category === 'commission_earned') {
-          const { data: commData } = await sb.from('breaks').select('commission_amount')
-            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
-            .gte('created_at', monthStart).lte('created_at', monthEnd);
-          value = (commData || []).reduce((s, b) => s + (parseFloat(b.commission_amount) || 0), 0);
-        } else if (category === 'consistency_score') {
-          const { data: daysData } = await sb.from('breaks').select('created_at')
-            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
-            .gte('created_at', monthStart).lte('created_at', monthEnd);
-          const uniqueDays = new Set((daysData || []).map(b => b.created_at.slice(0, 10)));
-          const daysInMonth = new Date(year, month, 0).getDate();
-          value = Math.round((uniqueDays.size / daysInMonth) * 100 * 10) / 10;
-        } else if (category === 'longest_streak') {
-          const { data: allBreakDays } = await sb.from('breaks').select('created_at')
-            .eq('breaker_id', breaker.id).eq('org_id', profile.org_id)
-            .order('created_at', { ascending: true });
-          const allDays = [...new Set((allBreakDays || []).map(b => b.created_at.slice(0, 10)))].sort();
-          let longest = 0, current = 0, prev = null;
-          for (const day of allDays) {
-            if (prev && (new Date(day) - new Date(prev)) / 86400000 === 1) current++;
-            else current = 1;
-            longest = Math.max(longest, current);
-            prev = day;
-          }
-          value = longest;
-        }
+        const a = agg[breaker.id] || { count: 0, revenue: 0 };
+        const value = category === 'breaks_completed' ? a.count : a.revenue;
         if (value > 0) computed.push({ staff_id: breaker.id, display_name: breaker.display_name, role: breaker.role, value });
       }
 
@@ -473,13 +478,12 @@ async function milestonesHandler(req, res, sb, action) {
             .eq('org_id', profile.org_id);
           metricValues.breaks_completed = count || 0;
         }
-        if (neededMetrics.has('revenue_generated')) {
-          const { data: revRows } = await sb.from('breaks')
-            .select('revenue')
-            .eq('breaker_id', profile.id)
-            .eq('org_id', profile.org_id);
-          metricValues.revenue_generated = (revRows || []).reduce(function(s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+        if (neededMetrics.has('revenue_generated') || neededMetrics.has('streak_days')) {
+          const rows = await pageAll(() => sb.from('breaks').select('revenue, break_date').eq('breaker_id', profile.id).eq('org_id', profile.org_id));
+          metricValues.revenue_generated = rows.reduce(function(s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+          metricValues.streak_days = longestStreak(rows.map(function (b) { return b.break_date; }));
         }
+        // commission_earned has no source column on breaks — never awardable; leave undefined so it's skipped
 
         const toAward = automaticUnawarded.filter(function(d) {
           return metricValues[d.trigger_metric] !== undefined && metricValues[d.trigger_metric] >= d.trigger_value;
@@ -611,150 +615,7 @@ async function milestonesHandler(req, res, sb, action) {
   return fail(res, 400, 'Unknown milestones action: ' + action);
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// SORTER SPLITS
-// ═════════════════════════════════════════════════════════════════════════════
-
-async function sorterSplitsHandler(req, res, sb, action) {
-  const { err, profile } = await authenticate(req, sb);
-  if (err) return fail(res, err.status, err.msg);
-
-  // ── GET /api/sorter-splits/pending ─────────────────────────────────────────
-  if (action === 'pending' && req.method === 'GET') {
-    const { data, error } = await sb.from('sorter_splits')
-      .select(`
-        id, created_at, stream_id, split_type,
-        initiating_sorter_percentage, receiving_sorter_percentage,
-        status, expires_at, initiating_sorter_id,
-        initiating_sorter:profiles!initiating_sorter_id(id, display_name),
-        stream:streams!stream_id(id, stream_key)
-      `)
-      .eq('receiving_sorter_id', profile.id)
-      .eq('status', 'pending')
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false });
-    if (error) return fail(res, 500, error.message);
-    return res.status(200).json({ pending_splits: data || [] });
-  }
-
-  // ── POST /api/sorter-splits ────────────────────────────────────────────────
-  if (action === 'splits' && req.method === 'POST') {
-    if (profile.role !== 'sorter') return fail(res, 403, 'Sorter role only');
-    const { stream_id, receiving_sorter_id, split_type, initiating_sorter_percentage, receiving_sorter_percentage } = req.body || {};
-    if (!stream_id || !receiving_sorter_id || !split_type) {
-      return fail(res, 400, 'stream_id, receiving_sorter_id, split_type required');
-    }
-    if (!['equal','custom'].includes(split_type)) return fail(res, 400, 'split_type must be equal or custom');
-
-    const initPct = parseFloat(initiating_sorter_percentage);
-    const recvPct = parseFloat(receiving_sorter_percentage);
-    if (isNaN(initPct) || isNaN(recvPct)) return fail(res, 400, 'percentages required');
-    if (initPct < 0 || initPct > 100 || recvPct < 0 || recvPct > 100) return fail(res, 400, 'Percentages must be between 0 and 100');
-    if (Math.abs(initPct + recvPct - 100) > 0.001) return fail(res, 400, 'Percentages must sum to 100');
-
-    // Verify stream exists in this org
-    const { data: stream } = await sb.from('streams')
-      .select('id, org_id').eq('id', stream_id).eq('org_id', profile.org_id).maybeSingle();
-    if (!stream) return fail(res, 404, 'Stream not found');
-
-    // No existing active split for this stream
-    const { data: existingSplit } = await sb.from('sorter_splits')
-      .select('id, status').eq('stream_id', stream_id).maybeSingle();
-    if (existingSplit && ['pending','confirmed'].includes(existingSplit.status)) {
-      return fail(res, 409, 'An active split already exists for this stream');
-    }
-
-    // Verify receiving sorter is in same org and is a sorter
-    const { data: receivingSorter } = await sb.from('profiles')
-      .select('id, role').eq('id', receiving_sorter_id).eq('org_id', profile.org_id).maybeSingle();
-    if (!receivingSorter) return fail(res, 404, 'Receiving sorter not found in your organization');
-    if (receivingSorter.role !== 'sorter') return fail(res, 400, 'Receiving user must have sorter role');
-    if (receiving_sorter_id === profile.id) return fail(res, 400, 'Cannot create split with yourself');
-
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await sb.from('sorter_splits')
-      .insert({
-        stream_id, initiating_sorter_id: profile.id, receiving_sorter_id,
-        split_type, initiating_sorter_percentage: initPct, receiving_sorter_percentage: recvPct,
-        expires_at: expiresAt
-      })
-      .select('*').single();
-    if (error) return fail(res, 500, error.message);
-
-    // Notify receiving sorter
-    await sb.from('notifications').insert({
-      organization_id: profile.org_id, user_id: receiving_sorter_id,
-      type: 'split_request',
-      title: 'New split request from ' + (profile.display_name || 'a sorter'),
-      body: profile.display_name + ' wants to split sorter earnings ' + initPct + '/' + recvPct + '. You have 24 hours to respond.',
-      action_url: APP_URL + '/sorter'
-    }).catch(() => {});
-
-    return res.status(201).json({ split: data });
-  }
-
-  // ── PATCH /api/sorter-splits/:id/confirm ──────────────────────────────────
-  if (action === 'confirm' && req.method === 'PATCH') {
-    const id = req.query.id;
-    if (!id) return fail(res, 400, 'id required');
-
-    const { data: split } = await sb.from('sorter_splits')
-      .select('*').eq('id', id).maybeSingle();
-    if (!split) return fail(res, 404, 'Split not found');
-    if (split.receiving_sorter_id !== profile.id) return fail(res, 403, 'Only the receiving sorter can confirm');
-    if (split.status !== 'pending') return fail(res, 409, 'Split is no longer pending');
-    if (new Date(split.expires_at) < new Date()) return fail(res, 409, 'Split request has expired');
-
-    const { data, error } = await sb.from('sorter_splits')
-      .update({ status: 'confirmed', confirmed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', id).select('*').single();
-    if (error) return fail(res, 500, error.message);
-
-    // Notify initiating sorter
-    await sb.from('notifications').insert({
-      organization_id: (await sb.from('streams').select('org_id').eq('id', split.stream_id).single()).data?.org_id,
-      user_id: split.initiating_sorter_id,
-      type: 'split_confirmed',
-      title: 'Split request confirmed',
-      body: (profile.display_name || 'Your sorter partner') + ' accepted the split agreement.',
-      action_url: APP_URL + '/sorter'
-    }).catch(() => {});
-
-    return res.status(200).json({ split: data });
-  }
-
-  // ── PATCH /api/sorter-splits/:id/decline ──────────────────────────────────
-  if (action === 'decline' && req.method === 'PATCH') {
-    const id = req.query.id;
-    if (!id) return fail(res, 400, 'id required');
-
-    const { data: split } = await sb.from('sorter_splits')
-      .select('*').eq('id', id).maybeSingle();
-    if (!split) return fail(res, 404, 'Split not found');
-    if (split.receiving_sorter_id !== profile.id) return fail(res, 403, 'Only the receiving sorter can decline');
-    if (split.status !== 'pending') return fail(res, 409, 'Split is no longer pending');
-
-    const { data, error } = await sb.from('sorter_splits')
-      .update({ status: 'declined', updated_at: new Date().toISOString() })
-      .eq('id', id).select('*').single();
-    if (error) return fail(res, 500, error.message);
-
-    // Notify initiating sorter
-    const { data: streamData } = await sb.from('streams').select('org_id').eq('id', split.stream_id).single();
-    await sb.from('notifications').insert({
-      organization_id: streamData?.org_id,
-      user_id: split.initiating_sorter_id,
-      type: 'split_declined',
-      title: 'Split request declined',
-      body: (profile.display_name || 'Your sorter partner') + ' declined the split. Full earnings will go to you.',
-      action_url: APP_URL + '/sorter'
-    }).catch(() => {});
-
-    return res.status(200).json({ split: data });
-  }
-
-  return fail(res, 400, 'Unknown sorter-splits action: ' + action);
-}
+// (Sorter splits removed 2026-09 — sorters are paid hourly; see AUDIT.md BL-1/BL-8.)
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MONTHLY GOALS
@@ -894,30 +755,32 @@ async function notifyHandler(req, res, sb, action) {
     const body     = `${stream_key} just closed. ${breaks} ${breakWord} sorting. Oldest stream is always first in your queue.`;
     let sent = 0;
 
+    // Batched: one prefs query, one bulk notification insert, then emails.
+    // (Was one prefs query + one insert + one admin lookup per sorter, in series.)
+    const { data: prefRows } = await sb.from('notification_preferences').select('*').in('user_id', sorters.map(s => s.id));
+    const prefsBy = {}; (prefRows || []).forEach(p => { prefsBy[p.user_id] = p; });
+    const inserts = [], emailTo = [];
     for (const sorter of sorters) {
-      const { data: prefs } = await sb.from('notification_preferences')
-        .select('*').eq('user_id', sorter.id).maybeSingle();
+      const prefs = prefsBy[sorter.id];
       const inApp  = prefs ? prefs.in_app_notifications_enabled : true;
       const email  = prefs ? prefs.email_notifications_enabled  : true;
       const closed = prefs ? prefs.notify_stream_closed         : true;
       if (!closed) continue;
-
-      if (inApp) {
-        await sb.from('notifications').insert({ organization_id: org_id, user_id: sorter.id, type: 'stream_closed', title, body, action_url: sortUrl });
-      }
-      if (email) {
-        const { data: authUser } = await sb.auth.admin.getUserById(sorter.id);
-        const toEmail = authUser?.user?.email;
-        if (toEmail) {
-          const firstName = (sorter.display_name || '').split(' ')[0] || 'there';
-          try {
-            await sendEmail({ to: toEmail, subject: `New stream ready to sort — ${stream_key}`, html: buildStreamClosedHtml(firstName, stream_key, breaks, sortUrl), text: buildStreamClosedText(firstName, stream_key, breaks, sortUrl) });
-          } catch (e) { console.error('Email error (stream closed):', e.message); }
-        }
-      }
+      if (inApp) inserts.push({ organization_id: org_id, user_id: sorter.id, type: 'stream_closed', title, body, action_url: sortUrl, ref_id: stream_id || null });
+      if (email) emailTo.push(sorter);
       sent++;
     }
-
+    const ins = await insertNotifications(sb, inserts);
+    if (ins.error) console.error('stream-closed notifications insert failed:', ins.error.message);
+    for (const sorter of emailTo) {
+      try {
+        const { data: authUser } = await sb.auth.admin.getUserById(sorter.id);
+        const toEmail = authUser?.user?.email;
+        if (!toEmail) continue;
+        const firstName = (sorter.display_name || '').split(' ')[0] || 'there';
+        await sendEmail({ to: toEmail, subject: `New stream ready to sort — ${stream_key}`, html: buildStreamClosedHtml(firstName, stream_key, breaks, sortUrl), text: buildStreamClosedText(firstName, stream_key, breaks, sortUrl) });
+      } catch (e) { console.error('Email error (stream closed):', e.message); }
+    }
 
     return res.status(200).json({ sent });
   }
@@ -937,25 +800,41 @@ async function notifyHandler(req, res, sb, action) {
       .select('id, display_name, role').eq('org_id', org_id).in('role', ['owner','manager']);
     if (!recipients || recipients.length === 0) return res.status(200).json({ sent: 0, reason: 'no recipients' });
 
-    const inventoryUrl = APP_URL + '/dashboard#inventory';
+    const inventoryUrl = APP_URL + '/dashboard?tab=inventory';
     let totalSent = 0;
 
+    const { data: prefRows } = await sb.from('notification_preferences').select('*').in('user_id', recipients.map(r => r.id));
+    const prefsBy = {}; (prefRows || []).forEach(p => { prefsBy[p.user_id] = p; });
+    const since24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+
     for (const product of lowProducts) {
-      const { data: existing } = await sb.from('notifications').select('id')
-        .eq('organization_id', org_id).eq('type', 'inventory_low').eq('is_read', false)
-        .ilike('body', `%${product.name}%`).limit(1).maybeSingle();
+      // De-dupe per product for 24h (ref_id, migration 013). The old check
+      // matched on body text, so "Prizm" suppressed "Prizm Hobby" and one
+      // unread alert blocked that product forever.
+      let existing = null;
+      if (product.id) {
+        const r = await sb.from('notifications').select('id').eq('organization_id', org_id).eq('type', 'inventory_low')
+          .eq('ref_id', String(product.id)).gte('created_at', since24h).limit(1).maybeSingle();
+        if (!r.error) existing = r.data;
+        else if (isMissingSchema(r.error)) {
+          const r2 = await sb.from('notifications').select('id').eq('organization_id', org_id).eq('type', 'inventory_low')
+            .gte('created_at', since24h).ilike('body', `${product.name} is down to%`).limit(1).maybeSingle();
+          existing = r2.data;
+        }
+      }
       if (existing) continue;
 
       const title = 'Inventory running low';
       const body  = `${product.name} is down to ${product.current_stock} ${product.current_stock === 1 ? 'box' : 'boxes'}. You may want to restock before your next stream.`;
 
+      const inserts = [];
       for (const recipient of recipients) {
-        const { data: prefs } = await sb.from('notification_preferences').select('*').eq('user_id', recipient.id).maybeSingle();
+        const prefs = prefsBy[recipient.id];
         const inApp = prefs ? prefs.in_app_notifications_enabled : true;
         const email = prefs ? prefs.email_notifications_enabled  : true;
         const inv   = prefs ? prefs.notify_inventory_low         : true;
         if (!inv) continue;
-        if (inApp) await sb.from('notifications').insert({ organization_id: org_id, user_id: recipient.id, type: 'inventory_low', title, body, action_url: inventoryUrl });
+        if (inApp) inserts.push({ organization_id: org_id, user_id: recipient.id, type: 'inventory_low', title, body, action_url: inventoryUrl, ref_id: product.id ? String(product.id) : null });
         if (email) {
           const { data: authUser } = await sb.auth.admin.getUserById(recipient.id);
           const toEmail = authUser?.user?.email;
@@ -968,6 +847,8 @@ async function notifyHandler(req, res, sb, action) {
         }
         totalSent++;
       }
+      const ins = await insertNotifications(sb, inserts);
+      if (ins.error) console.error('inventory-low notifications insert failed:', ins.error.message);
     }
     return res.status(200).json({ sent: totalSent });
   }
@@ -983,60 +864,64 @@ async function notifyHandler(req, res, sb, action) {
 // Called after stream closes — updates leaderboard_snapshots for all involved breakers
 // Returns array of staff_ids that had updates (for milestone check)
 async function updateLeaderboardOnStreamClose(sb, streamId, orgId) {
-  const now   = new Date();
-  const year  = now.getFullYear();
-  const month = now.getMonth() + 1;
+  // The snapshot month is the STREAM's month (break_date), not the server's
+  // UTC month at close time — a Friday-night stream closed at 1am UTC on the
+  // 1st belongs to Friday's month, and last month's board must still update.
+  const { data: stream } = await sb.from('streams').select('break_date').eq('id', streamId).maybeSingle();
+  const bd = (stream && stream.break_date) ? stream.break_date : new Date().toISOString().slice(0, 10);
+  const year  = parseInt(bd.slice(0, 4), 10);
+  const month = parseInt(bd.slice(5, 7), 10);
+  const { start: monthStart, end: monthEnd } = monthRange(year, month);
 
   // Get all breaks for this stream
   const { data: streamBreaks } = await sb.from('breaks')
-    .select('breaker_id, revenue').eq('stream_id', streamId);
+    .select('breaker_id').eq('stream_id', streamId);
   if (!streamBreaks || streamBreaks.length === 0) return [];
 
   const staffIds = [...new Set(streamBreaks.map(b => b.breaker_id).filter(Boolean))];
   if (staffIds.length === 0) return [];
 
-  const monthStart = new Date(year, month - 1, 1).toISOString();
-  const monthEnd   = new Date(year, month, 0, 23, 59, 59).toISOString();
+  // One paged query for everyone involved this month, aggregated in memory
+  const monthBreaks = await pageAll(() => sb.from('breaks').select('breaker_id, revenue')
+    .eq('org_id', orgId).in('breaker_id', staffIds).gte('break_date', monthStart).lte('break_date', monthEnd));
+  const agg = {};
+  for (const b of monthBreaks) { const a = agg[b.breaker_id] = agg[b.breaker_id] || { count: 0, revenue: 0 }; a.count++; a.revenue += parseFloat(b.revenue) || 0; }
 
+  const rows = [];
   for (const staffId of staffIds) {
-    // breaks_completed: count of breaks this month for this staff
-    const { count: breaksCompleted } = await sb.from('breaks')
-      .select('id', { count: 'exact', head: true })
-      .eq('breaker_id', staffId).eq('org_id', orgId)
-      .gte('created_at', monthStart).lte('created_at', monthEnd);
+    const a = agg[staffId] || { count: 0, revenue: 0 };
+    rows.push({ org_id: orgId, staff_id: staffId, period_year: year, period_month: month, category: 'breaks_completed',  value: a.count });
+    rows.push({ org_id: orgId, staff_id: staffId, period_year: year, period_month: month, category: 'revenue_generated', value: a.revenue });
+  }
+  await sb.from('leaderboard_snapshots').upsert(rows, { onConflict: 'org_id,staff_id,period_year,period_month,category' });
 
-    // revenue_generated: sum of revenue this month
-    const { data: revData } = await sb.from('breaks')
-      .select('revenue').eq('breaker_id', staffId).eq('org_id', orgId)
-      .gte('created_at', monthStart).lte('created_at', monthEnd);
-    const revenueGenerated = (revData || []).reduce((s, b) => s + (parseFloat(b.revenue) || 0), 0);
-
-    // Upsert 2 categories
-    const categories = [
-      { category: 'breaks_completed',  value: breaksCompleted  || 0 },
-      { category: 'revenue_generated', value: revenueGenerated },
-    ];
-
-    for (const cat of categories) {
-      await sb.from('leaderboard_snapshots').upsert({
-        org_id: orgId, staff_id: staffId, period_year: year, period_month: month,
-        category: cat.category, value: cat.value
-      }, { onConflict: 'org_id,staff_id,period_year,period_month,category' });
-    }
-
-    // Recalculate ranks for this period/category
-    for (const cat of categories) {
-      const { data: ranked } = await sb.from('leaderboard_snapshots')
-        .select('id, value').eq('org_id', orgId).eq('period_year', year)
-        .eq('period_month', month).eq('category', cat.category)
-        .order('value', { ascending: false });
-      for (let i = 0; i < (ranked || []).length; i++) {
-        await sb.from('leaderboard_snapshots').update({ rank: i + 1 }).eq('id', ranked[i].id);
-      }
+  // Ranks: one UPDATE with a window function (migration 013); falls back to the old loop
+  for (const category of ['breaks_completed', 'revenue_generated']) {
+    const r = await sb.rpc('recalc_leaderboard_ranks', { p_org: orgId, p_year: year, p_month: month, p_category: category });
+    if (!r.error) continue;
+    if (!isMissingSchema(r.error)) { console.error('recalc_leaderboard_ranks:', r.error.message); }
+    const { data: ranked } = await sb.from('leaderboard_snapshots')
+      .select('id, value').eq('org_id', orgId).eq('period_year', year)
+      .eq('period_month', month).eq('category', category)
+      .order('value', { ascending: false });
+    for (let i = 0; i < (ranked || []).length; i++) {
+      await sb.from('leaderboard_snapshots').update({ rank: i + 1 }).eq('id', ranked[i].id);
     }
   }
 
   return staffIds;
+}
+
+// Longest run of consecutive calendar days with at least one break.
+function longestStreak(dates) {
+  const days = [...new Set((dates || []).filter(Boolean).map(d => String(d).slice(0, 10)))].sort();
+  let longest = 0, cur = 0, prev = null;
+  for (const day of days) {
+    cur = prev && Math.round((new Date(day + 'T00:00:00Z') - new Date(prev + 'T00:00:00Z')) / 86400000) === 1 ? cur + 1 : 1;
+    longest = Math.max(longest, cur);
+    prev = day;
+  }
+  return longest;
 }
 
 // Called after leaderboard update — checks automatic milestone thresholds for each staff member
@@ -1053,27 +938,18 @@ async function checkMilestoneTriggers(sb, staffIds, orgId) {
   if (!milestones || milestones.length === 0) return newlyAwarded;
 
   for (const staffId of staffIds) {
-    // Get all-time stats for this staff member in this org
-    const { data: allBreaks } = await sb.from('breaks')
-      .select('revenue, commission_amount, created_at')
-      .eq('breaker_id', staffId).eq('org_id', orgId);
-    const breaks       = (allBreaks || []).length;
-    const revenue      = (allBreaks || []).reduce((s, b) => s + (parseFloat(b.revenue) || 0), 0);
-    const commission   = (allBreaks || []).reduce((s, b) => s + (parseFloat(b.commission_amount) || 0), 0);
-
-    // Streak (all-time longest)
-    const allDays = [...new Set((allBreaks || []).map(b => b.created_at.slice(0, 10)))].sort();
-    let streak = 0, cur = 0, prev = null;
-    for (const day of allDays) {
-      cur = prev && (new Date(day) - new Date(prev)) / 86400000 === 1 ? cur + 1 : 1;
-      streak = Math.max(streak, cur);
-      prev = day;
-    }
+    // All-time stats for this staff member in this org. (The old select asked for
+    // breaks.commission_amount, a column that doesn't exist — the query failed,
+    // every stat read 0, and automatic awards at stream close never fired.)
+    const allBreaks = await pageAll(() => sb.from('breaks').select('revenue, break_date').eq('breaker_id', staffId).eq('org_id', orgId));
+    const breaks  = allBreaks.length;
+    const revenue = allBreaks.reduce((s, b) => s + (parseFloat(b.revenue) || 0), 0);
+    const streak  = longestStreak(allBreaks.map(b => b.break_date));
 
     const statsMap = {
       breaks_completed:  breaks,
       revenue_generated: revenue,
-      commission_earned: commission,
+      commission_earned: null,   // no source column — never awardable, skipped below
       streak_days:       streak,
     };
 
@@ -1199,25 +1075,24 @@ async function analyticsHandler(req, res, sb, action) {
   const cutoff    = periodDays ? new Date(now.getTime() - periodDays * 86400000).toISOString() : null;
   const prevCutoff = periodDays ? new Date(now.getTime() - 2 * periodDays * 86400000).toISOString() : null;
 
-  const [streamsRes, prevStreamsRes, breaksRes, buyersRes, staffRes, productsRes] = await Promise.all([
-    cutoff
-      ? sb.from('streams').select('id,closed_at,break_date,final_sales,total_submitted_revenue,net_profit,break_count,total_product_cost').eq('org_id', orgId).eq('status','closed').gte('closed_at', cutoff)
-      : sb.from('streams').select('id,closed_at,break_date,final_sales,total_submitted_revenue,net_profit,break_count,total_product_cost').eq('org_id', orgId).eq('status','closed'),
+  // Every list here is paged — the 'all' period and the buyers table silently
+  // truncated at 1,000 rows before (AUDIT AB-1).
+  const streamSel = 'id,closed_at,break_date,final_sales,total_submitted_revenue,net_profit,break_count,total_product_cost';
+  const [streams, prevStreams, breaks, buyers, staffRes, productsRes] = await Promise.all([
+    pageAll(() => cutoff
+      ? sb.from('streams').select(streamSel).eq('org_id', orgId).eq('status','closed').gte('closed_at', cutoff).order('id')
+      : sb.from('streams').select(streamSel).eq('org_id', orgId).eq('status','closed').order('id')),
     periodDays
-      ? sb.from('streams').select('final_sales,net_profit').eq('org_id', orgId).eq('status','closed').gte('closed_at', prevCutoff).lt('closed_at', cutoff)
-      : Promise.resolve({ data: [] }),
-    cutoff
-      ? sb.from('breaks').select('breaker_id,revenue,net_profit').eq('org_id', orgId).gte('created_at', cutoff)
-      : sb.from('breaks').select('breaker_id,revenue,net_profit').eq('org_id', orgId),
-    sb.from('buyers').select('id,total_spent,temperature,total_breaks_purchased,created_at,last_purchase_date').eq('organization_id', orgId),
-    sb.from('profiles').select('id,display_name').eq('org_id', orgId).eq('role','breaker'),
+      ? pageAll(() => sb.from('streams').select('final_sales,net_profit').eq('org_id', orgId).eq('status','closed').gte('closed_at', prevCutoff).lt('closed_at', cutoff).order('id'))
+      : Promise.resolve([]),
+    pageAll(() => cutoff
+      ? sb.from('breaks').select('breaker_id,revenue,net_profit').eq('org_id', orgId).gte('created_at', cutoff).order('id')
+      : sb.from('breaks').select('breaker_id,revenue,net_profit').eq('org_id', orgId).order('id')),
+    pageAll(() => sb.from('buyers').select('id,total_spent,temperature,total_breaks_purchased,created_at,last_purchase_date').eq('organization_id', orgId).order('id')),
+    sb.from('profiles').select('id,display_name').eq('org_id', orgId).in('role', ['breaker', 'breaker/manager']),
     sb.from('products').select('id,name,current_stock').eq('org_id', orgId).lte('current_stock', 3)
   ]);
 
-  const streams    = streamsRes.data || [];
-  const prevStreams = prevStreamsRes.data || [];
-  const breaks     = breaksRes.data || [];
-  const buyers     = buyersRes.data || [];
   const staff      = staffRes.data || [];
   const lowProducts = productsRes.data || [];
 
@@ -1399,6 +1274,10 @@ async function streamHandler(req, res, sb, action) {
       });
       const logEntries = [];
       for (const [productId, qty] of Object.entries(stockDeltas)) {
+        // Atomic restore (adjust_stock_admin, migration 013) — no read-then-write race
+        const r = await sb.rpc('adjust_stock_admin', { p_org: profile.org_id, p_product_id: productId, p_delta: qty, p_action: 'restored', p_notes: 'Stream ' + stream.stream_key + ' deleted — stock restored' });
+        if (!r.error) continue;
+        if (!isMissingSchema(r.error)) { console.error('adjust_stock_admin failed:', r.error.message); }
         const { data: prod } = await sb.from('products')
           .select('current_stock, name, unit_cost').eq('id', productId).eq('org_id', profile.org_id).maybeSingle();
         if (prod) {
@@ -1408,7 +1287,7 @@ async function streamHandler(req, res, sb, action) {
             notes: 'Stream ' + stream.stream_key + ' deleted — stock restored' });
         }
       }
-      if (logEntries.length) await sb.from('inventory_log').insert(logEntries).then(null, () => {});
+      if (logEntries.length) { const lg = await sb.from('inventory_log').insert(logEntries); if (lg.error) console.error('inventory_log restore failed:', lg.error.message); }
 
       // 2. Reverse buyer totals before deleting purchases
       const { data: purchases } = await sb.from('buyer_purchases')

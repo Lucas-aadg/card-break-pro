@@ -55,11 +55,25 @@ module.exports = async (req, res) => {
     const remainingSeconds = Math.max(0, stripeSub.current_period_end - now);
     const remainingDays    = Math.floor(remainingSeconds / 86400);
 
-    const prorationCredit = Math.min(
-      Math.floor((remainingDays / 30) * MONTHLY_PRICES_CENTS[sub.tier]),
-      ANNUAL_PRICES_CENTS[sub.tier]
-    );
-    const chargeToday = Math.max(0, ANNUAL_PRICES_CENTS[sub.tier] - prorationCredit);
+    // Ask Stripe what it will actually charge, so the preview equals the invoice.
+    // Falls back to the local estimate if the preview call fails. (AUDIT BL-18)
+    let prorationCredit, chargeToday, previewSource = 'stripe';
+    try {
+      const upcoming = await stripe.invoices.retrieveUpcoming({
+        customer: typeof stripeSub.customer === 'string' ? stripeSub.customer : stripeSub.customer.id,
+        subscription: sub.stripe_subscription_id,
+        subscription_items: [{ id: stripeSub.items.data[0].id, price: annualPriceId }],
+        subscription_proration_behavior: 'create_prorations',
+        subscription_billing_cycle_anchor: 'now'
+      });
+      chargeToday = Math.max(0, upcoming.amount_due);
+      prorationCredit = Math.max(0, ANNUAL_PRICES_CENTS[sub.tier] - chargeToday);
+    } catch (e) {
+      console.error('switch-to-annual preview fallback:', e.message);
+      previewSource = 'estimate';
+      prorationCredit = Math.min(Math.floor((remainingDays / 30) * MONTHLY_PRICES_CENTS[sub.tier]), ANNUAL_PRICES_CENTS[sub.tier]);
+      chargeToday = Math.max(0, ANNUAL_PRICES_CENTS[sub.tier] - prorationCredit);
+    }
 
     const renewalDate = new Date();
     renewalDate.setFullYear(renewalDate.getFullYear() + 1);
@@ -69,6 +83,7 @@ module.exports = async (req, res) => {
       // Preview — return the numbers without making changes
       return res.status(200).json({
         preview:          true,
+        preview_source:   previewSource,
         tier:             sub.tier,
         annual_price:     ANNUAL_PRICES_CENTS[sub.tier],
         proration_credit: prorationCredit,

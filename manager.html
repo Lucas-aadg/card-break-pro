@@ -14,6 +14,7 @@
   <title>Card Break Pro — Manager Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
+  <script src="shared.js"></script>
   <script src="buyer-intel.js"></script>
   <style>
     :root {
@@ -1840,10 +1841,13 @@ async function invHandleSave() {
     if (error) throw error;
 
     if (stock > 0) {
-      await sb.from('inventory_log').insert({
+      // Same column names every other writer uses (quantity / unit_cost) — the old
+      // qty / cost_per_unit insert failed silently, so manager-added products had no log line.
+      const { error: logErr } = await sb.from('inventory_log').insert({
         org_id: currentProfile.org_id, product_id: inserted.id, product_name: name,
-        action: 'initial', qty: stock, cost_per_unit: cost, notes: 'Initial stock'
+        action: 'initial', quantity: stock, unit_cost: cost, notes: 'Initial stock'
       });
+      if (logErr) CBP.captureError(logErr, 'inventory_log initial (manager)');
     }
     invClearForm();
     await loadInventory();
@@ -1923,19 +1927,23 @@ async function pmHandleSave() {
       if (!freshErr && fresh && fresh.current_stock != null) baseStock = fresh.current_stock;
     }
 
-    // Only write current_stock when it actually changes (restock or manual
-    // correction) — never blindly overwrite with a stale value.
+    // Restock is an atomic increment (adjust_stock RPC) so a breaker opening
+    // boxes at the same moment can't lose the update; the weighted-average cost
+    // is written alongside. Manual corrections still set the absolute value.
+    let restocked = false;
     if (restock > 0) {
-      updates.current_stock = baseStock + restock;
       const existingCost = p.unit_cost || cost;
       if (existingCost > 0 && (baseStock + restock) > 0) {
         updates.unit_cost = (baseStock * existingCost + restock * restockCost) / (baseStock + restock);
       }
-      await sb.from('inventory_log').insert({
-        org_id: currentProfile.org_id, product_id: id, product_name: name,
-        action: 'restock', quantity: restock, unit_cost: restockCost,
-        notes: 'Restock by manager'
-      });
+      const rpc = await sb.rpc('adjust_stock', { p_product_id: id, p_delta: restock, p_action: 'restock', p_notes: 'Restock by manager' });
+      if (!rpc.error) restocked = true;
+      else if (!CBP.isMissingSchema(rpc.error)) throw rpc.error;
+      else {
+        updates.current_stock = baseStock + restock;   // migration 013 not run yet
+        const { error: logErr } = await sb.from('inventory_log').insert({ org_id: currentProfile.org_id, product_id: id, product_name: name, action: 'restock', quantity: restock, unit_cost: restockCost, notes: 'Restock by manager' });
+        if (logErr) CBP.captureError(logErr, 'inventory_log restock (manager)');
+      }
     } else if (stockManuallyEdited) {
       updates.current_stock = baseStock; // owner-style manual correction
     }

@@ -1,7 +1,9 @@
 {
   "functions": {
     "api/process-import.js": { "maxDuration": 60 },
-    "api/import-slip.js": { "maxDuration": 30 }
+    "api/import-slip.js": { "maxDuration": 30 },
+    "api/cron.js": { "maxDuration": 60 },
+    "api/features.js": { "maxDuration": 30 }
   },
   "rewrites": [
     { "source": "/", "destination": "/landing.html" },
@@ -31,11 +33,6 @@
     { "source": "/api/milestones/award", "destination": "/api/features?feature=milestones&action=award" },
 
 
-    { "source": "/api/sorter-splits/pending", "destination": "/api/features?feature=sorter-splits&action=pending" },
-    { "source": "/api/sorter-splits/confirm", "destination": "/api/features?feature=sorter-splits&action=confirm" },
-    { "source": "/api/sorter-splits/decline", "destination": "/api/features?feature=sorter-splits&action=decline" },
-    { "source": "/api/sorter-splits", "destination": "/api/features?feature=sorter-splits&action=splits" },
-
     { "source": "/api/goals", "destination": "/api/features?feature=goals&action=goals" },
     { "source": "/api/goals/manage", "destination": "/api/features?feature=goals&action=manage" },
 
@@ -62,10 +59,6 @@
     {
       "path": "/api/cron?type=annual-renewal",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron?type=split-expiry",
-      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron?type=goal-prompt",

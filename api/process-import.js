@@ -126,7 +126,27 @@ async function handleImport(req, res) {
     oldBuyerIds.forEach(id => affected.add(id));
     const affectedIds = Array.from(affected);
 
+    const idToRealName = {};
+    unames.forEach(u => { if (byUname[u].realName && unameToId[u]) idToRealName[unameToId[u]] = byUname[u].realName; });
+    const nowIso = new Date().toISOString();
+
+    // One SQL statement for all affected buyers (migration 013). A 2,000-buyer
+    // slip used to be 2,000 round-trips against a 60s limit (AUDIT SC-7).
+    let recomputed = false;
+    for (let i = 0; i < affectedIds.length; i += 500) {
+      const r = await sb.rpc('recompute_buyer_totals', { p_org: orgId, p_ids: affectedIds.slice(i, i + 500) });
+      if (r.error) { if (!/does not exist|could not find|schema cache/i.test(r.error.message || '')) throw new Error('recompute failed: ' + r.error.message); recomputed = false; break; }
+      recomputed = true;
+    }
+    if (recomputed) {
+      // Real names come from the slip, not the purchases — a small separate write
+      for (const id of Object.keys(idToRealName)) {
+        await sb.from('buyers').update({ real_name: idToRealName[id], updated_at: nowIso }).eq('id', id).eq('organization_id', orgId);
+      }
+    }
+
     const agg = {};
+    if (!recomputed) {
     affectedIds.forEach(id => { agg[id] = { spent: 0, breaks: 0, streams: new Set(), last: null }; });
     for (const grp of chunk(affectedIds, IN_CHUNK)) {
       let pf = 0;
@@ -145,10 +165,6 @@ async function handleImport(req, res) {
       }
     }
 
-    const idToRealName = {};
-    unames.forEach(u => { if (byUname[u].realName && unameToId[u]) idToRealName[unameToId[u]] = byUname[u].realName; });
-
-    const nowIso = new Date().toISOString();
     const updateOne = async (id) => {
       const a = agg[id];
       const patch = {
@@ -166,6 +182,7 @@ async function handleImport(req, res) {
     };
     // Parallel in small batches — many single-row updates, but wall-clock stays low.
     for (const grp of chunk(affectedIds, 25)) await Promise.all(grp.map(updateOne));
+    } // end fallback (migration 013 not run)
 
     // ── 6. Record the import ──
     let importId = null;

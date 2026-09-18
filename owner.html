@@ -17,6 +17,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="config.js"></script>
   <script src="analytics.js"></script>
+  <script src="shared.js"></script>
   <script src="buyer-intel.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -1762,7 +1763,7 @@
                 <th>Role</th>
                 <th>Pay Structure</th>
                 <th>Breakdown</th>
-                <th style="text-align:right;">Total Owed</th>
+                <th style="text-align:right;">Owed Now</th>
               </tr>
             </thead>
             <tbody id="prTableBody"></tbody>
@@ -2062,6 +2063,19 @@
       </div>
       <div style="margin-top:1rem;">
         <button class="btn btn-primary btn-sm" id="settSaveProfile" style="padding:0.5rem 1.25rem;">Save Profile</button>
+      </div>
+    </div>
+
+    <!-- Business timezone — every "today", pay period and shift time uses it -->
+    <div class="panel">
+      <div class="panel-title">Business Timezone</div>
+      <div style="font-size:0.82rem;color:var(--muted);margin-bottom:0.85rem;">Pay periods, "today", shift reminders and clock-in windows all follow this zone. Evening streams that run past midnight stay on the day they started.</div>
+      <div class="form-group" style="max-width:320px;">
+        <label for="settTimezone">Timezone</label>
+        <select id="settTimezone" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.6rem 0.75rem;font-size:0.9rem;width:100%;"></select>
+      </div>
+      <div style="margin-top:0.75rem;">
+        <button class="btn btn-primary btn-sm" id="settSaveTimezone" onclick="saveOrgTimezone()" style="padding:0.5rem 1.25rem;">Save</button>
       </div>
     </div>
 
@@ -2937,51 +2951,17 @@
     </div>
 
     <!-- Role: Sorter -->
+    <!-- Sorters are hourly. Pay = hours clocked × rate; nothing else. -->
     <div id="ps-sorter-fields" style="display:none;">
-      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.75rem;">Pay Type</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem;margin-bottom:1.1rem;">
-        <label style="all:unset;cursor:pointer;">
-          <input type="radio" name="ps-sorter-type" value="hourly" id="pss-hourly" style="display:none;" />
-          <div class="ps-type-card" id="pss-hourly-card" onclick="psSorterType('hourly')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
-            <div style="font-size:1.1rem;margin-bottom:0.2rem;">⏱</div>
-            <div style="font-weight:700;font-size:0.8rem;">Hourly</div>
-            <div style="font-size:0.72rem;color:var(--muted);">rate × hrs clocked</div>
-          </div>
-        </label>
-        <label style="all:unset;cursor:pointer;">
-          <input type="radio" name="ps-sorter-type" value="per_break" id="pss-per-break" style="display:none;" />
-          <div class="ps-type-card" id="pss-per-break-card" onclick="psSorterType('per_break')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
-            <div style="font-size:1.1rem;margin-bottom:0.2rem;">📦</div>
-            <div style="font-weight:700;font-size:0.8rem;">Per Break</div>
-            <div style="font-size:0.72rem;color:var(--muted);">$ per break sorted</div>
-          </div>
-        </label>
-        <label style="all:unset;cursor:pointer;">
-          <input type="radio" name="ps-sorter-type" value="hourly_per_break" id="pss-hourly-per-break" style="display:none;" />
-          <div class="ps-type-card" id="pss-hourly-per-break-card" onclick="psSorterType('hourly_per_break')" style="border:2px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center;">
-            <div style="font-size:1.1rem;margin-bottom:0.2rem;">⏱📦</div>
-            <div style="font-weight:700;font-size:0.8rem;">Hourly + Per Break</div>
-            <div style="font-size:0.72rem;color:var(--muted);">both combined</div>
-          </div>
-        </label>
+      <input type="radio" name="ps-sorter-type" value="hourly" id="pss-hourly" checked style="display:none;" />
+      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.5rem;">Pay Type</div>
+      <div style="display:flex;align-items:center;gap:0.6rem;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.25);border-radius:8px;padding:0.7rem 0.9rem;margin-bottom:1.1rem;">
+        <span style="font-size:1.1rem;">⏱</span>
+        <div><div style="font-weight:700;font-size:0.85rem;">Hourly</div><div style="font-size:0.74rem;color:var(--muted);">Sorters are paid for hours clocked in and out. Time is prorated at pay-period edges so a shift that runs past midnight is never dropped.</div></div>
       </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-        <div class="form-group ps-sorter-field-hourly ps-sorter-field-hourly-per-break" id="pss-hourly-rate-group">
-          <label for="ps-sorter-hourly-rate">Hourly Rate ($/hr)</label>
-          <input type="number" id="ps-sorter-hourly-rate" min="0" step="0.01" placeholder="e.g. 15.00" />
-        </div>
-        <div class="form-group ps-sorter-field-per-break ps-sorter-field-hourly-per-break" id="pss-per-break-rate-group">
-          <label for="ps-sorter-per-break-rate">Default Rate per Tray ($) <span style="color:var(--red);font-weight:800;">*</span> <span style="font-weight:400;color:var(--muted);font-size:0.75rem;">— used when no category rate matches</span></label>
-          <input type="number" id="ps-sorter-per-break-rate" min="0.01" step="0.01" placeholder="e.g. 4.00" />
-        </div>
-      </div>
-
-      <!-- Category Rates — only shown for per_break types -->
-      <div id="pss-category-rates-group" style="display:none;margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--border);">
-        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Rate by Product Type <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.72rem;">(optional — overrides default rate per category)</span></div>
-        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem;">e.g. Baseball $3, Pokemon $5, Football $4</div>
-        <div id="pss-category-rates-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem 1rem;"></div>
+      <div class="form-group" id="pss-hourly-rate-group" style="max-width:260px;">
+        <label for="ps-sorter-hourly-rate">Hourly Rate ($/hr)</label>
+        <input type="number" id="ps-sorter-hourly-rate" min="0" step="0.01" placeholder="e.g. 15.00" />
       </div>
     </div>
 
@@ -3196,10 +3176,8 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString();
 }
 
-function today() {
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
+// "Today" in the business's timezone (Settings → Business Timezone), not the browser's.
+function today() { return CBP.todayIn(); }
 
 function showLoading(text) {
   document.getElementById('loadingText').textContent = text || 'Loading…';
@@ -3562,7 +3540,7 @@ async function loadInsights() {
 
     // 3. Low stock alerts
     const lowStockItems = products.filter(function(p){ return p.current_stock <= (p.min_stock_alert || 5) && p.current_stock > 0; });
-    const outItems = products.filter(function(p){ return p.current_stock === 0; });
+    const outItems = products.filter(function(p){ return p.current_stock <= 0; });
     if (outItems.length) {
       insights.push({ icon:'🚨', color:'var(--red)', title:'Out of Stock', body: outItems.slice(0,3).map(function(p){ return '<strong>' + escHtml(p.name) + '</strong>'; }).join(', ') + (outItems.length > 3 ? ' and ' + (outItems.length-3) + ' more' : '') + ' — restock before your next stream.' });
     }
@@ -3767,6 +3745,9 @@ async function initAuth() {
     currentProfile = profile;
     orgTier = sub ? (sub.tier || 'legacy') : 'legacy';
     document.getElementById('ownerBadge').textContent = escHtml(profile.display_name);
+
+    // Org timezone drives "today", pay periods and shift times everywhere
+    await CBP.loadOrgTz(sb, profile.org_id);
 
     // PostHog: identify user with org/tier context
     const { data: orgInfo } = await sb.from('organizations').select('name').eq('id', profile.org_id).maybeSingle();
@@ -4089,8 +4070,8 @@ function beRenderProductTable() {
 
   activeProducts.forEach(function (p, idx) {
     const tr = document.createElement('tr');
-    const stockClass = p.current_stock === 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
-    const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
+    const stockClass = p.current_stock <= 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
+    const stockLabel = p.current_stock < 0 ? p.current_stock + ' — OVER-USED' : p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
     tr.innerHTML =
       '<td>' + escHtml(p.name) + '</td>' +
       '<td style="color:var(--muted);">' + escHtml(p.category || '—') + '</td>' +
@@ -5107,7 +5088,7 @@ function invRenderFilteredProducts() {
     if (status === 'active' && !p.active) return false;
     if (status === 'inactive' && p.active) return false;
     if (status === 'low' && !(p.current_stock > 0 && p.current_stock <= p.min_stock_alert)) return false;
-    if (status === 'out' && p.current_stock !== 0) return false;
+    if (status === 'out' && p.current_stock > 0) return false;
     return true;
   });
 
@@ -5142,8 +5123,8 @@ function invRenderFilteredProducts() {
 
   filtered.forEach(function (p) {
     const tr = document.createElement('tr');
-    const stockClass = p.current_stock === 0 ? 'badge-red' : p.current_stock <= p.min_stock_alert ? 'badge-yellow' : 'badge-green';
-    const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
+    const stockClass = p.current_stock <= 0 ? 'badge-red' : p.current_stock <= p.min_stock_alert ? 'badge-yellow' : 'badge-green';
+    const stockLabel = p.current_stock < 0 ? p.current_stock + ' — OVER-USED' : p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
     tr.innerHTML =
       '<td><strong>' + escHtml(p.name) + '</strong>' + (p.notes ? '<br><small style="color:var(--muted);">' + escHtml(p.notes) + '</small>' : '') + '</td>' +
       '<td>' + escHtml(p.category || '—') + '</td>' +
@@ -5439,33 +5420,27 @@ async function loadHistory() {
   const to = document.getElementById('histDateTo').value;
   const breakerId = document.getElementById('histBreaker').value;
 
-  let query = sb.from('breaks').select('*')
-    .eq('org_id', currentProfile.org_id)
-    .order('break_date', { ascending: false })
-    .order('created_at', { ascending: false });
-
-  // Filter breaks by channel via stream IDs
-  if (activeChannel) {
-    const chStreamIds = await getActiveChannelStreamIds();
-    if (chStreamIds && chStreamIds.length === 0) {
-      historyData = [];
-      renderHistoryTable([]);
-      return;
-    }
-    if (chStreamIds) query = query.in('stream_id', chStreamIds);
-  }
-
-  if (from) query = query.gte('break_date', from);
-  if (to) query = query.lte('break_date', to);
-  if (breakerId) query = query.eq('breaker_id', breakerId);
+  // Account scope is a join filter on the stream, not a list of stream ids in
+  // the URL (which breaks past a few hundred streams). Paged past the row cap.
+  const chFilter = await channelOrFilter();
+  const buildQuery = function () {
+    let q = sb.from('breaks').select(chFilter ? '*, stream:streams!inner(id,channel_id,breaker_id)' : '*')
+      .eq('org_id', currentProfile.org_id)
+      .order('break_date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (chFilter) q = q.or(chFilter, { referencedTable: 'stream' });
+    if (from) q = q.gte('break_date', from);
+    if (to) q = q.lte('break_date', to);
+    if (breakerId) q = q.eq('breaker_id', breakerId);
+    return q;
+  };
 
   try {
-    const { data, error } = await query;
-    if (error) throw error;
-    historyData = data || [];
+    historyData = await CBP.pageAll(buildQuery);
     renderHistoryTable(historyData);
   } catch (err) {
     showGlobalError('Failed to load history: ' + escHtml(err.message));
+    CBP.captureError(err, 'loadHistory');
   }
 }
 
@@ -5503,9 +5478,9 @@ function renderHistoryTable(breaks) {
 
 async function loadStreamsMap(streamIds) {
   if (!streamIds.length) return {};
-  const { data } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', streamIds);
+  const data = await inChunks(function (ids) { return sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', ids); }, streamIds);
   const map = {};
-  (data || []).forEach(function (s) { map[s.id] = s.stream_key; });
+  data.forEach(function (s) { map[s.id] = s.stream_key; });
   return map;
 }
 
@@ -5628,15 +5603,15 @@ async function loadStreamSummary() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Loading…</td></tr>';
 
   try {
-    const ssStreamIds = await getActiveChannelStreamIds();
-    let ssQ = sb.from('streams').select('*')
-      .eq('org_id', currentProfile.org_id)
-      .order('break_date', { ascending: false })
-      .order('created_at', { ascending: false });
-    if (ssStreamIds) ssQ = ssQ.in('id', ssStreamIds);
-    const { data, error } = await ssQ;
-
-    if (error) throw error;
+    const chFilter = await channelOrFilter();
+    const data = await CBP.pageAll(function () {
+      let ssQ = sb.from('streams').select('*')
+        .eq('org_id', currentProfile.org_id)
+        .order('break_date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (chFilter) ssQ = ssQ.or(chFilter);
+      return ssQ;
+    });
 
     tbody.innerHTML = '';
     if (!data || data.length === 0) {
@@ -5948,15 +5923,21 @@ async function confirmEditStream() {
         stockDelta[p.product_id] = (stockDelta[p.product_id] || 0) - (p.qty || 0);
       });
     });
-    // Apply delta to inventory
+    // Apply delta to inventory — atomically (adjust_stock RPC), so a breaker
+    // submitting a break at the same moment can't overwrite this correction.
     for (const [prodId, delta] of Object.entries(stockDelta)) {
       if (delta === 0) continue;
       const product = (orgProducts || []).find(function(p){ return p.id === prodId; });
       if (!product) continue;
-      const newStock = Math.max(0, (product.current_stock || 0) + delta);
+      const rpc = await sb.rpc('adjust_stock', { p_product_id: prodId, p_delta: delta, p_action: delta > 0 ? 'restored' : 'used', p_notes: 'Edit Stream ' + (_esStreamData.stream_key || '') });
+      if (!rpc.error) { product.current_stock = rpc.data; continue; }
+      if (!CBP.isMissingSchema(rpc.error)) throw new Error('Inventory update failed for ' + product.name + ': ' + rpc.error.message);
+      // Migration 013 not run yet — last-resort non-atomic path
+      const { data: fresh } = await sb.from('products').select('current_stock').eq('id', prodId).maybeSingle();
+      const newStock = ((fresh && fresh.current_stock) || 0) + delta;
       const { error: esStkErr } = await sb.from('products').update({ current_stock: newStock }).eq('id', prodId).eq('org_id', currentProfile.org_id);
       if (esStkErr) throw new Error('Inventory update failed for ' + product.name + ': ' + esStkErr.message);
-      product.current_stock = newStock; // update local cache
+      product.current_stock = newStock;
     }
 
     // ── Delete removed breaks ────────────────────────────────────────────
@@ -6096,6 +6077,33 @@ function setupDashboard() {
   // no additional setup needed — loaded on tab switch
 }
 
+// Run a `.in(col, ids)` query in chunks so the URL never blows past the proxy /
+// PostgREST length limit (a few hundred UUIDs is enough to break a GET), and
+// page each chunk past the 1,000-row cap.
+async function inChunks(makeQuery, ids, size) {
+  size = size || 120;
+  let out = [];
+  for (let i = 0; i < ids.length; i += size) {
+    const slice = ids.slice(i, i + size);
+    const rows = await CBP.pageAll(function () { return makeQuery(slice); });
+    out = out.concat(rows);
+  }
+  return out;
+}
+
+// PostgREST `or()` filter expressing "this stream belongs to the active account":
+// tagged to it, or untagged and run by a breaker assigned to it.
+var _channelBreakerIds = {};
+async function channelOrFilter() {
+  if (!activeChannel) return null;
+  if (!_channelBreakerIds[activeChannel.id]) {
+    const { data: assigns } = await sb.from('channel_assignments').select('profile_id').eq('org_id', currentProfile.org_id).eq('channel_id', activeChannel.id);
+    _channelBreakerIds[activeChannel.id] = (assigns || []).map(function (a) { return a.profile_id; });
+  }
+  const ids = _channelBreakerIds[activeChannel.id];
+  return 'channel_id.eq.' + activeChannel.id + (ids.length ? ',and(channel_id.is.null,breaker_id.in.(' + ids.join(',') + '))' : '');
+}
+
 async function getActiveChannelStreamIds() {
   if (!activeChannel) return null;
 
@@ -6153,65 +6161,60 @@ async function loadDashboard() {
       return;
     }
 
-    // Today's breaks (revenue + count only — profit comes from streams)
-    let todayBreaksQ = sb.from('breaks').select('revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id).eq('break_date', todayStr);
-    if (chStreamIds) todayBreaksQ = todayBreaksQ.in('stream_id', chStreamIds);
-    const { data: todayBreaks, error: tbErr } = await todayBreaksQ;
-    if (tbErr) throw tbErr;
+    // Server-side totals (migration 013 — one query, no 1,000-row cap). Falls
+    // back to the paged client computation until the migration is run.
+    let t = null;
+    const rpc = await sb.rpc('org_dashboard_totals', { p_channel: activeChannel ? activeChannel.id : null, p_today: todayStr });
+    if (!rpc.error && rpc.data && rpc.data.length) {
+      const r = rpc.data[0];
+      t = { todayRev: Number(r.today_revenue) || 0, todayCount: Number(r.today_breaks) || 0, todayProfit: Number(r.today_profit) || 0,
+            totalRev: Number(r.total_revenue) || 0, totalBreaks: Number(r.total_breaks) || 0, totalStreams: Number(r.total_streams) || 0, totalProfit: Number(r.total_profit) || 0 };
+    } else if (rpc.error && !CBP.isMissingSchema(rpc.error)) {
+      throw rpc.error;
+    }
+    if (!t) t = await dashboardTotalsClient(todayStr, chStreamIds);
 
-    const todayRev = (todayBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
-    const todayCount = (todayBreaks || []).length;
-
-    // Today's profit: closed streams use actual net_profit; active streams use estimated break profit
-    let todayStreamsQ = sb.from('streams').select('id, net_profit, commission_payout, final_sales, total_product_cost, total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed').eq('break_date', todayStr);
-    if (chStreamIds) todayStreamsQ = todayStreamsQ.in('id', chStreamIds);
-    const { data: todayClosedStreams } = await todayStreamsQ;
-    const todayClosedIds = new Set((todayClosedStreams || []).map(function (s) { return s.id; }));
-    const todayClosedProfit = (todayClosedStreams || []).reduce(function (s, x) {
-      const np = x.net_profit != null ? parseFloat(x.net_profit) : (parseFloat(x.final_sales)||0) - (parseFloat(x.total_product_cost)||0) - (parseFloat(x.total_other_costs)||0);
-      return s + np - (parseFloat(x.commission_payout) || 0);
-    }, 0);
-    const todayActiveProfit = (todayBreaks || []).filter(function (b) { return !todayClosedIds.has(b.stream_id); }).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
-    const todayProfit = todayClosedProfit + todayActiveProfit;
-
-    document.getElementById('dash-revenue').textContent = fmt(todayRev);
+    document.getElementById('dash-revenue').textContent = fmt(t.todayRev);
     const profitEl = document.getElementById('dash-profit');
-    profitEl.textContent = fmt(todayProfit);
-    profitEl.className = 'stat-value ' + (todayProfit >= 0 ? 'green' : 'red');
-    document.getElementById('dash-breaks').textContent = todayCount;
-    document.getElementById('dash-avg').textContent = todayCount > 0 ? fmt(todayRev / todayCount) : '—';
+    profitEl.textContent = fmt(t.todayProfit);
+    profitEl.className = 'stat-value ' + (t.todayProfit >= 0 ? 'green' : 'red');
+    document.getElementById('dash-breaks').textContent = t.todayCount;
+    document.getElementById('dash-avg').textContent = t.todayCount > 0 ? fmt(t.todayRev / t.todayCount) : '—';
 
-    // All-time revenue from breaks, profit from streams (accurate)
-    let allBreaksQ = sb.from('breaks').select('revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id);
-    if (chStreamIds) allBreaksQ = allBreaksQ.in('stream_id', chStreamIds);
-    const { data: allBreaks, error: abErr } = await allBreaksQ;
-    if (abErr) throw abErr;
-
-    const totalRev = (allBreaks || []).reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
-
-    let allClosedStreamsQ = sb.from('streams').select('id, net_profit, commission_payout, final_sales, total_product_cost, total_other_costs').eq('org_id', currentProfile.org_id).eq('status', 'closed');
-    if (chStreamIds) allClosedStreamsQ = allClosedStreamsQ.in('id', chStreamIds);
-    const { data: allClosedStreams } = await allClosedStreamsQ;
-    const allClosedIds = new Set((allClosedStreams || []).map(function (s) { return s.id; }));
-    const closedProfit = (allClosedStreams || []).reduce(function (s, x) {
-      const np = x.net_profit != null ? parseFloat(x.net_profit) : (parseFloat(x.final_sales)||0) - (parseFloat(x.total_product_cost)||0) - (parseFloat(x.total_other_costs)||0);
-      return s + np - (parseFloat(x.commission_payout) || 0);
-    }, 0);
-    const activeProfit = (allBreaks || []).filter(function (b) { return !allClosedIds.has(b.stream_id); }).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
-    const totalProfit = closedProfit + activeProfit;
-
-    document.getElementById('dash-totalRevenue').textContent = fmt(totalRev);
+    document.getElementById('dash-totalRevenue').textContent = fmt(t.totalRev);
     const totalProfitEl = document.getElementById('dash-totalProfit');
-    totalProfitEl.textContent = fmt(totalProfit);
-    totalProfitEl.className = 'stat-value ' + (totalProfit >= 0 ? 'green' : 'red');
-    document.getElementById('dash-totalBreaks').textContent = (allBreaks || []).length;
-
-    // Streams count
-    document.getElementById('dash-totalStreams').textContent = chStreamIds ? chStreamIds.length : ((await sb.from('streams').select('id', { count: 'exact', head: true }).eq('org_id', currentProfile.org_id)).count || 0);
+    totalProfitEl.textContent = fmt(t.totalProfit);
+    totalProfitEl.className = 'stat-value ' + (t.totalProfit >= 0 ? 'green' : 'red');
+    document.getElementById('dash-totalBreaks').textContent = t.totalBreaks;
+    document.getElementById('dash-totalStreams').textContent = t.totalStreams;
 
   } catch (err) {
     showGlobalError('Dashboard load error: ' + escHtml(err.message));
+    CBP.captureError(err, 'loadDashboard');
   }
+}
+
+// Browser fallback for org_dashboard_totals(): same math, paged past the row cap.
+async function dashboardTotalsClient(todayStr, chStreamIds) {
+  const org = currentProfile.org_id;
+  const breaksQ = function (ids) { let q = sb.from('breaks').select('revenue, net_profit, stream_id, break_date').eq('org_id', org); return ids ? q.in('stream_id', ids) : q; };
+  const streamsQ = function (ids) { let q = sb.from('streams').select('id, break_date, net_profit, commission_payout, final_sales, total_product_cost, total_other_costs').eq('org_id', org).eq('status', 'closed'); return ids ? q.in('id', ids) : q; };
+  const allBreaks = chStreamIds ? await inChunks(breaksQ, chStreamIds) : await CBP.pageAll(function () { return breaksQ(null); });
+  const allClosed = chStreamIds ? await inChunks(streamsQ, chStreamIds) : await CBP.pageAll(function () { return streamsQ(null); });
+  const closedIds = new Set(allClosed.map(function (s) { return s.id; }));
+  const profitOf = function (x) {
+    const np = x.net_profit != null ? parseFloat(x.net_profit) : (parseFloat(x.final_sales)||0) - (parseFloat(x.total_product_cost)||0) - (parseFloat(x.total_other_costs)||0);
+    return np - (parseFloat(x.commission_payout) || 0);
+  };
+  const todayBreaks = allBreaks.filter(function (b) { return b.break_date === todayStr; });
+  const todayRev = todayBreaks.reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+  const todayProfit = allClosed.filter(function (s) { return s.break_date === todayStr; }).reduce(function (s, x) { return s + profitOf(x); }, 0)
+    + todayBreaks.filter(function (b) { return !closedIds.has(b.stream_id); }).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
+  const totalRev = allBreaks.reduce(function (s, b) { return s + (parseFloat(b.revenue) || 0); }, 0);
+  const totalProfit = allClosed.reduce(function (s, x) { return s + profitOf(x); }, 0)
+    + allBreaks.filter(function (b) { return !closedIds.has(b.stream_id); }).reduce(function (s, b) { return s + (parseFloat(b.net_profit) || 0); }, 0);
+  const totalStreams = chStreamIds ? chStreamIds.length : ((await sb.from('streams').select('id', { count: 'exact', head: true }).eq('org_id', org)).count || 0);
+  return { todayRev, todayCount: todayBreaks.length, todayProfit, totalRev, totalBreaks: allBreaks.length, totalStreams, totalProfit };
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6227,31 +6230,34 @@ async function loadProductRoi() {
       tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No breaks yet for this channel.</td></tr>';
       return;
     }
-    let roiQ = sb.from('breaks').select('revenue, products_used').eq('org_id', currentProfile.org_id);
-    if (chStreamIds) roiQ = roiQ.in('stream_id', chStreamIds);
-    const { data: breaks, error } = await roiQ;
-    if (error) throw error;
-
-    const productMap = {};
-
-    (breaks || []).forEach(function (b) {
-      const pu = b.products_used || [];
-      if (!Array.isArray(pu)) return;
-      const perUnitRevShare = pu.length > 0 ? (parseFloat(b.revenue) || 0) / pu.reduce(function (s, p) { return s + (p.qty || 0); }, 0) : 0;
-
-      pu.forEach(function (p) {
-        const key = p.product_id || p.name;
-        if (!productMap[key]) {
-          productMap[key] = { name: p.name, timesUsed: 0, totalUnits: 0, totalCost: 0, totalRevenue: 0 };
-        }
-        productMap[key].timesUsed += 1;
-        productMap[key].totalUnits += p.qty || 0;
-        productMap[key].totalCost += p.ext_cost || 0;
-        productMap[key].totalRevenue += (perUnitRevShare * (p.qty || 0));
+    // Server-side ROI (migration 013); paged client fallback until it's run.
+    let rows = null;
+    const rpc = await sb.rpc('product_roi', { p_channel: activeChannel ? activeChannel.id : null });
+    if (!rpc.error) {
+      rows = (rpc.data || []).map(function (r) { return { name: r.name || r.product_key, timesUsed: Number(r.times_used) || 0, totalUnits: Number(r.total_units) || 0, totalCost: Number(r.total_cost) || 0, totalRevenue: Number(r.total_revenue) || 0 }; });
+    } else if (!CBP.isMissingSchema(rpc.error)) {
+      throw rpc.error;
+    }
+    if (!rows) {
+      const roiQ = function (ids) { let q = sb.from('breaks').select('revenue, products_used').eq('org_id', currentProfile.org_id); return ids ? q.in('stream_id', ids) : q; };
+      const breaks = chStreamIds ? await inChunks(roiQ, chStreamIds) : await CBP.pageAll(function () { return roiQ(null); });
+      const productMap = {};
+      breaks.forEach(function (b) {
+        const pu = b.products_used || [];
+        if (!Array.isArray(pu)) return;
+        const units = pu.reduce(function (s, p) { return s + (p.qty || 0); }, 0);
+        const perUnitRevShare = units > 0 ? (parseFloat(b.revenue) || 0) / units : 0;
+        pu.forEach(function (p) {
+          const key = p.product_id || p.name;
+          if (!productMap[key]) productMap[key] = { name: p.name, timesUsed: 0, totalUnits: 0, totalCost: 0, totalRevenue: 0 };
+          productMap[key].timesUsed += 1;
+          productMap[key].totalUnits += p.qty || 0;
+          productMap[key].totalCost += p.ext_cost || 0;
+          productMap[key].totalRevenue += (perUnitRevShare * (p.qty || 0));
+        });
       });
-    });
-
-    const rows = Object.values(productMap);
+      rows = Object.values(productMap);
+    }
     if (rows.length === 0) {
       tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No product usage data yet.</td></tr>';
       return;
@@ -6294,11 +6300,13 @@ async function openProductChart(productName) {
   document.getElementById('pchartStats').innerHTML = '<div style="color:var(--muted);font-size:0.82rem;grid-column:1/-1;">Loading…</div>';
   document.getElementById('productChartModal').classList.add('active');
 
-  // Fetch all breaks that used this product
-  const { data: breaks } = await sb.from('breaks')
-    .select('revenue, break_date, products_used')
-    .eq('org_id', currentProfile.org_id)
-    .order('break_date', { ascending: true });
+  // Fetch all breaks that used this product (paged past the row cap)
+  const breaks = await CBP.pageAll(function () {
+    return sb.from('breaks')
+      .select('revenue, break_date, products_used')
+      .eq('org_id', currentProfile.org_id)
+      .order('break_date', { ascending: true }).order('id', { ascending: true });
+  });
 
   const usages = []; // { date, qty, extCost, revShare }
   (breaks || []).forEach(function(b) {
@@ -6436,31 +6444,39 @@ async function loadBreakerPerformance() {
       tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No breaks yet for this channel.</td></tr>';
       return;
     }
-    let perfQ = sb.from('breaks').select('breaker_id, revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id);
-    if (chStreamIds) perfQ = perfQ.in('stream_id', chStreamIds);
-    const { data: breaks, error } = await perfQ;
-    if (error) throw error;
+    // Server-side per-breaker totals (migration 013); paged client fallback.
+    let agg = null;
+    const rpc = await sb.rpc('breaker_performance', { p_channel: activeChannel ? activeChannel.id : null });
+    if (!rpc.error) {
+      agg = (rpc.data || []).map(function (r) { return { id: r.breaker_id, totalRevenue: Number(r.total_revenue) || 0, totalProfit: Number(r.total_profit) || 0, breakCount: Number(r.break_count) || 0, streamCount: Number(r.stream_count) || 0 }; });
+    } else if (!CBP.isMissingSchema(rpc.error)) {
+      throw rpc.error;
+    }
+    if (!agg) {
+      const perfQ = function (ids) { let q = sb.from('breaks').select('breaker_id, revenue, net_profit, stream_id').eq('org_id', currentProfile.org_id); return ids ? q.in('stream_id', ids) : q; };
+      const breaks = chStreamIds ? await inChunks(perfQ, chStreamIds) : await CBP.pageAll(function () { return perfQ(null); });
+      const map = {};
+      breaks.forEach(function (b) {
+        if (!b.breaker_id) return;
+        if (!map[b.breaker_id]) map[b.breaker_id] = { totalRevenue: 0, totalProfit: 0, breakCount: 0, streams: new Set() };
+        map[b.breaker_id].totalRevenue += parseFloat(b.revenue) || 0;
+        map[b.breaker_id].totalProfit += parseFloat(b.net_profit) || 0;
+        map[b.breaker_id].breakCount += 1;
+        if (b.stream_id) map[b.breaker_id].streams.add(b.stream_id);
+      });
+      agg = Object.entries(map).map(function (e) { return { id: e[0], totalRevenue: e[1].totalRevenue, totalProfit: e[1].totalProfit, breakCount: e[1].breakCount, streamCount: e[1].streams.size }; });
+    }
 
-    const map = {};
-    (breaks || []).forEach(function (b) {
-      if (!b.breaker_id) return;
-      if (!map[b.breaker_id]) map[b.breaker_id] = { totalRevenue: 0, totalProfit: 0, breakCount: 0, streams: new Set() };
-      map[b.breaker_id].totalRevenue += parseFloat(b.revenue) || 0;
-      map[b.breaker_id].totalProfit += parseFloat(b.net_profit) || 0;
-      map[b.breaker_id].breakCount += 1;
-      if (b.stream_id) map[b.breaker_id].streams.add(b.stream_id);
-    });
-
-    const rows = Object.entries(map).map(function (e) {
+    const rows = agg.map(function (a) {
       return {
-        name: getProfileName(e[0]),
-        totalRevenue: e[1].totalRevenue,
-        totalProfit: e[1].totalProfit,
-        breakCount: e[1].breakCount,
-        streamCount: e[1].streams.size,
-        avgRevenue: e[1].breakCount > 0 ? e[1].totalRevenue / e[1].breakCount : 0,
-        avgProfit: e[1].breakCount > 0 ? e[1].totalProfit / e[1].breakCount : 0,
-        margin: e[1].totalRevenue > 0 ? (e[1].totalProfit / e[1].totalRevenue) * 100 : 0
+        name: getProfileName(a.id),
+        totalRevenue: a.totalRevenue,
+        totalProfit: a.totalProfit,
+        breakCount: a.breakCount,
+        streamCount: a.streamCount,
+        avgRevenue: a.breakCount > 0 ? a.totalRevenue / a.breakCount : 0,
+        avgProfit: a.breakCount > 0 ? a.totalProfit / a.breakCount : 0,
+        margin: a.totalRevenue > 0 ? (a.totalProfit / a.totalRevenue) * 100 : 0
       };
     }).sort(function (a, b) { return b.totalRevenue - a.totalRevenue; });
 
@@ -6495,28 +6511,29 @@ async function loadSorterPerformance() {
     const sorters = allProfiles.filter(function (p) { return p.role === 'sorter'; });
     if (!sorters.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No sorters on your team yet.</td></tr>'; return; }
 
-    let sorterTasksQ = sb.from('sort_tasks')
-      .select('sorter_id, status, stream_id, completed_at, created_at')
-      .eq('org_id', currentProfile.org_id);
+    const sorterTasksQ = function (ids) {
+      let q = sb.from('sort_tasks').select('sorter_id, status, stream_id, completed_at, created_at').eq('org_id', currentProfile.org_id);
+      return ids ? q.in('stream_id', ids) : q;
+    };
     let sorterShiftsQ = sb.from('schedules')
       .select('sorter_id, clocked_in_at, clocked_out_at')
       .eq('org_id', currentProfile.org_id)
       .not('sorter_id', 'is', null)
       .not('clocked_in_at', 'is', null)
       .not('clocked_out_at', 'is', null);
+    let tasks;
     if (activeChannel) {
       const chStreamIds = await getActiveChannelStreamIds();
-      if (chStreamIds) {
-        if (chStreamIds.length === 0) {
-          tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No sorter data for this channel.</td></tr>';
-          return;
-        }
-        sorterTasksQ = sorterTasksQ.in('stream_id', chStreamIds);
+      if (chStreamIds && chStreamIds.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No sorter data for this channel.</td></tr>';
+        return;
       }
+      tasks = await inChunks(sorterTasksQ, chStreamIds);
       sorterShiftsQ = sorterShiftsQ.eq('channel_id', activeChannel.id);
+    } else {
+      tasks = await CBP.pageAll(function () { return sorterTasksQ(null); });
     }
-    const { data: tasks } = await sorterTasksQ;
-    const { data: shifts } = await sorterShiftsQ;
+    const shifts = await CBP.pageAll(function () { return sorterShiftsQ; });
 
     const rows = sorters.map(function (s) {
       const myTasks = (tasks || []).filter(function (t) { return t.sorter_id === s.id && t.status === 'completed'; });
@@ -6871,22 +6888,25 @@ function formatPayStructureLabel(p) {
     salary: 'Salary',
     hourly_commission: 'Hourly + Commission',
     salary_commission: 'Salary + Commission',
-    per_break: 'Per Break Sorted',
-    hourly_per_break: 'Hourly + Per Break'
+    per_break: 'Per Break',
+    hourly_per_break: 'Hourly (legacy per-break removed)'
   };
   let label = labels[type] || type;
   const parts = [];
   if (p.commission_rate != null && (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission')) {
     parts.push(p.commission_rate + '% net profit');
   }
-  if (p.hourly_rate != null && (type === 'hourly' || type === 'hourly_commission' || type === 'hourly_per_break')) {
+  if (p.hourly_rate != null && (type === 'hourly' || type === 'hourly_commission' || type === 'hourly_per_break' || p.role === 'sorter')) {
     parts.push('$' + parseFloat(p.hourly_rate).toFixed(2) + '/hr');
   }
   if (p.salary_amount != null && (type === 'salary' || type === 'salary_commission')) {
     parts.push('$' + parseFloat(p.salary_amount).toFixed(2) + '/' + (p.salary_period || 'period'));
   }
-  if (p.per_break_rate != null && (type === 'per_break' || type === 'hourly_per_break')) {
+  if (p.per_break_rate != null && type === 'per_break' && p.role !== 'sorter') {
     parts.push('$' + parseFloat(p.per_break_rate).toFixed(2) + '/break');
+  }
+  if (p.role === 'sorter' && type && type !== 'hourly') {
+    label = 'Hourly <span style="color:var(--yellow);font-size:0.72rem;">(re-save — sorters are hourly only)</span>';
   }
   return label + (parts.length ? ' <span style="color:var(--muted);">(' + parts.join(', ') + ')</span>' : '');
 }
@@ -6929,32 +6949,17 @@ function psBreakerType(type) {
   document.getElementById('ps-commission-method-group').style.display = hasCommission ? '' : 'none';
 }
 
-function psSorterType(type) {
-  const slug = type.replace(/_/g, '-');
-  document.getElementById('pss-' + slug).checked = true;
-  psSelectCard('pss-' + slug + '-card', 'pss-');
-  ['pss-hourly-rate-group', 'pss-per-break-rate-group'].forEach(function (id) {
-    document.getElementById(id).style.display = 'none';
-  });
-  if (type === 'hourly') {
-    document.getElementById('pss-hourly-rate-group').style.display = '';
-    document.getElementById('pss-category-rates-group').style.display = 'none';
-  } else if (type === 'per_break') {
-    document.getElementById('pss-per-break-rate-group').style.display = '';
-    document.getElementById('pss-category-rates-group').style.display = '';
-    loadCategoryRateInputs(psCurrentProfile ? (psCurrentProfile.category_rates || {}) : {});
-  } else if (type === 'hourly_per_break') {
-    document.getElementById('pss-hourly-rate-group').style.display = '';
-    document.getElementById('pss-per-break-rate-group').style.display = '';
-    document.getElementById('pss-category-rates-group').style.display = '';
-    loadCategoryRateInputs(psCurrentProfile ? (psCurrentProfile.category_rates || {}) : {});
-  }
+// Sorters have exactly one pay type: hourly.
+function psSorterType() {
+  const r = document.getElementById('pss-hourly');
+  if (r) r.checked = true;
 }
 
 let psCurrentProfile = null;
 
 async function loadCategoryRateInputs(existingRates, bodyId) {
-  const body = document.getElementById(bodyId || 'pss-category-rates-body');
+  const body = document.getElementById(bodyId || 'psb-category-rates-body');
+  if (!body) return;
   body.innerHTML = '<span style="color:var(--muted);font-size:0.82rem;">Loading…</span>';
   try {
     const { data: prods } = await sb.from('products').select('category')
@@ -6987,17 +6992,12 @@ async function openPaySettings(profile) {
   const isBreakerRole = profile.role === 'breaker' || profile.role === 'breaker/manager';
   document.getElementById('ps-breaker-fields').style.display = isBreakerRole ? '' : 'none';
   document.getElementById('ps-sorter-fields').style.display = profile.role === 'sorter' ? '' : 'none';
-  document.getElementById('pss-category-rates-group').style.display = 'none';
   document.getElementById('psb-category-rates-group').style.display = 'none';
 
   // Reset all field visibility
   ['ps-commission-rate-group','ps-hourly-rate-group','ps-salary-group','ps-per-break-rate-group'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
-  ['pss-hourly-rate-group','pss-per-break-rate-group'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
   // Reset card highlights
   ['psb-commission-card','psb-hourly-card','psb-salary-card','psb-hourly-commission-card','psb-salary-commission-card','psb-per-break-card'].forEach(function(id){
-    const c = document.getElementById(id); if(c){c.style.borderColor='var(--border)';c.style.background='transparent';}
-  });
-  ['pss-hourly-card','pss-per-break-card','pss-hourly-per-break-card'].forEach(function(id){
     const c = document.getElementById(id); if(c){c.style.borderColor='var(--border)';c.style.background='transparent';}
   });
 
@@ -7007,23 +7007,20 @@ async function openPaySettings(profile) {
   document.getElementById('ps-salary-amount').value = profile.salary_amount != null ? profile.salary_amount : '';
   document.getElementById('ps-salary-period').value = profile.salary_period || 'weekly';
   document.getElementById('ps-sorter-hourly-rate').value = profile.hourly_rate != null ? profile.hourly_rate : '';
-  document.getElementById('ps-sorter-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
   document.getElementById('ps-per-break-rate').value = profile.per_break_rate != null ? profile.per_break_rate : '';
   const storedCommMethod = (profile.category_rates || {}).__commission_method || profile.commission_method || 'per_stream';
   document.getElementById('ps-commission-period-total').checked = storedCommMethod === 'period_total';
 
   // Select current pay type — guard against mismatched pay_type after a role change
   const breakerPayTypes = ['commission', 'hourly', 'salary', 'hourly_commission', 'salary_commission', 'per_break'];
-  const sorterPayTypes = ['hourly', 'per_break', 'hourly_per_break'];
   const isBreakerRolePay = profile.role === 'breaker' || profile.role === 'breaker/manager';
   if (profile.pay_type) {
     if (isBreakerRolePay && breakerPayTypes.includes(profile.pay_type)) {
       psBreakerType(profile.pay_type);
-    } else if (profile.role === 'sorter' && sorterPayTypes.includes(profile.pay_type)) {
-      psSorterType(profile.pay_type);
     }
     // If pay_type doesn't match role (e.g. sorter promoted to breaker), leave blank so owner sets new pay settings
   }
+  if (profile.role === 'sorter') psSorterType();
 
   document.getElementById('paySettingsModal').classList.add('active');
 }
@@ -7072,23 +7069,13 @@ document.addEventListener('DOMContentLoaded', function () {
         updates.category_rates = catRates;
       }
     } else {
-      const sel = document.querySelector('input[name="ps-sorter-type"]:checked');
-      if (!sel) { showGlobalError('Please select a pay type.'); return; }
-      payType = sel.value;
-      if (payType === 'hourly' || payType === 'hourly_per_break') {
-        updates.hourly_rate = parseFloat(document.getElementById('ps-sorter-hourly-rate').value) || 0;
-      }
-      if (payType === 'per_break' || payType === 'hourly_per_break') {
-        const perBreakRate = parseFloat(document.getElementById('ps-sorter-per-break-rate').value) || 0;
-        if (perBreakRate <= 0) { showGlobalError('Please enter a Rate per Break greater than $0.'); return; }
-        updates.per_break_rate = perBreakRate;
-        const catRates = {};
-        document.querySelectorAll('#pss-category-rates-body .cat-rate-input').forEach(function(inp) {
-          const val = parseFloat(inp.value);
-          if (!isNaN(val) && val > 0) catRates[inp.dataset.category] = val;
-        });
-        updates.category_rates = catRates;
-      }
+      // Sorters: hourly only. Clear any legacy per-break config so old rates can't leak into payroll.
+      payType = 'hourly';
+      const hr = parseFloat(document.getElementById('ps-sorter-hourly-rate').value) || 0;
+      if (hr <= 0) { showGlobalError('Enter an hourly rate greater than $0.'); return; }
+      updates.hourly_rate = hr;
+      updates.per_break_rate = null;
+      updates.category_rates = null;
     }
     updates.pay_type = payType;
 
@@ -7116,34 +7103,16 @@ let prCurrentResults = [];
 let prCurrentRange = { from: null, to: null, label: '' };
 let prCurrentStreamProfit = null;
 
+// Period edges are org-local days (CBP.tz), with ISO instants for timestamptz
+// filters. A shift that runs past midnight on the last day is prorated, not dropped.
 function getPayrollRange(preset) {
-  const now = new Date();
-  const todayStr = ld(now);
-  let from, to = todayStr, label;
-
-  if (preset === 'this_week') {
-    const d = new Date(now); d.setDate(d.getDate() - d.getDay());
-    from = ld(d);
-    label = 'This Week (' + from + ' – ' + to + ')';
-  } else if (preset === 'last_two_weeks') {
-    const d = new Date(now); d.setDate(d.getDate() - 13);
-    from = ld(d);
-    label = 'Last 2 Weeks (' + from + ' – ' + to + ')';
-  } else if (preset === 'this_month') {
-    from = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
-    label = 'This Month (' + from + ' – ' + to + ')';
-  } else if (preset === 'last_month') {
-    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    from = ld(lm);
-    const lme = new Date(now.getFullYear(), now.getMonth(), 0);
-    to = ld(lme);
-    label = 'Last Month (' + from + ' – ' + to + ')';
-  } else {
-    from = document.getElementById('prFrom').value;
-    to = document.getElementById('prTo').value || todayStr;
-    label = 'Custom (' + from + ' – ' + to + ')';
+  if (preset === 'custom') {
+    const from = document.getElementById('prFrom').value;
+    const to = document.getElementById('prTo').value || CBP.todayIn();
+    if (!from) return { from: '', to, label: '' };
+    return CBP.periodBounds('custom', { from, to });
   }
-  return { from, to, label };
+  return CBP.periodBounds(preset);
 }
 
 async function loadPayroll() {
@@ -7160,11 +7129,19 @@ async function loadPayroll() {
 
     document.getElementById('prMarkPaidBtn').addEventListener('click', async function () {
       if (!prCurrentResults.length) return;
+      // What's owed NOW = computed total minus anything already recorded for an overlapping period.
+      const owed = prCurrentResults.reduce(function (s, r) { return s + Math.max(0, r.total - (r.paid || 0)); }, 0);
       const total = prCurrentResults.reduce(function (s, r) { return s + r.total; }, 0);
-      const staffCount = prCurrentResults.length;
+      const staffCount = prCurrentResults.filter(function (r) { return r.total - (r.paid || 0) > 0.005; }).length;
+      const overlaps = prOverlappingRuns || [];
+      const exact = overlaps.find(function (r) { return r.period_from === prCurrentRange.from && r.period_to === prCurrentRange.to; });
+      if (owed <= 0.005) { showGlobalError('Nothing left to pay for ' + prCurrentRange.label + ' — every line is already covered by a recorded run.'); return; }
+      const warn = exact
+        ? '\n\n⚠ A run for this exact period was already recorded on ' + fmtDate(exact.created_at) + ' (' + fmt(exact.total_paid) + '). Only the difference (' + fmt(owed) + ') will be recorded.'
+        : overlaps.length ? '\n\n⚠ ' + overlaps.length + ' earlier run(s) overlap this period; amounts already paid have been subtracted.' : '';
       openConfirm(
         'Mark as Paid',
-        'Record a payroll payment of ' + fmt(total) + ' for ' + staffCount + ' staff member(s) for ' + prCurrentRange.label + '?',
+        'Record a payroll payment of ' + fmt(owed) + ' for ' + staffCount + ' staff member(s) for ' + prCurrentRange.label + '?' + warn,
         async function () {
           try {
             const { error } = await sb.from('payroll_runs').insert({
@@ -7172,15 +7149,16 @@ async function loadPayroll() {
               period_from: prCurrentRange.from,
               period_to: prCurrentRange.to,
               period_label: prCurrentRange.label,
-              total_paid: total,
+              total_paid: Math.round(owed * 100) / 100,
               staff_count: staffCount,
               details: JSON.stringify(prCurrentResults.map(function (r) {
-                return { name: r.name, role: r.role, pay_type: r.pay_type, total: r.total, breakdown: r.breakdown };
+                return { profile_id: r.profile_id, name: r.name, role: r.role, pay_type: r.pay_type, total: Math.round(Math.max(0, r.total - (r.paid || 0)) * 100) / 100, computed: r.total, previously_paid: r.paid || 0, breakdown: r.breakdown };
               }))
             });
             if (error) throw error;
-            showGlobalSuccess('Payroll of ' + fmt(total) + ' marked as paid!');
+            showGlobalSuccess('Payroll of ' + fmt(owed) + ' marked as paid!' + (Math.abs(total - owed) > 0.005 ? ' (' + fmt(total - owed) + ' was already recorded)' : ''));
             await loadPayrollHistory();
+            await runPayroll();
           } catch (err) {
             showGlobalError('Failed to record payroll: ' + escHtml(err.message));
           }
@@ -7190,11 +7168,11 @@ async function loadPayroll() {
 
     document.getElementById('prExportBtn').addEventListener('click', function () {
       if (!prCurrentResults.length) return;
-      let csv = 'Name,Role,Pay Type,Breakdown,Total Owed\n';
+      let csv = 'Name,Role,Pay Type,Breakdown,Computed,Already Paid,Owed Now\n';
       prCurrentResults.forEach(function (r) {
-        csv += '"' + r.name + '","' + r.role + '","' + r.pay_type + '","' + r.breakdown + '",' + r.total.toFixed(2) + '\n';
+        csv += '"' + r.name + '","' + r.role + '","' + r.pay_type + '","' + String(r.breakdown || '').replace(/"/g, '""') + '",' + r.total.toFixed(2) + ',' + (r.paid || 0).toFixed(2) + ',' + Math.max(0, r.total - (r.paid || 0)).toFixed(2) + '\n';
       });
-      csv += '\n,,,Total,' + prCurrentResults.reduce(function(s,r){return s+r.total;},0).toFixed(2) + '\n';
+      csv += '\n,,,Total,' + prCurrentResults.reduce(function(s,r){return s+r.total;},0).toFixed(2) + ',' + prCurrentResults.reduce(function(s,r){return s+(r.paid||0);},0).toFixed(2) + ',' + prCurrentResults.reduce(function(s,r){return s+Math.max(0,r.total-(r.paid||0));},0).toFixed(2) + '\n';
       const blob = new Blob([csv], { type: 'text/csv' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -7208,6 +7186,56 @@ async function loadPayroll() {
   await loadPayrollHistory();
   // Auto-run with the default period on first load
   await runPayroll();
+}
+
+var prOverlappingRuns = [];
+
+// Per-stream commission, one rule everywhere: the snapshot written at closeout
+// (streams.commission_payout — the breaker's rate at the time) is the ledger.
+// Dashboard, history and the breaker's My Pay read the same number, so a rate
+// change applies to streams closed after it, never retroactively.
+function streamCommission(x, rate) {
+  if (x.commission_payout != null && x.commission_payout !== '') return Math.max(0, parseFloat(x.commission_payout) || 0);
+  const profit = (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
+  return Math.max(0, profit) * rate;
+}
+
+// Majority category (by units) across a break's products — a break that opened
+// 4 NBA and 1 NFL is an NBA break, not "whatever product was listed first".
+function breakCategory(b, prodCatMap) {
+  const tally = {};
+  (b.products_used || []).forEach(function (pu) {
+    const cat = pu.product_id && prodCatMap[pu.product_id];
+    if (!cat) return;
+    tally[cat] = (tally[cat] || 0) + (Number(pu.qty) || 1);
+  });
+  let best = null, bestN = 0;
+  Object.keys(tally).forEach(function (c) { if (tally[c] > bestN) { best = c; bestN = tally[c]; } });
+  return best;
+}
+
+// Earlier payroll runs whose period overlaps this one, and how much each
+// person was already paid in them — so "Owed now" is computed minus paid.
+async function loadOverlappingRuns(range) {
+  prOverlappingRuns = [];
+  const paidBy = {};
+  try {
+    const { data } = await sb.from('payroll_runs')
+      .select('id, created_at, period_from, period_to, period_label, total_paid, details')
+      .eq('org_id', currentProfile.org_id)
+      .lte('period_from', range.to).gte('period_to', range.from)
+      .order('created_at', { ascending: true });
+    (data || []).forEach(function (run) {
+      prOverlappingRuns.push(run);
+      let lines = run.details;
+      if (typeof lines === 'string') { try { lines = JSON.parse(lines); } catch (e) { lines = []; } }
+      (lines || []).forEach(function (l) {
+        const key = l.profile_id || ('name:' + l.name);
+        paidBy[key] = (paidBy[key] || 0) + (Number(l.total) || 0);
+      });
+    });
+  } catch (e) { CBP.captureError(e, 'loadOverlappingRuns'); }
+  return paidBy;
 }
 
 async function runPayroll() {
@@ -7230,19 +7258,22 @@ async function runPayroll() {
       const assignedIds = new Set((chAssigns || []).map(function(a){ return a.profile_id; }));
       staff = staff.filter(function(p){ return assignedIds.has(p.id); });
     }
-    const fromTs = range.from + 'T00:00:00';
-    const toTs = range.to + 'T23:59:59';
+    // ISO instants for timestamptz filters (org-local midnight edges; toISO is exclusive)
+    const fromTs = range.fromISO;
+    const toTs = range.toISO;
 
+    const paidBy = await loadOverlappingRuns(range);
     prCurrentResults = [];
 
     for (const p of staff) {
-      const result = { name: p.display_name, role: p.role, pay_type: p.pay_type || 'not_set', total: 0, breakdown: '', tips: 0 };
+      const result = { profile_id: p.id, name: p.display_name, role: p.role, pay_type: p.pay_type || 'not_set', total: 0, breakdown: '', tips: 0, paid: 0 };
 
       if (p.role === 'breaker' || p.role === 'breaker/manager') {
         await calcBreakerPay(p, fromTs, toTs, result);
       } else if (p.role === 'sorter') {
         await calcSorterPay(p, fromTs, toTs, result);
       }
+      result.paid = paidBy[p.id] || paidBy['name:' + p.display_name] || 0;
 
       prCurrentResults.push(result);
     }
@@ -7250,10 +7281,18 @@ async function runPayroll() {
     // ── Data quality warnings ──────────────────────────────
     const warnings = [];
 
+    if (prOverlappingRuns.length) {
+      warnings.push('ℹ ' + prOverlappingRuns.length + ' recorded payroll run(s) overlap this period (' + prOverlappingRuns.map(function (r) { return escHtml(r.period_label || (r.period_from + ' – ' + r.period_to)) + ' · ' + fmt(r.total_paid); }).join('; ') + '). "Already Paid" is subtracted so you don\'t pay twice.');
+    }
+
     // 1. Staff with no pay type configured
     const noPayType = staff.filter(function (p) { return !p.pay_type; });
     if (noPayType.length) {
       warnings.push('⚠ Pay type not set for: <strong>' + noPayType.map(function(p){return escHtml(p.display_name);}).join(', ') + '</strong> — their totals show as $0. Go to Team → Pay Settings to fix.');
+    }
+    const legacySorters = staff.filter(function (p) { return p.role === 'sorter' && p.pay_type && p.pay_type !== 'hourly'; });
+    if (legacySorters.length) {
+      warnings.push('⚠ Sorters are hourly only now. Re-save pay settings for: <strong>' + legacySorters.map(function(p){return escHtml(p.display_name);}).join(', ') + '</strong> (their hourly rate is used; old per-break rates are ignored).');
     }
 
     // 2. Shifts with a clock-in but no clock-out in this period (hours calculation is incomplete)
@@ -7263,7 +7302,7 @@ async function runPayroll() {
       .not('clocked_in_at', 'is', null)
       .is('clocked_out_at', null)
       .gte('clocked_in_at', fromTs)
-      .lte('clocked_in_at', toTs);
+      .lt('clocked_in_at', toTs);
 
     if (openShifts && openShifts.length) {
       const openNames = openShifts.map(function (s) {
@@ -7277,7 +7316,7 @@ async function runPayroll() {
 
     // 3. Hourly/salary staff with zero hours and no shifts at all
     const hourlyStaff = staff.filter(function (p) {
-      return p.pay_type && (p.pay_type === 'hourly' || p.pay_type === 'hourly_commission' || p.pay_type === 'hourly_per_break');
+      return (p.pay_type && (p.pay_type === 'hourly' || p.pay_type === 'hourly_commission')) || p.role === 'sorter';
     });
     for (const p of hourlyStaff) {
       const hours = await calcHours(p.id, fromTs, toTs);
@@ -7336,15 +7375,14 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
     // dropped streams whose closed_at was null or on a different calendar day,
     // making commission come out low and not reconcile with net profit.
     let commStreamsQ = sb.from('streams')
-      .select('final_sales, total_product_cost, total_other_costs')
+      .select('final_sales, total_product_cost, total_other_costs, commission_payout')
       .eq('breaker_id', p.id)
       .eq('org_id', currentProfile.org_id)
       .eq('status', 'closed')
       .gte('break_date', prCurrentRange.from)
       .lte('break_date', prCurrentRange.to);
     if (activeChannel) commStreamsQ = commStreamsQ.eq('channel_id', activeChannel.id);
-    const { data: streams } = await commStreamsQ;
-    const streamList = streams || [];
+    const streamList = await CBP.pageAll(function () { return commStreamsQ; });
     let commission;
     if (periodTotal) {
       // Sum all streams first, then floor at $0 — losses can reduce gains
@@ -7354,14 +7392,10 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
       commission = Math.max(0, netProfit) * rate;
       parts.push(streamList.length + ' streams · sales ' + fmt(totalSales) + ' − costs ' + fmt(totalCosts) + ' = profit ' + fmt(netProfit) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission));
     } else {
-      // Per-stream: each losing stream floors at $0, never drags down other streams
-      let commissionBase = 0;
-      commission = streamList.reduce(function (s, x) {
-        const profit = (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0);
-        commissionBase += Math.max(0, profit);
-        return s + Math.max(0, profit) * rate;
-      }, 0);
-      parts.push(streamList.length + ' streams · profit base ' + fmt(commissionBase) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission));
+      // Per-stream: the closeout snapshot per stream (rate at the time), floored at $0 each —
+      // the same number the dashboard and the breaker's My Pay show.
+      commission = streamList.reduce(function (s, x) { return s + streamCommission(x, rate); }, 0);
+      parts.push(streamList.length + ' streams · commission at closeout = ' + fmt(commission));
     }
     total += commission;
   }
@@ -7375,16 +7409,18 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
     parts.push(hours.toFixed(2) + ' hrs × $' + rate.toFixed(2) + '/hr = ' + fmt(earned));
   }
 
-  // Salary component
+  // Salary component — prorated to the run's length vs the salary period
   if (type === 'salary' || type === 'salary_commission') {
     const amount = parseFloat(p.salary_amount) || 0;
-    total += amount;
-    parts.push('Salary: ' + fmt(amount) + ' (' + (p.salary_period || 'period') + ')');
+    const sal = CBP.salaryForRange(amount, p.salary_period || 'weekly', prCurrentRange.from, prCurrentRange.to);
+    total += sal.total;
+    parts.push('Salary: ' + fmt(amount) + '/' + (p.salary_period || 'weekly') + ' × ' + sal.days + ' days = ' + fmt(sal.total));
   }
 
-  // Per Break — each stream = one break run, rate by product category
+  // Per Break — each stream = one break run, rate by the stream's majority product category
   if (type === 'per_break') {
-    const categoryRates = p.category_rates || {};
+    const categoryRates = Object.assign({}, p.category_rates || {});
+    delete categoryRates.__commission_method;
     const hasCategoryRates = Object.keys(categoryRates).length > 0;
     const defaultRate = parseFloat(p.per_break_rate) || 0;
 
@@ -7396,47 +7432,40 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
       .gte('break_date', prCurrentRange.from)
       .lte('break_date', prCurrentRange.to);
     if (activeChannel) perBreakStreamsQ = perBreakStreamsQ.eq('channel_id', activeChannel.id);
-    const { data: streams } = await perBreakStreamsQ;
-
-    const streamIds = (streams || []).map(function(s){ return s.id; });
+    const streams = await CBP.pageAll(function () { return perBreakStreamsQ; });
+    const streamIds = streams.map(function(s){ return s.id; });
 
     if (hasCategoryRates && streamIds.length) {
-      // Map each stream → category via first product_used on any break in that stream
-      const { data: bks } = await sb.from('breaks')
-        .select('stream_id, products_used')
-        .in('stream_id', streamIds)
-        .not('products_used', 'is', null);
-
-      const streamProdMap = {};
+      const bks = await inChunks(function (ids) {
+        return sb.from('breaks').select('stream_id, products_used').in('stream_id', ids).not('products_used', 'is', null).order('break_number', { ascending: true });
+      }, streamIds);
       const productIds = [];
-      (bks || []).forEach(function(b) {
-        if (!streamProdMap[b.stream_id] && b.products_used && b.products_used.length) {
-          const pid = b.products_used[0].product_id;
-          if (pid) { streamProdMap[b.stream_id] = pid; productIds.push(pid); }
-        }
-      });
-
-      const streamCatMap = {};
+      bks.forEach(function (b) { (b.products_used || []).forEach(function (pu) { if (pu.product_id) productIds.push(pu.product_id); }); });
+      const prodCatMap = {};
       if (productIds.length) {
-        const { data: prods } = await sb.from('products').select('id, category').in('id', [...new Set(productIds)]);
-        const prodCatMap = {};
-        (prods || []).forEach(function(prod){ prodCatMap[prod.id] = prod.category; });
-        Object.entries(streamProdMap).forEach(function(entry){
-          streamCatMap[entry[0]] = prodCatMap[entry[1]];
-        });
+        const prods = await inChunks(function (ids) { return sb.from('products').select('id, category').in('id', ids); }, [...new Set(productIds)]);
+        prods.forEach(function(prod){ prodCatMap[prod.id] = prod.category; });
       }
-
+      // Stream category = majority of its breaks' (majority-by-units) categories
+      const perStream = {};
+      bks.forEach(function (b) {
+        const cat = breakCategory(b, prodCatMap);
+        if (!cat) return;
+        const t = perStream[b.stream_id] = perStream[b.stream_id] || {};
+        t[cat] = (t[cat] || 0) + 1;
+      });
       const catTally = {};
       streamIds.forEach(function(sid) {
-        const cat = streamCatMap[sid] ? streamCatMap[sid] : '__default__';
-        if (!catTally[cat]) catTally[cat] = 0;
-        catTally[cat]++;
+        let best = '__default__', bestN = 0;
+        Object.keys(perStream[sid] || {}).forEach(function (c) { if (perStream[sid][c] > bestN) { best = c; bestN = perStream[sid][c]; } });
+        if (best !== '__default__' && categoryRates[best] == null) best = '__default__';
+        catTally[best] = (catTally[best] || 0) + 1;
       });
 
       const catParts = [];
       Object.entries(catTally).forEach(function(entry) {
         const cat = entry[0]; const count = entry[1];
-        const rate = cat !== '__default__' && categoryRates[cat] != null ? parseFloat(categoryRates[cat]) : defaultRate;
+        const rate = cat !== '__default__' ? parseFloat(categoryRates[cat]) : defaultRate;
         const earned = count * rate;
         total += earned;
         catParts.push(count + ' ' + (cat === '__default__' ? 'uncategorized' : cat) + ' × $' + rate.toFixed(2) + ' = ' + fmt(earned));
@@ -7459,7 +7488,7 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
     .eq('breaker_id', p.id)
     .eq('org_id', currentProfile.org_id)
     .gte('created_at', fromTs)
-    .lte('created_at', toTs);
+    .lt('created_at', toTs);
   const totalTips = (tipsData || []).reduce(function (s, t) { return s + (parseFloat(t.amount) || 0); }, 0);
   if (totalTips > 0) {
     total += totalTips;
@@ -7477,104 +7506,18 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
   result.total = total;
 }
 
+// Sorters are hourly. Pay = clocked hours in the period × hourly rate. That's it.
 async function calcSorterPay(p, fromTs, toTs, result) {
-  const type = p.pay_type;
-  const parts = [];
-  let total = 0;
-
-  // Hourly component
-  if (type === 'hourly' || type === 'hourly_per_break') {
-    const rate = parseFloat(p.hourly_rate) || 0;
-    const hours = await calcHours(p.id, fromTs, toTs);
-    const earned = hours * rate;
-    total += earned;
-    parts.push(hours.toFixed(2) + ' hrs × $' + rate.toFixed(2) + '/hr = ' + fmt(earned));
-  }
-
-  // Per break sorted — category-aware
-  if (type === 'per_break' || type === 'hourly_per_break') {
-    const defaultRate = parseFloat(p.per_break_rate) || 0;
-    const categoryRates = p.category_rates || {};
-    const hasCategoryRates = Object.keys(categoryRates).some(function(k) { return parseFloat(categoryRates[k]) > 0; });
-
-    // Fetch all completed tasks, filter client-side so NULL completed_at doesn't drop tasks
-    let q = sb.from('sort_tasks')
-      .select('id, completed_at, created_at, stream_id')
-      .eq('sorter_id', p.id)
-      .eq('org_id', currentProfile.org_id)
-      .eq('status', 'completed');
-    if (activeChannel) {
-      const chStreamIds = await getActiveChannelStreamIds();
-      if (chStreamIds && chStreamIds.length === 0) { result.breakdown = 'No tasks for this channel'; result.total = 0; return; }
-      if (chStreamIds) q = q.in('stream_id', chStreamIds);
-    }
-    const { data: allTasks } = await q;
-
-    const tasks = (allTasks || []).filter(function(t) {
-      const d = t.completed_at || t.created_at;
-      return d >= fromTs && d <= toTs;
-    });
-
-    if (!tasks.length) {
-      parts.push('0 breaks sorted (none found in this period)');
-    } else {
-      // Count individual BREAKS within each sorted stream, not streams themselves
-      const streamIds = [...new Set(tasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
-      const { data: allBreaks } = await sb.from('breaks')
-        .select('stream_id, products_used')
-        .in('stream_id', streamIds);
-
-      // Build product_id → category map
-      const pidCat = {};
-      if (hasCategoryRates) {
-        const pids = [];
-        (allBreaks || []).forEach(function(b) {
-          (b.products_used || []).forEach(function(p){ if (p.product_id) pids.push(p.product_id); });
-        });
-        const uniquePids = [...new Set(pids)];
-        if (uniquePids.length) {
-          const { data: prods } = await sb.from('products').select('id, category').in('id', uniquePids);
-          (prods || []).forEach(function(pr){ pidCat[pr.id] = pr.category; });
-        }
-      }
-
-      // Tally breaks per category
-      const catTally = {};
-      (allBreaks || []).forEach(function(b) {
-        const pu = b.products_used || [];
-        const cat = hasCategoryRates && pu[0] && pu[0].product_id && pidCat[pu[0].product_id]
-          ? pidCat[pu[0].product_id] : '__default__';
-        catTally[cat] = (catTally[cat] || 0) + 1;
-      });
-
-      const totalBreaks = Object.values(catTally).reduce(function(s,n){ return s+n; }, 0);
-      if (hasCategoryRates) {
-        const catParts = [];
-        Object.entries(catTally).forEach(function(entry) {
-          const cat = entry[0]; const count = entry[1];
-          const rate = cat !== '__default__' && parseFloat(categoryRates[cat]) > 0 ? parseFloat(categoryRates[cat]) : defaultRate;
-          const earned = count * rate;
-          total += earned;
-          catParts.push(count + ' ' + (cat === '__default__' ? 'other' : cat) + ' × $' + rate.toFixed(2) + ' = ' + fmt(earned));
-        });
-        parts.push(totalBreaks + ' breaks · ' + catParts.join(' + '));
-      } else {
-        const earned = totalBreaks * defaultRate;
-        total += earned;
-        parts.push(totalBreaks + ' break' + (totalBreaks !== 1 ? 's' : '') + ' sorted × $' + defaultRate.toFixed(2) + ' = ' + fmt(earned));
-      }
-    }
-    if (defaultRate === 0 && !hasCategoryRates) parts.push('⚠ rate is $0 — set it in Team → Pay Settings');
-  }
-
-  if (!type || type === 'not_set') {
-    result.breakdown = '⚠ Pay type not configured — set it in Team → Pay Settings';
-  } else {
-    result.breakdown = parts.join(' · ') || '—';
-  }
-  result.total = total;
+  const rate = parseFloat(p.hourly_rate) || 0;
+  const hours = await calcHours(p.id, fromTs, toTs);
+  const earned = hours * rate;
+  result.pay_type = 'hourly';
+  result.total = earned;
+  result.breakdown = hours.toFixed(2) + ' hrs × $' + rate.toFixed(2) + '/hr = ' + fmt(earned) + (rate === 0 ? ' · ⚠ hourly rate is $0 — set it in Team → Pay Settings' : '');
 }
 
+// Clocked hours inside [fromTs, toTs). Shifts that straddle a period edge are
+// prorated (only the part inside the window counts) instead of being dropped.
 async function calcHours(profileId, fromTs, toTs) {
   let hoursQ = sb.from('schedules')
     .select('clocked_in_at, clocked_out_at')
@@ -7582,16 +7525,11 @@ async function calcHours(profileId, fromTs, toTs) {
     .eq('status', 'completed')
     .or('breaker_id.eq.' + profileId + ',sorter_id.eq.' + profileId)
     .not('clocked_in_at', 'is', null)
-    .not('clocked_out_at', 'is', null)
-    .gte('clocked_in_at', fromTs)
-    .lte('clocked_out_at', toTs);
+    .not('clocked_out_at', 'is', null);
+  hoursQ = CBP.applyShiftWindow(hoursQ, fromTs, toTs);
   if (activeChannel) hoursQ = hoursQ.eq('channel_id', activeChannel.id);
-  const { data: shifts } = await hoursQ;
-  return (shifts || []).reduce(function (sum, s) {
-    const inT = new Date(s.clocked_in_at).getTime();
-    const outT = new Date(s.clocked_out_at).getTime();
-    return sum + Math.max(0, (outT - inT) / 3600000);
-  }, 0);
+  const shifts = await CBP.pageAll(function () { return hoursQ; });
+  return CBP.sumHours(shifts, fromTs, toTs);
 }
 
 function renderPayrollResults() {
@@ -7610,23 +7548,26 @@ function renderPayrollResults() {
       const typeLabels = {
         commission:'Commission', hourly:'Hourly', salary:'Salary',
         hourly_commission:'Hourly + Commission', salary_commission:'Salary + Commission',
-        per_break:'Per Break', hourly_per_break:'Hourly + Per Break'
+        per_break:'Per Break'
       };
       const tips = r.tips || 0;
+      const paid = r.paid || 0;
+      const owed = Math.max(0, r.total - paid);
       tr.innerHTML =
         '<td><strong>' + escHtml(r.name) + '</strong></td>' +
         '<td><span class="badge ' + (r.role === 'breaker' || r.role === 'breaker/manager' ? 'badge-green' : 'badge-gray') + '">' + r.role + '</span></td>' +
         '<td style="font-size:0.82rem;">' + escHtml(typeLabels[r.pay_type] || (notSet ? 'Not set' : r.pay_type)) + '</td>' +
-        '<td style="font-size:0.8rem;color:var(--muted);">' + escHtml(r.breakdown || '—') + '</td>' +
-        '<td style="text-align:right;font-weight:800;color:' + (notSet && !tips ? 'var(--muted)' : 'var(--text)') + ';">' + (notSet && !tips ? '—' : fmt(r.total)) + '</td>';
+        '<td style="font-size:0.8rem;color:var(--muted);">' + escHtml(r.breakdown || '—') + (paid ? '<div style="font-size:0.72rem;color:var(--yellow);margin-top:2px;">already paid ' + fmt(paid) + ' in an overlapping run</div>' : '') + '</td>' +
+        '<td style="text-align:right;font-weight:800;color:' + (notSet && !tips ? 'var(--muted)' : 'var(--text)') + ';">' + (notSet && !tips ? '—' : fmt(owed)) + (paid ? '<div style="font-size:0.7rem;color:var(--muted);font-weight:500;">of ' + fmt(r.total) + '</div>' : '') + '</td>';
       tbody.appendChild(tr);
     });
   }
 
-  // Totals
+  // Totals — what's owed now (computed minus already-recorded runs)
   const all = prCurrentResults;
-  const bTotal = all.filter(function(r){return r.role==='breaker'||r.role==='breaker/manager';}).reduce(function(s,r){return s+r.total;},0);
-  const sTotal = all.filter(function(r){return r.role==='sorter';}).reduce(function(s,r){return s+r.total;},0);
+  const owedOf = function (r) { return Math.max(0, r.total - (r.paid || 0)); };
+  const bTotal = all.filter(function(r){return r.role==='breaker'||r.role==='breaker/manager';}).reduce(function(s,r){return s+owedOf(r);},0);
+  const sTotal = all.filter(function(r){return r.role==='sorter';}).reduce(function(s,r){return s+owedOf(r);},0);
   const grandTotal = bTotal + sTotal;
   document.getElementById('prTotalPayroll').textContent = fmt(grandTotal);
   document.getElementById('prBreakerTotal').textContent = fmt(bTotal);
@@ -7683,8 +7624,8 @@ let ownerSchedChannel = null;
 let ownerSchedAssignments = {};
 let ownerUpcomingCollapsed = false;
 
-const CAL_MIN_YEAR = 2026;
-const CAL_MIN_MONTH = 4; // May (0-indexed)
+let CAL_MIN_YEAR = 2026;
+let CAL_MIN_MONTH = 4; // May (0-indexed) — overwritten from the earliest shift on load
 
 let _schedSetupDone = false;
 async function setupSchedule() {
@@ -7946,22 +7887,32 @@ function schedDisplayName(s) {
 }
 
 async function loadSchedules() {
-  let q = sb.from('schedules').select(SCHED_SELECT).eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
-  if (ownerSchedChannel) q = q.eq('channel_id', ownerSchedChannel.id);
-  let { data, error } = await q;
-
+  // Paged past the 1,000-row cap; a year of shifts for a 10-person team is ~3,000 rows.
+  const build = function (sel, withChannel) {
+    return function () {
+      let q = sb.from('schedules').select(sel).eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true }).order('id', { ascending: true });
+      if (withChannel && ownerSchedChannel) q = q.eq('channel_id', ownerSchedChannel.id);
+      return q;
+    };
+  };
+  let data = null, error = null;
+  try { data = await CBP.pageAll(build(SCHED_SELECT, true)); }
+  catch (e) { error = e; }
   if (error && error.message && error.message.includes('channel_id')) {
-    const fallback = await sb.from('schedules').select(SCHED_SELECT).eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
-    data = fallback.data; error = fallback.error;
+    error = null; try { data = await CBP.pageAll(build(SCHED_SELECT, false)); } catch (e) { error = e; }
   }
-
   if (error && error.message && (error.message.includes('stream_key') || error.message.includes('schema cache') || error.message.includes('scheduled_time'))) {
-    const fallback2 = await sb.from('schedules').select(SCHED_SELECT_MINIMAL).eq('org_id', currentProfile.org_id).order('scheduled_date', { ascending: true });
-    data = fallback2.data; error = fallback2.error;
+    error = null; try { data = await CBP.pageAll(build(SCHED_SELECT_MINIMAL, false)); } catch (e) { error = e; }
   }
 
-  if (error) { showGlobalError('Failed to load schedules: ' + error.message); return; }
+  if (error) { showGlobalError('Failed to load schedules: ' + error.message); CBP.captureError(error, 'loadSchedules'); return; }
   allSchedules = data || [];
+  // Calendar can go back as far as the data does (was hard-floored at May 2026)
+  const earliest = allSchedules.length ? allSchedules[0].scheduled_date : null;
+  const floor = earliest && earliest < today() ? earliest : today();
+  CAL_MIN_YEAR = parseInt(floor.slice(0, 4), 10);
+  CAL_MIN_MONTH = parseInt(floor.slice(5, 7), 10) - 1;
+  if (typeof updateCalPrevBtn === 'function' && document.getElementById('calPrevBtn')) updateCalPrevBtn();
   renderCalendar();
   renderSchedTable();
   if (document.getElementById('schedViewWeekBtn') && document.getElementById('schedViewWeekBtn').classList.contains('active')) renderWeekGrid();
@@ -8276,7 +8227,8 @@ function openReassign(shiftId) {
   calHidePopup();
   const sel = document.getElementById('reassignPersonSelect');
   sel.innerHTML = '<option value="">— select person —</option>';
-  allProfiles.forEach(function(p){
+  // Only people payroll can pay for a shift (owner/manager hours are never counted)
+  allProfiles.filter(function (p) { return ['breaker', 'breaker/manager', 'sorter'].includes(p.role); }).forEach(function(p){
     const opt=document.createElement('option');
     opt.value=p.id; opt.textContent=p.display_name+' ('+p.role+')';
     sel.appendChild(opt);
@@ -8433,14 +8385,31 @@ function setupSchedSave() {
       }
 
       const selectedProfile = allProfiles.find(function(p){ return p.id === breakerId; });
-      const rows = dates.map(function (d) {
+      const personCol = selectedProfile && selectedProfile.role === 'sorter' ? 'sorter_id' : 'breaker_id';
+
+      // No duplicate shifts: same person, same date (and same time when one is set).
+      // Duplicates made clock-in attach hours to an arbitrary row and left ghosts "open".
+      const { data: existingRows } = await sb.from('schedules')
+        .select('scheduled_date, scheduled_time, status')
+        .eq('org_id', currentProfile.org_id).eq(personCol, breakerId)
+        .in('scheduled_date', dates).neq('status', 'cancelled');
+      const dupeDates = new Set((existingRows || [])
+        .filter(function (r) { return !time || !r.scheduled_time || r.scheduled_time.slice(0, 5) === time.slice(0, 5); })
+        .map(function (r) { return r.scheduled_date; }));
+      const newDates = dates.filter(function (d) { return !dupeDates.has(d); });
+      if (!newDates.length) {
+        showGlobalError((selectedProfile ? selectedProfile.display_name : 'They') + ' already ' + (dates.length > 1 ? 'have shifts on all of those dates' : 'has a shift on ' + dates[0] + (time ? ' at ' + time.slice(0, 5) : '')) + '.');
+        return;
+      }
+      const skipped = dates.length - newDates.length;
+
+      const rows = newDates.map(function (d) {
         const row = {
           org_id: currentProfile.org_id,
           scheduled_date: d,
           status: 'scheduled'
         };
-        if (selectedProfile && selectedProfile.role === 'sorter') row.sorter_id = breakerId;
-        else row.breaker_id = breakerId;
+        row[personCol] = breakerId;
         return row;
       });
 
@@ -8472,7 +8441,7 @@ function setupSchedSave() {
       await loadSchedules();
       document.getElementById('schedRepeat').checked = false;
       document.getElementById('ownerSchedRepeatDaysWrap').style.display = 'none';
-      showGlobalSuccess(repeat ? repeatDays + ' shifts scheduled!' : 'Shift scheduled!');
+      showGlobalSuccess((rows.length > 1 ? rows.length + ' shifts scheduled!' : 'Shift scheduled!') + (skipped ? ' (' + skipped + ' skipped — already scheduled)' : ''));
     } catch (err) {
       showGlobalError('Failed to schedule shift: ' + escHtml(err.message));
     } finally {
@@ -8489,33 +8458,33 @@ async function loadSorting() {
   tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading…</td></tr>';
 
   try {
-    // Step 1: load sort tasks (scoped to active channel via stream_ids)
-    let sortTasksQ = sb.from('sort_tasks')
-      .select('id, status, sorter_id, completed_at, created_at, stream_id')
-      .eq('org_id', currentProfile.org_id)
-      .order('created_at', { ascending: true });
+    // Step 1: load sort tasks (scoped to active channel via chunked stream_ids)
+    const sortTasksQ = function (ids) {
+      let q = sb.from('sort_tasks')
+        .select('id, status, sorter_id, completed_at, created_at, stream_id')
+        .eq('org_id', currentProfile.org_id)
+        .order('created_at', { ascending: true });
+      return ids ? q.in('stream_id', ids) : q;
+    };
+    let allTasks;
     if (activeChannel) {
       const chStreamIds = await getActiveChannelStreamIds();
       if (chStreamIds && chStreamIds.length === 0) {
         tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No sort tasks for this channel.</td></tr>';
         return;
       }
-      if (chStreamIds) sortTasksQ = sortTasksQ.in('stream_id', chStreamIds);
+      allTasks = await inChunks(sortTasksQ, chStreamIds);
+      allTasks.sort(function (a, b) { return a.created_at < b.created_at ? -1 : 1; });
+    } else {
+      allTasks = await CBP.pageAll(function () { return sortTasksQ(null); });
     }
-    const { data: tasks, error } = await sortTasksQ;
-
-    if (error) throw error;
-    const allTasks = tasks || [];
 
     // Step 2: load stream details
     const streamIds = [...new Set(allTasks.map(t => t.stream_id).filter(Boolean))];
     let streamMap = {};
     if (streamIds.length > 0) {
-      const { data: streams } = await sb
-        .from('streams')
-        .select('id, stream_key, break_date, break_count')
-        .in('id', streamIds);
-      if (streams) streams.forEach(s => { streamMap[s.id] = s; });
+      const streams = await inChunks(function (ids) { return sb.from('streams').select('id, stream_key, break_date, break_count').in('id', ids); }, streamIds);
+      streams.forEach(s => { streamMap[s.id] = s; });
     }
 
     // Step 3: load sorter display names
@@ -8663,6 +8632,16 @@ async function loadSettings() {
   if (wm) wm.value = WHALE_MIN;
   const cd = document.getElementById('settColdDays');
   if (cd) cd.value = COLD_MIN_DAYS;
+
+  // Business timezone
+  const tzSel = document.getElementById('settTimezone');
+  if (tzSel && !tzSel.options.length) {
+    const cur = CBP.tz;
+    const list = CBP.US_TIMEZONES.slice();
+    if (!list.some(function (z) { return z[0] === cur; })) list.unshift([cur, cur]);
+    tzSel.innerHTML = list.map(function (z) { return '<option value="' + escHtml(z[0]) + '">' + escHtml(z[1]) + ' — ' + escHtml(z[0]) + '</option>'; }).join('');
+  }
+  if (tzSel) tzSel.value = CBP.tz;
 
   // Load current email
   const { data: { user } } = await sb.auth.getUser();
@@ -9198,6 +9177,21 @@ async function ensureWhaleMin() {
   _whaleMinLoaded = true;
   const s = await BuyerIntel.loadOrgSettings(sb, currentProfile.org_id);
   WHALE_MIN = s.whaleMin; COLD_MIN_DAYS = s.coldAfterDays;
+}
+
+async function saveOrgTimezone() {
+  const btn = document.getElementById('settSaveTimezone');
+  const tz = document.getElementById('settTimezone').value;
+  if (!tz) return;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const { error } = await sb.from('organizations').update({ timezone: tz }).eq('id', currentProfile.org_id);
+  btn.disabled = false; btn.textContent = 'Save';
+  if (error) {
+    showGlobalError(CBP.isMissingSchema(error) ? 'Run migrations/013_audit_fixes.sql in Supabase first, then try again.' : 'Couldn\'t save: ' + error.message);
+    return;
+  }
+  CBP.setTz(tz);
+  showGlobalSuccess('Timezone set to ' + tz + '. Pay periods and "today" now follow it.');
 }
 
 async function saveWhaleMin() {

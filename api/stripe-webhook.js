@@ -373,13 +373,19 @@ async function processReferralConversion(sb, referredOrgId) {
   let rewardApplied = false;
 
   if (referrerSub.billing_cycle === 'monthly' && referrerSub.stripe_subscription_id) {
-    // Monthly: extend current period by 30 days
+    // Monthly: credit one month's price to the customer balance — it's applied to
+    // the next invoice. (Setting trial_end on a paid sub flipped it back to
+    // "trialing" in Stripe's eyes and shifted the billing date. AUDIT BL-18.)
     try {
+      const MONTHLY_PRICES_CENTS = { standard: 9900, starter: 12999, pro: 39999, empire: 99999 };
+      const credit = MONTHLY_PRICES_CENTS[referrerSub.tier];
+      if (!credit) throw new Error('no monthly price known for tier ' + referrerSub.tier);
       const stripeSub = await stripe.subscriptions.retrieve(referrerSub.stripe_subscription_id);
-      const newPeriodEnd = stripeSub.current_period_end + (30 * 24 * 60 * 60);
-      await stripe.subscriptions.update(referrerSub.stripe_subscription_id, {
-        trial_end: newPeriodEnd,
-        proration_behavior: 'none'
+      const customerId = typeof stripeSub.customer === 'string' ? stripeSub.customer : stripeSub.customer?.id;
+      if (!customerId) throw new Error('subscription has no customer');
+      await stripe.customers.createBalanceTransaction(customerId, {
+        amount: -credit, currency: 'usd',
+        description: 'Referral reward — one month free (' + (org.name || 'referred org') + ' subscribed)'
       });
       rewardApplied = true;
     } catch (e) {

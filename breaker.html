@@ -15,6 +15,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="analytics.js"></script>
+  <script src="shared.js"></script>
   <script src="buyer-intel.js"></script>
   <style>
     :root {
@@ -1122,10 +1123,8 @@ function fmt(n) {
   return '$' + (parseFloat(n) || 0).toFixed(2);
 }
 
-function today() {
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
+// "Today" in the business's timezone, not the phone's.
+function today() { return CBP.todayIn(); }
 
 function showLoading(text) {
   document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = text || 'Loading…';
@@ -1197,6 +1196,7 @@ async function initAuth() {
       document.getElementById('mgrViewLink').style.display = '';
     }
 
+    await CBP.loadOrgTz(sb, profile.org_id);
     await loadProducts();
     setupBreakerTabs();
     setupEventListeners();
@@ -1367,8 +1367,8 @@ function renderProductTable() {
   filtered.forEach(function (p) {
     const idx = products.indexOf(p);
     const tr = document.createElement('tr');
-    const stockClass = p.current_stock === 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
-    const stockLabel = p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
+    const stockClass = p.current_stock <= 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
+    const stockLabel = p.current_stock < 0 ? p.current_stock + ' — OVER-USED' : p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
 
     tr.innerHTML =
       '<td data-label="Product">' + escHtml(p.name) + '</td>' +
@@ -1822,31 +1822,32 @@ async function handleSubmitBreak() {
 
     if (breakErr) throw breakErr;
 
-    // Deduct stock from products and log usage
+    // Deduct stock atomically (adjust_stock RPC: UPDATE … current_stock = current_stock - qty
+    // + the log line, server-side). Two breakers on the same product can no longer
+    // overwrite each other, and stock is allowed to go negative so the log always
+    // matches what was actually opened.
+    const stockNote = 'Break #' + breakNumber + (currentStream ? ' — stream ' + currentStream.stream_key : '');
     for (const used of productsUsed) {
       const product = products.find(function (p) { return p.id === used.product_id; });
       if (!product) continue;
-      const newStock = Math.max(0, product.current_stock - used.qty);
-      const { error: stockErr } = await sb
-        .from('products')
-        .update({ current_stock: newStock })
-        .eq('id', used.product_id)
-        .eq('org_id', currentProfile.org_id);
-      if (stockErr) { console.error('Stock update error:', stockErr); showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.'); }
-      else { product.current_stock = newStock; } // only trust the cache when the write actually landed
-      try {
-        await sb.from('inventory_log').insert({
-          org_id: currentProfile.org_id,
-          product_id: used.product_id,
-          product_name: product.name,
-          action: 'used',
-          quantity: used.qty,
-          unit_cost: product.unit_cost,
-          notes: 'Break #' + breakNumber + (currentStream ? ' — stream ' + currentStream.stream_key : '')
-        });
-      } catch (logErr) {
-        console.warn('Inventory log insert failed:', logErr);
+      const rpc = await sb.rpc('adjust_stock', { p_product_id: used.product_id, p_delta: -used.qty, p_action: 'used', p_notes: stockNote });
+      if (!rpc.error) { product.current_stock = rpc.data; continue; }
+      if (!CBP.isMissingSchema(rpc.error)) {
+        CBP.captureError(rpc.error, 'adjust_stock');
+        showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.');
+        continue;
       }
+      // Migration 013 not run yet — last-resort non-atomic path (re-reads live stock first)
+      const { data: fresh } = await sb.from('products').select('current_stock').eq('id', used.product_id).maybeSingle();
+      const newStock = ((fresh && fresh.current_stock != null) ? fresh.current_stock : product.current_stock) - used.qty;
+      const { error: stockErr } = await sb.from('products').update({ current_stock: newStock }).eq('id', used.product_id).eq('org_id', currentProfile.org_id);
+      if (stockErr) { CBP.captureError(stockErr, 'stock update'); showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.'); }
+      else { product.current_stock = newStock; }
+      const { error: logErr } = await sb.from('inventory_log').insert({
+        org_id: currentProfile.org_id, product_id: used.product_id, product_name: product.name,
+        action: 'used', quantity: used.qty, unit_cost: product.unit_cost, notes: stockNote
+      });
+      if (logErr) CBP.captureError(logErr, 'inventory_log insert');
     }
 
     // Fire inventory-low notification check (fire and forget)
@@ -1864,27 +1865,31 @@ async function handleSubmitBreak() {
       });
     }
 
-    // Update stream totals
-    const newTotalRevenue = (parseFloat(stream.total_submitted_revenue) || 0) + revenue;
-    const newTotalBoxCost = (parseFloat(stream.total_product_cost) || 0) + boxCost;
-    const newTotalFees = (parseFloat(stream.total_fees) || 0) + fees;
-    const newTotalOther = (parseFloat(stream.total_other_costs) || 0) + otherCosts;
-    const newBreakCount = (stream.break_count || 0) + 1;
-
-    const { error: streamErr } = await sb
-      .from('streams')
-      .update({
-        total_submitted_revenue: newTotalRevenue,
-        total_product_cost: newTotalBoxCost,
-        total_fees: newTotalFees,
-        total_other_costs: newTotalOther,
-        break_count: newBreakCount
-      })
-      .eq('id', stream.id);
-
-    if (streamErr) {
-      console.error('Stream total update error:', streamErr);
-      showGlobalError('Break saved, but the stream running total didn\'t update — refresh to re-sync your totals.');
+    // Stream totals are recomputed from the breaks table server-side (never a
+    // running sum that can drift). Falls back to the old read-modify-write
+    // until migration 013 is run.
+    let newTotalRevenue = (parseFloat(stream.total_submitted_revenue) || 0) + revenue;
+    let newBreakCount = (stream.break_count || 0) + 1;
+    const tot = await sb.rpc('recompute_stream_totals', { p_stream_id: stream.id });
+    if (!tot.error && tot.data && tot.data.length) {
+      newTotalRevenue = parseFloat(tot.data[0].total_submitted_revenue) || newTotalRevenue;
+      newBreakCount = tot.data[0].break_count || newBreakCount;
+    } else {
+      if (tot.error && !CBP.isMissingSchema(tot.error)) CBP.captureError(tot.error, 'recompute_stream_totals');
+      const { error: streamErr } = await sb
+        .from('streams')
+        .update({
+          total_submitted_revenue: newTotalRevenue,
+          total_product_cost: (parseFloat(stream.total_product_cost) || 0) + boxCost,
+          total_fees: (parseFloat(stream.total_fees) || 0) + fees,
+          total_other_costs: (parseFloat(stream.total_other_costs) || 0) + otherCosts,
+          break_count: newBreakCount
+        })
+        .eq('id', stream.id);
+      if (streamErr) {
+        CBP.captureError(streamErr, 'stream totals update');
+        showGlobalError('Break saved, but the stream running total didn\'t update — refresh to re-sync your totals.');
+      }
     }
 
     // Update local state — store individual revenue, cumulative total, and products used for repeat
@@ -2411,14 +2416,14 @@ async function loadShifts() {
   loading.style.display = 'block';
   root.style.display = 'none';
 
-  const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  const today = CBP.todayIn();
 
-  const { data, error } = await sb
-    .from('schedules')
-    .select('*')
-    .eq('org_id', currentProfile.org_id)
-    .eq('breaker_id', currentUser.id)
-    .order('scheduled_date', { ascending: true });
+  let data = null, error = null;
+  try {
+    data = await CBP.pageAll(function () {
+      return sb.from('schedules').select('*').eq('org_id', currentProfile.org_id).eq('breaker_id', currentUser.id).order('scheduled_date', { ascending: true }).order('id', { ascending: true });
+    });
+  } catch (e) { error = e; }
 
   loading.style.display = 'none';
   root.style.display = '';
@@ -2499,7 +2504,7 @@ let activeShiftId = null;
 let activeShiftChannelId = null;  // account tied to the clocked-in shift; new streams inherit it
 
 async function checkTodayShiftAndNotify() {
-  const today = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  const today = CBP.todayIn();   // business timezone, not the phone's
   const { data } = await sb
     .from('schedules')
     .select('*')
@@ -2523,18 +2528,16 @@ async function checkTodayShiftAndNotify() {
     return;
   }
 
-  // Check 45-minute window if shift has a scheduled_time
+  // Check 45-minute window if shift has a scheduled_time (interpreted in the org's timezone)
   let tooEarly = false;
   let availableAt = '';
   if (shift.scheduled_time) {
-    const [h, m] = shift.scheduled_time.slice(0, 5).split(':').map(Number);
-    const now = new Date();
-    const shiftMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime();
+    const shiftMs = new Date(CBP.localTimeISO(shift.scheduled_date || today, shift.scheduled_time)).getTime();
     const windowMs = shiftMs - 45 * 60 * 1000;
     if (Date.now() < windowMs) {
       tooEarly = true;
-      const av = new Date(windowMs);
-      availableAt = String(av.getHours()).padStart(2,'0') + ':' + String(av.getMinutes()).padStart(2,'0');
+      const p = CBP.partsIn(new Date(windowMs));
+      availableAt = String(p.hour).padStart(2,'0') + ':' + String(p.minute).padStart(2,'0');
     }
   }
 
@@ -2560,9 +2563,7 @@ async function checkTodayShiftAndNotify() {
   document.getElementById('clockInBtn').addEventListener('click', async function () {
     // Re-check window at click time in case page has been open a while
     if (shift.scheduled_time) {
-      const [h, m] = shift.scheduled_time.slice(0, 5).split(':').map(Number);
-      const now = new Date();
-      const windowMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime() - 45 * 60 * 1000;
+      const windowMs = new Date(CBP.localTimeISO(shift.scheduled_date || today, shift.scheduled_time)).getTime() - 45 * 60 * 1000;
       if (Date.now() < windowMs) {
         showError('You can only clock in within 45 minutes of your scheduled start time.');
         return;
@@ -2605,23 +2606,17 @@ function showClockedInBanner(shift) {
 // ── My Pay ────────────────────────────────────────────────
 let currentPeriod = 'daily';
 
-function getPeriodRange(period) {
-  const now = new Date();
-  let from;
-  if (period === 'daily') from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  else if (period === 'weekly') { const d = now.getDay(); from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - d); }
-  else if (period === 'monthly') from = new Date(now.getFullYear(), now.getMonth(), 1);
-  else from = new Date(2000, 0, 1);
-  return from.toISOString();
-}
-
 function checkCommissionEnabled() {
   // No-op — payouts tab is always shown, pay type drives what's displayed
   setupPayoutListeners();
 }
 
+// My Pay — the same rules the owner's payroll uses: streams by break_date
+// (org-local), commission = the closeout snapshot, hours prorated at period
+// edges, salary prorated to the period, tips by created_at.
 async function loadPayouts() {
-  const from = getPeriodRange(currentPeriod);
+  const pb = CBP.periodBounds(currentPeriod);
+  const from = pb.fromISO, to = pb.toISO;
   const type = currentProfile.pay_type;
 
   // Hide all sections first
@@ -2652,16 +2647,17 @@ async function loadPayouts() {
   // ── Commission component ───────────────────────────────
   if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
     const rate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
-    const { data: streamsData } = await sb
-      .from('streams')
-      .select('id, stream_key, break_date, final_sales, total_product_cost, total_other_costs')
-      .eq('org_id', currentProfile.org_id)
-      .eq('breaker_id', currentUser.id)
-      .eq('status', 'closed')
-      .gte('closed_at', from)
-      .order('break_date', { ascending: false });
+    const streams = await CBP.pageAll(function () {
+      return sb.from('streams')
+        .select('id, stream_key, break_date, final_sales, total_product_cost, total_other_costs, commission_payout')
+        .eq('org_id', currentProfile.org_id)
+        .eq('breaker_id', currentUser.id)
+        .eq('status', 'closed')
+        .gte('break_date', pb.from)
+        .lte('break_date', pb.to)
+        .order('break_date', { ascending: false });
+    });
 
-    const streams = streamsData || [];
     let totalProfit = 0, totalCommission = 0;
     const tbody = document.getElementById('payoutStreamBody');
     tbody.innerHTML = '';
@@ -2672,7 +2668,8 @@ async function loadPayouts() {
       const other = parseFloat(s.total_other_costs) || 0;
       // final_sales already reflects platform fee deduction — no double-subtract
       const profit = sales - cost - other;
-      const commission = Math.max(0, profit) * rate;
+      // The closeout snapshot is the ledger (rate at the time); fall back to a live calc for old rows
+      const commission = (s.commission_payout != null && s.commission_payout !== '') ? Math.max(0, parseFloat(s.commission_payout) || 0) : Math.max(0, profit) * rate;
       totalProfit += profit;
       totalCommission += commission;
       const tr = document.createElement('tr');
@@ -2697,21 +2694,22 @@ async function loadPayouts() {
   // ── Hourly component ───────────────────────────────────
   if (type === 'hourly' || type === 'hourly_commission') {
     const rate = parseFloat(currentProfile.hourly_rate) || 0;
-    const { data: shifts } = await sb
-      .from('schedules')
-      .select('scheduled_date, clocked_in_at, clocked_out_at')
-      .eq('org_id', currentProfile.org_id)
-      .eq('breaker_id', currentUser.id)
-      .not('clocked_in_at', 'is', null)
-      .not('clocked_out_at', 'is', null)
-      .gte('clocked_in_at', from)
-      .order('clocked_in_at', { ascending: false });
+    const shifts = await CBP.pageAll(function () {
+      return CBP.applyShiftWindow(sb
+        .from('schedules')
+        .select('scheduled_date, clocked_in_at, clocked_out_at')
+        .eq('org_id', currentProfile.org_id)
+        .eq('breaker_id', currentUser.id)
+        .not('clocked_in_at', 'is', null)
+        .not('clocked_out_at', 'is', null), from, to)
+        .order('clocked_in_at', { ascending: false });
+    });
 
     let totalHours = 0, totalHourlyPay = 0;
     const shiftTbody = document.getElementById('payoutShiftBody');
     shiftTbody.innerHTML = '';
     (shifts || []).forEach(function (s) {
-      const hrs = Math.max(0, (new Date(s.clocked_out_at) - new Date(s.clocked_in_at)) / 3600000);
+      const hrs = CBP.hoursOverlap(s, from, to);   // only the part inside the period counts
       const pay = hrs * rate;
       totalHours += hrs; totalHourlyPay += pay;
       const tr = document.createElement('tr');
@@ -2735,13 +2733,15 @@ async function loadPayouts() {
   // ── Salary component ───────────────────────────────────
   if (type === 'salary' || type === 'salary_commission') {
     const amount = parseFloat(currentProfile.salary_amount) || 0;
-    const period = currentProfile.salary_period || 'period';
-    statsHTML.push('<div class="stat-card"><div class="stat-label">Salary</div><div class="stat-value green">' + fmt(amount) + '<span style="font-size:0.7rem;color:var(--muted);font-weight:400;"> /' + period + '</span></div></div>');
-    grandTotal += amount;
+    const period = currentProfile.salary_period || 'weekly';
+    // Prorated to the selected period (a weekly salary over "This Month" ≈ 4.3×). "All time" shows the base amount.
+    const sal = currentPeriod === 'all' ? { total: amount } : CBP.salaryForRange(amount, period, pb.from, pb.to);
+    statsHTML.push('<div class="stat-card"><div class="stat-label">Salary' + (currentPeriod === 'all' ? '' : ' (this period)') + '</div><div class="stat-value green">' + fmt(sal.total) + '<span style="font-size:0.7rem;color:var(--muted);font-weight:400;"> ' + fmt(amount) + '/' + period + '</span></div></div>');
+    grandTotal += sal.total;
   }
 
   // ── Tips ───────────────────────────────────────────────
-  const { data: tipsData } = await sb.from('tips').select('amount').eq('breaker_id', currentUser.id).eq('org_id', currentProfile.org_id).gte('created_at', from);
+  const { data: tipsData } = await sb.from('tips').select('amount').eq('breaker_id', currentUser.id).eq('org_id', currentProfile.org_id).gte('created_at', from).lt('created_at', to);
   const totalTips = (tipsData || []).reduce(function (s, t) { return s + (parseFloat(t.amount) || 0); }, 0);
   statsHTML.push('<div class="stat-card"><div class="stat-label">Tips Received</div><div class="stat-value green">' + fmt(totalTips) + '</div></div>');
   grandTotal += totalTips;

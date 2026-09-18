@@ -15,6 +15,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="analytics.js"></script>
+  <script src="shared.js"></script>
   <style>
     :root {
       --bg: #0d0d14; --card: #13131e; --border: #2d2d3d;
@@ -202,33 +203,6 @@
     .lb-bar-fill{height:100%;border-radius:100px;background:var(--primary);transition:width 0.55s ease;}
     @media(max-width:375px){.lb-bar-wrap{display:none;}}
 
-    /* ── SPLITS ── */
-    .split-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.85rem;}
-    .split-card-meta{font-size:0.8rem;color:var(--muted);margin-top:0.3rem;}
-    .split-pct-row{display:flex;align-items:center;gap:1rem;margin:0.85rem 0;flex-wrap:wrap;}
-    .split-pct-box{flex:1;min-width:130px;background:rgba(79,110,247,0.08);border:1px solid rgba(79,110,247,0.25);border-radius:8px;padding:0.65rem;text-align:center;}
-    .split-pct-label{font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.2rem;}
-    .split-pct-val{font-size:1.3rem;font-weight:800;color:var(--primary);}
-    .split-actions{display:flex;gap:0.6rem;margin-top:0.75rem;flex-wrap:wrap;}
-
-    /* ── SPLIT EARNINGS MODAL ── */
-    .split-modal-step{display:none;}
-    .split-modal-step.active{display:block;}
-    .split-sorter-row{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;transition:border-color 0.15s;}
-    .split-sorter-row:hover{border-color:rgba(79,110,247,0.5);}
-    .split-opt-card{border:2px solid var(--border);border-radius:10px;padding:0.9rem 1rem;margin-bottom:0.65rem;cursor:pointer;transition:border-color 0.2s,background 0.2s;}
-    .split-opt-card.soc-active{border-color:var(--primary);background:rgba(79,110,247,0.06);}
-    .split-earnings-preview{background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.83rem;margin:0.85rem 0;line-height:1.65;}
-    .queue-split-alert{background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:0.85rem 1.1rem;margin-bottom:0.75rem;position:relative;}
-    .queue-split-alert-dismiss{position:absolute;top:0.55rem;right:0.7rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1;min-width:32px;min-height:32px;display:flex;align-items:center;justify-content:center;}
-    .queue-split-alert-actions{display:flex;gap:0.55rem;margin-top:0.6rem;flex-wrap:wrap;}
-    .tab-split-dot{display:none;width:7px;height:7px;background:var(--red);border-radius:50%;margin-left:5px;vertical-align:middle;flex-shrink:0;position:relative;top:-1px;}
-    .pay-split-parent-td{font-weight:700;color:var(--yellow);background:rgba(245,158,11,0.04);}
-    .pay-split-child-td{padding-left:1.85rem!important;font-size:0.8rem;color:var(--muted);background:rgba(245,158,11,0.02);}
-    .pay-split-child-td.amt{font-weight:700;color:var(--green)!important;}
-    .btn-split{background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.3);color:var(--primary);font-size:0.78rem;font-weight:700;padding:0.42rem 0.85rem;border-radius:7px;cursor:pointer;transition:opacity 0.2s;min-height:44px;}
-    .btn-split:hover{opacity:0.8;}
-    @media(max-width:375px){.split-opt-card{padding:0.7rem 0.8rem;}.split-modal-step{font-size:0.9rem;}}
   </style>
 </head>
 <body>
@@ -264,10 +238,9 @@
 </nav>
 
 <div class="tabs">
-  <button class="tab-btn active" data-tab="queue">Sort Queue<span class="tab-split-dot" id="queueSplitDot"></span></button>
+  <button class="tab-btn active" data-tab="queue">Sort Queue</button>
   <button class="tab-btn" data-tab="shifts">My Shifts</button>
-  <button class="tab-btn" data-tab="pay">My Pay</button>
-  <button class="tab-btn" data-tab="splits">Splits</button>
+  <button class="tab-btn" data-tab="pay">My Hours</button>
   <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
 </div>
 
@@ -282,7 +255,6 @@
         <div class="panel-title">Sort Queue — Oldest First</div>
         <button class="btn btn-outline" id="refreshQueueBtn" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
       </div>
-      <div id="queueSplitAlerts"></div>
       <div class="ptr-hint">Pull down to refresh</div>
       <div id="sortQueueList" class="sort-queue">
         <div style="color:var(--muted);font-style:italic;text-align:center;padding:2rem;">Loading queue…</div>
@@ -320,11 +292,11 @@
     </div>
   </div>
 
-  <!-- ── MY PAY TAB ── -->
+  <!-- ── MY HOURS TAB — sorters are hourly: this is clock-in / clock-out time, nothing else ── -->
   <div class="tab-content" id="tab-pay">
     <div class="panel">
-      <div class="panel-title">My Pay</div>
-      <div id="sorterPayTypeLabel" style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;"></div>
+      <div class="panel-title">My Hours</div>
+      <div id="sorterPayTypeLabel" style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;">Hours you've clocked in and out. Your owner runs payroll from these.</div>
 
       <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem;flex-wrap:wrap;">
         <button class="pay-period-btn active" data-period="daily" style="padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">Today</button>
@@ -335,9 +307,9 @@
 
       <div id="sorterPayStatsRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem;margin-bottom:1.25rem;"></div>
 
-      <!-- Hourly shift breakdown -->
-      <div id="sorterShiftSection" style="display:none;margin-bottom:1.25rem;">
-        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Shift Hours</div>
+      <!-- Shift hours -->
+      <div id="sorterShiftSection" style="margin-bottom:1.25rem;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Shifts</div>
         <div style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
             <thead>
@@ -346,7 +318,6 @@
                 <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Clock In</th>
                 <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Clock Out</th>
                 <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Hours</th>
-                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Pay</th>
               </tr>
             </thead>
             <tbody id="sorterShiftBody"></tbody>
@@ -354,82 +325,10 @@
         </div>
       </div>
 
-      <!-- Per break breakdown -->
-      <div id="sorterBreakSection" style="display:none;margin-bottom:1.25rem;">
-        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;">Breaks Sorted</div>
-        <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
-            <thead>
-              <tr style="border-bottom:1px solid var(--border);">
-                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Date</th>
-                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Stream</th>
-                <th style="text-align:left;color:var(--muted);padding:0.4rem 0.5rem;font-weight:600;">Pay</th>
-              </tr>
-            </thead>
-            <tbody id="sorterBreakBody"></tbody>
-          </table>
-        </div>
+      <div style="padding:0.75rem;background:rgba(79,110,247,0.06);border:1px solid rgba(79,110,247,0.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:700;color:var(--muted);">Total Hours This Period</span>
+        <span style="font-size:1.4rem;font-weight:800;color:var(--primary);" id="sorterPayTotal">—</span>
       </div>
-
-      <div style="padding:0.75rem;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-weight:700;color:var(--muted);">Total Earnings This Period</span>
-        <span style="font-size:1.4rem;font-weight:800;color:#22c55e;" id="sorterPayTotal">—</span>
-      </div>
-
-      <div id="sorterPayNotConfigured" style="display:none;margin-top:1rem;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:0.85rem 1rem;font-size:0.85rem;color:#e2e8f0;">
-        ⚠ Your pay hasn't been configured yet. Ask your owner to set up your pay type in the Team tab.
-      </div>
-    </div>
-  </div>
-
-  <!-- ── SPLITS TAB ── -->
-  <div class="tab-content" id="tab-splits">
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">Pending Split Requests</div>
-        <button class="btn btn-outline" onclick="loadSplitsPending()" style="font-size:0.78rem;padding:0.35rem 0.8rem;">Refresh</button>
-      </div>
-      <div id="splitsPendingList"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No pending requests.</div></div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-title">Create Split Request</div>
-      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:1rem;">Propose a commission split with another sorter for a stream. They must accept within 24 hours.</p>
-      <div class="form-group">
-        <label for="splitStreamSel">Stream</label>
-        <select id="splitStreamSel"><option value="">— select stream —</option></select>
-      </div>
-      <div class="form-group">
-        <label for="splitPartnerSel">Receiving Sorter</label>
-        <select id="splitPartnerSel"><option value="">— select sorter —</option></select>
-      </div>
-      <div class="form-group">
-        <label for="splitType">Split Type</label>
-        <select id="splitType" onchange="onSplitTypeChange()">
-          <option value="equal">Equal (50/50)</option>
-          <option value="custom">Custom</option>
-        </select>
-      </div>
-      <div id="splitCustomRow" style="display:none;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
-          <div class="form-group" style="margin:0;">
-            <label>My % (you)</label>
-            <input type="number" id="splitMyPct" min="1" max="99" value="50" oninput="updateSplitPreview()" />
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>Their %</label>
-            <input type="number" id="splitTheirPct" min="1" max="99" value="50" readonly style="color:var(--muted);" />
-          </div>
-        </div>
-      </div>
-      <div id="splitPreview" style="display:none;margin:0.85rem 0;">
-        <div class="split-pct-row">
-          <div class="split-pct-box"><div class="split-pct-label">You</div><div class="split-pct-val" id="splitPreviewMy">50%</div></div>
-          <div style="font-size:1.2rem;color:var(--muted);">↔</div>
-          <div class="split-pct-box"><div class="split-pct-label">Them</div><div class="split-pct-val" id="splitPreviewTheir">50%</div></div>
-        </div>
-      </div>
-      <button class="btn btn-primary" id="createSplitBtn" onclick="createSplitRequest()">Send Split Request</button>
     </div>
   </div>
 
@@ -451,64 +350,6 @@
 
 </div>
 
-<!-- ── SPLIT EARNINGS MODAL ── -->
-<div class="modal-overlay" id="splitEarningsModal">
-  <div class="modal" style="max-width:500px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
-      <h2 style="margin:0;font-size:1rem;" id="splitModalTitle">Split Earnings</h2>
-      <button onclick="closeSplitModal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.25rem;min-width:36px;min-height:36px;">✕</button>
-    </div>
-
-    <!-- Step 1: Select Sorter -->
-    <div class="split-modal-step active" id="splitStep1">
-      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Select a sorter to split earnings with for this stream.</p>
-      <div id="splitSorterList"><div style="color:var(--muted);text-align:center;padding:1.5rem;font-size:0.85rem;">Loading…</div></div>
-    </div>
-
-    <!-- Step 2: Choose Split -->
-    <div class="split-modal-step" id="splitStep2">
-      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Splitting with <strong id="splitWithName">—</strong></p>
-
-      <div class="split-opt-card soc-active" id="splitOptEqual" onclick="splitSetType('equal')">
-        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
-          <span>⚖️</span>
-          <span style="font-weight:700;font-size:0.9rem;">Equal Split — 50% / 50%</span>
-        </div>
-        <div id="splitEqualNames" style="font-size:0.82rem;color:var(--muted);"></div>
-      </div>
-
-      <div class="split-opt-card" id="splitOptCustom" onclick="splitSetType('custom')">
-        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;">
-          <span>✏️</span>
-          <span style="font-weight:700;font-size:0.9rem;">Custom Split</span>
-        </div>
-        <div id="splitCustomInputs" style="display:none;">
-          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.6rem;align-items:center;margin-top:0.5rem;">
-            <div>
-              <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;">Your %</div>
-              <input type="number" id="splitModalMyPct" min="1" max="99" value="60" oninput="splitUpdatePcts()" style="text-align:center;" />
-            </div>
-            <span style="color:var(--muted);font-size:1.1rem;text-align:center;">↔</span>
-            <div>
-              <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;" id="splitModalTheirLabel">Their %</div>
-              <input type="number" id="splitModalTheirPct" value="40" readonly style="color:var(--muted);text-align:center;" />
-            </div>
-          </div>
-          <div id="splitCustomSummary" style="font-size:0.82rem;color:var(--muted);margin-top:0.5rem;"></div>
-        </div>
-      </div>
-
-      <div class="split-earnings-preview" id="splitEarningsPreview"></div>
-      <div id="splitModalError" style="color:var(--red);font-size:0.83rem;margin-bottom:0.75rem;display:none;"></div>
-    </div>
-
-    <div class="modal-btn-row">
-      <button class="btn btn-outline" id="splitModalBackBtn" onclick="splitGoBack()" style="display:none;">← Back</button>
-      <button class="btn btn-primary" id="splitModalNextBtn" onclick="splitModalNext()">Select Sorter →</button>
-    </div>
-  </div>
-</div>
-
 <script>
 'use strict';
 
@@ -520,14 +361,6 @@ let currentProfile = null;
 let activeShiftId = null;
 
 // Split modal state
-let splitModalStreamId = null;
-let splitModalStreamKey = '';
-let splitModalBreakCount = 0;
-let splitModalSorters = [];
-let splitModalSelectedId = null;
-let splitModalSelectedName = '';
-let splitModalActiveType = 'equal';
-let splitModalStep = 1;
 
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -546,10 +379,9 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     hideMessages();
-    if (btn.dataset.tab === 'queue') { loadSortQueue(); loadQueueSplitAlerts(); }
+    if (btn.dataset.tab === 'queue') loadSortQueue();
     if (btn.dataset.tab === 'shifts') { loadShifts(); loadMyScheduleView(); }
     if (btn.dataset.tab === 'pay') loadSorterPay();
-    if (btn.dataset.tab === 'splits') { loadSplitsPending(); loadSplitsFormData(); }
     if (btn.dataset.tab === 'leaderboard') loadLeaderboard();
   });
 });
@@ -583,21 +415,6 @@ async function loadSortQueue() {
       if (streams) streams.forEach(s => { streamMap[s.id] = s; });
     }
 
-    // Fetch active splits for these streams (only if per_break sorter)
-    const isPerBreak = currentProfile.pay_type === 'per_break';
-    const splitByStream = {};
-    if (isPerBreak && streamIds.length > 0) {
-      const { data: activeSplits } = await sb.from('sorter_splits')
-        .select('id, stream_id, status, initiating_sorter_id, receiving_sorter_id')
-        .in('stream_id', streamIds)
-        .in('status', ['pending', 'confirmed']);
-      (activeSplits || []).forEach(function(sp) {
-        if (sp.initiating_sorter_id === currentUser.id || sp.receiving_sorter_id === currentUser.id) {
-          splitByStream[sp.stream_id] = sp;
-        }
-      });
-    }
-
     if (!tasks.length) {
       list.innerHTML = '<div class="sort-empty"><div class="sort-empty-icon">✅</div><div class="sort-empty-title">Queue is clear. Nice work.</div><div style="font-size:0.85rem;color:var(--muted);">No streams waiting to be sorted.</div></div>';
       return;
@@ -616,26 +433,11 @@ async function loadSortQueue() {
       if (task.status === 'pending') statusBadge = '<span class="badge badge-gray">Pending</span>';
       else if (task.status === 'in_progress') statusBadge = '<span class="badge badge-yellow">In Progress</span>';
 
-      // Split status badge
-      const streamSplit = splitByStream[task.stream_id];
-      let splitBadge = '';
-      if (streamSplit && streamSplit.status === 'pending') {
-        splitBadge = ' <span class="badge badge-yellow">Split Pending</span>';
-      } else if (streamSplit && streamSplit.status === 'confirmed') {
-        splitBadge = ' <span class="badge badge-green">⚡ Split Active</span>';
-      }
-
-      // Split Earnings button: show only if per_break, this sorter is in progress on this task, and no active split
-      let splitBtn = '';
-      if (isPerBreak && isInProgress && !streamSplit) {
-        splitBtn = '<button class="btn-split" data-action="split" data-stream-id="' + task.stream_id + '" data-stream-key="' + escHtml(s.stream_key || '') + '" data-break-count="' + (s.break_count || 0) + '">⚡ Split Earnings</button>';
-      }
-
       let actionsHtml = '';
       if (task.status === 'pending') {
         actionsHtml = '<button class="btn btn-yellow" data-action="start" data-id="' + task.id + '">▶ Start Sorting</button>';
       } else if (isInProgress) {
-        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">✓ Mark Complete</button>' + splitBtn;
+        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">✓ Mark Complete</button>';
       } else if (isOtherProgress) {
         actionsHtml = '<span style="font-size:0.82rem;color:var(--muted);padding:0.5rem 0;display:block;">In progress by another sorter</span>';
       }
@@ -644,7 +446,7 @@ async function loadSortQueue() {
 
       card.innerHTML =
         '<div class="sort-card-info">' +
-          '<div class="sort-card-key">' + escHtml(s.stream_key || 'Unknown Stream') + ' ' + statusBadge + splitBadge + '</div>' +
+          '<div class="sort-card-key">' + escHtml(s.stream_key || 'Unknown Stream') + ' ' + statusBadge + '</div>' +
           '<div class="sort-card-meta">' +
             '<span>📅 ' + (s.break_date || '—') + '</span>' +
             '<span>📦 ' + breakCount + ' break' + (breakCount !== 1 ? 's' : '') + '</span>' +
@@ -661,20 +463,17 @@ async function loadSortQueue() {
         const action = btn.dataset.action;
         const taskId = btn.dataset.id;
 
-        if (action === 'split') {
-          openSplitModal(btn.dataset.streamId, btn.dataset.streamKey, parseInt(btn.dataset.breakCount) || 0);
-          return;
-        }
-
         btn.disabled = true;
 
         try {
           if (action === 'start') {
-            const { error: startErr } = await sb.from('sort_tasks').update({
+            // Claim only if it's still pending — two sorters tapping at once can't both "own" it
+            const { data: claimed, error: startErr } = await sb.from('sort_tasks').update({
               status: 'in_progress',
               sorter_id: currentUser.id
-            }).eq('id', taskId).eq('org_id', currentProfile.org_id);
+            }).eq('id', taskId).eq('org_id', currentProfile.org_id).eq('status', 'pending').select('id');
             if (startErr) throw startErr;
+            if (!claimed || !claimed.length) throw new Error('Someone else just started this one — refresh the queue.');
             showSuccess('Started sorting. Mark complete when done.');
             const sfsFlagKey = 'cbp_sorter_first_sort_' + (currentUser?.id || '');
             if (!localStorage.getItem(sfsFlagKey)) {
@@ -720,7 +519,7 @@ async function loadShifts() {
   loading.style.display = 'block';
   root.style.display = 'none';
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = CBP.todayIn();
 
   try {
     const { data, error } = await sb
@@ -845,7 +644,7 @@ async function loadShifts() {
 
 // ── Today Shift Banner ────────────────────────────────────
 async function checkTodayShift() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = CBP.todayIn();   // business timezone — after 8pm ET "today" is still today
   const { data: shifts } = await sb
     .from('schedules')
     .select('*')
@@ -962,8 +761,8 @@ async function initAuth() {
     currentProfile = profile;
     document.getElementById('sorterBadge').textContent = escHtml(profile.display_name);
 
+    await CBP.loadOrgTz(sb, profile.org_id);
     await loadSortQueue();
-    await loadQueueSplitAlerts();
     await checkTodayShift();
     loadNotifCount();
     setInterval(loadNotifCount, 60000);
@@ -1050,18 +849,12 @@ document.addEventListener('click', function(e) {
 
 initAuth();
 
-// ── My Pay ────────────────────────────────────────────────
+// ── My Hours ──────────────────────────────────────────────
+// Sorters are hourly: this tab is clock-in / clock-out time and nothing else.
+// The owner's payroll uses the exact same window + proration (shared.js).
 let sorterPayPeriod = 'daily';
 
 function fmt(n) { return '$' + (parseFloat(n) || 0).toFixed(2); }
-
-function getSorterPeriodFrom(period) {
-  const now = new Date();
-  if (period === 'daily') return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  if (period === 'weekly') { const d = now.getDay(); return new Date(now.getFullYear(), now.getMonth(), now.getDate() - d).toISOString(); }
-  if (period === 'monthly') return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  return new Date(2000, 0, 1).toISOString();
-}
 
 document.querySelectorAll('.pay-period-btn').forEach(function (btn) {
   btn.addEventListener('click', function () {
@@ -1076,237 +869,55 @@ document.querySelectorAll('.pay-period-btn').forEach(function (btn) {
 
 async function loadSorterPay() {
   try {
-  // Always re-fetch profile so rate changes by owner show immediately
-  const { data: freshProfile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-  if (freshProfile) currentProfile = freshProfile;
+    const pb = CBP.periodBounds(sorterPayPeriod);
+    const shifts = await CBP.pageAll(function () {
+      return CBP.applyShiftWindow(sb
+        .from('schedules')
+        .select('scheduled_date, clocked_in_at, clocked_out_at')
+        .eq('org_id', currentProfile.org_id)
+        .eq('sorter_id', currentUser.id)
+        .not('clocked_in_at', 'is', null)
+        .not('clocked_out_at', 'is', null), pb.fromISO, pb.toISO)
+        .order('clocked_in_at', { ascending: false });
+    });
 
-  const from = getSorterPeriodFrom(sorterPayPeriod);
-  const type = currentProfile.pay_type;
-
-  document.getElementById('sorterShiftSection').style.display = 'none';
-  document.getElementById('sorterBreakSection').style.display = 'none';
-  document.getElementById('sorterPayNotConfigured').style.display = 'none';
-  document.getElementById('sorterPayStatsRow').innerHTML = '';
-
-  const typeLabels = {
-    hourly: 'Hourly — rate × hours clocked',
-    per_break: 'Per Break Sorted — flat rate per break',
-    hourly_per_break: 'Hourly + Per Break Sorted'
-  };
-  document.getElementById('sorterPayTypeLabel').textContent = type
-    ? 'Pay type: ' + (typeLabels[type] || type)
-    : 'Pay type not configured.';
-
-  if (!type) {
-    document.getElementById('sorterPayNotConfigured').style.display = 'block';
-    document.getElementById('sorterPayTotal').textContent = '—';
-    return;
-  }
-
-  let grandTotal = 0;
-  const statsHTML = [];
-
-  // ── Hourly component ───────────────────────────────────
-  if (type === 'hourly' || type === 'hourly_per_break') {
-    const rate = parseFloat(currentProfile.hourly_rate) || 0;
-    const { data: shifts } = await sb
-      .from('schedules')
-      .select('scheduled_date, clocked_in_at, clocked_out_at')
-      .eq('org_id', currentProfile.org_id)
-      .eq('sorter_id', currentUser.id)
-      .not('clocked_in_at', 'is', null)
-      .not('clocked_out_at', 'is', null)
-      .gte('clocked_in_at', from)
-      .order('clocked_in_at', { ascending: false });
-
-    let totalHours = 0, totalPay = 0;
+    let totalHours = 0;
     const tbody = document.getElementById('sorterShiftBody');
     tbody.innerHTML = '';
-    (shifts || []).forEach(function (s) {
-      const hrs = Math.max(0, (new Date(s.clocked_out_at) - new Date(s.clocked_in_at)) / 3600000);
-      const pay = hrs * rate;
-      totalHours += hrs; totalPay += pay;
+    shifts.forEach(function (s) {
+      const hrs = CBP.hoursOverlap(s, pb.fromISO, pb.toISO);   // only the part inside the period counts
+      totalHours += hrs;
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
       tr.innerHTML =
-        '<td style="padding:0.4rem 0.5rem;">' + s.scheduled_date + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_in_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_out_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;">' + hrs.toFixed(2) + ' hrs</td>' +
-        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(pay) + '</td>';
+        '<td style="padding:0.4rem 0.5rem;">' + escHtml(CBP.dateInTz(new Date(s.clocked_in_at))) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_in_at).toLocaleTimeString('en-US', { timeZone: CBP.tz, hour: '2-digit', minute: '2-digit' }) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_out_at).toLocaleTimeString('en-US', { timeZone: CBP.tz, hour: '2-digit', minute: '2-digit' }) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;">' + hrs.toFixed(2) + ' hrs</td>';
       tbody.appendChild(tr);
     });
-    if (!(shifts||[]).length) tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No completed shifts this period.</td></tr>';
-    document.getElementById('sorterShiftSection').style.display = '';
-    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Hours Clocked</div><div style="font-size:1.4rem;font-weight:900;color:#e2e8f0;">' + totalHours.toFixed(2) + ' hrs</div></div>');
-    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Hourly Pay ($' + rate.toFixed(2) + '/hr)</div><div style="font-size:1.4rem;font-weight:900;color:#22c55e;">' + fmt(totalPay) + '</div></div>');
-    grandTotal += totalPay;
-  }
+    if (!shifts.length) tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No completed shifts this period.</td></tr>';
 
-  // ── Per break component ────────────────────────────────
-  if (type === 'per_break' || type === 'hourly_per_break') {
-    const defaultRate = parseFloat(currentProfile.per_break_rate) || 0;
-    const categoryRates = currentProfile.category_rates || {};
-    const hasCategoryRates = Object.keys(categoryRates).some(function(k){ return parseFloat(categoryRates[k]) > 0; });
-    // Fetch all completed tasks then filter client-side — avoids NULL completed_at being dropped by SQL comparison
-    const { data: allSortTasks } = await sb
-      .from('sort_tasks')
-      .select('id, completed_at, created_at, stream_id')
-      .eq('sorter_id', currentUser.id)
-      .eq('org_id', currentProfile.org_id)
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: false });
-    const tasks = (allSortTasks || []).filter(function(t) {
-      const d = t.completed_at || t.created_at;
-      return d >= from;
-    });
+    // A shift that's still open right now
+    const { data: open } = await sb.from('schedules').select('clocked_in_at').eq('org_id', currentProfile.org_id).eq('sorter_id', currentUser.id).eq('status', 'in_progress').not('clocked_in_at', 'is', null).limit(1);
+    const live = (open && open.length) ? Math.max(0, (Date.now() - new Date(open[0].clocked_in_at).getTime()) / 3600000) : 0;
 
-    // Get all breaks within those sorted streams — pay is per break, not per stream
-    const taskStreamIds = [...new Set(tasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
-    let allBreaks = [];
-    if (taskStreamIds.length) {
-      const { data: bks } = await sb.from('breaks').select('stream_id, products_used').in('stream_id', taskStreamIds);
-      allBreaks = bks || [];
-    }
-
-    // Build product_id → category map if category rates configured
-    const pidCat = {};
-    if (hasCategoryRates && allBreaks.length) {
-      const pids = [];
-      allBreaks.forEach(function(b){ (b.products_used||[]).forEach(function(p){ if(p.product_id) pids.push(p.product_id); }); });
-      const uniquePids = [...new Set(pids)];
-      if (uniquePids.length) {
-        const { data: prods } = await sb.from('products').select('id, category').in('id', uniquePids);
-        (prods||[]).forEach(function(pr){ pidCat[pr.id] = pr.category; });
-      }
-    }
-
-    function rateForBreak(b) {
-      const pu = b.products_used || [];
-      const cat = hasCategoryRates && pu[0] && pu[0].product_id && pidCat[pu[0].product_id] ? pidCat[pu[0].product_id] : null;
-      return (cat && parseFloat(categoryRates[cat]) > 0) ? parseFloat(categoryRates[cat]) : defaultRate;
-    }
-
-    // Build stream → stream_key map for display
-    const streamKeyMap = {};
-    if (taskStreamIds.length) {
-      const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).in('id', taskStreamIds);
-      (streams||[]).forEach(function(s){ streamKeyMap[s.id] = s.stream_key; });
-    }
-
-    // Fetch confirmed splits for these streams where I am involved
-    const paySplitByStream = {};
-    if (taskStreamIds.length) {
-      const { data: confirmedSplits } = await sb.from('sorter_splits')
-        .select('id, stream_id, initiating_sorter_id, receiving_sorter_id, initiating_sorter_percentage, receiving_sorter_percentage')
-        .in('stream_id', taskStreamIds)
-        .eq('status', 'confirmed');
-      if (confirmedSplits) {
-        const partnerIds = [];
-        confirmedSplits.forEach(function(sp) {
-          if (sp.initiating_sorter_id === currentUser.id || sp.receiving_sorter_id === currentUser.id) {
-            paySplitByStream[sp.stream_id] = sp;
-            const partnerId = sp.initiating_sorter_id === currentUser.id ? sp.receiving_sorter_id : sp.initiating_sorter_id;
-            partnerIds.push(partnerId);
-          }
-        });
-        // Fetch partner names
-        const uniquePartnerIds = [...new Set(partnerIds)];
-        if (uniquePartnerIds.length) {
-          const { data: partnerProfiles } = await sb.from('profiles').select('id, display_name').in('id', uniquePartnerIds);
-          (partnerProfiles || []).forEach(function(p) {
-            Object.values(paySplitByStream).forEach(function(sp) {
-              const pid = sp.initiating_sorter_id === currentUser.id ? sp.receiving_sorter_id : sp.initiating_sorter_id;
-              if (pid === p.id) sp._partnerName = p.display_name;
-            });
-          });
-        }
-      }
-    }
-
-    // Group breaks by stream for split rendering
-    const breaksByStream = {};
-    allBreaks.forEach(function(b) {
-      if (!breaksByStream[b.stream_id]) breaksByStream[b.stream_id] = [];
-      breaksByStream[b.stream_id].push(b);
-    });
-
-    const breakCount = allBreaks.length;
-    let totalBreakPay = 0;
-    const tbody = document.getElementById('sorterBreakBody');
-    tbody.innerHTML = '';
-
-    // Render: for split streams show parent+child rows; for others show individual rows
-    taskStreamIds.forEach(function(sid) {
-      const streamBreaks = breaksByStream[sid] || [];
-      if (!streamBreaks.length) return;
-      const streamTotal = streamBreaks.reduce(function(s, b) { return s + rateForBreak(b); }, 0);
-      const split = paySplitByStream[sid];
-
-      if (split) {
-        const myPct = split.initiating_sorter_id === currentUser.id ? split.initiating_sorter_percentage : split.receiving_sorter_percentage;
-        const theirPct = 100 - myPct;
-        const myAmt = streamTotal * myPct / 100;
-        const theirAmt = streamTotal * theirPct / 100;
-        const partnerName = split._partnerName || 'Partner';
-        const myName = currentProfile.display_name || 'You';
-        totalBreakPay += myAmt;
-
-        // Parent row
-        const trP = document.createElement('tr');
-        trP.innerHTML =
-          '<td class="pay-split-parent-td" style="padding:0.4rem 0.5rem;">⚡</td>' +
-          '<td class="pay-split-parent-td" style="padding:0.4rem 0.5rem;">' + escHtml(streamKeyMap[sid] || sid) + ' <span style="font-size:0.72rem;color:var(--muted);font-weight:400;">(split)</span></td>' +
-          '<td class="pay-split-parent-td" style="padding:0.4rem 0.5rem;">' + fmt(streamTotal) + ' total</td>';
-        tbody.appendChild(trP);
-
-        // My child row
-        const trM = document.createElement('tr');
-        trM.innerHTML =
-          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;"></td>' +
-          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;">→ ' + escHtml(myName) + ' (' + myPct + '%)</td>' +
-          '<td class="pay-split-child-td amt" style="padding:0.3rem 0.5rem;">' + fmt(myAmt) + '</td>';
-        tbody.appendChild(trM);
-
-        // Partner child row
-        const trT = document.createElement('tr');
-        trT.innerHTML =
-          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;"></td>' +
-          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;">→ ' + escHtml(partnerName) + ' (' + theirPct + '%)</td>' +
-          '<td class="pay-split-child-td" style="padding:0.3rem 0.5rem;color:var(--muted);">' + fmt(theirAmt) + '</td>';
-        tbody.appendChild(trT);
-      } else {
-        // Normal individual break rows
-        streamBreaks.forEach(function(b) {
-          const bRate = rateForBreak(b);
-          totalBreakPay += bRate;
-          const tr = document.createElement('tr');
-          tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
-          const cat = (b.products_used||[])[0] && pidCat[((b.products_used||[])[0]).product_id] ? pidCat[((b.products_used||[])[0]).product_id] : '—';
-          tr.innerHTML =
-            '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + escHtml(cat) + '</td>' +
-            '<td style="padding:0.4rem 0.5rem;">' + escHtml(streamKeyMap[b.stream_id] || '—') + '</td>' +
-            '<td style="padding:0.4rem 0.5rem;font-weight:700;color:#22c55e;">' + fmt(bRate) + '</td>';
-          tbody.appendChild(tr);
-        });
-      }
-    });
-
-    if (!breakCount) tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No breaks sorted this period.</td></tr>';
-    document.getElementById('sorterBreakSection').style.display = '';
-    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Breaks Sorted</div><div style="font-size:1.4rem;font-weight:900;color:#e2e8f0;">' + breakCount + '</div></div>');
-    statsHTML.push('<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">Break Pay</div><div style="font-size:1.4rem;font-weight:900;color:#22c55e;">' + fmt(totalBreakPay) + '</div></div>');
-    grandTotal += totalBreakPay;
-  }
-
-  document.getElementById('sorterPayStatsRow').innerHTML = statsHTML.join('');
-  document.getElementById('sorterPayTotal').textContent = fmt(grandTotal);
-  } catch(err) {
-    console.error('loadSorterPay error:', err);
+    const card = function (label, value, color) {
+      return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">' + label + '</div><div style="font-size:1.4rem;font-weight:900;color:' + (color || '#e2e8f0') + ';">' + value + '</div></div>';
+    };
+    document.getElementById('sorterPayStatsRow').innerHTML =
+      card('Shifts', shifts.length) +
+      card('Hours', totalHours.toFixed(2) + ' hrs', 'var(--primary)') +
+      card('Avg / shift', shifts.length ? (totalHours / shifts.length).toFixed(2) + ' hrs' : '—') +
+      (live ? card('Clocked in now', live.toFixed(2) + ' hrs', '#22c55e') : '');
+    document.getElementById('sorterPayTotal').textContent = totalHours.toFixed(2) + ' hrs';
+  } catch (err) {
+    CBP.captureError(err, 'loadSorterPay');
     document.getElementById('sorterPayTotal').textContent = '—';
-    showError('Failed to load pay summary. Please refresh and try again.');
+    showError('Failed to load your hours. Please refresh and try again.');
   }
 }
+
 
 // ── My Schedule Week View ─────────────────────────────────
 let mySchedWeekRef = new Date();
@@ -1509,340 +1120,6 @@ async function authToken() {
   return session?.access_token;
 }
 
-async function loadSplitsPending() {
-  const list = document.getElementById('splitsPendingList');
-  list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:1rem;font-size:0.85rem;">Loading…</div>';
-  try {
-    const token = await authToken();
-    const res = await fetch('/api/sorter-splits/pending', { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    const splits = data.pending_splits || [];
-    if (!splits.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No pending requests.</div>'; return; }
-    list.innerHTML = splits.map(function(s) {
-      const exp = new Date(s.expires_at);
-      const hoursLeft = Math.max(0, Math.round((exp - Date.now()) / 36e5));
-      return '<div class="split-card">' +
-        '<div style="font-size:0.9rem;font-weight:700;">' + escHtml(s.stream?.stream_key || 'Unknown Stream') + '</div>' +
-        '<div class="split-card-meta">From: ' + escHtml(s.initiating_sorter?.display_name || '?') + ' · Expires in ' + hoursLeft + 'h</div>' +
-        '<div class="split-pct-row">' +
-          '<div class="split-pct-box"><div class="split-pct-label">Them</div><div class="split-pct-val">' + s.initiating_sorter_percentage + '%</div></div>' +
-          '<div style="font-size:1.2rem;color:var(--muted);">↔</div>' +
-          '<div class="split-pct-box"><div class="split-pct-label">You</div><div class="split-pct-val">' + s.receiving_sorter_percentage + '%</div></div>' +
-        '</div>' +
-        '<div class="split-actions">' +
-          '<button class="btn btn-green" style="font-size:0.82rem;" onclick="respondSplit(\'' + s.id + '\',\'confirm\')">Accept</button>' +
-          '<button class="btn" style="font-size:0.82rem;background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);" onclick="respondSplit(\'' + s.id + '\',\'decline\')">Decline</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  } catch (e) { list.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed to load: ' + escHtml(e.message) + '</div>'; }
-}
-
-async function loadSplitsFormData() {
-  try {
-    const { data: streams } = await sb.from('streams').select('id, stream_key').eq('org_id', currentProfile.org_id).neq('status', 'closed').order('created_at', { ascending: false }).limit(50);
-    const streamSel = document.getElementById('splitStreamSel');
-    streamSel.innerHTML = '<option value="">— select stream —</option>' + (streams || []).map(function(s) { return '<option value="' + s.id + '">' + escHtml(s.stream_key) + '</option>'; }).join('');
-
-    const { data: sorters } = await sb.from('profiles').select('id, display_name').eq('org_id', currentProfile.org_id).eq('role', 'sorter').neq('id', currentUser.id);
-    const partnerSel = document.getElementById('splitPartnerSel');
-    partnerSel.innerHTML = '<option value="">— select sorter —</option>' + (sorters || []).map(function(s) { return '<option value="' + s.id + '">' + escHtml(s.display_name) + '</option>'; }).join('');
-
-    document.getElementById('splitPreview').style.display = 'flex';
-    updateSplitPreview();
-  } catch (e) { console.error('loadSplitsFormData', e); }
-}
-
-function onSplitTypeChange() {
-  const type = document.getElementById('splitType').value;
-  document.getElementById('splitCustomRow').style.display = type === 'custom' ? '' : 'none';
-  if (type === 'equal') { document.getElementById('splitMyPct').value = 50; document.getElementById('splitTheirPct').value = 50; }
-  updateSplitPreview();
-}
-
-function updateSplitPreview() {
-  const my = parseFloat(document.getElementById('splitMyPct').value) || 50;
-  const their = 100 - my;
-  document.getElementById('splitTheirPct').value = their;
-  document.getElementById('splitPreviewMy').textContent = my + '%';
-  document.getElementById('splitPreviewTheir').textContent = their + '%';
-}
-
-async function createSplitRequest() {
-  const streamId = document.getElementById('splitStreamSel').value;
-  const receivingId = document.getElementById('splitPartnerSel').value;
-  const splitType = document.getElementById('splitType').value;
-  const initPct = parseFloat(document.getElementById('splitMyPct').value) || 50;
-  const recvPct = 100 - initPct;
-  if (!streamId || !receivingId) { showError('Select a stream and receiving sorter.'); return; }
-  const btn = document.getElementById('createSplitBtn');
-  btn.disabled = true; btn.textContent = 'Sending…';
-  try {
-    const token = await authToken();
-    const res = await fetch('/api/sorter-splits', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stream_id: streamId, receiving_sorter_id: receivingId, split_type: splitType, initiating_sorter_percentage: initPct, receiving_sorter_percentage: recvPct })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to create split');
-    showSuccess('Split request sent. They have 24 hours to respond.');
-    await loadSplitsPending();
-  } catch (e) { showError(e.message); }
-  finally { btn.disabled = false; btn.textContent = 'Send Split Request'; }
-}
-
-async function respondSplit(splitId, action) {
-  try {
-    const token = await authToken();
-    const url = action === 'confirm' ? '/api/sorter-splits/confirm' : '/api/sorter-splits/decline';
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ split_id: splitId })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to respond');
-    showSuccess(action === 'confirm' ? 'Split confirmed. Earnings will be divided automatically on stream completion.' : 'Split declined. Full earnings will go to the initiating sorter.');
-    await loadSplitsPending();
-    await loadQueueSplitAlerts();
-    await loadSortQueue();
-  } catch (e) { showError(e.message); }
-}
-
-// ── Queue Split Alerts ─────────────────────────────────────
-async function loadQueueSplitAlerts() {
-  const container = document.getElementById('queueSplitAlerts');
-  const dot = document.getElementById('queueSplitDot');
-  if (!container) return;
-  try {
-    const token = await authToken();
-    const res = await fetch('/api/sorter-splits/pending', { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    // Only show alerts where I am the receiving sorter (incoming requests)
-    const incoming = (data.pending_splits || []).filter(function(s) {
-      return s.receiving_sorter_id === currentUser.id;
-    });
-    if (dot) dot.style.display = incoming.length ? 'inline-block' : 'none';
-    if (!incoming.length) { container.innerHTML = ''; return; }
-    container.innerHTML = incoming.map(function(s) {
-      const exp = new Date(s.expires_at);
-      const hoursLeft = Math.max(0, Math.round((exp - Date.now()) / 36e5));
-      const pctLabel = s.initiating_sorter_percentage + '/' + s.receiving_sorter_percentage + ' split';
-      return '<div class="queue-split-alert" id="qsa-' + s.id + '">' +
-        '<button class="queue-split-alert-dismiss" onclick="document.getElementById(\'qsa-' + s.id + '\').remove()">✕</button>' +
-        '<div style="font-weight:700;color:var(--yellow);margin-bottom:0.25rem;">⚡ Split Request</div>' +
-        '<div style="font-size:0.85rem;color:var(--text);margin-bottom:0.15rem;">' +
-          '<strong>' + escHtml(s.initiating_sorter?.display_name || 'A sorter') + '</strong> wants to split earnings on <strong>' + escHtml(s.stream?.stream_key || 'a stream') + '</strong>.' +
-        '</div>' +
-        '<div style="font-size:0.8rem;color:var(--muted);">' + pctLabel + ' · Expires in ' + hoursLeft + 'h</div>' +
-        '<div class="queue-split-alert-actions">' +
-          '<button class="btn btn-green" style="font-size:0.82rem;min-height:44px;" onclick="respondSplitAlert(\'' + s.id + '\',\'confirm\')">Accept</button>' +
-          '<button class="btn" style="font-size:0.82rem;min-height:44px;background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);" onclick="respondSplitAlert(\'' + s.id + '\',\'decline\')">Decline</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  } catch (e) { console.error('loadQueueSplitAlerts', e); }
-}
-
-async function respondSplitAlert(splitId, action) {
-  try {
-    const token = await authToken();
-    const url = action === 'confirm' ? '/api/sorter-splits/confirm' : '/api/sorter-splits/decline';
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ split_id: splitId })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to respond');
-    if (action === 'confirm') {
-      showSuccess('Split confirmed. Earnings will be divided automatically on stream completion.');
-    } else {
-      showSuccess('Split declined.');
-    }
-    await loadQueueSplitAlerts();
-    await loadSortQueue();
-  } catch (e) { showError(e.message); }
-}
-
-// ── Split Earnings Modal ───────────────────────────────────
-function openSplitModal(streamId, streamKey, breakCount) {
-  splitModalStreamId = streamId;
-  splitModalStreamKey = streamKey;
-  splitModalBreakCount = breakCount;
-  splitModalSelectedId = null;
-  splitModalSelectedName = '';
-  splitModalActiveType = 'equal';
-  splitModalStep = 1;
-
-  document.getElementById('splitModalTitle').textContent = 'Split Earnings — ' + streamKey;
-  document.getElementById('splitStep1').classList.add('active');
-  document.getElementById('splitStep2').classList.remove('active');
-  document.getElementById('splitModalBackBtn').style.display = 'none';
-  document.getElementById('splitModalNextBtn').textContent = 'Select Sorter →';
-  document.getElementById('splitModalNextBtn').disabled = true;
-
-  // Load sorters
-  const listEl = document.getElementById('splitSorterList');
-  listEl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:1.5rem;font-size:0.85rem;">Loading…</div>';
-
-  sb.from('profiles')
-    .select('id, display_name, role, pay_type')
-    .eq('org_id', currentProfile.org_id)
-    .eq('role', 'sorter')
-    .neq('id', currentUser.id)
-    .then(function(res) {
-      // Only show sorters under the same pay structure (per_break)
-      const sorters = (res.data || []).filter(function(p) { return p.pay_type === 'per_break'; });
-      splitModalSorters = sorters;
-      if (!sorters.length) {
-        listEl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:1.5rem;font-size:0.85rem;">No other sorters available to split with.</div>';
-        return;
-      }
-      listEl.innerHTML = sorters.map(function(p) {
-        return '<div class="split-sorter-row" id="srow-' + p.id + '">' +
-          '<div>' +
-            '<span style="font-weight:700;font-size:0.88rem;">' + escHtml(p.display_name || '?') + '</span>' +
-            ' <span class="badge badge-gray" style="font-size:0.68rem;">Sorter</span>' +
-          '</div>' +
-          '<button class="btn btn-outline" style="font-size:0.78rem;padding:0.35rem 0.8rem;min-height:44px;" onclick="splitSelectSorter(\'' + p.id + '\',\'' + escHtml(p.display_name || '') + '\')">Select</button>' +
-        '</div>';
-      }).join('');
-    });
-
-  document.getElementById('splitEarningsModal').classList.add('active');
-}
-
-function splitSelectSorter(id, name) {
-  splitModalSelectedId = id;
-  splitModalSelectedName = name;
-  // Highlight selected row
-  document.querySelectorAll('.split-sorter-row').forEach(function(r) { r.style.borderColor = ''; });
-  const row = document.getElementById('srow-' + id);
-  if (row) row.style.borderColor = 'var(--primary)';
-  document.getElementById('splitModalNextBtn').disabled = false;
-}
-
-function splitGoToStep2() {
-  splitModalStep = 2;
-  document.getElementById('splitStep1').classList.remove('active');
-  document.getElementById('splitStep2').classList.add('active');
-  document.getElementById('splitModalBackBtn').style.display = '';
-  document.getElementById('splitModalNextBtn').textContent = 'Confirm and Send Request';
-  document.getElementById('splitModalNextBtn').disabled = false;
-  document.getElementById('splitModalError').style.display = 'none';
-
-  document.getElementById('splitWithName').textContent = splitModalSelectedName;
-  const myName = currentProfile.display_name || 'You';
-  document.getElementById('splitEqualNames').textContent = myName + ' — 50%  ·  ' + splitModalSelectedName + ' — 50%';
-  document.getElementById('splitModalTheirLabel').textContent = splitModalSelectedName + '\'s %';
-
-  splitSetType('equal');
-  splitUpdateEarningsPreview();
-}
-
-function splitGoBack() {
-  splitModalStep = 1;
-  document.getElementById('splitStep1').classList.add('active');
-  document.getElementById('splitStep2').classList.remove('active');
-  document.getElementById('splitModalBackBtn').style.display = 'none';
-  document.getElementById('splitModalNextBtn').textContent = 'Select Sorter →';
-  document.getElementById('splitModalNextBtn').disabled = splitModalSelectedId === null;
-}
-
-function splitSetType(type) {
-  splitModalActiveType = type;
-  const eqCard = document.getElementById('splitOptEqual');
-  const cuCard = document.getElementById('splitOptCustom');
-  const inputs = document.getElementById('splitCustomInputs');
-  eqCard.classList.toggle('soc-active', type === 'equal');
-  cuCard.classList.toggle('soc-active', type === 'custom');
-  inputs.style.display = type === 'custom' ? '' : 'none';
-  if (type === 'equal') {
-    document.getElementById('splitModalMyPct').value = 50;
-    document.getElementById('splitModalTheirPct').value = 50;
-  }
-  splitUpdateEarningsPreview();
-}
-
-function splitUpdatePcts() {
-  const my = Math.min(99, Math.max(1, parseInt(document.getElementById('splitModalMyPct').value) || 50));
-  const their = 100 - my;
-  document.getElementById('splitModalTheirPct').value = their;
-  splitUpdateEarningsPreview();
-}
-
-function splitUpdateEarningsPreview() {
-  const el = document.getElementById('splitEarningsPreview');
-  const rate = parseFloat(currentProfile.per_break_rate) || 0;
-  const myPct = splitModalActiveType === 'equal' ? 50 : (parseInt(document.getElementById('splitModalMyPct').value) || 50);
-  const theirPct = 100 - myPct;
-
-  if (!rate || !splitModalBreakCount) {
-    el.textContent = 'Earnings calculated on stream completion.';
-    return;
-  }
-
-  const totalEst = rate * splitModalBreakCount;
-  const myEst = totalEst * myPct / 100;
-  const theirEst = totalEst * theirPct / 100;
-  const fmt = function(v) { return '$' + v.toFixed(2); };
-  el.innerHTML = 'Based on this stream\'s sort rate ($' + rate.toFixed(2) + '/break, ' + splitModalBreakCount + ' breaks):<br>' +
-    '<strong>Your estimated earnings: ' + fmt(myEst) + '</strong><br>' +
-    '<span>' + escHtml(splitModalSelectedName) + '\'s estimated earnings: ' + fmt(theirEst) + '</span>';
-}
-
-async function splitModalNext() {
-  if (splitModalStep === 1) {
-    if (!splitModalSelectedId) { showError('Select a sorter first.'); return; }
-    splitGoToStep2();
-  } else {
-    await splitConfirmRequest();
-  }
-}
-
-async function splitConfirmRequest() {
-  const btn = document.getElementById('splitModalNextBtn');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  const errEl = document.getElementById('splitModalError');
-  errEl.style.display = 'none';
-
-  const myPct = splitModalActiveType === 'equal' ? 50 : (parseInt(document.getElementById('splitModalMyPct').value) || 50);
-  const theirPct = 100 - myPct;
-
-  try {
-    const token = await authToken();
-    const res = await fetch('/api/sorter-splits', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        stream_id: splitModalStreamId,
-        receiving_sorter_id: splitModalSelectedId,
-        split_type: splitModalActiveType,
-        initiating_sorter_percentage: myPct,
-        receiving_sorter_percentage: theirPct
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to create split');
-    closeSplitModal();
-    showSuccess('Split request sent to ' + splitModalSelectedName + '. They have 24 hours to confirm.');
-    await loadSortQueue();
-    await loadQueueSplitAlerts();
-  } catch (e) {
-    errEl.textContent = e.message;
-    errEl.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Confirm and Send Request';
-  }
-}
-
-function closeSplitModal() {
-  document.getElementById('splitEarningsModal').classList.remove('active');
-}
-
 // ═══════════════════════════════════════════════════════════
 // LEADERBOARD V2
 // ═══════════════════════════════════════════════════════════
@@ -2015,13 +1292,13 @@ function renderLbList(entries, myRank) {
       </div>
     </div>
 
-    <!-- Screen 5: Your Pay -->
+    <!-- Screen 5: Your Hours -->
     <div class="sg-screen">
-      <div class="sg-icon">💰</div>
+      <div class="sg-icon">⏱</div>
       <div class="sg-step">Step 5 of 6</div>
-      <div class="sg-title">Your Pay</div>
+      <div class="sg-title">Your Hours</div>
       <div class="sg-body">
-        Your pay is calculated automatically based on your hours clocked. You can view your full pay history and shift breakdown in the <strong>My Pay</strong> tab.
+        You're paid hourly. Clock in when your shift starts and out when it ends — that's the whole system. See every shift and your totals in the <strong>My Hours</strong> tab.
         <div class="sg-highlight">If something looks wrong, talk to your owner. They control your rate and can adjust records.</div>
       </div>
       <div class="sg-actions">
@@ -2072,7 +1349,7 @@ function renderLbList(entries, myRank) {
     <span class="btm-nav-icon">📅</span><span class="btm-nav-label">Schedule</span>
   </button>
   <button class="btm-nav-item" id="btn-btm-pay" onclick="sorterBtmNav('pay')">
-    <span class="btm-nav-icon">💰</span><span class="btm-nav-label">My Pay</span>
+    <span class="btm-nav-icon">⏱</span><span class="btm-nav-label">My Hours</span>
   </button>
   <button class="btm-nav-item" id="btn-btm-leaderboard" onclick="sorterBtmNav('leaderboard')">
     <span class="btm-nav-icon">🏆</span><span class="btm-nav-label">Leaderboard</span>
@@ -2091,7 +1368,7 @@ function sorterBtmNav(tab) {
   const btnMap = { queue: 'btn-btm-queue', shifts: 'btn-btm-sched', pay: 'btn-btm-pay', leaderboard: 'btn-btm-leaderboard' };
   if (btnMap[tab]) document.getElementById(btnMap[tab]).classList.add('active');
 
-  if (tab === 'queue')         { typeof loadSortQueue !== 'undefined' && loadSortQueue(); typeof loadQueueSplitAlerts !== 'undefined' && loadQueueSplitAlerts(); }
+  if (tab === 'queue')         { typeof loadSortQueue !== 'undefined' && loadSortQueue(); }
   if (tab === 'shifts')        { typeof loadShifts !== 'undefined' && loadShifts(); typeof loadMyScheduleView !== 'undefined' && loadMyScheduleView(); }
   if (tab === 'pay')           { typeof loadSorterPay !== 'undefined' && loadSorterPay(); }
   if (tab === 'leaderboard')   { typeof loadLeaderboard !== 'undefined' && loadLeaderboard(); }

@@ -8,7 +8,20 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { sendEmail } = require('./send-email');
+const { CBP } = require('../shared.js');   // same timezone / period math the pages use
 const APP_URL = process.env.APP_URL || 'https://cardbreakpro.com';
+
+// ── shared per-run lookups (each job used to re-query these per org) ─────────
+async function exemptOrgSet(sb) {
+  const { data } = await sb.from('subscriptions').select('org_id').eq('tier', 'exempt');
+  return new Set((data || []).map(s => s.org_id));
+}
+async function orgTimezones(sb) {
+  const out = {};
+  const r = await sb.from('organizations').select('id, timezone');
+  if (!r.error) (r.data || []).forEach(o => { out[o.id] = o.timezone || CBP.DEFAULT_TZ; });
+  return out;
+}
 
 module.exports = async (req, res) => {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -28,7 +41,6 @@ module.exports = async (req, res) => {
     if (type === 'shift-reminder')    return await runShiftReminders(sb, res);
     if (type === 'daily-digest')      return await runDailyDigest(sb, res);
     if (type === 'annual-renewal')    return await runAnnualRenewalReminders(sb, res);
-    if (type === 'split-expiry')      return await runSplitExpiry(sb, res);
     if (type === 'goal-prompt')       return await runGoalPrompt(sb, res);
     if (type === 'leaderboard-reset') return await runLeaderboardReset(sb, res);
     return res.status(400).json({ error: 'Unknown type: ' + type });
@@ -95,74 +107,100 @@ async function runTrialEmails(sb, res) {
 // ─────────────────────────────────────────────────────────────────────────────
 // SHIFT REMINDERS  (30-min window)
 // ─────────────────────────────────────────────────────────────────────────────
+// Two modes, chosen by SHIFT_REMINDER_MODE:
+//   'day'   (default) — a heads-up for every shift LATER TODAY in the org's
+//                       timezone. Works on a once-a-day cron (Vercel Hobby).
+//   '30min'           — the original "starts in 30 minutes" ping. Only correct
+//                       when this job runs every ~5 minutes (Vercel Pro / pg_cron).
+// The old code did '30min' logic on a daily cron, and treated scheduled_time as
+// UTC, so it matched nothing (AUDIT BL-13).
 async function runShiftReminders(sb, res) {
+  const mode = process.env.SHIFT_REMINDER_MODE === '30min' ? '30min' : 'day';
   const now = new Date();
-  const windowStart = new Date(now.getTime() + 25 * 60 * 1000);
-  const windowEnd   = new Date(now.getTime() + 35 * 60 * 1000);
-  const results = { sent: [], skipped: [], errors: [] };
+  const results = { mode, sent: [], skipped: [], errors: [] };
 
-  // schedules stores scheduled_date (date) + scheduled_time (time) separately
-  // Fetch today's unreminded shifts then filter by 25–35 min window in JS
-  const todayStr = now.toISOString().split('T')[0];
+  const tzByOrg = await orgTimezones(sb);
+  const exempt = await exemptOrgSet(sb);
+
+  // Candidate rows: unreminded, still scheduled, dated yesterday..tomorrow in
+  // UTC terms (covers every timezone's "today"); the precise filter is below.
+  const dates = [isoDaysAgo(1), isoDaysAgo(0), isoDaysAgo(-1)];
   const { data: allShifts, error: shiftErr } = await sb
     .from('schedules')
     .select('id, org_id, breaker_id, sorter_id, stream_key, scheduled_date, scheduled_time, channel_id')
     .eq('reminder_sent', false)
     .neq('status', 'completed').neq('status', 'cancelled')
-    .eq('scheduled_date', todayStr);
-
+    .in('scheduled_date', dates);
   if (shiftErr) throw new Error('Schedules query failed: ' + shiftErr.message);
 
-  const shifts = (allShifts || []).filter(function(s) {
-    if (!s.scheduled_time) return false;
-    const combined = new Date(s.scheduled_date + 'T' + s.scheduled_time + 'Z');
-    return combined >= windowStart && combined <= windowEnd;
+  const shifts = (allShifts || []).filter(function (s) {
+    if (exempt.has(s.org_id)) return false;
+    const tz = tzByOrg[s.org_id] || CBP.DEFAULT_TZ;
+    if (mode === '30min') {
+      if (!s.scheduled_time) return false;
+      const t = new Date(CBP.localTimeISO(s.scheduled_date, s.scheduled_time, tz)).getTime();
+      return t >= now.getTime() + 25 * 60000 && t <= now.getTime() + 35 * 60000;
+    }
+    if (s.scheduled_date !== CBP.dateInTz(now, tz)) return false;          // today, org-local
+    if (!s.scheduled_time) return true;
+    const t = new Date(CBP.localTimeISO(s.scheduled_date, s.scheduled_time, tz)).getTime();
+    return t > now.getTime() - 60 * 60000;                                  // hasn't started >1h ago
   });
+  if (shifts.length === 0) return res.status(200).json({ message: 'No shifts to remind', results });
 
-  if (shifts.length === 0) return res.status(200).json({ message: 'No upcoming shifts', results });
+  // One lookup each for prefs, profiles and channels instead of per shift
+  const userIds = [...new Set(shifts.map(s => s.breaker_id || s.sorter_id).filter(Boolean))];
+  const chIds   = [...new Set(shifts.map(s => s.channel_id).filter(Boolean))];
+  const [prefRes, profRes, chRes] = await Promise.all([
+    sb.from('notification_preferences').select('*').in('user_id', userIds),
+    sb.from('profiles').select('id, display_name, org_id').in('id', userIds),
+    chIds.length ? sb.from('channels').select('id, name').in('id', chIds) : Promise.resolve({ data: [] })
+  ]);
+  const prefsBy = {}; (prefRes.data || []).forEach(p => { prefsBy[p.user_id] = p; });
+  const profBy  = {}; (profRes.data || []).forEach(p => { profBy[p.id] = p; });
+  const chBy    = {}; (chRes.data || []).forEach(c => { chBy[c.id] = c.name; });
 
   for (const shift of shifts) {
     try {
       const userId = shift.breaker_id || shift.sorter_id;
       if (!userId) { results.skipped.push(shift.id + ':no-user'); continue; }
-
-      let channelName = 'your channel';
-      if (shift.channel_id) {
-        const { data: ch } = await sb.from('channels').select('name').eq('id', shift.channel_id).maybeSingle();
-        if (ch?.name) channelName = ch.name;
-      }
-
-      const { data: prefs } = await sb.from('notification_preferences').select('*').eq('user_id', userId).maybeSingle();
+      const prefs = prefsBy[userId];
       const inApp = prefs ? prefs.in_app_notifications_enabled !== false : true;
       const emailEnabled = prefs ? prefs.email_notifications_enabled !== false : true;
       const reminderEnabled = prefs ? prefs.notify_shift_reminder !== false : true;
-
       if (!reminderEnabled) {
         await sb.from('schedules').update({ reminder_sent: true }).eq('id', shift.id);
         results.skipped.push(shift.id + ':pref-off'); continue;
       }
 
-      const shiftTime  = new Date(shift.scheduled_date + 'T' + shift.scheduled_time + 'Z');
-      const timeStr    = shiftTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const tz = tzByOrg[shift.org_id] || CBP.DEFAULT_TZ;
+      const channelName = (shift.channel_id && chBy[shift.channel_id]) || 'your channel';
+      const timeStr = shift.scheduled_time
+        ? new Date(CBP.localTimeISO(shift.scheduled_date, shift.scheduled_time, tz)).toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true })
+        : null;
       const streamName = shift.stream_key || 'your scheduled stream';
-      const { data: profile } = await sb.from('profiles').select('display_name').eq('id', userId).maybeSingle();
-      const title = 'Your shift starts in 30 minutes';
-      const body  = streamName + ' on ' + channelName + ' starts at ' + timeStr + '. Make sure you are clocked in before you go live.';
+      const profile = profBy[userId] || {};
+      const isSorter = !!shift.sorter_id && !shift.breaker_id;
+      const title = mode === '30min' ? 'Your shift starts in 30 minutes' : 'You have a shift today' + (timeStr ? ' at ' + timeStr : '');
+      const body  = mode === '30min'
+        ? streamName + ' on ' + channelName + ' starts at ' + timeStr + '. Make sure you are clocked in before you go live.'
+        : (isSorter ? 'Sorting shift' : streamName + ' on ' + channelName) + (timeStr ? ' at ' + timeStr : '') + '. Clock in when you start.';
+      const link = APP_URL + (isSorter ? '/sorter' : '/break');
 
       if (inApp) {
-        const { data: orgProfile } = await sb.from('profiles').select('org_id').eq('id', userId).maybeSingle();
-        await sb.from('notifications').insert({ organization_id: orgProfile?.org_id || shift.org_id, user_id: userId, type: 'shift_reminder', title, body, action_url: APP_URL + '/break' });
+        const ins = await sb.from('notifications').insert({ organization_id: profile.org_id || shift.org_id, user_id: userId, type: 'shift_reminder', title, body, action_url: link });
+        if (ins.error) throw ins.error;
       }
       if (emailEnabled) {
         const { data: authUser } = await sb.auth.admin.getUserById(userId);
         const toEmail = authUser?.user?.email;
         if (toEmail) {
-          const firstName = (profile?.display_name || '').split(' ')[0] || 'there';
+          const firstName = (profile.display_name || '').split(' ')[0] || 'there';
           await sendEmail({
             to: toEmail,
-            subject: 'Your shift starts in 30 minutes',
-            html: buildShiftReminderHtml(firstName, streamName, channelName, timeStr),
-            text: 'Hey ' + firstName + ',\n\nYour shift starts in 30 minutes.\n\n' + streamName + ' on ' + channelName + ' starts at ' + timeStr + '.\n\nMake sure you are clocked in before you go live.\n\n— Card Break Pro'
+            subject: title,
+            html: buildShiftReminderHtml(firstName, streamName, channelName, timeStr || 'today'),
+            text: 'Hey ' + firstName + ',\n\n' + title + '.\n\n' + body + '\n\n— Card Break Pro'
           });
         }
       }
@@ -200,39 +238,52 @@ async function runDailyDigest(sb, res) {
   return res.status(200).json({ message: 'Done', results });
 }
 
+// Sends once per org-local day, the first time the job runs at/after the
+// owner's chosen digest time (org timezone). The old check required the cron
+// to run in the exact same minute as the setting — on a daily cron that meant
+// it effectively never sent (AUDIT AB-4).
 async function runDigestEmails(sb, results) {
   const now = new Date();
-  const todayUTC = now.toISOString().slice(0, 10);
-  const currentTimeStr = String(now.getUTCHours()).padStart(2, '0') + ':' + String(now.getUTCMinutes()).padStart(2, '0');
 
   const { data: prefs, error: prefsErr } = await sb.from('notification_preferences')
     .select('user_id, organization_id, daily_digest_time, notify_daily_digest, email_notifications_enabled, last_digest_sent')
-    .eq('notify_daily_digest', true).eq('email_notifications_enabled', true)
-    .or('last_digest_sent.is.null,last_digest_sent.lt.' + todayUTC);
-
+    .eq('notify_daily_digest', true).eq('email_notifications_enabled', true);
   if (prefsErr || !prefs || prefs.length === 0) return;
+
+  const userIds = prefs.map(p => p.user_id);
+  const [profRes, exempt, tzByOrg] = await Promise.all([
+    sb.from('profiles').select('id, role, display_name, org_id').in('id', userIds),
+    exemptOrgSet(sb), orgTimezones(sb)
+  ]);
+  const profBy = {}; (profRes.data || []).forEach(p => { profBy[p.id] = p; });
+  const orgNames = {};
+  const orgIds = [...new Set(Object.values(profBy).map(p => p.org_id).filter(Boolean))];
+  if (orgIds.length) { const { data: orgs } = await sb.from('organizations').select('id, name').in('id', orgIds); (orgs || []).forEach(o => { orgNames[o.id] = o.name; }); }
 
   for (const pref of prefs) {
     try {
-      const { data: profile } = await sb.from('profiles').select('role, display_name, org_id').eq('id', pref.user_id).maybeSingle();
+      const profile = profBy[pref.user_id];
       if (!profile || profile.role !== 'owner') continue;
-      const { data: sub } = await sb.from('subscriptions').select('tier').eq('org_id', profile.org_id || pref.organization_id).maybeSingle();
-      if (sub?.tier === 'exempt') { results.skipped.push((profile.org_id || pref.organization_id) + ':exempt'); continue; }
-      const digestTime = (pref.daily_digest_time || '08:30').slice(0, 5);
-      if (digestTime !== currentTimeStr) continue;
       const orgId = profile.org_id || pref.organization_id;
       if (!orgId) continue;
-      const yesterday = new Date(now); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-      const yesterdayStr = yesterday.toISOString().slice(0, 10);
-      const stats = await compileStats(sb, orgId, yesterdayStr + 'T00:00:00.000Z', yesterdayStr + 'T23:59:59.999Z');
+      if (exempt.has(orgId)) { results.skipped.push(orgId + ':exempt'); continue; }
+
+      const tz = tzByOrg[orgId] || CBP.DEFAULT_TZ;
+      const localToday = CBP.dateInTz(now, tz);
+      if (pref.last_digest_sent && pref.last_digest_sent >= localToday) continue;          // already sent today
+      const digestTime = (pref.daily_digest_time || '08:30').slice(0, 5);
+      const dueAt = new Date(CBP.localTimeISO(localToday, digestTime, tz)).getTime();
+      if (now.getTime() < dueAt) { results.skipped.push(pref.user_id + ':not-yet'); continue; } // before their chosen time
+
+      const yesterday = CBP.addDays(localToday, -1);
+      const stats = await compileStats(sb, orgId, CBP.localMidnightISO(yesterday, tz), CBP.localMidnightISO(localToday, tz));
       const { data: authUser } = await sb.auth.admin.getUserById(pref.user_id);
       const ownerEmail = authUser?.user?.email;
       if (!ownerEmail) { results.skipped.push(pref.user_id + ':no-email'); continue; }
       const firstName = (profile.display_name || '').split(' ')[0] || 'there';
-      const { data: org } = await sb.from('organizations').select('name').eq('id', orgId).maybeSingle();
-      const dateLabel = yesterday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      await sendEmail({ to: ownerEmail, subject: 'Your CardBreakPro daily summary — ' + dateLabel, html: buildDigestHtml(firstName, org?.name || 'your operation', dateLabel, stats, APP_URL + '/dashboard'), text: buildDigestText(firstName, org?.name || 'your operation', dateLabel, stats, APP_URL + '/dashboard') });
-      await sb.from('notification_preferences').update({ last_digest_sent: todayUTC, updated_at: new Date().toISOString() }).eq('user_id', pref.user_id);
+      const dateLabel = new Date(yesterday + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
+      await sendEmail({ to: ownerEmail, subject: 'Your CardBreakPro daily summary — ' + dateLabel, html: buildDigestHtml(firstName, orgNames[orgId] || 'your operation', dateLabel, stats, APP_URL + '/dashboard'), text: buildDigestText(firstName, orgNames[orgId] || 'your operation', dateLabel, stats, APP_URL + '/dashboard') });
+      await sb.from('notification_preferences').update({ last_digest_sent: localToday, updated_at: new Date().toISOString() }).eq('user_id', pref.user_id);
       results.sent.push({ user_id: pref.user_id, org_id: orgId });
     } catch (innerErr) { results.errors.push({ user_id: pref.user_id, error: innerErr.message }); }
   }
@@ -247,9 +298,10 @@ async function runRenewalReminders(sb, results) {
       if (!sub.current_period_end) { results.skipped.push(sub.org_id + ':no-end-date'); continue; }
       const renewalDate = new Date(sub.current_period_end);
       const daysUntil = Math.round((renewalDate - now) / (1000 * 60 * 60 * 24));
+      // Windows, not exact days — a missed/failed run no longer skips a reminder forever
       let reminderDay = null;
-      if (daysUntil === 7 && !sub.renewal_reminder_7d_sent) reminderDay = 7;
-      else if (daysUntil === 3 && !sub.renewal_reminder_3d_sent) reminderDay = 3;
+      if (daysUntil <= 3 && daysUntil >= 0 && !sub.renewal_reminder_3d_sent) reminderDay = 3;
+      else if (daysUntil <= 7 && daysUntil > 3 && !sub.renewal_reminder_7d_sent) reminderDay = 7;
       if (!reminderDay) { results.skipped.push(sub.org_id); continue; }
       const { data: owner } = await sb.from('profiles').select('id, display_name').eq('org_id', sub.org_id).eq('role', 'owner').maybeSingle();
       if (!owner) { results.skipped.push(sub.org_id + ':no-owner'); continue; }
@@ -289,10 +341,14 @@ async function runBuyerAlerts(sb, results) {
   if (orgsRes.error && isMissingColumn(orgsRes.error)) orgsRes = await sb.from('organizations').select('id, whale_threshold');
   if (orgsRes.error) { results.errors.push('orgs: ' + orgsRes.error.message); return; }
 
+  // One lookup for exempt orgs and one for all owners/managers (was 2 queries per org)
+  const exempt = await exemptOrgSet(sb);
+  const { data: allStaff } = await sb.from('profiles').select('id, org_id, role').in('role', ['owner', 'manager', 'breaker/manager']);
+  const staffByOrg = {}; (allStaff || []).forEach(p => { (staffByOrg[p.org_id] = staffByOrg[p.org_id] || []).push(p); });
+
   for (const org of (orgsRes.data || [])) {
     try {
-      const { data: sub } = await sb.from('subscriptions').select('tier').eq('org_id', org.id).maybeSingle();
-      if (sub?.tier === 'exempt') continue;
+      if (exempt.has(org.id)) continue;
       const whaleMin  = Number(org.whale_threshold) || 1000;
       const coldAfter = Math.max(7, Number(org.cold_after_days) || 21);
       const newest = isoDaysAgo(coldAfter), oldest = isoDaysAgo(120);
@@ -319,8 +375,8 @@ async function runBuyerAlerts(sb, results) {
       if (!due.length) continue;
       results.orgs++;
 
-      const { data: staff } = await sb.from('profiles').select('id, role').eq('org_id', org.id).in('role', ['owner', 'manager', 'breaker/manager']);
-      if (!staff || !staff.length) continue;
+      const staff = staffByOrg[org.id] || [];
+      if (!staff.length) continue;
 
       const money = n => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
       const days = d => Math.floor((Date.now() - new Date(d + 'T12:00:00Z').getTime()) / 86400000);
@@ -372,15 +428,11 @@ async function runSlipNags(sb, results) {
 
   const byBreaker = {};
   for (const s of streams) { if (!s.breaker_id) continue; (byBreaker[s.breaker_id] = byBreaker[s.breaker_id] || []).push(s); }
-  const exemptCache = {};
+  const exempt = await exemptOrgSet(sb);
   for (const [breakerId, list] of Object.entries(byBreaker)) {
     try {
       const orgId = list[0].org_id;
-      if (exemptCache[orgId] === undefined) {
-        const { data: sub } = await sb.from('subscriptions').select('tier').eq('org_id', orgId).maybeSingle();
-        exemptCache[orgId] = sub?.tier === 'exempt';
-      }
-      if (exemptCache[orgId]) continue;
+      if (exempt.has(orgId)) continue;
       const fmtDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const sales = list.reduce((s, x) => s + (Number(x.final_sales) || 0), 0);
       const keys = list.slice(0, 3).map(s => s.stream_key + ' (' + fmtDate(s.break_date) + ')').join(', ') + (list.length > 3 ? ' +' + (list.length - 3) + ' more' : '');
@@ -450,51 +502,7 @@ async function runAnnualRenewalReminders(sb, res) {
 // ─────────────────────────────────────────────────────────────────────────────
 // SORTER SPLIT EXPIRY  (runs hourly)
 // ─────────────────────────────────────────────────────────────────────────────
-async function runSplitExpiry(sb, res) {
-  const results = { expired: [], errors: [] };
-
-  const { data: expiredSplits, error } = await sb
-    .from('sorter_splits')
-    .select('id, stream_id, initiating_sorter_id, initiating_sorter_percentage, receiving_sorter_percentage, org_id')
-    .eq('status', 'pending')
-    .lt('expires_at', new Date().toISOString());
-
-  if (error) throw new Error('sorter_splits query failed: ' + error.message);
-  if (!expiredSplits || expiredSplits.length === 0) {
-    return res.status(200).json({ message: 'No expired splits', results });
-  }
-
-  for (const split of expiredSplits) {
-    try {
-      // Mark split as expired
-      await sb.from('sorter_splits').update({ status: 'expired' }).eq('id', split.id);
-
-      // Log to activity_log — initiating sorter keeps 100% since split was not confirmed
-      const { data: stream } = await sb.from('streams')
-        .select('stream_key').eq('id', split.stream_id).maybeSingle();
-
-      await sb.from('activity_log').insert({
-        org_id: split.org_id || null,
-        user_id: split.initiating_sorter_id,
-        action: 'sorter_split_expired',
-        details: JSON.stringify({
-          split_id: split.id,
-          stream_id: split.stream_id,
-          stream_key: stream?.stream_key || null,
-          initiating_pct: split.initiating_sorter_percentage,
-          receiving_pct: split.receiving_sorter_percentage,
-          reason: 'Receiving sorter did not respond within 24 hours'
-        })
-      }).catch(() => {}); // non-fatal if activity_log insert fails
-
-      results.expired.push({ split_id: split.id, stream_id: split.stream_id });
-    } catch (innerErr) {
-      results.errors.push({ split_id: split.id, error: innerErr.message });
-    }
-  }
-
-  return res.status(200).json({ message: 'Done', results });
-}
+// (split-expiry job removed 2026-09 — sorter splits retired; sorters are hourly.)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MONTHLY GOAL PROMPT  (runs 25th of month at 9am Eastern)
@@ -631,9 +639,11 @@ async function compileStats(sb, orgId, dayStart, dayEnd) {
       if (topId) { const { data: bp } = await sb.from('profiles').select('display_name').eq('id', topId[0]).maybeSingle(); topBreaker = { name: bp?.display_name || 'Unknown', revenue: topId[1] }; }
     }
   }
-  const { data: lowProducts } = await sb.from('products').select('name, current_stock').eq('org_id', orgId).lte('current_stock', 3).eq('is_active', true);
-  const { data: pendingSort } = await sb.from('streams').select('id').eq('org_id', orgId).eq('status', 'closed').neq('sort_status', 'completed');
-  return { streamsRun, totalRevenue, totalProfit, totalBreaks, topBreaker, lowProducts: lowProducts || [], pendingSort: pendingSort ? pendingSort.length : 0 };
+  // (These used products.is_active and streams.sort_status — neither column exists, so
+  //  every digest reported "no low stock" and "0 pending sort". AUDIT AB-2.)
+  const { data: lowProducts } = await sb.from('products').select('name, current_stock').eq('org_id', orgId).lte('current_stock', 3).eq('active', true);
+  const { count: pendingSort } = await sb.from('sort_tasks').select('id', { count: 'exact', head: true }).eq('org_id', orgId).neq('status', 'completed');
+  return { streamsRun, totalRevenue, totalProfit, totalBreaks, topBreaker, lowProducts: lowProducts || [], pendingSort: pendingSort || 0 };
 }
 
 function buildTrialEmail(day, firstName, orgName, breaks, streams, hoursSaved, billingUrl) {
