@@ -566,6 +566,17 @@
         <div class="break-num-display" id="breakNumDisplay">1</div>
       </div>
     </div>
+    <!-- Which Whatnot account is this stream on? Hidden until the org has accounts.
+         Without it the stream's buyers are invisible to the account filter. -->
+    <div id="streamChannelWrap" style="display:none;margin-top:0.85rem;">
+      <label for="streamChannel">Account</label>
+      <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+        <select id="streamChannel" style="flex:1;min-width:180px;padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text,inherit);font-size:0.95rem;">
+          <option value="">— pick the account you're streaming on —</option>
+        </select>
+        <span id="streamChannelHint" style="font-size:0.72rem;color:var(--muted);"></span>
+      </div>
+    </div>
   </div>
 
   <!-- PRODUCTS -->
@@ -1190,7 +1201,9 @@ async function initAuth() {
     setupBreakerTabs();
     setupEventListeners();
     setupMySchedNav();
+    await brkEnsureOrgChannels();
     await initSession();
+    brkSyncStreamChannel();
     await checkCommissionEnabled();
     await checkTodayShiftAndNotify();
     loadNotifCount();
@@ -1555,6 +1568,83 @@ function updateRunningTotalLivePreview(currentWhatnotTotal) {
 }
 
 // ── Stream Management ─────────────────────────────────────
+// ── Stream account (which Whatnot account is this stream on?) ──────────
+// The account filter on every Buyers page only sees purchases whose stream
+// has a channel_id. Inferring it from schedules missed most streams, so the
+// breaker picks it explicitly — with the best guess pre-selected.
+var _brkOrgChannels = null;
+async function brkEnsureOrgChannels() {
+  if (_brkOrgChannels) return _brkOrgChannels;
+  try {
+    const { data } = await sb.from('channels').select('id,name,icon,sort_order').eq('org_id', currentProfile.org_id).order('sort_order', { ascending: true });
+    _brkOrgChannels = data || [];
+  } catch (e) { _brkOrgChannels = []; }
+  const wrap = document.getElementById('streamChannelWrap');
+  const sel = document.getElementById('streamChannel');
+  if (wrap && sel && _brkOrgChannels.length) {
+    _brkOrgChannels.forEach(function (ch) { const o = document.createElement('option'); o.value = ch.id; o.textContent = (ch.icon ? ch.icon + ' ' : '') + ch.name; sel.appendChild(o); });
+    wrap.style.display = '';
+  }
+  return _brkOrgChannels;
+}
+
+function brkChannelName(id) { const c = (_brkOrgChannels || []).find(function (x) { return x.id === id; }); return c ? (c.icon ? c.icon + ' ' : '') + c.name : ''; }
+function brkChannelPrefKey() { return 'cbp_stream_channel_' + (currentUser ? currentUser.id : 'anon'); }
+
+// Best guess for a NEW stream: schedule with this key → any shift today on an
+// account → clocked-in shift → the only account → last one used.
+async function brkGuessChannel(streamKey, breakDate) {
+  const chans = await brkEnsureOrgChannels();
+  if (!chans.length) return null;
+  if (chans.length === 1) return chans[0].id;
+  if (streamKey) {
+    const { data: byKey } = await sb.from('schedules').select('channel_id').eq('org_id', currentProfile.org_id).eq('breaker_id', currentUser.id).eq('stream_key', streamKey).not('channel_id', 'is', null).limit(1).maybeSingle();
+    if (byKey && byKey.channel_id) return byKey.channel_id;
+  }
+  if (breakDate) {
+    const { data: byDay } = await sb.from('schedules').select('channel_id,status').eq('org_id', currentProfile.org_id).eq('breaker_id', currentUser.id).eq('scheduled_date', breakDate).not('channel_id', 'is', null).neq('status', 'cancelled').limit(1).maybeSingle();
+    if (byDay && byDay.channel_id) return byDay.channel_id;
+  }
+  if (activeShiftChannelId) return activeShiftChannelId;
+  try { const last = localStorage.getItem(brkChannelPrefKey()); if (last && chans.some(function (c) { return c.id === last; })) return last; } catch (e) {}
+  return null;
+}
+
+// Keep the picker in sync with the loaded stream; if the loaded stream has no
+// account but we have a good guess, repair it on the spot.
+async function brkSyncStreamChannel() {
+  const sel = document.getElementById('streamChannel'); if (!sel) return;
+  const hint = document.getElementById('streamChannelHint');
+  const chans = await brkEnsureOrgChannels();
+  if (!chans.length) return;
+  if (currentStream) {
+    if (currentStream.channel_id) { sel.value = currentStream.channel_id; if (hint) hint.textContent = ''; return; }
+    const guess = sel.value || await brkGuessChannel(currentStream.stream_key, currentStream.break_date);
+    if (guess) { await brkSetStreamChannel(guess, true); return; }
+    sel.value = '';
+    if (hint) { hint.textContent = '⚠ this stream has no account — its buyers won\'t show under any account until you pick one'; hint.style.color = '#f0603f'; }
+    return;
+  }
+  const guess = await brkGuessChannel(document.getElementById('streamKey').value.trim(), document.getElementById('breakDate').value);
+  sel.value = guess || '';
+  if (hint) { hint.textContent = guess ? '' : (chans.length > 1 ? 'pick before your first break' : ''); hint.style.color = 'var(--muted)'; }
+}
+
+// Breaker changed the picker (or we auto-repaired). Persists to the active stream.
+async function brkSetStreamChannel(channelId, silent) {
+  const sel = document.getElementById('streamChannel');
+  const hint = document.getElementById('streamChannelHint');
+  if (sel && sel.value !== channelId) sel.value = channelId || '';
+  try { if (channelId) localStorage.setItem(brkChannelPrefKey(), channelId); } catch (e) {}
+  if (!currentStream || !channelId) return;
+  const { error } = await sb.from('streams').update({ channel_id: channelId }).eq('id', currentStream.id);
+  if (error) { showGlobalError('Couldn\'t set the account: ' + error.message); return; }
+  currentStream.channel_id = channelId;
+  if (hint) { hint.textContent = silent ? 'auto-set to ' + brkChannelName(channelId) : ''; hint.style.color = 'var(--muted)'; }
+  if (_brkStreamChannelMap) _brkStreamChannelMap[currentStream.id] = channelId;
+  if (!silent) showGlobalSuccess('Stream tagged to ' + brkChannelName(channelId) + '.');
+}
+
 async function getOrCreateStream() {
   const streamKey = document.getElementById('streamKey').value.trim();
   const breakDate = document.getElementById('breakDate').value;
@@ -1578,30 +1668,10 @@ async function getOrCreateStream() {
     return existing;
   }
 
-  // Try to find the channel_id from an active schedule with this stream key
-  let channelId = null;
-  const { data: schedMatch } = await sb
-    .from('schedules')
-    .select('channel_id')
-    .eq('org_id', currentProfile.org_id)
-    .eq('breaker_id', currentUser.id)
-    .eq('stream_key', streamKey)
-    .not('channel_id', 'is', null)
-    .limit(1)
-    .maybeSingle();
-  if (schedMatch) channelId = schedMatch.channel_id;
-  // Fallback: inherit the account from the shift the breaker clocked into, so
-  // ad-hoc streams (stream_key not yet matched to a schedule) still get tagged.
-  if (!channelId && activeShiftChannelId) channelId = activeShiftChannelId;
-  // Last resort: an org with exactly one account — every stream is on it. An
-  // untagged stream is invisible to the account filter, so never leave it NULL
-  // when the answer is obvious.
-  if (!channelId) {
-    try {
-      const { data: chs } = await sb.from('channels').select('id').eq('org_id', currentProfile.org_id).limit(2);
-      if (chs && chs.length === 1) channelId = chs[0].id;
-    } catch (e) { /* channels table optional */ }
-  }
+  // Account: whatever the breaker picked, else the best guess.
+  const picked = (document.getElementById('streamChannel') || {}).value || '';
+  let channelId = picked || await brkGuessChannel(streamKey, breakDate);
+  if (channelId) { try { localStorage.setItem(brkChannelPrefKey(), channelId); } catch (e) {} }
 
   // Create new stream
   const { data: newStream, error: createErr } = await sb
@@ -1675,6 +1745,7 @@ async function onStreamKeyChange() {
 
     renderRunningTotal();
     updateBreakDisplay();
+    brkSyncStreamChannel();
     if ((currentStream ? currentStream.id : null) !== prevStreamId) brkOnStreamChanged();
 
     // Write stream key back to the active schedule so clock log shows it
@@ -2160,6 +2231,10 @@ function setupEventListeners() {
   document.getElementById('breakDate').addEventListener('change', function () {
     saveSessionState();
     onStreamKeyChange();
+  });
+
+  document.getElementById('streamChannel').addEventListener('change', function () {
+    brkSetStreamChannel(this.value, false);
   });
 
   document.getElementById('finalSalesInput').addEventListener('input', function () {

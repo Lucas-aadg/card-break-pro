@@ -204,22 +204,42 @@
     return { lifetime, byChannel, purchases: purchases.length };
   }
 
+  // Streams with no account in the last N days — purchases on them are
+  // invisible to the account filter. Owner/manager see the whole org; a
+  // breaker only their own (RLS), which is what they can fix anyway.
+  async function fetchUntaggedStreams(sb, orgId, opts) {
+    opts = opts || {};
+    let q = sb.from('streams')
+      .select('id,stream_key,break_date,breaker_id,status,final_sales,slips_imported_at')
+      .eq('org_id', orgId).is('channel_id', null)
+      .gte('break_date', isoDaysAgo(opts.days || 90))
+      .order('break_date', { ascending: false }).limit(300);
+    if (opts.breakerId) q = q.eq('breaker_id', opts.breakerId);
+    const { data, error } = await q;
+    if (error) { if (isMissingSchema(error)) return []; throw error; }
+    return data || [];
+  }
+
   // Plain-words explanation of what the account filter is working with, so
   // "nothing shows up" is never silent. Mirrors the breaker's on-screen diag.
-  function channelDiagnostic(rollups, streamCh, channelId) {
+  // `untagged` (optional) = untagged streams with slips imported, i.e. the
+  // ones whose buyers the filter can't see.
+  function channelDiagnostic(rollups, streamCh, channelId, untagged) {
     streamCh = streamCh || {};
     const taggedTotal = Object.keys(streamCh).length;
+    const blind = (untagged || []).filter(s => s.slips_imported_at).length;
+    const blindNote = blind ? ' · ⚠ ' + blind + ' recent stream' + (blind > 1 ? 's' : '') + ' with buyers ' + (blind > 1 ? 'have' : 'has') + ' no account — invisible here' : '';
     if (!channelId) {
       if (!taggedTotal) return { level: 'warn', text: '⚠ no streams are tagged to any account yet — the account filter has nothing to work with' };
-      return { level: 'ok', text: '' };
+      return { level: blind ? 'warn' : 'ok', text: blindNote.replace(/^ · /, '') };
     }
     const streamsInCh = Object.keys(streamCh).filter(sid => streamCh[sid] === channelId).length;
     let buyersInCh = 0;
     Object.keys((rollups && rollups.byChannel) || {}).forEach(id => { if (rollups.byChannel[id][channelId]) buyersInCh++; });
     if (!taggedTotal) return { level: 'warn', text: '⚠ no streams are tagged to any account yet' };
-    if (!streamsInCh) return { level: 'warn', text: '⚠ 0 streams tagged to this account — streams get an account from the schedule/shift the breaker clocked into' };
-    if (!buyersInCh) return { level: 'warn', text: '⚠ ' + streamsInCh + ' streams on this account but no imported buyers from them yet (' + (rollups && rollups.source || '?') + ')' };
-    return { level: 'ok', text: buyersInCh + ' buyers · ' + streamsInCh + ' streams on this account' + (rollups && rollups.source !== 'rpc' ? ' · ' + rollups.source : '') };
+    if (!streamsInCh) return { level: 'warn', text: '⚠ 0 streams tagged to this account — streams get an account from the schedule/shift the breaker clocked into' + blindNote };
+    if (!buyersInCh) return { level: 'warn', text: '⚠ ' + streamsInCh + ' streams on this account but no imported buyers from them yet (' + (rollups && rollups.source || '?') + ')' + blindNote };
+    return { level: blind ? 'warn' : 'ok', text: buyersInCh + ' buyers · ' + streamsInCh + ' streams on this account' + (rollups && rollups.source !== 'rpc' ? ' · ' + rollups.source : '') + blindNote };
   }
 
   // rows of buyer_stream_facts() — null if the migration isn't in yet
@@ -543,7 +563,7 @@
   global.BuyerIntel = {
     COLD_MAX_DAYS, CONTACTED_WINDOW_DAYS,
     daysSince, relDate, money, mono, isoDaysAgo, isMissingSchema, pageAll,
-    loadOrgSettings, fetchBuyers, fetchHitCounts, fetchStreamChannels, fetchRollups, computeRollupsFromPurchases, channelDiagnostic,
+    loadOrgSettings, fetchBuyers, fetchHitCounts, fetchStreamChannels, fetchRollups, computeRollupsFromPurchases, channelDiagnostic, fetchUntaggedStreams,
     fetchStreamFacts, fetchCategoryMix, fetchTouches, fetchBuyerTouches, logTouch,
     effective, inChannel, enrich, segment, contactedRecently,
     winbackStats, buildAffinity, topAffinity, healthMetrics, fetchSlipStatus

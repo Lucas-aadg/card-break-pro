@@ -2535,11 +2535,12 @@ async function ensureBuyerData(force) {
   _biPromise = (async function () {
     await mgrEnsureWhaleMin();
     const org = currentProfile.org_id;
-    const [buyers, hits, streamCh, touches] = await Promise.all([
+    const [buyers, hits, streamCh, touches, untagged] = await Promise.all([
       BuyerIntel.fetchBuyers(sb, org),
       BuyerIntel.fetchHitCounts(sb, org),
       BuyerIntel.fetchStreamChannels(sb, org),
-      BuyerIntel.fetchTouches(sb, org, 180)
+      BuyerIntel.fetchTouches(sb, org, 180),
+      BuyerIntel.fetchUntaggedStreams(sb, org, { days: 90 }).catch(function () { return []; })
     ]);
     const rollups = await BuyerIntel.fetchRollups(sb, org, { streamChannels: streamCh });
     buyers.forEach(b => { b._hitCount = hits.counts[b.id] || 0; });
@@ -2548,7 +2549,7 @@ async function ensureBuyerData(force) {
     _mgrBuyerChannelStats = rollups.byChannel;
     _mgrBuyerChannelMap = new Map();
     Object.keys(rollups.byChannel).forEach(id => { _mgrBuyerChannelMap.set(id, new Set(Object.keys(rollups.byChannel[id]))); });
-    _bi = { buyers, hits, rollups, streamCh, touches, facts: undefined, mix: undefined, affinity: null, loadedAt: Date.now() };
+    _bi = { buyers, hits, rollups, streamCh, touches, untagged, facts: undefined, mix: undefined, affinity: null, loadedAt: Date.now() };
     updateBuyersDiag();
     return _bi;
   })();
@@ -2558,7 +2559,7 @@ async function ensureBuyerData(force) {
 function updateBuyersDiag() {
   const el = document.getElementById('buyersDataSource');
   if (!el || !_bi) return;
-  const d = BuyerIntel.channelDiagnostic(_bi.rollups, _bi.streamCh, mgrSelCh());
+  const d = BuyerIntel.channelDiagnostic(_bi.rollups, _bi.streamCh, mgrSelCh(), _bi.untagged);
   let text = d.text;
   if (_bi.rollups.source === 'client') text = (text ? text + ' · ' : '') + 'computing in browser — ask the owner to run migration 010';
   el.textContent = text;

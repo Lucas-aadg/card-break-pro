@@ -1990,6 +1990,8 @@
 
     <!-- Data freshness — the board is only as true as the last slip import -->
     <div id="buyersFreshness" style="display:none;margin-bottom:0.85rem;"></div>
+    <!-- Streams with no account — their buyers are invisible to the account filter -->
+    <div id="buyersUntagged" style="display:none;margin-bottom:0.85rem;"></div>
 
     <!-- Global account/channel filter — applies to Board, Hit Board, List and Health -->
     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.85rem;flex-wrap:wrap;">
@@ -2562,6 +2564,14 @@
     <div class="es-modal-body" id="esModalBody">
       <div id="esLoadingState" style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading stream data…</div>
       <div id="esContent" style="display:none;">
+
+        <!-- Account (which Whatnot account the stream ran on) -->
+        <div class="es-field" id="esChannelField" style="display:none;margin-bottom:0.9rem;">
+          <label>Account <span>— buyers from this stream only count under this account</span></label>
+          <select id="esChannel" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.6rem 0.75rem;font-size:0.95rem;font-family:inherit;width:100%;box-sizing:border-box;">
+            <option value="">— no account —</option>
+          </select>
+        </div>
 
         <!-- Revenue + Final Sales -->
         <div class="es-row-2">
@@ -5705,6 +5715,20 @@ async function openEditStream(streamId) {
 
     // Render
     document.getElementById('esSubtitle').textContent = escHtml(_esStreamData.stream_key || '') + ' · ' + escHtml(_esStreamData.break_date || '');
+    // Account picker (only when the org has accounts)
+    const esChField = document.getElementById('esChannelField');
+    const esChSel = document.getElementById('esChannel');
+    if (esChField && esChSel) {
+      if (orgChannels && orgChannels.length) {
+        esChSel.innerHTML = '<option value="">— no account —</option>' + orgChannels.map(function (ch) {
+          return '<option value="' + ch.id + '">' + escHtml((ch.icon ? ch.icon + ' ' : '') + ch.name) + '</option>';
+        }).join('');
+        esChSel.value = _esStreamData.channel_id || '';
+        esChField.style.display = '';
+      } else {
+        esChField.style.display = 'none';
+      }
+    }
     document.getElementById('esTotalRev').value = _esStreamData.total_submitted_revenue || '';
     document.getElementById('esFinalSales').value = _esStreamData.final_sales || '';
     document.getElementById('esNotes').value = _esStreamData.notes || '';
@@ -5982,7 +6006,7 @@ async function confirmEditStream() {
 
     // ── Update stream record ─────────────────────────────────────────────
     const breakCount = currentBreaks.length;
-    const esStreamRes = await sb.from('streams').update({
+    const esPatch = {
       total_submitted_revenue: totalRev,
       final_sales: finalSales,
       total_product_cost: totalBoxCost,
@@ -5991,7 +6015,13 @@ async function confirmEditStream() {
       commission_payout: commPayout,
       break_count: breakCount,
       notes: notes || null
-    }).eq('id', _esStreamId);
+    };
+    const esChSel = document.getElementById('esChannel');
+    if (esChSel && document.getElementById('esChannelField').style.display !== 'none') {
+      const newCh = esChSel.value || null;
+      if (newCh !== (_esStreamData.channel_id || null)) { esPatch.channel_id = newCh; invalidateBuyerData(); }
+    }
+    const esStreamRes = await sb.from('streams').update(esPatch).eq('id', _esStreamId);
     // Money + breaker commission — never report success if this didn't save
     if (esStreamRes.error) throw new Error('Stream totals/commission failed to save: ' + esStreamRes.error.message);
 
@@ -9206,11 +9236,12 @@ async function ensureBuyerData(force) {
   _biPromise = (async function () {
     await ensureWhaleMin();
     const org = currentProfile.org_id;
-    const [buyers, hits, streamCh, touches] = await Promise.all([
+    const [buyers, hits, streamCh, touches, untagged] = await Promise.all([
       BuyerIntel.fetchBuyers(sb, org),
       BuyerIntel.fetchHitCounts(sb, org),
       BuyerIntel.fetchStreamChannels(sb, org),
-      BuyerIntel.fetchTouches(sb, org, 180)
+      BuyerIntel.fetchTouches(sb, org, 180),
+      BuyerIntel.fetchUntaggedStreams(sb, org, { days: 90 }).catch(function () { return []; })
     ]);
     const rollups = await BuyerIntel.fetchRollups(sb, org, { streamChannels: streamCh });
     buyers.forEach(b => { b._hitCount = hits.counts[b.id] || 0; });
@@ -9220,8 +9251,9 @@ async function ensureBuyerData(force) {
     _buyerChannelStats = rollups.byChannel;
     _buyerChannelMap = new Map();
     Object.keys(rollups.byChannel).forEach(id => { _buyerChannelMap.set(id, new Set(Object.keys(rollups.byChannel[id]))); });
-    _bi = { buyers, hits, rollups, streamCh, touches, facts: undefined, mix: undefined, affinity: null, loadedAt: Date.now() };
+    _bi = { buyers, hits, rollups, streamCh, touches, untagged, facts: undefined, mix: undefined, affinity: null, loadedAt: Date.now() };
     updateBuyersDiag();
+    renderBuyersUntagged();
     return _bi;
   })();
   try { return await _biPromise; } catch (e) { _biPromise = null; throw e; }
@@ -9232,11 +9264,74 @@ async function ensureBuyerData(force) {
 function updateBuyersDiag() {
   const el = document.getElementById('buyersDataSource');
   if (!el || !_bi) return;
-  const d = BuyerIntel.channelDiagnostic(_bi.rollups, _bi.streamCh, buyersSelCh());
+  const d = BuyerIntel.channelDiagnostic(_bi.rollups, _bi.streamCh, buyersSelCh(), _bi.untagged);
   let text = d.text;
   if (_bi.rollups.source === 'client') text = (text ? text + ' · ' : '') + 'computing in browser — run migration 010 for server rollups';
   el.textContent = text;
   el.style.color = d.level === 'warn' ? '#f0603f' : 'var(--muted)';
+}
+
+// ── Streams without an account (owner can fix in bulk) ────
+// A stream with no channel_id is invisible to the account filter — whales,
+// 30-day rev and cold alerts under that account all read zero. Only shown when
+// the org actually has accounts.
+var _untaggedShowAll = false;
+function renderBuyersUntagged() {
+  const el = document.getElementById('buyersUntagged');
+  if (!el || !_bi) return;
+  const list = (_bi.untagged || []).filter(s => s.status === 'closed' || s.slips_imported_at);
+  if (!list.length || !orgChannels || !orgChannels.length) { el.style.display = 'none'; return; }
+  const withBuyers = list.filter(s => s.slips_imported_at).length;
+  const sales = list.reduce((s, x) => s + (parseFloat(x.final_sales) || 0), 0);
+  const opts = '<option value="">— pick account —</option>' + orgChannels.map(ch => '<option value="' + ch.id + '">' + escHtml((ch.icon ? ch.icon + ' ' : '') + ch.name) + '</option>').join('');
+  const shown = _untaggedShowAll ? list : list.slice(0, 8);
+  // Group the bulk action by breaker: "everything Austin ran → GasPackBreaks"
+  const byBreaker = {};
+  list.forEach(s => { (byBreaker[s.breaker_id] = byBreaker[s.breaker_id] || []).push(s); });
+  const bulkRows = Object.keys(byBreaker).map(id =>
+    '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;padding:0.3rem 0;">' +
+      '<span style="font-size:0.8rem;min-width:140px;"><strong>' + escHtml(breakerNameById(id)) + '</strong> · ' + byBreaker[id].length + ' stream' + (byBreaker[id].length > 1 ? 's' : '') + '</span>' +
+      '<select id="untagBulk_' + id + '" style="font-size:0.78rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text,inherit);">' + opts + '</select>' +
+      '<button class="btn btn-sm" onclick="assignUntaggedByBreaker(\'' + id + '\')" style="padding:0.3rem 0.7rem;font-size:0.72rem;">Apply</button>' +
+    '</div>').join('');
+  el.innerHTML = '<div style="background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:0.7rem 0.9rem;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">' +
+      '<div style="font-size:0.8rem;"><strong style="color:#f59e0b;">⚠ ' + list.length + ' stream' + (list.length > 1 ? 's' : '') + ' in the last 90 days ' + (list.length > 1 ? 'have' : 'has') + ' no account</strong> <span style="color:var(--muted);">— ' + fmt(sales) + ' in sales' + (withBuyers ? ', ' + withBuyers + ' with imported buyers' : '') + '. The account filter can\'t see any of it.</span></div>' +
+      '<button class="btn btn-sm btn-outline" onclick="_untaggedShowAll=!_untaggedShowAll;renderBuyersUntagged()" style="padding:0.3rem 0.7rem;font-size:0.72rem;">' + (_untaggedShowAll ? 'Show fewer' : 'Show all ' + list.length) + '</button>' +
+    '</div>' +
+    '<div style="margin-top:0.5rem;border-top:1px solid rgba(245,158,11,0.2);padding-top:0.4rem;"><div style="font-size:0.66rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.2rem;">Assign by breaker</div>' + bulkRows + '</div>' +
+    '<div style="margin-top:0.5rem;border-top:1px solid rgba(245,158,11,0.2);padding-top:0.4rem;"><div style="font-size:0.66rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.2rem;">Or one at a time</div>' +
+      shown.map(s => '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;padding:0.25rem 0;font-size:0.78rem;">' +
+        '<span style="min-width:200px;">' + escHtml(s.stream_key) + ' <span style="color:var(--muted);">· ' + fmtShortDate(s.break_date) + ' · ' + escHtml(breakerNameById(s.breaker_id)) + (s.slips_imported_at ? ' · <span style="color:#3aa0ff;">buyers imported</span>' : '') + '</span></span>' +
+        '<select onchange="assignStreamChannel(\'' + s.id + '\', this.value)" style="font-size:0.74rem;padding:0.25rem 0.45rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text,inherit);">' + opts + '</select>' +
+      '</div>').join('') +
+    '</div>' +
+  '</div>';
+  el.style.display = '';
+}
+
+async function assignStreamChannel(streamId, channelId) {
+  if (!channelId) return;
+  const { error } = await sb.from('streams').update({ channel_id: channelId }).eq('id', streamId).eq('org_id', currentProfile.org_id);
+  if (error) { showGlobalError('Couldn\'t set the account: ' + error.message); return; }
+  showGlobalSuccess('Stream moved to that account — recalculating…');
+  await ensureBuyerData(true);
+  setBuyersMode(_buyersMode);
+}
+
+async function assignUntaggedByBreaker(breakerId) {
+  const sel = document.getElementById('untagBulk_' + breakerId);
+  const channelId = sel ? sel.value : '';
+  if (!channelId) { showGlobalError('Pick an account first.'); return; }
+  const ids = (_bi.untagged || []).filter(s => s.breaker_id === breakerId).map(s => s.id);
+  if (!ids.length) return;
+  for (let i = 0; i < ids.length; i += 100) {
+    const { error } = await sb.from('streams').update({ channel_id: channelId }).in('id', ids.slice(i, i + 100)).eq('org_id', currentProfile.org_id);
+    if (error) { showGlobalError('Couldn\'t set the account: ' + error.message); return; }
+  }
+  showGlobalSuccess(ids.length + ' stream' + (ids.length > 1 ? 's' : '') + ' moved to that account — recalculating…');
+  await ensureBuyerData(true);
+  setBuyersMode(_buyersMode);
 }
 
 // Stream facts + category mix are only needed by Health, affinity and the
