@@ -1625,7 +1625,7 @@
       </div>
       <div class="feat-card fu">
         <div class="feat-icon">🤖</div>
-        <div class="feat-badge fb-pro">Pro+</div>
+        <div class="feat-badge fb-pro">Included</div>
         <div class="feat-title">AI Insights</div>
         <div class="feat-desc">Smart suggestions on what to run, what to cut, and when to go live — based on your actual data, not gut feeling.</div>
       </div>
@@ -1820,85 +1820,38 @@
       <button class="toggle-btn" id="toggleAnnual" onclick="setPricing('annual')">Annual <span style="color:var(--green);font-size:11px;margin-left:4px;">Save 2 months</span></button>
     </div>
 
-    <div class="pricing-grid fu">
-      <!-- Starter -->
-      <div class="price-card">
-        <div class="price-name">Starter</div>
-        <div class="price-amount"><span>$</span><span id="price-starter">129.99</span></div>
-        <div class="price-per">/month</div>
-        <div class="price-annual-note" id="note-starter"></div>
-        <div class="price-trial">&#10003; 14-day free trial</div>
-        <div class="price-divider"></div>
-        <div class="price-limits">
-          <div class="pl-row"><span class="pl-key">Organizations</span><span class="pl-val">1</span></div>
-          <div class="pl-row"><span class="pl-key">Breakers</span><span class="pl-val">5 max</span></div>
-          <div class="pl-row"><span class="pl-key">Sorters</span><span class="pl-val">3 max</span></div>
-          <div class="pl-row"><span class="pl-key">Managers</span><span class="pl-val">1 max</span></div>
-        </div>
-        <ul class="price-features">
-          <li>Instant profit tracking</li>
-          <li>Auto commission calculation</li>
-          <li>Break even calculator</li>
-          <li>Basic inventory management</li>
-          <li>Buyer management (100 buyers)</li>
-          <li>Sort queue</li>
-          <li>Scheduling tools</li>
-        </ul>
-        <a href="/register?plan=starter" class="btn-price-ghost">Start Free Trial</a>
-      </div>
-
-      <!-- Pro -->
+    <div class="pricing-grid fu" style="grid-template-columns:1fr;max-width:420px;">
+      <!-- Everything Included -->
       <div class="price-card pc-pro">
-        <div class="popular-badge">Most Popular</div>
-        <div class="price-name">Pro</div>
-        <div class="price-amount"><span>$</span><span id="price-pro">399.99</span></div>
-        <div class="price-per">/month</div>
-        <div class="price-annual-note" id="note-pro"></div>
-        <div class="price-trial">&#10003; 7-day free trial</div>
-        <div class="price-divider"></div>
-        <div class="price-limits">
-          <div class="pl-row"><span class="pl-key">Organizations</span><span class="pl-val">3</span></div>
-          <div class="pl-row"><span class="pl-key">Breakers</span><span class="pl-val">15 max</span></div>
-          <div class="pl-row"><span class="pl-key">Sorters</span><span class="pl-val">12 max</span></div>
-          <div class="pl-row"><span class="pl-key">Managers</span><span class="pl-val">3 max</span></div>
-        </div>
-        <ul class="price-features">
-          <li>Everything in Starter</li>
-          <li>Stream analytics &amp; trends</li>
-          <li>Empire Dashboard</li>
-          <li>Product ROI reporting</li>
-          <li>Advanced buyer intelligence</li>
-          <li>Daily digest &amp; notifications</li>
-          <li>Referral program access</li>
-          <li>Priority support</li>
-        </ul>
-        <a href="/register?plan=pro" class="btn-price-purple">Start Free Trial</a>
-      </div>
-
-      <!-- Empire -->
-      <div class="price-card">
-        <div class="price-name">Empire</div>
-        <div class="price-amount"><span>$</span><span id="price-empire">999.99</span></div>
-        <div class="price-per">/month</div>
-        <div class="price-annual-note" id="note-empire"></div>
-        <div class="price-trial" style="color:var(--purple2);">Custom onboarding included</div>
+        <div class="popular-badge">All Features</div>
+        <div class="price-name">CardBreakPro</div>
+        <div class="price-amount"><span>$</span><span id="price-standard">99</span></div>
+        <div class="price-per" id="per-standard">/month</div>
+        <div class="price-annual-note" id="note-standard"></div>
+        <div class="price-trial">&#10003; 30-day free trial</div>
         <div class="price-divider"></div>
         <div class="price-limits">
           <div class="pl-row"><span class="pl-key">Organizations</span><span class="pl-val-green">Unlimited</span></div>
-          <div class="pl-row"><span class="pl-key">Breakers</span><span class="pl-val-green">Unlimited</span></div>
-          <div class="pl-row"><span class="pl-key">Sorters</span><span class="pl-val-green">Unlimited</span></div>
-          <div class="pl-row"><span class="pl-key">Managers</span><span class="pl-val-green">Unlimited</span></div>
+          <div class="pl-row"><span class="pl-key">Team seats</span><span class="pl-val-green">Unlimited</span></div>
         </div>
         <ul class="price-features">
-          <li>Everything in Pro</li>
-          <li class="pf-unlimited">Unlimited organizations</li>
+          <li class="pf-unlimited">Instant profit tracking</li>
+          <li>Automated payroll &amp; commission</li>
+          <li>Break-even calculator</li>
+          <li>Inventory management</li>
+          <li>Buyer CRM &amp; advanced intelligence</li>
+          <li>Product ROI reporting</li>
+          <li>Stream analytics &amp; trends</li>
+          <li>Empire Dashboard</li>
+          <li class="pf-unlimited">Team management — <span class="pf-green">unlimited seats</span></li>
+          <li>Sort queue &amp; scheduling tools</li>
+          <li>Daily digest &amp; notifications</li>
           <li class="pf-unlimited">AI Insights</li>
-          <li class="pf-unlimited">White-glove onboarding</li>
-          <li>Dedicated account manager</li>
-          <li class="pf-unlimited">Custom reporting</li>
-          <li>SLA support</li>
+          <li>Custom reporting</li>
+          <li>Referral program access</li>
+          <li>Priority support</li>
         </ul>
-        <a href="mailto:hello@cardbreakpro.com?subject=Empire Plan" class="btn-price-ghost">Book a Demo</a>
+        <a href="/register" class="btn-price-purple">Start Free Trial</a>
       </div>
     </div>
 
@@ -1931,7 +1884,7 @@
       </div>
       <div class="faq-item fu">
         <div class="faq-q">How many team members can I add?</div>
-        <div class="faq-a">Starter supports up to 5 breakers, 3 sorters, and 1 manager. Pro supports up to 15 breakers, 12 sorters, and 3 managers. Empire has no limits on team size. You can upgrade at any time and your data carries over instantly.</div>
+        <div class="faq-a">As many as you want. One plan, unlimited seats — breakers, sorters, and managers are all included at no extra cost. Run one organization or ten; the price doesn't change.</div>
       </div>
       <div class="faq-item fu">
         <div class="faq-q">What happens to my data if I cancel?</div>
@@ -2050,24 +2003,17 @@
 
     // ── Pricing toggle ──
     var MONTHLY = {
-      starter: { display: '129.99', note: '' },
-      pro: { display: '399.99', note: '' },
-      empire: { display: '999.99', note: '' }
+      standard: { display: '99', per: '/month', note: '' }
     };
     var ANNUAL = {
-      starter: { display: '108.33', note: 'billed $1,299.90/yr — save $260' },
-      pro: { display: '333.33', note: 'billed $3,999.90/yr — save $800' },
-      empire: { display: '833.25', note: 'billed $9,999.00/yr — save $2,000' }
+      standard: { display: '990', per: '/year', note: '2 months free — save $198/yr' }
     };
 
     function setPricing(mode) {
       var data = mode === 'annual' ? ANNUAL : MONTHLY;
-      document.getElementById('price-starter').textContent = data.starter.display;
-      document.getElementById('note-starter').textContent = data.starter.note;
-      document.getElementById('price-pro').textContent = data.pro.display;
-      document.getElementById('note-pro').textContent = data.pro.note;
-      document.getElementById('price-empire').textContent = data.empire.display;
-      document.getElementById('note-empire').textContent = data.empire.note;
+      document.getElementById('price-standard').textContent = data.standard.display;
+      document.getElementById('per-standard').textContent = data.standard.per;
+      document.getElementById('note-standard').textContent = data.standard.note;
 
       document.getElementById('toggleMonthly').classList.toggle('active', mode === 'monthly');
       document.getElementById('toggleAnnual').classList.toggle('active', mode === 'annual');

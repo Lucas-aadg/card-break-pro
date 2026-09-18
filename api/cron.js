@@ -179,7 +179,15 @@ async function runShiftReminders(sb, res) {
 // ─────────────────────────────────────────────────────────────────────────────
 // DAILY DIGEST  (digest + renewal reminders + buyer cold alerts)
 // ─────────────────────────────────────────────────────────────────────────────
-const TIER_PRICES = { starter: '$129.99/mo', pro: '$399.99/mo', empire: '$999.99/mo', legacy: '$250.00/mo' };
+// Single plan: "standard" — $99/mo. Legacy tiers kept so existing subscribers
+// still get correctly-priced reminder emails.
+const TIER_PRICES = { standard: '$99.00/mo', starter: '$129.99/mo', pro: '$399.99/mo', empire: '$999.99/mo', legacy: '$250.00/mo' };
+const TIER_NAMES  = { standard: 'CardBreakPro' };
+
+function tierDisplayName(tier) {
+  if (!tier) return 'Plan';
+  return TIER_NAMES[tier] || (tier.charAt(0).toUpperCase() + tier.slice(1));
+}
 
 async function runDailyDigest(sb, res) {
   const results = { digest: { sent: [], skipped: [], errors: [] }, renewal: { sent: [], skipped: [], errors: [] }, buyerAlerts: { fired: 0 } };
@@ -247,7 +255,7 @@ async function runRenewalReminders(sb, results) {
       const { data: prefs } = await sb.from('notification_preferences').select('*').eq('user_id', owner.id).maybeSingle();
       const renewalDateStr = renewalDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       const tierPrice = TIER_PRICES[sub.tier] || '$0.00/mo';
-      const tierName  = sub.tier ? (sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1)) : 'Plan';
+      const tierName  = tierDisplayName(sub.tier);
       if (prefs?.in_app_notifications_enabled !== false) {
         await sb.from('notifications').insert({ organization_id: sub.org_id, user_id: owner.id, type: 'renewal_reminder', title: 'Your subscription renews in ' + reminderDay + ' days', body: 'Your ' + tierName + ' plan renews on ' + renewalDateStr + ' for ' + tierPrice + '.', action_url: APP_URL + '/billing' });
       }
@@ -294,7 +302,7 @@ async function runBuyerAlerts(sb, results) {
 // ─────────────────────────────────────────────────────────────────────────────
 // ANNUAL RENEWAL REMINDERS  (30-day and 7-day)
 // ─────────────────────────────────────────────────────────────────────────────
-const ANNUAL_PRICES = { starter: 1299.90, pro: 3999.90, empire: 9999.90 };
+const ANNUAL_PRICES = { standard: 990.00, starter: 1299.90, pro: 3999.90, empire: 9999.90 };
 
 async function runAnnualRenewalReminders(sb, res) {
   const results = { sent: [], skipped: [], errors: [] };
@@ -326,8 +334,8 @@ async function runAnnualRenewalReminders(sb, res) {
       if (!ownerEmail) { results.skipped.push({ org_id: sub.org_id, reason: 'no-email' }); continue; }
 
       const firstName  = (owner?.display_name || '').split(' ')[0] || 'there';
-      const tierName   = (sub.tier || 'starter').charAt(0).toUpperCase() + (sub.tier || 'starter').slice(1);
-      const amount     = ANNUAL_PRICES[sub.tier] || 0;
+      const tierName   = tierDisplayName(sub.tier || 'standard');
+      const amount     = ANNUAL_PRICES[sub.tier] || ANNUAL_PRICES.standard;
       const renewalFmt = new Date(renewalDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       const { subject, html, text } = buildAnnualReminderEmail(daysUntil, firstName, tierName, amount, renewalFmt, APP_URL + '/billing');
       await sendEmail({ to: ownerEmail, subject, html, text });
