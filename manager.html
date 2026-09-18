@@ -14,6 +14,7 @@
   <title>Card Break Pro — Manager Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
+  <script src="buyer-intel.js"></script>
   <style>
     :root {
       --bg: #0d0d14; --card: #13131e; --border: #2d2d3d;
@@ -590,15 +591,28 @@
         <button class="btn btn-sm" id="mgrBuyersModeBoard" onclick="setMgrBuyersMode('board')" style="padding:0.35rem 0.9rem;">📋 Board</button>
         <button class="btn btn-sm btn-outline" id="mgrBuyersModeHits" onclick="setMgrBuyersMode('hits')" style="padding:0.35rem 0.9rem;">🎯 Hit Board</button>
         <button class="btn btn-sm btn-outline" id="mgrBuyersModeList" onclick="setMgrBuyersMode('list')" style="padding:0.35rem 0.9rem;">📇 All Buyers</button>
+        <button class="btn btn-sm btn-outline" id="mgrBuyersModeHealth" onclick="setMgrBuyersMode('health')" style="padding:0.35rem 0.9rem;">📈 Health</button>
       </div>
     </div>
 
-    <!-- Global account/channel filter — applies to Board, Hit Board, and List -->
+    <!-- Data freshness — the board is only as true as the last slip import -->
+    <div id="buyersFreshness" style="display:none;margin-bottom:0.85rem;"></div>
+
+    <!-- Global account/channel filter — applies to Board, Hit Board, List and Health -->
     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.85rem;flex-wrap:wrap;">
       <span style="font-size:0.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Account</span>
       <select id="mgrBuyersChannelFilter" onchange="onMgrBuyersChannelChange()" style="padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
         <option value="">All accounts</option>
       </select>
+      <button class="btn btn-sm btn-outline" id="mgrQueueToggle" onclick="toggleMgrQueue()" style="padding:0.35rem 0.8rem;font-size:0.75rem;">📬 My queue</button>
+      <span id="buyersDataSource" style="font-size:0.68rem;color:var(--muted);"></span>
+    </div>
+
+    <!-- HEALTH (trends + breaker attribution) -->
+    <div id="buyersHealthWrap" style="display:none;">
+      <div id="buyersHealth">
+        <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer health…</div>
+      </div>
     </div>
 
     <div id="mgrBuyersBoardWrap">
@@ -1009,7 +1023,9 @@ async function init() {
 
     await loadAllProfiles();
     await loadChannelsForSchedule();
-    switchTab('schedule');
+    // Honour ?tab= deep links (notifications land here)
+    const deepTab = new URLSearchParams(window.location.search).get('tab');
+    switchTab(deepTab && document.getElementById('tab-' + deepTab) ? deepTab : 'schedule');
 
     // Notifications
     loadNotifCount();
@@ -1036,7 +1052,7 @@ function closeNotifPanel() {
 }
 let _notifRealtimeChannel = null;
 function notifTypeIcon(type) {
-  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳' };
+  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳', buyer_cold:'❄️', buyer_fading:'📉', slips_missing:'📄', buyer_assigned:'📬', stream_recap:'🧾', whale_in_room:'👑' };
   return icons[type] || '🔔';
 }
 async function loadNotifCount() {
@@ -2496,30 +2512,149 @@ var _mgrBuyersChannelSelPopulated = false;
 
 // ── Buyer Board (segmented, action-first) ─────────────────
 var _mgrBuyersMode = 'board';
-const MGR_COLD_MIN = 21, MGR_COLD_MAX = 120;
+var MGR_COLD_MIN = 21;                      // owner-configurable (organizations.cold_after_days)
+const MGR_COLD_MAX = BuyerIntel.COLD_MAX_DAYS;
 var MGR_WHALE_MIN = 1000, _mgrWhaleMinLoaded = false;
+var _mgrQueueOnly = false;                  // "My queue" — only buyers assigned to me
 async function mgrEnsureWhaleMin() {
   if (_mgrWhaleMinLoaded) return;
   _mgrWhaleMinLoaded = true;
-  const { data, error } = await sb.from('organizations').select('whale_threshold').eq('id', currentProfile.org_id).maybeSingle();
-  if (!error && data && data.whale_threshold != null) MGR_WHALE_MIN = Number(data.whale_threshold) || 1000;
+  const s = await BuyerIntel.loadOrgSettings(sb, currentProfile.org_id);
+  MGR_WHALE_MIN = s.whaleMin; MGR_COLD_MIN = s.coldAfterDays;
+}
+
+// ── Shared buyer dataset (one load feeds Board, Hit Board, List, Health) ──
+var _bi = null;
+var _biPromise = null;
+function invalidateBuyerData() { _bi = null; _biPromise = null; _mgrBuyerChannelMap = null; }
+
+async function ensureBuyerData(force) {
+  if (force) invalidateBuyerData();
+  if (_bi) return _bi;
+  if (_biPromise) return _biPromise;
+  _biPromise = (async function () {
+    await mgrEnsureWhaleMin();
+    const org = currentProfile.org_id;
+    const [buyers, hits, streamCh, touches] = await Promise.all([
+      BuyerIntel.fetchBuyers(sb, org),
+      BuyerIntel.fetchHitCounts(sb, org),
+      BuyerIntel.fetchStreamChannels(sb, org),
+      BuyerIntel.fetchTouches(sb, org, 180)
+    ]);
+    const rollups = await BuyerIntel.fetchRollups(sb, org, { streamChannels: streamCh });
+    buyers.forEach(b => { b._hitCount = hits.counts[b.id] || 0; });
+    _mgrBuyerHitStreams = hits.streams;
+    _mgrStreamChannelMap = streamCh;
+    _mgrBuyerChannelStats = rollups.byChannel;
+    _mgrBuyerChannelMap = new Map();
+    Object.keys(rollups.byChannel).forEach(id => { _mgrBuyerChannelMap.set(id, new Set(Object.keys(rollups.byChannel[id]))); });
+    _bi = { buyers, hits, rollups, streamCh, touches, facts: undefined, mix: undefined, affinity: null, loadedAt: Date.now() };
+    const src = document.getElementById('buyersDataSource');
+    if (src) src.textContent = rollups.source === 'client' ? '· computing in browser — ask the owner to run migration 010' : '';
+    return _bi;
+  })();
+  try { return await _biPromise; } catch (e) { _biPromise = null; throw e; }
+}
+
+async function ensureBuyerFacts() {
+  const d = await ensureBuyerData();
+  if (d.facts !== undefined) return d;
+  const [facts, mix] = await Promise.all([BuyerIntel.fetchStreamFacts(sb), BuyerIntel.fetchCategoryMix(sb)]);
+  d.facts = facts; d.mix = mix;
+  d.affinity = (facts && mix) ? BuyerIntel.buildAffinity(facts, mix) : {};
+  return d;
+}
+
+function mgrSelCh() { const sel = document.getElementById('mgrBuyersChannelFilter'); return sel ? sel.value : ''; }
+
+function breakerNameById(id) {
+  const p = (allProfiles || []).find(x => x.id === id);
+  return p ? p.display_name : 'Unknown';
+}
+function fmtShortDate(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'; }
+
+function buyersAssigneeOptions() {
+  return (allProfiles || [])
+    .filter(p => ['owner', 'manager', 'breaker', 'breaker/manager'].includes(p.role))
+    .map(p => ({ id: p.id, name: p.display_name || 'Unnamed' }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function toggleMgrQueue() {
+  _mgrQueueOnly = !_mgrQueueOnly;
+  document.getElementById('mgrQueueToggle').className = _mgrQueueOnly ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  if (_mgrBuyersMode === 'board') loadMgrBuyersBoard();
+  else if (_mgrBuyersMode === 'list') applyMgrBuyersFilters();
+}
+
+// ── Data freshness ────────────────────────────────────────
+var _slipStatus = null;
+async function renderBuyersFreshness() {
+  const el = document.getElementById('buyersFreshness');
+  if (!el) return;
+  try {
+    _slipStatus = await BuyerIntel.fetchSlipStatus(sb, currentProfile.org_id, { days: 45 });
+    const st = _slipStatus;
+    if (!st.available) { el.style.display = 'none'; return; }
+    const n = st.missing.length;
+    const through = st.currentThrough ? 'Buyer data current through <strong>' + fmtShortDate(st.currentThrough) + '</strong>' : 'No slips imported in the last 45 days';
+    if (!n) {
+      el.innerHTML = '<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.76rem;color:var(--muted);"><span style="color:#2fbf71;">●</span><span>' + through + ' · every closed stream has slips ✓</span></div>';
+    } else {
+      const atRisk = st.missing.reduce((s, x) => s + (parseFloat(x.final_sales) || 0), 0);
+      const rows = st.missing.slice(0, 6).map(s => '<span style="display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:0.7rem;margin:2px 4px 2px 0;">' + escHtml(s.stream_key) + ' · ' + fmtShortDate(s.break_date) + ' · ' + escHtml(breakerNameById(s.breaker_id)) + '</span>').join('');
+      el.innerHTML = '<div style="background:rgba(240,96,63,0.08);border:1px solid rgba(240,96,63,0.3);border-radius:10px;padding:0.7rem 0.9rem;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">' +
+          '<div style="font-size:0.8rem;"><strong style="color:#f0603f;">⚠ ' + n + ' closed stream' + (n > 1 ? 's' : '') + ' missing slips</strong> <span style="color:var(--muted);">— ' + fmt(atRisk) + ' of sales not in the CRM. ' + through + '.</span></div>' +
+          '<button class="btn btn-sm btn-outline" onclick="nudgeSlipImports()" style="padding:0.3rem 0.7rem;font-size:0.72rem;">Nudge breakers</button>' +
+        '</div>' +
+        '<div style="margin-top:0.4rem;">' + rows + (n > 6 ? '<span style="font-size:0.7rem;color:var(--muted);">+' + (n - 6) + ' more</span>' : '') + '</div>' +
+      '</div>';
+    }
+    el.style.display = '';
+  } catch (e) { el.style.display = 'none'; }
+}
+
+async function nudgeSlipImports() {
+  try {
+    const st = _slipStatus || await BuyerIntel.fetchSlipStatus(sb, currentProfile.org_id, { days: 45 });
+    const byBreaker = {};
+    st.missing.forEach(s => { (byBreaker[s.breaker_id] = byBreaker[s.breaker_id] || []).push(s); });
+    const ids = Object.keys(byBreaker);
+    if (!ids.length) { showGlobalSuccess('Nothing to nudge — every closed stream has slips.'); return; }
+    const rows = ids.map(id => {
+      const list = byBreaker[id];
+      const keys = list.slice(0, 3).map(s => s.stream_key + ' (' + fmtShortDate(s.break_date) + ')').join(', ') + (list.length > 3 ? ' +' + (list.length - 3) + ' more' : '');
+      return { organization_id: currentProfile.org_id, user_id: id, type: 'slips_missing',
+        title: list.length + ' stream' + (list.length > 1 ? 's' : '') + ' still need packing slips',
+        body: 'Import slips for ' + keys + ' so your buyers count toward whales, commissions and win-backs.',
+        action_url: '/break?tab=buyers' };
+    });
+    const { error } = await sb.from('notifications').insert(rows);
+    if (error) throw error;
+    showGlobalSuccess('Nudged ' + ids.length + ' breaker' + (ids.length > 1 ? 's' : '') + '.');
+  } catch (e) { showGlobalError('Couldn\'t send nudges: ' + e.message); }
 }
 
 function openMgrBuyersTab() {
   populateMgrBuyersChannelSelect();
+  renderBuyersFreshness();
   setMgrBuyersMode(_mgrBuyersMode);
 }
 
 function setMgrBuyersMode(mode) {
   _mgrBuyersMode = mode;
-  document.getElementById('mgrBuyersModeBoard').className = mode === 'board' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
-  document.getElementById('mgrBuyersModeHits').className  = mode === 'hits'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
-  document.getElementById('mgrBuyersModeList').className  = mode === 'list'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
-  document.getElementById('mgrBuyersBoardWrap').style.display = mode === 'board' ? '' : 'none';
-  document.getElementById('mgrBuyersHitsWrap').style.display  = mode === 'hits'  ? '' : 'none';
-  document.getElementById('mgrBuyersListWrap').style.display  = mode === 'list'  ? '' : 'none';
+  document.getElementById('mgrBuyersModeBoard').className  = mode === 'board'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('mgrBuyersModeHits').className   = mode === 'hits'   ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('mgrBuyersModeList').className   = mode === 'list'   ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('mgrBuyersModeHealth').className = mode === 'health' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('mgrBuyersBoardWrap').style.display = mode === 'board'  ? '' : 'none';
+  document.getElementById('mgrBuyersHitsWrap').style.display  = mode === 'hits'   ? '' : 'none';
+  document.getElementById('mgrBuyersListWrap').style.display  = mode === 'list'   ? '' : 'none';
+  document.getElementById('buyersHealthWrap').style.display   = mode === 'health' ? '' : 'none';
   if (mode === 'board') loadMgrBuyersBoard();
   else if (mode === 'hits') loadMgrBuyersHitBoard();
+  else if (mode === 'health') loadMgrBuyersHealth();
   else loadMgrBuyersTab();
 }
 
@@ -2533,6 +2668,7 @@ async function loadMgrBuyersHitBoard() {
   if (!el || !currentProfile) return;
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading hits…</div>';
   try {
+    await ensureBuyerData();   // stream→account map for the account filter
     let all = [], from = 0; const size = 1000;
     while (true) {
       const { data, error } = await sb.from('buyer_hits')
@@ -2611,80 +2747,27 @@ async function loadMgrBuyersBoard() {
   if (!el || !currentProfile) return;
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>';
   try {
-    await mgrEnsureWhaleMin();
-    const [allBuyers, hitCounts] = await Promise.all([fetchAllMgrBuyers(), fetchMgrBuyerHitCounts()]);
-    const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0 && mgrBuyerInChannel(b.id));
-    spenders.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
-
-    if (!spenders.length) {
+    const d = await ensureBuyerData();
+    const selCh = mgrSelCh();
+    // Segmentation lives in buyer-intel.js — identical to the owner's board.
+    BuyerIntel.enrich(d.buyers, d.rollups, { channelId: selCh, whaleMin: MGR_WHALE_MIN, coldAfterDays: MGR_COLD_MIN });
+    const seg = BuyerIntel.segment(d.buyers);
+    if (_mgrQueueOnly) {
+      const mine = b => b.assigned_to === currentUser.id;
+      ['cold', 'whales', 'regulars', 'fresh', 'fading'].forEach(k => { seg[k] = seg[k].filter(mine); });
+    }
+    if (!seg.spenders) {
       el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No spending buyers yet.</div>';
+      _mgrBoardData = null;
       return;
     }
-
-    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
-    const d60 = new Date(); d60.setDate(d60.getDate() - 60);
-    const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-    let purch = [], _pf = 0;
-    while (true) {
-      const { data, error } = await sb.from('buyer_purchases')
-        .select('buyer_id, amount, purchase_date')
-        .eq('organization_id', currentProfile.org_id)
-        .gte('purchase_date', s60)
-        .range(_pf, _pf + 999);
-      if (error) throw error;
-      purch = purch.concat(data || []);
-      if (!data || data.length < 1000) break;
-      _pf += 1000;
-    }
-    const recent = {}, prior = {};
-    (purch || []).forEach(p => {
-      const amt = Number(p.amount || 0);
-      if (p.purchase_date >= s30) recent[p.buyer_id] = (recent[p.buyer_id] || 0) + amt;
-      else prior[p.buyer_id] = (prior[p.buyer_id] || 0) + amt;
-    });
-
-    // Effective figures follow the account filter (per-account or lifetime)
-    const selCh = document.getElementById('mgrBuyersChannelFilter') ? document.getElementById('mgrBuyersChannelFilter').value : '';
-    spenders.forEach(b => {
-      if (selCh) {
-        const cs = (_mgrBuyerChannelStats[b.id] || {})[selCh] || { spent: 0, breaks: 0, streams: null, first: null, last: null, recent30: 0, prior30: 0 };
-        b._eSpent = cs.spent; b._eBreaks = cs.breaks; b._eStreams = cs.streams ? cs.streams.size : 0;
-        b._eFirst = cs.first; b._eLast = cs.last; b._eRec = cs.recent30; b._ePri = cs.prior30;
-      } else {
-        b._eSpent = Number(b.total_spent || 0); b._eBreaks = b.total_breaks_purchased || 0; b._eStreams = b.total_streams_participated || 0;
-        b._eFirst = b.first_seen_date; b._eLast = b.last_purchase_date; b._eRec = recent[b.id] || 0; b._ePri = prior[b.id] || 0;
-      }
-    });
-
-    const cold = [], regulars = [], fresh = [], whales = [];
-    spenders.forEach(b => {
-      const spent = b._eSpent;                 // effective (per-account or lifetime)
-      const rec = b._eRec, pri = b._ePri;
-      const since = mgrDaysSince(b._eLast);
-      const streams = b._eStreams || 0;
-      b._since = since; b._recent30 = rec;
-      const activeWhale = rec >= MGR_WHALE_MIN;
-      b._newBig = activeWhale && streams <= 1;  // new buyer who dropped big on their first stream
-      if (activeWhale) { whales.push(b); return; }
-      if (spent >= MGR_WHALE_MIN && since >= MGR_COLD_MIN && since <= MGR_COLD_MAX) { cold.push(b); return; }
-      if (streams <= 1) { fresh.push(b); return; }
-      regulars.push(b);
-    });
-    cold.sort((a, b) => {
-      const ac = a.last_cold_alert_at && mgrDaysSince(a.last_cold_alert_at) <= 7 ? 1 : 0;
-      const bc = b.last_cold_alert_at && mgrDaysSince(b.last_cold_alert_at) <= 7 ? 1 : 0;
-      if (ac !== bc) return ac - bc;
-      return b._eSpent - a._eSpent;
-    });
-    whales.sort((a, b) => b._eSpent - a._eSpent);
-    regulars.sort((a, b) => (b._eRec || 0) - (a._eRec || 0));
-    fresh.sort((a, b)  => b._eSpent - a._eSpent);
-
-    const whaleTotal = whales.length + cold.length;
-    const coldAtRisk = cold.reduce((s, b) => s + (b._eSpent || 0), 0);
-    const rev30 = spenders.reduce((s, b) => s + (b._eRec || 0), 0);
-    _mgrBoardData = { spenders: spenders.length, whaleTotal, coldAtRisk, rev30, cold, whales, rising: regulars, fresh };
+    const byId = {}; d.buyers.forEach(b => { byId[b.id] = b; });
+    seg.winback = BuyerIntel.winbackStats(d.touches, byId);
+    seg.assignees = buyersAssigneeOptions();
+    seg.rising = seg.regulars;   // legacy key used by the manager renderer
+    _mgrBoardData = seg;
     renderMgrBuyersBoard();
+    ensureBuyerFacts().then(function () { if (_mgrBuyersMode === 'board' && _mgrBoardData === seg) renderMgrBuyersBoard(); }).catch(function () {});
   } catch (err) {
     el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load board: ' + escHtml(err.message) + '</div>';
   }
@@ -2703,11 +2786,12 @@ function renderMgrBuyersBoard() {
   const el = document.getElementById('mgrBuyersBoard');
   if (!el || !_mgrBoardData) return;
   const d = _mgrBoardData;
+  const fadingNote = d.fading.length ? ' · <span style="color:#f59e0b;font-weight:700;">' + d.fading.length + ' fading</span> — overdue vs their own rhythm' : '';
   el.innerHTML =
     mgrBoardKpis(d) +
-    mgrBoardSegment('❄️', 'Going Cold', d.cold,   'Big buyers gone quiet ' + MGR_COLD_MIN + '+ days — flag for the owner', true,  'cold') +
+    mgrBoardSegment('❄️', 'Going Cold', d.cold,   'Big buyers gone quiet ' + MGR_COLD_MIN + '+ days — reach out now', true,  'cold') +
     mgrBoardSegment('👑', 'Whales',     d.whales, '$' + MGR_WHALE_MIN.toLocaleString() + '+ in the last 30 days — protect these', false, 'whale') +
-    mgrBoardSegment('📊', 'Regulars',   d.rising, 'Your steady buyers',                                            false, 'rising') +
+    mgrBoardSegment('📊', 'Regulars',   d.rising, 'Your steady buyers' + fadingNote,                               false, 'rising') +
     mgrBoardSegment('🆕', 'New',        d.fresh,  'New buyers — convert them into regulars',                       false, 'new');
 }
 
@@ -2719,11 +2803,16 @@ function mgrBoardKpis(d) {
       '<div style="font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;margin-top:4px;line-height:1;">' + val + '</div>' +
       '<div style="font-size:0.66rem;font-weight:700;margin-top:5px;color:' + (subColor || 'var(--muted)') + ';">' + sub + '</div>' +
     '</div>';
+  const wb = d.winback || { attempts: 0, returned: 0, pending: 0, rate: null };
+  const wbVal = wb.rate == null ? '<span style="color:var(--muted);">—</span>' : '<span style="color:' + (wb.rate >= 0.3 ? '#2fbf71' : '#f59e0b') + ';">' + Math.round(wb.rate * 100) + '%</span>';
+  const wbSub = wb.attempts ? wb.returned + ' of ' + wb.attempts + ' came back' + (wb.pending ? ' · ' + wb.pending + ' pending' : '') : (wb.pending ? wb.pending + ' pending' : 'no outreach logged yet');
   return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.6rem;margin-bottom:1rem;">' +
     kpi('var(--primary)', 'Buyers', d.spenders, 'with purchases') +
     kpi('#eab945', 'Whales', '<span style="color:#eab945;">' + d.whaleTotal + '</span>', '$' + MGR_WHALE_MIN.toLocaleString() + '+ / 30d') +
     kpi('#f0603f', 'Going Cold', '<span style="color:#f0603f;">' + d.cold.length + '</span>', mgrBoardMoney(d.coldAtRisk) + ' at risk', '#f0603f') +
+    kpi('#f59e0b', 'Fading', '<span style="color:#f59e0b;">' + d.fading.length + '</span>', d.fading.length ? mgrBoardMoney(d.fadingAtRisk) + ' slipping' : 'everyone on rhythm', d.fading.length ? '#f59e0b' : undefined) +
     kpi('#2fbf71', '30-day rev', mgrBoardMoney(d.rev30), 'last 30 days') +
+    kpi('#a855f7', 'Win-back', wbVal, wbSub) +
   '</div>';
 }
 
@@ -2758,6 +2847,17 @@ function mgrBuyerTagChip(b) {
   return t ? ' <span style="font-size:0.6rem;background:rgba(79,110,247,0.14);color:#93a6ff;padding:1px 6px;border-radius:3px;font-weight:700;">' + escHtml(t) + '</span>' : '';
 }
 
+function mgrAffinityChip(b) {
+  if (mgrBuyerTagChip(b)) return '';
+  const top = _bi && _bi.affinity ? BuyerIntel.topAffinity(_bi.affinity, b.id) : null;
+  if (!top || top.share < 0.4) return '';
+  return ' <span title="Inferred from the products opened in streams they buy in" style="font-size:0.6rem;background:rgba(168,85,247,0.14);color:#c084fc;padding:1px 6px;border-radius:3px;font-weight:700;">' + escHtml(top.category) + ' ' + Math.round(top.share * 100) + '%</span>';
+}
+function mgrCadenceText(b) {
+  if (!b._medianGap || b._purchaseDays < 3) return '';
+  return 'buys every ~' + Math.round(b._medianGap) + 'd';
+}
+
 function mgrBoardRow(b, kind) {
   const spent = b._eSpent != null ? b._eSpent : Number(b.total_spent || 0);
   const hits = mgrHitBadge(b);
@@ -2765,39 +2865,50 @@ function mgrBoardRow(b, kind) {
   const eBreaks = b._eBreaks != null ? b._eBreaks : (b.total_breaks_purchased || 0);
   const avg = eStreams > 0 ? spent / eStreams : spent;
   const av = kind === 'whale' ? 'linear-gradient(135deg,#eab945,#d98e2b);color:#0a0a11;'
-           : kind === 'rising' ? 'linear-gradient(135deg,#64748b,#475569);color:#fff;'
            : kind === 'new'    ? 'linear-gradient(135deg,#3aa0ff,#4f6ef7);color:#fff;'
-           :                     'linear-gradient(135deg,#f0603f,#c23b6b);color:#fff;';
+           : kind === 'cold'   ? 'linear-gradient(135deg,#f0603f,#c23b6b);color:#fff;'
+           : b._fading         ? 'linear-gradient(135deg,#f59e0b,#d97706);color:#0a0a11;'
+           :                     'linear-gradient(135deg,#64748b,#475569);color:#fff;';
   const since = b._since != null ? b._since : mgrDaysSince(b._eLast || b.last_purchase_date);
   const uname = (b.username || '').replace(/'/g, "\\'");
-  const contactedDays = (kind === 'cold' && b.last_cold_alert_at) ? mgrDaysSince(b.last_cold_alert_at) : null;
-  const contacted = contactedDays != null && contactedDays <= 7;
+  const actionable = kind === 'cold' || b._fading;
+  const contactedDays = (actionable && b.last_cold_alert_at) ? mgrDaysSince(b.last_cold_alert_at) : null;
+  const contacted = contactedDays != null && contactedDays <= BuyerIntel.CONTACTED_WINDOW_DAYS;
+  const cad = mgrCadenceText(b);
   let meta;
-  if (kind === 'cold')        meta = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + eBreaks + ' breaks';
-  else if (kind === 'rising') meta = 'Last 30d $' + (b._eRec || 0).toFixed(0) + ' · ' + eBreaks + ' breaks';
+  if (kind === 'cold')        meta = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + eBreaks + ' breaks' + (cad ? ' · ' + cad : '');
   else if (kind === 'new')    meta = 'First seen ' + mgrDaysSince(b._eFirst || b.first_seen_date) + 'd ago · ' + eBreaks + ' breaks';
-  else                        meta = mgrRelativeDate(b._eLast || b.last_purchase_date) + ' · ' + eBreaks + ' breaks';
+  else if (b._fading)         meta = 'Last buy ' + since + 'd ago — ' + (cad || 'off rhythm') + ' · ' + eBreaks + ' breaks';
+  else                        meta = mgrRelativeDate(b._eLast || b.last_purchase_date) + ' · ' + eBreaks + ' breaks' + (cad ? ' · ' + cad : '');
 
   let right;
-  if (kind === 'cold') {
-    right = '<div style="text-align:right;flex-shrink:0;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div><div style="font-size:0.66rem;color:var(--muted);">$' + Math.round(avg) + '/str</div></div>' +
-      '<button onclick="event.stopPropagation();mgrCopyWinback(\'' + b.id + '\',\'' + uname + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.35rem 0.65rem;font-size:0.7rem;flex-shrink:0;">' + (contacted ? 'Again' : 'Win-back') + '</button>';
+  const money = '<div style="text-align:right;flex-shrink:0;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div><div style="font-size:0.66rem;color:var(--muted);">$' + Math.round(avg) + '/str</div></div>';
+  if (actionable) {
+    const seg = kind === 'cold' ? 'cold' : 'fading';
+    right = money +
+      '<div style="display:flex;flex-direction:column;gap:0.3rem;flex-shrink:0;align-items:stretch;">' +
+        '<button onclick="event.stopPropagation();mgrCopyWinback(\'' + b.id + '\',\'' + uname + '\',\'' + seg + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.32rem 0.65rem;font-size:0.7rem;">' + (contacted ? 'Again' : 'Win-back') + '</button>' +
+        mgrAssignSelect(b) +
+      '</div>';
   } else if (kind === 'whale') {
     const top = (_mgrBoardData && _mgrBoardData.whales.length) ? Number(_mgrBoardData.whales[0]._eSpent || 0) : spent;
     const pct = top > 0 ? Math.max(8, Math.round(spent / top * 100)) : 100;
     right = '<div style="text-align:right;flex-shrink:0;min-width:66px;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div>' +
       '<div style="width:72px;height:5px;border-radius:3px;background:rgba(255,255,255,0.07);overflow:hidden;margin-top:5px;margin-left:auto;"><i style="display:block;height:100%;width:' + pct + '%;background:#eab945;border-radius:3px;"></i></div></div>';
   } else {
-    right = '<div style="text-align:right;flex-shrink:0;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div><div style="font-size:0.66rem;color:var(--muted);">$' + Math.round(avg) + '/str</div></div>';
+    right = money;
   }
 
+  const assignedName = b.assigned_to ? breakerNameById(b.assigned_to) : null;
   return '<div onclick="openBuyerProfile(\'' + b.id + '\')" style="display:flex;align-items:center;gap:0.7rem;padding:0.7rem 1rem;border-bottom:1px solid var(--border);cursor:pointer;' + (contacted ? 'opacity:0.6;' : '') + '">' +
     '<div style="width:38px;height:38px;border-radius:10px;background:' + av + 'display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;flex-shrink:0;">' + mgrBoardMono(b.username) + '</div>' +
     '<div style="flex:1;min-width:0;">' +
-      '<div style="font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">@' + escHtml(b.username) + mgrBuyerTagChip(b) +
+      '<div style="font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">@' + escHtml(b.username) + mgrBuyerTagChip(b) + mgrAffinityChip(b) +
         (b._newBig ? ' <span style="font-size:0.55rem;background:rgba(234,185,69,0.16);color:#eab945;padding:1px 6px;border-radius:4px;font-weight:800;">🔥 NEW BIG</span>' : '') +
+        (b._fading ? ' <span style="font-size:0.58rem;background:rgba(245,158,11,0.16);color:#f59e0b;padding:1px 6px;border-radius:4px;font-weight:800;">⚠ FADING</span>' : '') +
         (hits > 0 ? ' <span style="font-size:0.58rem;background:rgba(240,96,63,0.13);color:#f0603f;padding:1px 5px;border-radius:4px;font-weight:800;">🎯 ' + hits + '</span>' : '') +
         (contacted ? ' <span style="font-size:0.58rem;background:rgba(47,191,113,0.14);color:#2fbf71;padding:1px 6px;border-radius:4px;font-weight:800;">✓ ' + (contactedDays === 0 ? 'today' : contactedDays + 'd') + '</span>' : '') +
+        (assignedName && !actionable ? ' <span style="font-size:0.58rem;background:rgba(79,110,247,0.14);color:#93a6ff;padding:1px 6px;border-radius:4px;font-weight:700;">📬 ' + escHtml(assignedName) + '</span>' : '') +
       '</div>' +
       '<div style="font-size:0.72rem;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + meta + '</div>' +
     '</div>' +
@@ -2805,16 +2916,51 @@ function mgrBoardRow(b, kind) {
   '</div>';
 }
 
-async function mgrCopyWinback(buyerId, username) {
+function mgrAssignSelect(b) {
+  const opts = (_mgrBoardData && _mgrBoardData.assignees) || [];
+  if (!opts.length) return '';
+  return '<select onclick="event.stopPropagation()" onchange="event.stopPropagation();assignBuyer(\'' + b.id + '\', this.value)" title="Assign outreach" style="font-size:0.66rem;padding:0.22rem 0.35rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text,inherit);max-width:110px;">' +
+    '<option value="">' + (b.assigned_to ? 'Unassign' : 'Assign to…') + '</option>' +
+    opts.map(o => '<option value="' + o.id + '"' + (b.assigned_to === o.id ? ' selected' : '') + '>' + escHtml(o.name) + '</option>').join('') +
+  '</select>';
+}
+
+async function assignBuyer(buyerId, userId) {
+  const b = _bi && _bi.buyers.find(x => x.id === buyerId);
+  const { error } = await sb.from('buyers').update({ assigned_to: userId || null }).eq('id', buyerId);
+  if (error) {
+    showGlobalError(BuyerIntel.isMissingSchema(error) ? 'Assignments need migrations/010_buyer_crm.sql in Supabase first.' : 'Couldn\'t assign: ' + error.message);
+    return;
+  }
+  if (b) b.assigned_to = userId || null;
+  if (userId && b && userId !== currentUser.id) {
+    const spent = '$' + Number(b._eSpent || b.total_spent || 0).toFixed(0);
+    await sb.from('notifications').insert({
+      organization_id: currentProfile.org_id, user_id: userId, type: 'buyer_assigned',
+      title: 'Win-back assigned to you: @' + b.username,
+      body: '@' + b.username + ' (' + spent + ' lifetime) hasn\'t bought in ' + (b._since === Infinity ? 'a while' : b._since + ' days') + '. Reach out and log the touch.',
+      action_url: '/break?tab=buyers'
+    }).then(null, function () {});
+  }
+  showGlobalSuccess(userId ? 'Assigned @' + (b ? b.username : 'buyer') + ' to ' + breakerNameById(userId) + '.' : 'Unassigned.');
+  renderMgrBuyersBoard();
+}
+
+async function mgrCopyWinback(buyerId, username, segment) {
   const msg = 'Hey @' + username + '! Haven\'t seen you in a bit — we\'ve got some fire breaks coming up I think you\'d love. Come hang soon 🔥';
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    try { await navigator.clipboard.writeText(msg); showGlobalSuccess('Win-back copied — paste it into a Whatnot DM to @' + username + '.'); }
+    try { await navigator.clipboard.writeText(msg); showGlobalSuccess('Win-back copied — paste it into a Whatnot DM to @' + username + '. Logged as outreach.'); }
     catch (e) { showGlobalError('Couldn\'t copy automatically. Message: ' + msg); }
   } else {
     showGlobalError('Copy not supported here. Message: ' + msg);
   }
-  const { error } = await sb.from('buyers').update({ last_cold_alert_at: new Date().toISOString() }).eq('id', buyerId);
-  if (error) { console.error('mark contacted failed:', error.message); return; }
+  try {
+    await BuyerIntel.logTouch(sb, { orgId: currentProfile.org_id, buyerId, userId: currentUser.id, channel: 'whatnot_dm', note: 'Win-back DM copied', segment: segment || 'cold' });
+  } catch (e) { console.error('log touch failed:', e.message); showGlobalError('Couldn\'t log the outreach: ' + e.message); return; }
+  if (_bi) {
+    _bi.touches = await BuyerIntel.fetchTouches(sb, currentProfile.org_id, 180);
+    const b = _bi.buyers.find(x => x.id === buyerId); if (b) b.last_cold_alert_at = new Date().toISOString();
+  }
   loadMgrBuyersBoard();
 }
 
@@ -2836,39 +2982,14 @@ function mgrRelativeDate(dateStr) {
 }
 
 async function fetchAllMgrBuyers() {
-  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,first_seen_date,temperature,is_new_buyer,case_hits,last_cold_alert_at,fav_team,fav_player,fav_sport';
-  let all = [], from = 0; const size = 1000;
-  while (true) {
-    const { data, error } = await sb.from('buyers')
-      .select(cols)
-      .eq('organization_id', currentProfile.org_id)
-      .order('total_spent', { ascending: false })
-      .range(from, from + size - 1);
-    if (error) throw error;
-    all = all.concat(data || []);
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  return all;
+  return BuyerIntel.fetchBuyers(sb, currentProfile.org_id);
 }
 
 // Single source of truth for hit counts — derived from buyer_hits rows
 async function fetchMgrBuyerHitCounts() {
-  const map = {};
-  _mgrBuyerHitStreams = {};
-  let from = 0; const size = 1000;
-  while (true) {
-    const { data, error } = await sb.from('buyer_hits')
-      .select('buyer_id,stream_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(h => {
-      map[h.buyer_id] = (map[h.buyer_id] || 0) + 1;
-      (_mgrBuyerHitStreams[h.buyer_id] = _mgrBuyerHitStreams[h.buyer_id] || []).push(h.stream_id || null);
-    });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  return map;
+  const h = await BuyerIntel.fetchHitCounts(sb, currentProfile.org_id);
+  _mgrBuyerHitStreams = h.streams;
+  return h.counts;
 }
 
 function mgrHitBadge(b) {
@@ -2880,48 +3001,10 @@ function mgrHitBadge(b) {
   return streams.filter(s => s && _mgrStreamChannelMap && _mgrStreamChannelMap[s] === ch).length;
 }
 
+// buyer_id -> Set(channel_id). Comes from the shared dataset (server rollups).
 async function buildMgrBuyerChannelMap() {
-  if (_mgrBuyerChannelMap && _mgrBuyerChannelMap.size > 0) return _mgrBuyerChannelMap;  // rebuild if a prior build came back empty
-  const org = currentProfile.org_id;
-  const streamCh = {};
-  let from = 0; const size = 1000;
-  while (true) {
-    const { data, error } = await sb.from('streams')
-      .select('id,channel_id').eq('org_id', org).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(s => { if (s.channel_id) streamCh[s.id] = s.channel_id; });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  const map = new Map();
-  const stats = {};
-  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
-  const d60 = new Date(); d60.setDate(d60.getDate() - 60);
-  const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-  from = 0;
-  while (true) {
-    const { data, error } = await sb.from('buyer_purchases')
-      .select('buyer_id,stream_id,amount,purchase_date').eq('organization_id', org).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(p => {
-      const ch = p.stream_id ? streamCh[p.stream_id] : null;
-      if (!ch) return;
-      if (!map.has(p.buyer_id)) map.set(p.buyer_id, new Set());
-      map.get(p.buyer_id).add(ch);
-      const bs = stats[p.buyer_id] = stats[p.buyer_id] || {};
-      const cs = bs[ch] = bs[ch] || { spent: 0, breaks: 0, streams: new Set(), first: null, last: null, recent30: 0, prior30: 0 };
-      const amt = Number(p.amount) || 0;
-      cs.spent += amt; cs.breaks += 1; if (p.stream_id) cs.streams.add(p.stream_id);
-      const d = p.purchase_date;
-      if (d) { if (!cs.first || d < cs.first) cs.first = d; if (!cs.last || d > cs.last) cs.last = d; if (d >= s30) cs.recent30 += amt; else if (d >= s60) cs.prior30 += amt; }
-    });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  _mgrBuyerChannelMap = map;
-  _mgrStreamChannelMap = streamCh;
-  _mgrBuyerChannelStats = stats;
-  return map;
+  await ensureBuyerData();
+  return _mgrBuyerChannelMap;
 }
 
 function populateMgrBuyersChannelSelect() {
@@ -2952,16 +3035,13 @@ function mgrHitInChannel(h) {
 }
 
 async function onMgrBuyersChannelChange() {
-  const chId = document.getElementById('mgrBuyersChannelFilter').value;
-  if (chId && !(_mgrBuyerChannelMap && _mgrBuyerChannelMap.size > 0)) {
-    const el = document.getElementById(_mgrBuyersMode === 'board' ? 'mgrBuyersBoard' : _mgrBuyersMode === 'hits' ? 'mgrBuyersHits' : 'mgrBuyersLeaderboard');
-    if (el) el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading account data…</div>';
-    try { await buildMgrBuyerChannelMap(); }
-    catch (err) { if (el) el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load account data: ' + escHtml(err.message) + '</div>'; return; }
-  }
+  const el = document.getElementById(_mgrBuyersMode === 'board' ? 'mgrBuyersBoard' : _mgrBuyersMode === 'hits' ? 'mgrBuyersHits' : _mgrBuyersMode === 'health' ? 'buyersHealth' : 'mgrBuyersLeaderboard');
+  try { await ensureBuyerData(); }
+  catch (err) { if (el) el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load account data: ' + escHtml(err.message) + '</div>'; return; }
   if (_mgrBuyersMode === 'board') loadMgrBuyersBoard();
   else if (_mgrBuyersMode === 'hits') { renderMgrHitFilter(); renderMgrHitBoard(); }
-  else applyMgrBuyersFilters();
+  else if (_mgrBuyersMode === 'health') loadMgrBuyersHealth();
+  else loadMgrBuyersTab();
 }
 
 async function loadMgrBuyersTab() {
@@ -2971,36 +3051,110 @@ async function loadMgrBuyersTab() {
   populateMgrBuyersChannelSelect();
 
   try {
-    const [buyersAll, hitCounts] = await Promise.all([fetchAllMgrBuyers(), fetchMgrBuyerHitCounts()]);
-    buyersAll.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
-    const visible = buyersAll.filter(b => Number(b.total_spent || 0) > 0 || b._hitCount > 0);
+    const d = await ensureBuyerData();
+    BuyerIntel.enrich(d.buyers, d.rollups, { channelId: mgrSelCh(), whaleMin: MGR_WHALE_MIN, coldAfterDays: MGR_COLD_MIN });
+    let visible = d.buyers.filter(b => Number(b.total_spent || 0) > 0 || b._hitCount > 0);
+    if (_mgrQueueOnly) visible = visible.filter(b => b.assigned_to === currentUser.id);
     if (_mgrBuyersViewMode === 'alltime') {
       _mgrBuyersData = visible;
     } else {
-      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-      const cutoffStr = cutoff.toISOString().split('T')[0];
-      let purch = [], _pf = 0;
-      while (true) {
-        const { data, error } = await sb.from('buyer_purchases')
-          .select('buyer_id, amount')
-          .eq('organization_id', currentProfile.org_id)
-          .gte('purchase_date', cutoffStr)
-          .range(_pf, _pf + 999);
-        if (error) throw error;
-        purch = purch.concat(data || []);
-        if (!data || data.length < 1000) break;
-        _pf += 1000;
-      }
-      const sums = {};
-      (purch || []).forEach(p => { sums[p.buyer_id] = (sums[p.buyer_id] || 0) + Number(p.amount || 0); });
-      _mgrBuyersData = buyersAll
-        .filter(b => (sums[b.id] || 0) > 0)
-        .map(b => Object.assign({}, b, { _recentSpent: sums[b.id] }))
+      _mgrBuyersData = visible
+        .filter(b => (b._eRec || 0) > 0)
+        .map(b => Object.assign({}, b, { _recentSpent: b._eRec }))
         .sort((a, b) => (b._recentSpent || 0) - (a._recentSpent || 0));
     }
     applyMgrBuyersFilters();
   } catch (err) {
     el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+// ── Health (trends + breaker attribution) — same view as the owner's ──
+function healthBars(values, labels, color, fmtFn) {
+  const max = Math.max.apply(null, values.concat([1]));
+  return '<div style="display:flex;align-items:flex-end;gap:6px;height:96px;">' + values.map(function (v, i) {
+    const h = Math.max(3, Math.round(v / max * 80));
+    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;">' +
+      '<div style="font-size:0.62rem;font-weight:700;color:var(--text);">' + fmtFn(v) + '</div>' +
+      '<div style="width:100%;height:' + h + 'px;border-radius:4px 4px 0 0;background:' + color + ';opacity:' + (i === values.length - 1 ? 1 : 0.7) + ';"></div>' +
+      '<div style="font-size:0.58rem;color:var(--muted);white-space:nowrap;">' + labels[i] + '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+function pctColor(p, good, bad) { return p == null ? 'var(--muted)' : p >= good ? '#2fbf71' : p <= bad ? '#f0603f' : '#f59e0b'; }
+
+async function loadMgrBuyersHealth() {
+  const el = document.getElementById('buyersHealth');
+  if (!el || !currentProfile) return;
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer health…</div>';
+  try {
+    const d = await ensureBuyerFacts();
+    if (!d.facts) {
+      el.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:0.85rem;">Buyer Health needs the server rollups — ask the owner to run <code>migrations/010_buyer_crm.sql</code> in Supabase.</div>';
+      return;
+    }
+    const selCh = mgrSelCh();
+    BuyerIntel.enrich(d.buyers, d.rollups, { channelId: selCh, whaleMin: MGR_WHALE_MIN, coldAfterDays: MGR_COLD_MIN });
+    const h = BuyerIntel.healthMetrics(d.buyers, d.facts, { whaleMin: MGR_WHALE_MIN, channelId: selCh, months: 6 });
+    const panel = (title, why, body) => '<div class="panel" style="margin-bottom:0.8rem;"><div class="panel-title" style="margin-bottom:0.15rem;">' + title + '</div><div style="font-size:0.72rem;color:var(--muted);margin-bottom:0.75rem;">' + why + '</div>' + body + '</div>';
+    const mLabel = k => new Date(k + '-15T12:00:00').toLocaleDateString('en-US', { month: 'short' });
+
+    const newBars = healthBars(h.cohorts.map(c => c.newBuyers), h.cohorts.map(c => mLabel(c.month)), '#3aa0ff', v => v);
+    const lastFull = h.cohorts[h.cohorts.length - 2], prevFull = h.cohorts[h.cohorts.length - 3];
+    const newTrend = (lastFull && prevFull && prevFull.newBuyers) ? Math.round((lastFull.newBuyers - prevFull.newBuyers) / prevFull.newBuyers * 100) : null;
+
+    const convRows = h.cohorts.map(c => '<div style="display:flex;align-items:center;gap:0.6rem;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.8rem;">' +
+      '<span style="width:44px;color:var(--muted);">' + mLabel(c.month) + '</span>' +
+      '<span style="width:70px;">' + c.newBuyers + ' new</span>' +
+      '<div style="flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,0.06);overflow:hidden;"><i style="display:block;height:100%;width:' + (c.rate != null ? Math.round(c.rate * 100) : 0) + '%;background:' + pctColor(c.rate, 0.35, 0.15) + ';"></i></div>' +
+      '<span style="width:120px;text-align:right;font-weight:700;color:' + pctColor(c.rate, 0.35, 0.15) + ';">' + (c.tooEarly ? '<span style="color:var(--muted);font-weight:500;">too early</span>' : c.newBuyers ? c.converted + ' came back (' + Math.round(c.rate * 100) + '%)' : '—') + '</span>' +
+    '</div>').join('');
+
+    const wc = h.whaleChurn;
+    const nameOf = id => { const b = d.buyers.find(x => x.id === id); return b ? '@' + escHtml(b.username) : '?'; };
+    const churnBody = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.6rem;margin-bottom:0.6rem;">' +
+      '<div style="text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:#eab945;">' + wc.cur + '</div><div style="font-size:0.66rem;color:var(--muted);">whales now</div></div>' +
+      '<div style="text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:#2fbf71;">+' + wc.gained.length + '</div><div style="font-size:0.66rem;color:var(--muted);">new this month</div></div>' +
+      '<div style="text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:#f0603f;">−' + wc.churned.length + '</div><div style="font-size:0.66rem;color:var(--muted);">dropped off</div></div>' +
+      '<div style="text-align:center;"><div style="font-size:1.4rem;font-weight:800;">' + (wc.prev ? Math.round(wc.retained.length / wc.prev * 100) + '%' : '—') + '</div><div style="font-size:0.66rem;color:var(--muted);">retained</div></div>' +
+    '</div>' +
+    (wc.churned.length ? '<div style="font-size:0.76rem;"><span style="color:#f0603f;font-weight:700;">Dropped:</span> ' + wc.churned.slice(0, 8).map(id => '<span onclick="openBuyerProfile(\'' + id + '\')" style="cursor:pointer;color:var(--primary);">' + nameOf(id) + '</span>').join(', ') + (wc.churned.length > 8 ? ' +' + (wc.churned.length - 8) : '') + '</div>' : '') +
+    (wc.gained.length ? '<div style="font-size:0.76rem;margin-top:0.25rem;"><span style="color:#2fbf71;font-weight:700;">New whales:</span> ' + wc.gained.slice(0, 8).map(id => '<span onclick="openBuyerProfile(\'' + id + '\')" style="cursor:pointer;color:var(--primary);">' + nameOf(id) + '</span>').join(', ') + (wc.gained.length > 8 ? ' +' + (wc.gained.length - 8) : '') + '</div>' : '');
+
+    const cc = h.concentration;
+    const concColor = cc.top10Share >= 0.6 ? '#f0603f' : cc.top10Share >= 0.4 ? '#f59e0b' : '#2fbf71';
+    const concBody = '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">' +
+      '<div><div style="font-size:1.6rem;font-weight:800;color:' + concColor + ';">' + Math.round(cc.top10Share * 100) + '%</div><div style="font-size:0.66rem;color:var(--muted);">of 90-day revenue from the top 10 buyers</div></div>' +
+      '<div><div style="font-size:1.6rem;font-weight:800;">' + Math.round(cc.top1Share * 100) + '%</div><div style="font-size:0.66rem;color:var(--muted);">from the single biggest buyer</div></div>' +
+      '<div><div style="font-size:1.6rem;font-weight:800;">' + cc.buyers + '</div><div style="font-size:0.66rem;color:var(--muted);">buyers · ' + fmt(cc.total90) + ' in 90 days</div></div>' +
+    '</div>' +
+    '<div style="font-size:0.74rem;color:var(--muted);margin-top:0.5rem;">' + (cc.top10Share >= 0.6 ? '⚠ Heavy concentration — losing two whales would hurt. Grow the Regulars bench.' : cc.top10Share >= 0.4 ? 'Moderate concentration. Keep converting New → Regular so it doesn\'t creep up.' : 'Healthy spread — revenue isn\'t hostage to a few accounts.') + '</div>';
+
+    const brRows = h.breakers.length ? h.breakers.map(s => '<tr>' +
+      '<td style="font-weight:700;">' + escHtml(breakerNameById(s.breaker_id)) + '</td>' +
+      '<td style="text-align:right;">' + fmt(s.revenue90) + '</td>' +
+      '<td style="text-align:right;">' + s.buyers90 + '</td>' +
+      '<td style="text-align:right;color:#eab945;font-weight:700;">' + s.whales90 + '</td>' +
+      '<td style="text-align:right;color:#3aa0ff;font-weight:700;">' + s.newBuyers90 + '</td>' +
+      '<td style="text-align:right;font-weight:700;color:' + pctColor(s.conversion, 0.35, 0.15) + ';">' + (s.conversion == null ? '<span style="color:var(--muted);font-weight:500;">n/a</span>' : Math.round(s.conversion * 100) + '% <span style="color:var(--muted);font-weight:500;">of ' + s.originatedMature + '</span>') + '</td>' +
+    '</tr>').join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);">No stream-attributed purchases yet.</td></tr>';
+    const brBody = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
+      '<th>Breaker</th><th style="text-align:right;">90d revenue</th><th style="text-align:right;">Buyers</th><th style="text-align:right;">Whales in room</th><th style="text-align:right;">New brought in</th><th style="text-align:right;">New → Regular</th>' +
+      '</tr></thead><tbody>' + brRows + '</tbody></table></div>' +
+      '<div style="font-size:0.7rem;color:var(--muted);margin-top:0.5rem;">"New brought in" = buyers whose first-ever purchase was on this breaker\'s stream (last 90d). "New → Regular" = of the buyers they originated at least 30 days ago, how many bought a second stream.</div>';
+
+    el.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">' +
+        panel('New buyers per month', 'Is the top of the funnel growing?' + (newTrend != null ? ' Last full month <strong style="color:' + (newTrend >= 0 ? '#2fbf71' : '#f0603f') + ';">' + (newTrend >= 0 ? '▲ +' : '▼ ') + newTrend + '%</strong> vs the month before.' : ''), newBars) +
+        panel('New → Regular conversion', 'Of each month\'s first-timers, how many came back for a second stream.', convRows) +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">' +
+        panel('Whale churn', 'Whales ($' + MGR_WHALE_MIN.toLocaleString() + '+ / 30d) this month vs last month.', churnBody) +
+        panel('Revenue concentration', 'How much of the money depends on a handful of people.', concBody) +
+      '</div>' +
+      panel('Breaker attribution', 'Which breakers the whales show up for, and who actually grows the buyer base.', brBody);
+  } catch (err) {
+    el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load health: ' + escHtml(err.message) + '</div>';
   }
 }
 
@@ -3098,6 +3252,21 @@ function applyMgrBuyersFilters() {
     <div class="panel" style="margin-bottom:1rem;">
       <div class="panel-title">Buys Most Often</div>
       <div id="bpPreferred"></div>
+    </div>
+    <!-- Outreach log -->
+    <div class="panel" style="margin-bottom:1rem;">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;"><span>Outreach</span><span id="bpAssigned" style="font-size:0.72rem;font-weight:600;color:var(--muted);"></span></div>
+      <div id="bpTouchForm" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.65rem;">
+        <select id="bpTouchChannel" style="padding:0.45rem 0.55rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.8rem;">
+          <option value="whatnot_dm">Whatnot DM</option><option value="in_stream">In stream</option><option value="instagram">Instagram</option><option value="text">Text</option><option value="email">Email</option><option value="call">Call</option><option value="other">Other</option>
+        </select>
+        <input id="bpTouchNote" placeholder="What did you say / what happened?" autocomplete="off" style="flex:1;min-width:150px;padding:0.45rem 0.65rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.8rem;">
+        <select id="bpTouchOutcome" style="padding:0.45rem 0.55rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.8rem;">
+          <option value="">Waiting on reply</option><option value="replied">Replied</option><option value="returned">Came back &amp; bought</option><option value="no_reply">No reply</option>
+        </select>
+        <button class="btn btn-sm" id="bpTouchLogBtn" onclick="bpLogTouch()" style="padding:0.45rem 0.9rem;font-size:0.78rem;">Log</button>
+      </div>
+      <div id="bpTouches"></div>
     </div>
     <!-- Hit History -->
     <div class="panel" style="margin-bottom:1rem;">
@@ -3202,13 +3371,18 @@ async function openBuyerProfile(buyerId) {
     const nameCounts = {};
     purchases.forEach(p => { if (p.break_name) nameCounts[p.break_name] = (nameCounts[p.break_name] || 0) + 1; });
     const top3 = Object.entries(nameCounts).sort((a,b) => b[1]-a[1]).slice(0,3);
-    document.getElementById('bpPreferred').innerHTML = top3.length === 0
+    document.getElementById('bpPreferred').innerHTML = '<div id="bpAffinity"></div>' + (top3.length === 0
       ? '<div style="color:var(--muted);font-size:0.82rem;">No purchase history yet.</div>'
       : top3.map(function([name, count]) {
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.45rem 0;border-bottom:1px solid var(--border);">' +
             '<span style="font-size:0.88rem;font-weight:600;">' + escHtml(name) + '</span>' +
             '<span style="font-size:0.78rem;color:var(--muted);">' + count + 'x</span></div>';
-        }).join('');
+        }).join(''));
+    renderBpAffinity(buyerId);
+
+    // Outreach timeline + assignment
+    renderBpTouches(buyerId);
+    renderBpAssigned(buyer);
 
     // Hits
     const hits = hitsRes.data || [];
@@ -3315,10 +3489,99 @@ function renderBpPurchases() {
   }
 }
 
+async function renderBpAffinity(buyerId) {
+  const el = document.getElementById('bpAffinity');
+  if (!el) return;
+  try {
+    const d = await ensureBuyerFacts();
+    if (_buyerProfileId !== buyerId) return;
+    const aff = d.affinity && d.affinity[buyerId];
+    if (!aff || !aff.length) { el.innerHTML = ''; return; }
+    const top = aff.filter(a => a.share >= 0.08).slice(0, 4);
+    el.innerHTML = '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;padding-bottom:0.5rem;margin-bottom:0.35rem;border-bottom:1px solid var(--border);">' +
+      '<span style="font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);">Collects</span>' +
+      top.map(a => '<span style="font-size:0.72rem;background:rgba(168,85,247,0.14);color:#c084fc;padding:2px 8px;border-radius:5px;font-weight:700;">' + escHtml(a.category) + ' ' + Math.round(a.share * 100) + '%</span>').join('') +
+      '<span style="font-size:0.66rem;color:var(--muted);" title="Weighted by spend across the streams they buy in, using the products actually opened">inferred</span>' +
+    '</div>';
+  } catch (e) { el.innerHTML = ''; }
+}
+
+function renderBpAssigned(buyer) {
+  const el = document.getElementById('bpAssigned');
+  if (!el) return;
+  const opts = buyersAssigneeOptions();
+  el.innerHTML = 'Assigned to <select onchange="assignBuyer(\'' + buyer.id + '\', this.value)" style="font-size:0.72rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text,inherit);">' +
+    '<option value="">nobody</option>' + opts.map(o => '<option value="' + o.id + '"' + (buyer.assigned_to === o.id ? ' selected' : '') + '>' + escHtml(o.name) + '</option>').join('') + '</select>';
+}
+
+const TOUCH_CHANNEL_META = { whatnot_dm: '💬 Whatnot DM', in_stream: '🎙 In stream', instagram: '📸 Instagram', text: '📱 Text', email: '✉️ Email', call: '📞 Call', other: '🔗 Other' };
+const TOUCH_OUTCOME_META = { returned: ['Came back', '#2fbf71'], replied: ['Replied', '#3aa0ff'], no_reply: ['No reply', '#f0603f'] };
+
+async function renderBpTouches(buyerId) {
+  const el = document.getElementById('bpTouches');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;">Loading…</div>';
+  const rows = await BuyerIntel.fetchBuyerTouches(sb, buyerId);
+  if (_buyerProfileId !== buyerId) return;
+  if (rows === null) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;">The outreach log needs <code>migrations/010_buyer_crm.sql</code> in Supabase.</div>';
+    document.getElementById('bpTouchForm').style.display = 'none';
+    return;
+  }
+  document.getElementById('bpTouchForm').style.display = '';
+  if (!rows.length) { el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;">No outreach logged yet. Every DM, shout-out or call you log here feeds the win-back rate.</div>'; return; }
+  el.innerHTML = rows.map(function (t) {
+    const who = t.user_id ? breakerNameById(t.user_id) : '—';
+    const oc = t.outcome && TOUCH_OUTCOME_META[t.outcome];
+    const when = new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + new Date(t.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return '<div style="display:flex;gap:0.6rem;padding:0.5rem 0;border-bottom:1px solid var(--border);align-items:flex-start;">' +
+      '<div style="font-size:0.78rem;white-space:nowrap;min-width:110px;">' + (TOUCH_CHANNEL_META[t.channel] || escHtml(t.channel || '')) + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        (t.note ? '<div style="font-size:0.84rem;">' + escHtml(t.note) + '</div>' : '') +
+        '<div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">' + escHtml(who) + ' · ' + when + (t.segment_at_touch ? ' · was ' + escHtml(t.segment_at_touch) : '') + '</div>' +
+      '</div>' +
+      '<div style="flex-shrink:0;">' + (oc
+        ? '<span style="font-size:0.66rem;font-weight:800;padding:2px 7px;border-radius:5px;background:' + oc[1] + '22;color:' + oc[1] + ';">' + oc[0] + '</span>'
+        : '<select onchange="bpSetTouchOutcome(\'' + t.id + '\', this.value, \'' + buyerId + '\')" style="font-size:0.66rem;padding:0.15rem 0.3rem;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text,inherit);"><option value="">waiting…</option><option value="replied">Replied</option><option value="returned">Came back</option><option value="no_reply">No reply</option></select>') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function bpSetTouchOutcome(touchId, outcome, buyerId) {
+  if (!outcome) return;
+  const { error } = await sb.from('buyer_touches').update({ outcome }).eq('id', touchId);
+  if (error) { showGlobalError('Couldn\'t update: ' + error.message); return; }
+  if (_bi) _bi.touches = await BuyerIntel.fetchTouches(sb, currentProfile.org_id, 180);
+  renderBpTouches(buyerId);
+}
+
+async function bpLogTouch() {
+  const buyerId = _buyerProfileId; if (!buyerId) return;
+  const btn = document.getElementById('bpTouchLogBtn');
+  const channel = document.getElementById('bpTouchChannel').value;
+  const note = document.getElementById('bpTouchNote').value.trim();
+  const outcome = document.getElementById('bpTouchOutcome').value || null;
+  const b = _bi && _bi.buyers.find(x => x.id === buyerId);
+  const segment = b ? (b._tier === 'regular' && b._fading ? 'fading' : b._tier) : null;
+  btn.disabled = true; btn.textContent = 'Logging…';
+  try {
+    await BuyerIntel.logTouch(sb, { orgId: currentProfile.org_id, buyerId, userId: currentUser.id, channel, note, outcome, segment });
+    document.getElementById('bpTouchNote').value = '';
+    document.getElementById('bpTouchOutcome').value = '';
+    if (_bi) { _bi.touches = await BuyerIntel.fetchTouches(sb, currentProfile.org_id, 180); if (b) b.last_cold_alert_at = new Date().toISOString(); }
+    renderBpTouches(buyerId);
+    if (_mgrBuyersMode === 'board') loadMgrBuyersBoard();
+  } catch (e) {
+    showGlobalError(BuyerIntel.isMissingSchema(e) ? 'The outreach log needs migrations/010_buyer_crm.sql in Supabase first.' : 'Couldn\'t log: ' + e.message);
+  } finally { btn.disabled = false; btn.textContent = 'Log'; }
+}
+
 async function saveBuyerTag(buyerId, field, value) {
   const patch = { updated_at: new Date().toISOString() };
   patch[field] = value.trim() || null;
   const { error } = await sb.from('buyers').update(patch).eq('id', buyerId);
+  if (!error && _bi) { const b = _bi.buyers.find(x => x.id === buyerId); if (b) b[field] = patch[field]; }
   if (error) {
     console.error('tag save failed:', error.message);
     showGlobalError(/column .* does not exist/i.test(error.message)

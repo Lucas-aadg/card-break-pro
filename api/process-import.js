@@ -11,6 +11,7 @@ const { createClient } = require('@supabase/supabase-js');
 const MAX_BUYERS = 2000;   // slips can be big; batched writes keep us well under the serverless time limit
 const CHUNK = 400;         // rows per bulk insert
 const IN_CHUNK = 100;      // ids per .in() filter
+const APP_URL = process.env.APP_URL || 'https://cardbreakpro.com';
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -176,6 +177,34 @@ async function handleImport(req, res) {
       raw_filename: rawFilename || null, status: 'complete'
     }).select('id').single();
     if (!impRes.error && impRes.data) importId = impRes.data.id;
+
+    // ── 7. Stamp the stream (data freshness) + recap the breaker ──
+    // Both are best-effort: the import is already committed and idempotent.
+    await sb.from('streams').update({ slips_imported_at: nowIso }).eq('id', streamId).eq('org_id', orgId).then(null, () => {});
+    try {
+      const { data: stream } = await sb.from('streams').select('breaker_id, stream_key').eq('id', streamId).maybeSingle();
+      if (stream && stream.breaker_id) {
+        const totals = {};
+        purchRows.forEach(r => { totals[r.buyer_id] = (totals[r.buyer_id] || 0) + (r.amount || 0); });
+        const idToUname = {};
+        unames.forEach(u => { if (unameToId[u]) idToUname[unameToId[u]] = u; });
+        const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+        const rev = purchRows.reduce((s, r) => s + (r.amount || 0), 0);
+        const { data: org } = await sb.from('organizations').select('whale_threshold').eq('id', orgId).maybeSingle();
+        const whaleMin = Number(org && org.whale_threshold) || 1000;
+        const bigSpenders = ranked.filter(([, v]) => v >= whaleMin).length;
+        const top = ranked.slice(0, 3).map(([id, v]) => '@' + (idToUname[id] || '?') + ' $' + Math.round(v)).join(', ');
+        const body = unames.length + ' buyers · ' + newUnames.length + ' first-timer' + (newUnames.length === 1 ? '' : 's') + ' · $' + Math.round(rev).toLocaleString('en-US') + ' in orders' +
+          (top ? ' · Top: ' + top : '') +
+          (bigSpenders ? ' · ' + bigSpenders + ' whale-sized spend' + (bigSpenders > 1 ? 's' : '') + ' tonight' : '') +
+          (newUnames.length ? '. Shout out the first-timers next stream — that\'s how they become regulars.' : '.');
+        await sb.from('notifications').insert({
+          organization_id: orgId, user_id: stream.breaker_id, type: 'stream_recap',
+          title: 'Recap: ' + (stream.stream_key || 'stream') + ' — ' + unames.length + ' buyers',
+          body, action_url: APP_URL + '/break?tab=buyers'
+        }).then(null, () => {});
+      }
+    } catch (e) { console.error('recap notification failed:', e && e.message); }
 
     return res.status(200).json({
       success: true,

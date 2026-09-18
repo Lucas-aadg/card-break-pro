@@ -17,6 +17,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="config.js"></script>
   <script src="analytics.js"></script>
+  <script src="buyer-intel.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -980,6 +981,9 @@
       <div class="home-goal-reached-banner" id="homeGoalReachedBanner">Goal Reached! Your team hit the target this month.</div>
     </div>
 
+
+    <!-- Buyer data freshness — closed streams with no slips imported -->
+    <div id="homeBuyerData" style="display:none;margin-bottom:1.5rem;"></div>
 
     <!-- Account Cards -->
     <div style="margin-bottom:2rem;">
@@ -1980,15 +1984,27 @@
         <button class="btn btn-sm" id="buyersModeBoard" onclick="setBuyersMode('board')" style="padding:0.35rem 0.9rem;">📋 Board</button>
         <button class="btn btn-sm btn-outline" id="buyersModeHits" onclick="setBuyersMode('hits')" style="padding:0.35rem 0.9rem;">🎯 Hit Board</button>
         <button class="btn btn-sm btn-outline" id="buyersModeList" onclick="setBuyersMode('list')" style="padding:0.35rem 0.9rem;">📇 All Buyers</button>
+        <button class="btn btn-sm btn-outline" id="buyersModeHealth" onclick="setBuyersMode('health')" style="padding:0.35rem 0.9rem;">📈 Health</button>
       </div>
     </div>
 
-    <!-- Global account/channel filter — applies to Board, Hit Board, and List -->
+    <!-- Data freshness — the board is only as true as the last slip import -->
+    <div id="buyersFreshness" style="display:none;margin-bottom:0.85rem;"></div>
+
+    <!-- Global account/channel filter — applies to Board, Hit Board, List and Health -->
     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.85rem;flex-wrap:wrap;">
       <span style="font-size:0.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Account</span>
       <select id="buyersChannelFilter" onchange="onBuyersChannelChange()" style="padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.85rem;">
         <option value="">All accounts</option>
       </select>
+      <span id="buyersDataSource" style="font-size:0.68rem;color:var(--muted);"></span>
+    </div>
+
+    <!-- HEALTH (trends + breaker attribution) -->
+    <div id="buyersHealthWrap" style="display:none;">
+      <div id="buyersHealth">
+        <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer health…</div>
+      </div>
     </div>
 
     <!-- BOARD (segmented, action-first) -->
@@ -2051,11 +2067,20 @@
     <div class="panel">
       <div class="panel-title">Buyer Intelligence</div>
       <div style="font-size:0.82rem;color:var(--muted);margin-bottom:0.85rem;">Tune the Buyer Board to your scale. Bigger operations should raise this.</div>
-      <div class="form-group" style="max-width:320px;">
-        <label for="settWhaleMin">A "whale" spends this much in the last 30 days</label>
-        <div style="display:flex;align-items:center;gap:0.5rem;">
-          <span style="font-weight:800;color:var(--muted);">$</span>
-          <input type="number" id="settWhaleMin" min="0" step="50" placeholder="1000" style="flex:1;" />
+      <div class="inv-form">
+        <div class="form-group" style="max-width:320px;">
+          <label for="settWhaleMin">A "whale" spends this much in the last 30 days</label>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span style="font-weight:800;color:var(--muted);">$</span>
+            <input type="number" id="settWhaleMin" min="0" step="50" placeholder="1000" style="flex:1;" />
+          </div>
+        </div>
+        <div class="form-group" style="max-width:320px;">
+          <label for="settColdDays">A big buyer is "going cold" after this many quiet days</label>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <input type="number" id="settColdDays" min="7" max="90" step="1" placeholder="21" style="flex:1;" />
+            <span style="font-weight:700;color:var(--muted);font-size:0.85rem;">days</span>
+          </div>
         </div>
       </div>
       <div style="margin-top:0.75rem;">
@@ -3303,7 +3328,7 @@ async function loadHome() {
   await loadChannels();
   populateChannelDropdowns();
   await Promise.all([loadEmpireKpis(), renderChannelGrid()]);
-  await Promise.all([loadLiveActivity(), loadInsights(), ownerLoadHomeGoalBars(), ownerLoadMilestones()]);
+  await Promise.all([loadLiveActivity(), loadInsights(), ownerLoadHomeGoalBars(), ownerLoadMilestones(), renderHomeBuyerData()]);
 }
 
 async function loadEmpireKpis() {
@@ -3767,8 +3792,10 @@ async function initAuth() {
     setupSlipPreviewModal();
     setupLogHitModal();
 
-    // Load initial tab data
-    await loadHome();
+    // Load initial tab data — honour ?tab= deep links (notifications land here)
+    const deepTab = new URLSearchParams(window.location.search).get('tab');
+    if (deepTab && document.getElementById('tab-' + deepTab)) await switchTab(deepTab);
+    else await loadHome();
 
     // Notifications
     loadNotifCount();
@@ -8600,10 +8627,12 @@ async function loadSettings() {
     document.getElementById('settPhone').value = currentProfile.phone || '';
   }
 
-  // Buyer Intelligence: current whale threshold
+  // Buyer Intelligence: current whale threshold + cold window
   await ensureWhaleMin();
   const wm = document.getElementById('settWhaleMin');
   if (wm) wm.value = WHALE_MIN;
+  const cd = document.getElementById('settColdDays');
+  if (cd) cd.value = COLD_MIN_DAYS;
 
   // Load current email
   const { data: { user } } = await sb.auth.getUser();
@@ -8842,7 +8871,7 @@ async function loadNotifCount() {
 }
 
 function notifTypeIcon(type) {
-  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳' };
+  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳', buyer_cold:'❄️', buyer_fading:'📉', slips_missing:'📄', buyer_assigned:'📬', stream_recap:'🧾', whale_in_room:'👑' };
   return icons[type] || '🔔';
 }
 
@@ -9073,6 +9102,21 @@ function printTable(title, subtitle, tableId) {
       <div class="panel-title">Buys Most Often</div>
       <div id="bpPreferred"></div>
     </div>
+    <!-- Outreach log -->
+    <div class="panel" style="margin-bottom:1rem;">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;"><span>Outreach</span><span id="bpAssigned" style="font-size:0.72rem;font-weight:600;color:var(--muted);"></span></div>
+      <div id="bpTouchForm" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.65rem;">
+        <select id="bpTouchChannel" style="padding:0.45rem 0.55rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.8rem;">
+          <option value="whatnot_dm">Whatnot DM</option><option value="in_stream">In stream</option><option value="instagram">Instagram</option><option value="text">Text</option><option value="email">Email</option><option value="call">Call</option><option value="other">Other</option>
+        </select>
+        <input id="bpTouchNote" placeholder="What did you say / what happened?" autocomplete="off" style="flex:1;min-width:150px;padding:0.45rem 0.65rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.8rem;">
+        <select id="bpTouchOutcome" style="padding:0.45rem 0.55rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text,inherit);font-size:0.8rem;">
+          <option value="">Waiting on reply</option><option value="replied">Replied</option><option value="returned">Came back &amp; bought</option><option value="no_reply">No reply</option>
+        </select>
+        <button class="btn btn-sm" id="bpTouchLogBtn" onclick="bpLogTouch()" style="padding:0.45rem 0.9rem;font-size:0.78rem;">Log</button>
+      </div>
+      <div id="bpTouches"></div>
+    </div>
     <!-- Hit History -->
     <div class="panel" style="margin-bottom:1rem;">
       <div class="panel-title">Hit History</div>
@@ -9112,49 +9156,200 @@ var _buyersChannelSelPopulated = false;
 
 // ── Buyer Board (segmented, action-first) ─────────────────
 var _buyersMode = 'board';
-const COLD_MIN_DAYS = 21, COLD_MAX_DAYS = 120;
+var COLD_MIN_DAYS = 21;                       // owner-configurable (organizations.cold_after_days)
+const COLD_MAX_DAYS = BuyerIntel.COLD_MAX_DAYS;
 var WHALE_MIN = 1000;    // whale = spent >= this in the last 30 days. Owner-configurable (default $1,000).
 var _whaleMinLoaded = false;
 
-// Load the org's whale threshold once. Safe before migration 008 — a missing
-// column just leaves the $1,000 default in place.
+// Load the org's whale threshold + cold window once. Tolerates the columns not
+// existing yet (migrations 008 / 010) — defaults stay in place.
 async function ensureWhaleMin() {
   if (_whaleMinLoaded) return;
   _whaleMinLoaded = true;
-  const { data, error } = await sb.from('organizations').select('whale_threshold').eq('id', currentProfile.org_id).maybeSingle();
-  if (!error && data && data.whale_threshold != null) WHALE_MIN = Number(data.whale_threshold) || 1000;
+  const s = await BuyerIntel.loadOrgSettings(sb, currentProfile.org_id);
+  WHALE_MIN = s.whaleMin; COLD_MIN_DAYS = s.coldAfterDays;
 }
 
 async function saveWhaleMin() {
   const btn = document.getElementById('settSaveWhaleMin');
   const val = Math.max(0, Math.round(Number(document.getElementById('settWhaleMin').value) || 0));
+  const coldEl = document.getElementById('settColdDays');
+  const cold = coldEl ? Math.min(90, Math.max(7, Math.round(Number(coldEl.value) || 21))) : 21;
   if (!val) { showGlobalError('Enter a dollar amount (e.g. 1000).'); return; }
   btn.disabled = true; btn.textContent = 'Saving…';
-  const { error } = await sb.from('organizations').update({ whale_threshold: val }).eq('id', currentProfile.org_id);
+  let { error } = await sb.from('organizations').update({ whale_threshold: val, cold_after_days: cold }).eq('id', currentProfile.org_id);
+  if (error && /cold_after_days/i.test(error.message)) {
+    // Migration 010 not run yet — save the whale threshold alone so nothing is lost.
+    ({ error } = await sb.from('organizations').update({ whale_threshold: val }).eq('id', currentProfile.org_id));
+    if (!error) showGlobalError('Whale threshold saved. The cold-days setting needs migrations/010_buyer_crm.sql in Supabase first.');
+  }
   btn.disabled = false; btn.textContent = 'Save';
   if (error) {
     showGlobalError(/whale_threshold|column/i.test(error.message) ? 'Run migration 008_whale_threshold.sql in Supabase first, then try again.' : 'Couldn\'t save: ' + error.message);
     return;
   }
-  WHALE_MIN = val;
-  showGlobalSuccess('Whale threshold set to $' + val.toLocaleString() + '. It\'ll apply next time you open the Board.');
+  WHALE_MIN = val; COLD_MIN_DAYS = cold;
+  invalidateBuyerData();
+  showGlobalSuccess('Saved — whales at $' + val.toLocaleString() + '+ / 30d, going cold after ' + cold + ' quiet days.');
+}
+
+// ── Shared buyer dataset (one load feeds Board, Hit Board, List, Health) ──
+// { buyers, hits:{counts,streams}, rollups, streamCh, touches, facts, mix, affinity, loadedAt }
+var _bi = null;
+var _biPromise = null;
+function invalidateBuyerData() { _bi = null; _biPromise = null; _buyerChannelMap = null; }
+
+async function ensureBuyerData(force) {
+  if (force) invalidateBuyerData();
+  if (_bi) return _bi;
+  if (_biPromise) return _biPromise;
+  _biPromise = (async function () {
+    await ensureWhaleMin();
+    const org = currentProfile.org_id;
+    const [buyers, hits, streamCh, touches] = await Promise.all([
+      BuyerIntel.fetchBuyers(sb, org),
+      BuyerIntel.fetchHitCounts(sb, org),
+      BuyerIntel.fetchStreamChannels(sb, org),
+      BuyerIntel.fetchTouches(sb, org, 180)
+    ]);
+    const rollups = await BuyerIntel.fetchRollups(sb, org, { streamChannels: streamCh });
+    buyers.forEach(b => { b._hitCount = hits.counts[b.id] || 0; });
+    // Legacy maps still used by the hit badges and the list view
+    _buyerHitStreams = hits.streams;
+    _streamChannelMap = streamCh;
+    _buyerChannelStats = rollups.byChannel;
+    _buyerChannelMap = new Map();
+    Object.keys(rollups.byChannel).forEach(id => { _buyerChannelMap.set(id, new Set(Object.keys(rollups.byChannel[id]))); });
+    _bi = { buyers, hits, rollups, streamCh, touches, facts: undefined, mix: undefined, affinity: null, loadedAt: Date.now() };
+    const src = document.getElementById('buyersDataSource');
+    if (src) src.textContent = rollups.source === 'client' ? '· computing in browser — run migration 010 for server rollups' : '';
+    return _bi;
+  })();
+  try { return await _biPromise; } catch (e) { _biPromise = null; throw e; }
+}
+
+// Stream facts + category mix are only needed by Health, affinity and the
+// drawer — load them lazily and once.
+async function ensureBuyerFacts() {
+  const d = await ensureBuyerData();
+  if (d.facts !== undefined) return d;
+  const [facts, mix] = await Promise.all([BuyerIntel.fetchStreamFacts(sb), BuyerIntel.fetchCategoryMix(sb)]);
+  d.facts = facts; d.mix = mix;
+  d.affinity = (facts && mix) ? BuyerIntel.buildAffinity(facts, mix) : {};
+  return d;
+}
+
+// Current account filter value ('' = all accounts)
+function buyersSelCh() { const sel = document.getElementById('buyersChannelFilter'); return sel ? sel.value : ''; }
+
+// ── Data freshness ────────────────────────────────────────
+var _slipStatus = null;
+async function loadSlipStatus(force) {
+  if (_slipStatus && !force) return _slipStatus;
+  _slipStatus = await BuyerIntel.fetchSlipStatus(sb, currentProfile.org_id, { days: 45 });
+  return _slipStatus;
+}
+
+function breakerNameById(id) {
+  const p = (allProfiles || []).find(x => x.id === id);
+  return p ? p.display_name : 'Unknown breaker';
+}
+
+function fmtShortDate(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'; }
+
+async function renderBuyersFreshness() {
+  const el = document.getElementById('buyersFreshness');
+  if (!el) return;
+  try {
+    const st = await loadSlipStatus();
+    if (!st.available) { el.style.display = 'none'; return; }
+    const n = st.missing.length;
+    const through = st.currentThrough ? 'Buyer data current through <strong>' + fmtShortDate(st.currentThrough) + '</strong>' : 'No slips imported in the last 45 days';
+    if (!n) {
+      el.innerHTML = '<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.76rem;color:var(--muted);"><span style="color:#2fbf71;">●</span><span>' + through + ' · every closed stream has slips ✓</span></div>';
+    } else {
+      const atRisk = st.missing.reduce((s, x) => s + (parseFloat(x.final_sales) || 0), 0);
+      const rows = st.missing.slice(0, 6).map(s => '<span style="display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:0.7rem;margin:2px 4px 2px 0;">' + escHtml(s.stream_key) + ' · ' + fmtShortDate(s.break_date) + ' · ' + escHtml(breakerNameById(s.breaker_id)) + '</span>').join('');
+      el.innerHTML = '<div style="background:rgba(240,96,63,0.08);border:1px solid rgba(240,96,63,0.3);border-radius:10px;padding:0.7rem 0.9rem;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">' +
+          '<div style="font-size:0.8rem;"><strong style="color:#f0603f;">⚠ ' + n + ' closed stream' + (n > 1 ? 's' : '') + ' missing slips</strong> <span style="color:var(--muted);">— ' + fmt(atRisk) + ' of sales not in the CRM. ' + through + '.</span></div>' +
+          '<button class="btn btn-sm btn-outline" onclick="nudgeSlipImports()" style="padding:0.3rem 0.7rem;font-size:0.72rem;">Nudge breakers</button>' +
+        '</div>' +
+        '<div style="margin-top:0.4rem;">' + rows + (n > 6 ? '<span style="font-size:0.7rem;color:var(--muted);">+' + (n - 6) + ' more</span>' : '') + '</div>' +
+      '</div>';
+    }
+    el.style.display = '';
+  } catch (e) { el.style.display = 'none'; }
+}
+
+// Owner's Home card — same data, framed as "what's not in your numbers".
+async function renderHomeBuyerData() {
+  const el = document.getElementById('homeBuyerData');
+  if (!el) return;
+  try {
+    const st = await loadSlipStatus(true);
+    if (!st.available || !st.missing.length) { el.style.display = 'none'; return; }
+    const n = st.missing.length;
+    const atRisk = st.missing.reduce((s, x) => s + (parseFloat(x.final_sales) || 0), 0);
+    const byBreaker = {};
+    st.missing.forEach(s => { byBreaker[s.breaker_id] = (byBreaker[s.breaker_id] || 0) + 1; });
+    const who = Object.keys(byBreaker).map(id => escHtml(breakerNameById(id)) + ' (' + byBreaker[id] + ')').join(', ');
+    el.innerHTML = '<div class="panel" style="margin:0;border-color:rgba(240,96,63,0.3);background:linear-gradient(90deg,rgba(240,96,63,0.07),transparent);">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">' +
+        '<div><div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#f0603f;">Buyer data gap</div>' +
+          '<div style="font-size:0.9rem;margin-top:0.25rem;"><strong>' + n + ' closed stream' + (n > 1 ? 's' : '') + '</strong> never had packing slips imported — <strong>' + fmt(atRisk) + '</strong> in sales isn\'t in your Buyer CRM. ' +
+          '<span style="color:var(--muted);">Whales, cold alerts and win-back stats are blind to it.</span></div>' +
+          '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.3rem;">' + who + '</div></div>' +
+        '<div style="display:flex;gap:0.5rem;flex-shrink:0;">' +
+          '<button class="btn btn-sm btn-outline" onclick="nudgeSlipImports()" style="font-size:0.75rem;">Nudge breakers</button>' +
+          '<button class="btn btn-sm" onclick="switchTab(\'buyers\')" style="font-size:0.75rem;">Open Buyers</button>' +
+        '</div>' +
+      '</div></div>';
+    el.style.display = '';
+  } catch (e) { el.style.display = 'none'; }
+}
+
+// One tap: in-app notification to each breaker who has streams missing slips.
+async function nudgeSlipImports() {
+  try {
+    const st = await loadSlipStatus();
+    const byBreaker = {};
+    st.missing.forEach(s => { (byBreaker[s.breaker_id] = byBreaker[s.breaker_id] || []).push(s); });
+    const ids = Object.keys(byBreaker);
+    if (!ids.length) { showGlobalSuccess('Nothing to nudge — every closed stream has slips.'); return; }
+    const rows = ids.map(id => {
+      const list = byBreaker[id];
+      const keys = list.slice(0, 3).map(s => s.stream_key + ' (' + fmtShortDate(s.break_date) + ')').join(', ') + (list.length > 3 ? ' +' + (list.length - 3) + ' more' : '');
+      return { organization_id: currentProfile.org_id, user_id: id, type: 'slips_missing',
+        title: list.length + ' stream' + (list.length > 1 ? 's' : '') + ' still need packing slips',
+        body: 'Import slips for ' + keys + ' so your buyers count toward whales, commissions and win-backs.',
+        action_url: '/break?tab=buyers' };
+    });
+    const { error } = await sb.from('notifications').insert(rows);
+    if (error) throw error;
+    showGlobalSuccess('Nudged ' + ids.length + ' breaker' + (ids.length > 1 ? 's' : '') + '.');
+  } catch (e) { showGlobalError('Couldn\'t send nudges: ' + e.message); }
 }
 
 function openBuyersTab() {
   populateBuyersChannelSelect();
+  renderBuyersFreshness();
   setBuyersMode(_buyersMode);
 }
 
 function setBuyersMode(mode) {
   _buyersMode = mode;
-  document.getElementById('buyersModeBoard').className = mode === 'board' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
-  document.getElementById('buyersModeHits').className  = mode === 'hits'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
-  document.getElementById('buyersModeList').className  = mode === 'list'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
-  document.getElementById('buyersBoardWrap').style.display = mode === 'board' ? '' : 'none';
-  document.getElementById('buyersHitsWrap').style.display  = mode === 'hits'  ? '' : 'none';
-  document.getElementById('buyersListWrap').style.display  = mode === 'list'  ? '' : 'none';
+  document.getElementById('buyersModeBoard').className  = mode === 'board'  ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('buyersModeHits').className   = mode === 'hits'   ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('buyersModeList').className   = mode === 'list'   ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('buyersModeHealth').className = mode === 'health' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('buyersBoardWrap').style.display  = mode === 'board'  ? '' : 'none';
+  document.getElementById('buyersHitsWrap').style.display   = mode === 'hits'   ? '' : 'none';
+  document.getElementById('buyersListWrap').style.display   = mode === 'list'   ? '' : 'none';
+  document.getElementById('buyersHealthWrap').style.display = mode === 'health' ? '' : 'none';
   if (mode === 'board') loadBuyersBoard();
   else if (mode === 'hits') loadBuyersHitBoard();
+  else if (mode === 'health') loadBuyersHealth();
   else loadBuyersTab();
 }
 
@@ -9168,6 +9363,7 @@ async function loadBuyersHitBoard() {
   if (!el || !currentProfile) return;
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading hits…</div>';
   try {
+    await ensureBuyerData();   // stream→account map for the account filter
     let all = [], from = 0; const size = 1000;
     while (true) {
       const { data, error } = await sb.from('buyer_hits')
@@ -9254,87 +9450,35 @@ async function loadBuyersBoard() {
   if (!el || !currentProfile) return;
   el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer board…</div>';
   try {
-    await ensureWhaleMin();
-    const [allBuyers, hitCounts] = await Promise.all([fetchAllBuyers(), fetchBuyerHitCounts()]);
-    const spenders = allBuyers.filter(b => Number(b.total_spent || 0) > 0 && buyerInChannel(b.id));
-    spenders.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
-
-    if (!spenders.length) {
+    const d = await ensureBuyerData();
+    const selCh = buyersSelCh();
+    // Segmentation lives in buyer-intel.js — the same rule the manager and
+    // breaker pages use. Effective figures follow the account filter.
+    BuyerIntel.enrich(d.buyers, d.rollups, { channelId: selCh, whaleMin: WHALE_MIN, coldAfterDays: COLD_MIN_DAYS });
+    const seg = BuyerIntel.segment(d.buyers);
+    if (!seg.spenders) {
       el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No spending buyers yet. Import packing slips at closeout to build your board.</div>';
+      _boardData = null;
       return;
     }
-
-    // Recent (0-30d) vs prior (30-60d) spend for the Rising bucket
-    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
-    const d60 = new Date(); d60.setDate(d60.getDate() - 60);
-    const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-    let purch = [], _pf = 0;
-    while (true) {
-      const { data, error } = await sb.from('buyer_purchases')
-        .select('buyer_id, amount, purchase_date')
-        .eq('organization_id', currentProfile.org_id)
-        .gte('purchase_date', s60)
-        .range(_pf, _pf + 999);
-      if (error) throw error;
-      purch = purch.concat(data || []);
-      if (!data || data.length < 1000) break;
-      _pf += 1000;
-    }
-    const recent = {}, prior = {};
-    (purch || []).forEach(p => {
-      const amt = Number(p.amount || 0);
-      if (p.purchase_date >= s30) recent[p.buyer_id] = (recent[p.buyer_id] || 0) + amt;
-      else prior[p.buyer_id] = (prior[p.buyer_id] || 0) + amt;
-    });
-
-    // Effective figures follow the account filter: per-account when one is
-    // selected, lifetime otherwise.
-    const selCh = document.getElementById('buyersChannelFilter') ? document.getElementById('buyersChannelFilter').value : '';
-    spenders.forEach(b => {
-      if (selCh) {
-        const cs = (_buyerChannelStats[b.id] || {})[selCh] || { spent: 0, breaks: 0, streams: null, first: null, last: null, recent30: 0, prior30: 0 };
-        b._eSpent = cs.spent; b._eBreaks = cs.breaks; b._eStreams = cs.streams ? cs.streams.size : 0;
-        b._eFirst = cs.first; b._eLast = cs.last; b._eRec = cs.recent30; b._ePri = cs.prior30;
-      } else {
-        b._eSpent = Number(b.total_spent || 0); b._eBreaks = b.total_breaks_purchased || 0; b._eStreams = b.total_streams_participated || 0;
-        b._eFirst = b.first_seen_date; b._eLast = b.last_purchase_date; b._eRec = recent[b.id] || 0; b._ePri = prior[b.id] || 0;
-      }
-    });
-
-    // Whale = spent >= WHALE_MIN in the last 30 days. Cold = a buyer who's been
-    // that valuable (lifetime) but has gone quiet. New = one-stream first-timer.
-    // Everyone else with history is a Regular.
-    const cold = [], regulars = [], fresh = [], whales = [];
-    spenders.forEach(b => {
-      const lifetime = b._eSpent, last30 = b._eRec;
-      const since = daysSince(b._eLast);
-      b._since = since; b._recent30 = last30;
-      const activeWhale = last30 >= WHALE_MIN;
-      b._newBig = activeWhale && (b._eStreams || 0) <= 1;   // 🔥 big spender, first stream
-      if (lifetime >= WHALE_MIN && since >= COLD_MIN_DAYS && since <= COLD_MAX_DAYS) { cold.push(b); return; }
-      if (activeWhale) { whales.push(b); return; }
-      if ((b._eStreams || 0) <= 1) { fresh.push(b); return; }
-      regulars.push(b);
-    });
-    // Un-contacted whales first (act on them); already-reached ones sink
-    cold.sort((a, b) => {
-      const ac = a.last_cold_alert_at && daysSince(a.last_cold_alert_at) <= 7 ? 1 : 0;
-      const bc = b.last_cold_alert_at && daysSince(b.last_cold_alert_at) <= 7 ? 1 : 0;
-      if (ac !== bc) return ac - bc;
-      return b._eSpent - a._eSpent;
-    });
-    whales.sort((a, b) => b._eSpent - a._eSpent);
-    regulars.sort((a, b) => b._eSpent - a._eSpent);
-    fresh.sort((a, b)  => b._eSpent - a._eSpent);
-
-    const whaleTotal = whales.length + cold.length;
-    const coldAtRisk = cold.reduce((s, b) => s + (b._eSpent || 0), 0);
-    const rev30 = spenders.reduce((s, b) => s + (b._eRec || 0), 0);
-    _boardData = { spenders: spenders.length, whaleTotal, coldAtRisk, rev30, cold, whales, regulars, fresh };
+    const byId = {}; d.buyers.forEach(b => { byId[b.id] = b; });
+    seg.winback = BuyerIntel.winbackStats(d.touches, byId);
+    seg.assignees = buyersAssigneeOptions();
+    _boardData = seg;
     renderBuyersBoard();
+    // Collect-affinity chips arrive a beat later (lazy facts load) — re-render once.
+    ensureBuyerFacts().then(function () { if (_buyersMode === 'board' && _boardData === seg) renderBuyersBoard(); }).catch(function () {});
   } catch (err) {
     el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load board: ' + escHtml(err.message) + '</div>';
   }
+}
+
+// Team members a cold buyer can be assigned to for outreach (owner, managers, breakers).
+function buyersAssigneeOptions() {
+  return (allProfiles || [])
+    .filter(p => ['owner', 'manager', 'breaker', 'breaker/manager'].includes(p.role))
+    .map(p => ({ id: p.id, name: p.display_name || 'Unnamed' }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 var _boardData = null;
@@ -9351,11 +9495,12 @@ function renderBuyersBoard() {
   const el = document.getElementById('buyersBoard');
   if (!el || !_boardData) return;
   const d = _boardData;
+  const fadingNote = d.fading.length ? ' · <span style="color:#f59e0b;font-weight:700;">' + d.fading.length + ' fading</span> — overdue vs their own rhythm' : '';
   el.innerHTML =
     boardKpis(d) +
-    boardSegment('❄️', 'Going Cold', d.cold,     'Big buyers gone quiet 21+ days — reach out now',            true,  'cold') +
+    boardSegment('❄️', 'Going Cold', d.cold,     'Big buyers gone quiet ' + COLD_MIN_DAYS + '+ days — reach out now', true,  'cold') +
     boardSegment('👑', 'Whales',     d.whales,   '$' + WHALE_MIN.toLocaleString() + '+ in the last 30 days — protect these', false, 'whale') +
-    boardSegment('📊', 'Regulars',   d.regulars, 'Your steady buyers',                                        false, 'regular') +
+    boardSegment('📊', 'Regulars',   d.regulars, 'Your steady buyers' + fadingNote,                            false, 'regular') +
     boardSegment('🆕', 'New',        d.fresh,    'New buyers — convert them into regulars',                    false, 'new');
 }
 
@@ -9367,11 +9512,16 @@ function boardKpis(d) {
       '<div style="font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;margin-top:4px;line-height:1;">' + val + '</div>' +
       '<div style="font-size:0.66rem;font-weight:700;margin-top:5px;color:' + (subColor || 'var(--muted)') + ';">' + sub + '</div>' +
     '</div>';
+  const wb = d.winback || { attempts: 0, returned: 0, pending: 0, rate: null };
+  const wbVal = wb.rate == null ? '<span style="color:var(--muted);">—</span>' : '<span style="color:' + (wb.rate >= 0.3 ? '#2fbf71' : '#f59e0b') + ';">' + Math.round(wb.rate * 100) + '%</span>';
+  const wbSub = wb.attempts ? wb.returned + ' of ' + wb.attempts + ' came back' + (wb.pending ? ' · ' + wb.pending + ' pending' : '') : (wb.pending ? wb.pending + ' pending' : 'no outreach logged yet');
   return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.6rem;margin-bottom:1rem;">' +
     kpi('var(--primary)', 'Buyers', d.spenders, 'with purchases') +
-    kpi('#eab945', 'Whales', '<span style="color:#eab945;">' + d.whaleTotal + '</span>', 'top 20% by spend') +
+    kpi('#eab945', 'Whales', '<span style="color:#eab945;">' + d.whaleTotal + '</span>', '$' + WHALE_MIN.toLocaleString() + '+ / 30d') +
     kpi('#f0603f', 'Going Cold', '<span style="color:#f0603f;">' + d.cold.length + '</span>', boardMoney(d.coldAtRisk) + ' at risk', '#f0603f') +
+    kpi('#f59e0b', 'Fading', '<span style="color:#f59e0b;">' + d.fading.length + '</span>', d.fading.length ? boardMoney(d.fadingAtRisk) + ' slipping' : 'everyone on rhythm', d.fading.length ? '#f59e0b' : undefined) +
     kpi('#2fbf71', '30-day rev', boardMoney(d.rev30), 'last 30 days') +
+    kpi('#a855f7', 'Win-back', wbVal, wbSub) +
   '</div>';
 }
 
@@ -9401,6 +9551,21 @@ function boardSegment(icon, title, list, why, hero, kind) {
   return '<div class="panel" style="padding:0;overflow:hidden;margin-bottom:0.7rem;' + heroStyle + '">' + hd + body + '</div>';
 }
 
+// Inferred "collects" chip from what was actually opened in the streams they
+// buy in (only when nobody has typed a manual tag).
+function affinityChip(b) {
+  if (buyerTagChip(b)) return '';
+  const top = _bi && _bi.affinity ? BuyerIntel.topAffinity(_bi.affinity, b.id) : null;
+  if (!top || top.share < 0.4) return '';
+  return ' <span title="Inferred from the products opened in streams they buy in" style="font-size:0.6rem;background:rgba(168,85,247,0.14);color:#c084fc;padding:1px 6px;border-radius:3px;font-weight:700;">' + escHtml(top.category) + ' ' + Math.round(top.share * 100) + '%</span>';
+}
+
+function cadenceText(b) {
+  if (!b._medianGap || b._purchaseDays < 3) return '';
+  const g = Math.round(b._medianGap);
+  return 'buys every ~' + g + 'd';
+}
+
 function boardRow(b, kind, i) {
   const spent = b._eSpent != null ? b._eSpent : Number(b.total_spent || 0);
   const hits = ownerHitBadge(b);
@@ -9410,37 +9575,48 @@ function boardRow(b, kind, i) {
   const av = kind === 'whale' ? 'linear-gradient(135deg,#eab945,#d98e2b);color:#0a0a11;'
            : kind === 'cold'  ? 'linear-gradient(135deg,#f0603f,#c23b6b);color:#fff;'
            : kind === 'new'    ? 'linear-gradient(135deg,#3aa0ff,#4f6ef7);color:#fff;'
+           : b._fading         ? 'linear-gradient(135deg,#f59e0b,#d97706);color:#0a0a11;'
            :                     'linear-gradient(135deg,#64748b,#475569);color:#fff;';
   const since = b._since != null ? b._since : daysSince(b._eLast || b.last_purchase_date);
   const uname = (b.username || '').replace(/'/g, "\\'");
-  const contactedDays = (kind === 'cold' && b.last_cold_alert_at) ? daysSince(b.last_cold_alert_at) : null;
-  const contacted = contactedDays != null && contactedDays <= 7;
+  const actionable = kind === 'cold' || b._fading;
+  const contactedDays = (actionable && b.last_cold_alert_at) ? daysSince(b.last_cold_alert_at) : null;
+  const contacted = contactedDays != null && contactedDays <= BuyerIntel.CONTACTED_WINDOW_DAYS;
+  const cad = cadenceText(b);
   let meta;
-  if (kind === 'cold')        meta = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + eBreaks + ' breaks';
-  else if (kind === 'rising') meta = 'Last 30d $' + (b._eRec || 0).toFixed(0) + (b._growth != null ? ' · ▲ +' + b._growth + '%' : '');
+  if (kind === 'cold')        meta = 'Last buy ' + (since === Infinity ? 'never' : since + 'd ago') + ' · ' + eBreaks + ' breaks' + (cad ? ' · ' + cad : '');
   else if (kind === 'new')    meta = 'First seen ' + daysSince(b._eFirst || b.first_seen_date) + 'd ago · ' + eBreaks + ' breaks';
-  else                        meta = relativeDate(b._eLast || b.last_purchase_date) + ' · ' + eBreaks + ' breaks';
+  else if (b._fading)         meta = 'Last buy ' + since + 'd ago — ' + (cad || 'off rhythm') + ' · ' + eBreaks + ' breaks';
+  else                        meta = relativeDate(b._eLast || b.last_purchase_date) + ' · ' + eBreaks + ' breaks' + (cad ? ' · ' + cad : '');
 
   let right;
-  if (kind === 'cold') {
-    right = '<div style="text-align:right;flex-shrink:0;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div><div style="font-size:0.66rem;color:var(--muted);">$' + Math.round(avg) + '/str</div></div>' +
-      '<button onclick="event.stopPropagation();copyWinback(\'' + b.id + '\',\'' + uname + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.35rem 0.65rem;font-size:0.7rem;flex-shrink:0;">' + (contacted ? 'Again' : 'Win-back') + '</button>';
+  const money = '<div style="text-align:right;flex-shrink:0;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div><div style="font-size:0.66rem;color:var(--muted);">$' + Math.round(avg) + '/str</div></div>';
+  if (actionable) {
+    const seg = kind === 'cold' ? 'cold' : 'fading';
+    right = money +
+      '<div style="display:flex;flex-direction:column;gap:0.3rem;flex-shrink:0;align-items:stretch;">' +
+        '<button onclick="event.stopPropagation();copyWinback(\'' + b.id + '\',\'' + uname + '\',\'' + seg + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.32rem 0.65rem;font-size:0.7rem;">' + (contacted ? 'Again' : 'Win-back') + '</button>' +
+        assignSelect(b) +
+      '</div>';
   } else if (kind === 'whale') {
     const top = (_boardData && _boardData.whales.length) ? Number(_boardData.whales[0]._eSpent || 0) : spent;
     const pct = top > 0 ? Math.max(8, Math.round(spent / top * 100)) : 100;
     right = '<div style="text-align:right;flex-shrink:0;min-width:66px;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div>' +
       '<div style="width:72px;height:5px;border-radius:3px;background:rgba(255,255,255,0.07);overflow:hidden;margin-top:5px;margin-left:auto;"><i style="display:block;height:100%;width:' + pct + '%;background:#eab945;border-radius:3px;"></i></div></div>';
   } else {
-    right = '<div style="text-align:right;flex-shrink:0;"><div style="font-weight:800;font-size:1rem;">$' + spent.toFixed(0) + '</div><div style="font-size:0.66rem;color:var(--muted);">$' + Math.round(avg) + '/str</div></div>';
+    right = money;
   }
 
+  const assignedName = b.assigned_to ? breakerNameById(b.assigned_to) : null;
   return '<div onclick="openBuyerProfile(\'' + b.id + '\')" style="display:flex;align-items:center;gap:0.7rem;padding:0.7rem 1rem;border-bottom:1px solid var(--border);cursor:pointer;' + (contacted ? 'opacity:0.6;' : '') + '">' +
     '<div style="width:38px;height:38px;border-radius:10px;background:' + av + 'display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;flex-shrink:0;">' + boardMono(b.username) + '</div>' +
     '<div style="flex:1;min-width:0;">' +
-      '<div style="font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">@' + escHtml(b.username) + buyerTagChip(b) +
+      '<div style="font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">@' + escHtml(b.username) + buyerTagChip(b) + affinityChip(b) +
         (b._newBig ? ' <span style="font-size:0.58rem;background:rgba(234,185,69,0.16);color:#eab945;padding:1px 6px;border-radius:4px;font-weight:800;">🔥 NEW BIG BUYER</span>' : '') +
+        (b._fading ? ' <span style="font-size:0.58rem;background:rgba(245,158,11,0.16);color:#f59e0b;padding:1px 6px;border-radius:4px;font-weight:800;">⚠ FADING</span>' : '') +
         (hits > 0 ? ' <span style="font-size:0.58rem;background:rgba(240,96,63,0.13);color:#f0603f;padding:1px 5px;border-radius:4px;font-weight:800;">🎯 ' + hits + '</span>' : '') +
         (contacted ? ' <span style="font-size:0.58rem;background:rgba(47,191,113,0.14);color:#2fbf71;padding:1px 6px;border-radius:4px;font-weight:800;">✓ ' + (contactedDays === 0 ? 'today' : contactedDays + 'd') + '</span>' : '') +
+        (assignedName && !actionable ? ' <span style="font-size:0.58rem;background:rgba(79,110,247,0.14);color:#93a6ff;padding:1px 6px;border-radius:4px;font-weight:700;">📬 ' + escHtml(assignedName) + '</span>' : '') +
       '</div>' +
       '<div style="font-size:0.72rem;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + meta + '</div>' +
     '</div>' +
@@ -9448,17 +9624,55 @@ function boardRow(b, kind, i) {
   '</div>';
 }
 
-async function copyWinback(buyerId, username) {
+// Owner/manager hand a cold buyer to someone on the team for outreach.
+function assignSelect(b) {
+  const opts = (_boardData && _boardData.assignees) || [];
+  if (!opts.length) return '';
+  return '<select onclick="event.stopPropagation()" onchange="event.stopPropagation();assignBuyer(\'' + b.id + '\', this.value)" title="Assign outreach" style="font-size:0.66rem;padding:0.22rem 0.35rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text,inherit);max-width:110px;">' +
+    '<option value="">' + (b.assigned_to ? 'Unassign' : 'Assign to…') + '</option>' +
+    opts.map(o => '<option value="' + o.id + '"' + (b.assigned_to === o.id ? ' selected' : '') + '>' + escHtml(o.name) + '</option>').join('') +
+  '</select>';
+}
+
+async function assignBuyer(buyerId, userId) {
+  const b = _bi && _bi.buyers.find(x => x.id === buyerId);
+  const { error } = await sb.from('buyers').update({ assigned_to: userId || null }).eq('id', buyerId);
+  if (error) {
+    showGlobalError(BuyerIntel.isMissingSchema(error) ? 'Assignments need migrations/010_buyer_crm.sql in Supabase first.' : 'Couldn\'t assign: ' + error.message);
+    return;
+  }
+  if (b) b.assigned_to = userId || null;
+  if (userId && b && userId !== currentUser.id) {
+    const spent = '$' + Number(b._eSpent || b.total_spent || 0).toFixed(0);
+    await sb.from('notifications').insert({
+      organization_id: currentProfile.org_id, user_id: userId, type: 'buyer_assigned',
+      title: 'Win-back assigned to you: @' + b.username,
+      body: '@' + b.username + ' (' + spent + ' lifetime) hasn\'t bought in ' + (b._since === Infinity ? 'a while' : b._since + ' days') + '. Reach out and log the touch.',
+      action_url: '/break?tab=buyers'
+    }).then(null, function () {});
+  }
+  showGlobalSuccess(userId ? 'Assigned @' + (b ? b.username : 'buyer') + ' to ' + breakerNameById(userId) + '.' : 'Unassigned.');
+  renderBuyersBoard();
+}
+
+// Copy the win-back DM and log the touch. One tap — the log is what makes the
+// win-back rate real; the copy is what makes the tap worth it.
+async function copyWinback(buyerId, username, segment) {
   const msg = 'Hey @' + username + '! Haven\'t seen you in a bit — we\'ve got some fire breaks coming up I think you\'d love. Come hang soon 🔥';
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    try { await navigator.clipboard.writeText(msg); showGlobalSuccess('Win-back copied — paste it into a Whatnot DM to @' + username + '.'); }
+    try { await navigator.clipboard.writeText(msg); showGlobalSuccess('Win-back copied — paste it into a Whatnot DM to @' + username + '. Logged as outreach.'); }
     catch (e) { showGlobalError('Couldn\'t copy automatically. Message: ' + msg); }
   } else {
     showGlobalError('Copy not supported here. Message: ' + msg);
   }
-  // Record the outreach so this buyer drops down the list and shows "reached out"
-  const { error } = await sb.from('buyers').update({ last_cold_alert_at: new Date().toISOString() }).eq('id', buyerId);
-  if (error) { console.error('mark contacted failed:', error.message); return; }
+  try {
+    await BuyerIntel.logTouch(sb, { orgId: currentProfile.org_id, buyerId, userId: currentUser.id, channel: 'whatnot_dm', note: 'Win-back DM copied', segment: segment || 'cold' });
+  } catch (e) { console.error('log touch failed:', e.message); showGlobalError('Couldn\'t log the outreach: ' + e.message); return; }
+  // Refresh touches + the buyer's stamp without a full reload
+  if (_bi) {
+    _bi.touches = await BuyerIntel.fetchTouches(sb, currentProfile.org_id, 180);
+    const b = _bi.buyers.find(x => x.id === buyerId); if (b) b.last_cold_alert_at = new Date().toISOString();
+  }
   loadBuyersBoard();
 }
 
@@ -9470,22 +9684,9 @@ function setBuyersView(mode) {
   loadBuyersTab();
 }
 
-// Fetch ALL buyers, paging past PostgREST's 1000-row cap
+// Fetch ALL buyers (kept for the drawer/list callers; the board uses ensureBuyerData)
 async function fetchAllBuyers() {
-  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,first_seen_date,temperature,is_new_buyer,case_hits,last_cold_alert_at,fav_team,fav_player,fav_sport';
-  let all = [], from = 0; const size = 1000;
-  while (true) {
-    const { data, error } = await sb.from('buyers')
-      .select(cols)
-      .eq('organization_id', currentProfile.org_id)
-      .order('total_spent', { ascending: false })
-      .range(from, from + size - 1);
-    if (error) throw error;
-    all = all.concat(data || []);
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  return all;
+  return BuyerIntel.fetchBuyers(sb, currentProfile.org_id);
 }
 
 // A compact "🏀 NBA · Bulls" chip from a buyer's manual collect tags ('' if none)
@@ -9497,21 +9698,9 @@ function buyerTagChip(b) {
 // Single source of truth for hit counts: derive from the buyer_hits rows so the
 // count can never disagree with the actual history. Returns { buyer_id: count }.
 async function fetchBuyerHitCounts() {
-  const map = {};
-  _buyerHitStreams = {};
-  let from = 0; const size = 1000;
-  while (true) {
-    const { data, error } = await sb.from('buyer_hits')
-      .select('buyer_id,stream_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(h => {
-      map[h.buyer_id] = (map[h.buyer_id] || 0) + 1;
-      (_buyerHitStreams[h.buyer_id] = _buyerHitStreams[h.buyer_id] || []).push(h.stream_id || null);
-    });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  return map;
+  const h = await BuyerIntel.fetchHitCounts(sb, currentProfile.org_id);
+  _buyerHitStreams = h.streams;
+  return h.counts;
 }
 
 // Hit count for the 🎯 badge — respects the selected account (a buyer's football
@@ -9525,55 +9714,10 @@ function ownerHitBadge(b) {
   return streams.filter(s => s && _streamChannelMap && _streamChannelMap[s] === ch).length;
 }
 
-// Build buyer_id -> Set(channel_id) from purchases → streams. Cached until reload.
+// buyer_id -> Set(channel_id). Comes from the shared dataset (server rollups).
 async function buildBuyerChannelMap() {
-  if (_buyerChannelMap && _buyerChannelMap.size > 0) return _buyerChannelMap;  // rebuild if a prior build came back empty (e.g. before streams were tagged)
-  const org = currentProfile.org_id;
-  // stream_id -> channel_id
-  const streamCh = {};
-  let from = 0; const size = 1000;
-  while (true) {
-    const { data, error } = await sb.from('streams')
-      .select('id,channel_id').eq('org_id', org).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(s => { if (s.channel_id) streamCh[s.id] = s.channel_id; });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  // buyer_id -> Set(channel_id), plus per-account spend/breaks/recency stats
-  const map = new Map();
-  const stats = {}; // buyer_id -> { channel_id -> {spent,breaks,streams:Set,first,last,recent30,prior30} }
-  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
-  const d60 = new Date(); d60.setDate(d60.getDate() - 60);
-  const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-  from = 0;
-  while (true) {
-    const { data, error } = await sb.from('buyer_purchases')
-      .select('buyer_id,stream_id,amount,purchase_date').eq('organization_id', org).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(p => {
-      const ch = p.stream_id ? streamCh[p.stream_id] : null;
-      if (!ch) return;
-      if (!map.has(p.buyer_id)) map.set(p.buyer_id, new Set());
-      map.get(p.buyer_id).add(ch);
-      const bs = stats[p.buyer_id] = stats[p.buyer_id] || {};
-      const cs = bs[ch] = bs[ch] || { spent: 0, breaks: 0, streams: new Set(), first: null, last: null, recent30: 0, prior30: 0 };
-      const amt = Number(p.amount) || 0;
-      cs.spent += amt; cs.breaks += 1; if (p.stream_id) cs.streams.add(p.stream_id);
-      const d = p.purchase_date;
-      if (d) {
-        if (!cs.first || d < cs.first) cs.first = d;
-        if (!cs.last || d > cs.last) cs.last = d;
-        if (d >= s30) cs.recent30 += amt; else if (d >= s60) cs.prior30 += amt;
-      }
-    });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  _buyerChannelStats = stats;
-  _buyerChannelMap = map;
-  _streamChannelMap = streamCh;
-  return map;
+  await ensureBuyerData();
+  return _buyerChannelMap;
 }
 
 function populateBuyersChannelSelect() {
@@ -9599,17 +9743,14 @@ function buyerInChannel(id) {
 }
 
 async function onBuyersChannelChange() {
-  const chId = document.getElementById('buyersChannelFilter').value;
-  if (chId && !(_buyerChannelMap && _buyerChannelMap.size > 0)) {
-    const el = document.getElementById(_buyersMode === 'board' ? 'buyersBoard' : _buyersMode === 'hits' ? 'buyersHits' : 'buyersLeaderboard');
-    if (el) el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading account data…</div>';
-    try { await buildBuyerChannelMap(); }
-    catch (err) { if (el) el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load account data: ' + escHtml(err.message) + '</div>'; return; }
-  }
+  const el = document.getElementById(_buyersMode === 'board' ? 'buyersBoard' : _buyersMode === 'hits' ? 'buyersHits' : _buyersMode === 'health' ? 'buyersHealth' : 'buyersLeaderboard');
+  try { await ensureBuyerData(); }
+  catch (err) { if (el) el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load account data: ' + escHtml(err.message) + '</div>'; return; }
   // Re-render whichever view is active
   if (_buyersMode === 'board') loadBuyersBoard();
   else if (_buyersMode === 'hits') { renderHitFilter(); renderHitBoard(); }
-  else applyBuyersFilters();
+  else if (_buyersMode === 'health') loadBuyersHealth();
+  else loadBuyersTab();
 }
 
 async function loadBuyersTab() {
@@ -9619,40 +9760,119 @@ async function loadBuyersTab() {
   populateBuyersChannelSelect();
 
   try {
-    const [buyersAll, hitCounts] = await Promise.all([fetchAllBuyers(), fetchBuyerHitCounts()]);
-    // Attach derived hit counts and keep buyers who spent money OR have any logged
-    // hit (a giveaway winner who pulled a big card belongs here even at $0).
-    buyersAll.forEach(b => { b._hitCount = hitCounts[b.id] || 0; });
-    const visible = buyersAll.filter(b => Number(b.total_spent || 0) > 0 || b._hitCount > 0);
+    const d = await ensureBuyerData();
+    const selCh = buyersSelCh();
+    BuyerIntel.enrich(d.buyers, d.rollups, { channelId: selCh, whaleMin: WHALE_MIN, coldAfterDays: COLD_MIN_DAYS });
+    // Keep buyers who spent money OR have any logged hit (a giveaway winner who
+    // pulled a big card belongs here even at $0).
+    const visible = d.buyers.filter(b => Number(b.total_spent || 0) > 0 || b._hitCount > 0);
     if (_buyersViewMode === 'alltime') {
       _buyersData = visible;
     } else {
-      // Recent: sum purchases from last 30 days, keep buyers with recent activity
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
-      const cutoffStr = cutoff.toISOString().split('T')[0];
-      let purch = [], _pf = 0;
-      while (true) {
-        const { data, error } = await sb.from('buyer_purchases')
-          .select('buyer_id, amount')
-          .eq('organization_id', currentProfile.org_id)
-          .gte('purchase_date', cutoffStr)
-          .range(_pf, _pf + 999);
-        if (error) throw error;
-        purch = purch.concat(data || []);
-        if (!data || data.length < 1000) break;
-        _pf += 1000;
-      }
-      const sums = {};
-      (purch || []).forEach(p => { sums[p.buyer_id] = (sums[p.buyer_id] || 0) + Number(p.amount || 0); });
-      _buyersData = buyersAll
-        .filter(b => (sums[b.id] || 0) > 0)
-        .map(b => Object.assign({}, b, { _recentSpent: sums[b.id] }))
+      // Recent: last-30-day spend from the rollups (account-aware)
+      _buyersData = visible
+        .filter(b => (b._eRec || 0) > 0)
+        .map(b => Object.assign({}, b, { _recentSpent: b._eRec }))
         .sort((a, b) => (b._recentSpent || 0) - (a._recentSpent || 0));
     }
     applyBuyersFilters();
   } catch (err) {
     el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load buyers: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+// ── Health (trends + breaker attribution) ─────────────────
+function healthBars(values, labels, color, fmtFn) {
+  const max = Math.max.apply(null, values.concat([1]));
+  return '<div style="display:flex;align-items:flex-end;gap:6px;height:96px;">' + values.map(function (v, i) {
+    const h = Math.max(3, Math.round(v / max * 80));
+    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;">' +
+      '<div style="font-size:0.62rem;font-weight:700;color:var(--text);">' + fmtFn(v) + '</div>' +
+      '<div style="width:100%;height:' + h + 'px;border-radius:4px 4px 0 0;background:' + color + ';opacity:' + (i === values.length - 1 ? 1 : 0.7) + ';"></div>' +
+      '<div style="font-size:0.58rem;color:var(--muted);white-space:nowrap;">' + labels[i] + '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+function pctColor(p, good, bad) { return p == null ? 'var(--muted)' : p >= good ? '#2fbf71' : p <= bad ? '#f0603f' : '#f59e0b'; }
+
+async function loadBuyersHealth() {
+  const el = document.getElementById('buyersHealth');
+  if (!el || !currentProfile) return;
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyer health…</div>';
+  try {
+    const d = await ensureBuyerFacts();
+    if (!d.facts) {
+      el.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--muted);font-size:0.85rem;">Buyer Health needs the server rollups — run <code>migrations/010_buyer_crm.sql</code> in Supabase, then reload.</div>';
+      return;
+    }
+    const selCh = buyersSelCh();
+    BuyerIntel.enrich(d.buyers, d.rollups, { channelId: selCh, whaleMin: WHALE_MIN, coldAfterDays: COLD_MIN_DAYS });
+    const h = BuyerIntel.healthMetrics(d.buyers, d.facts, { whaleMin: WHALE_MIN, channelId: selCh, months: 6 });
+    const panel = (title, why, body) => '<div class="panel" style="margin-bottom:0.8rem;"><div class="panel-title" style="margin-bottom:0.15rem;">' + title + '</div><div style="font-size:0.72rem;color:var(--muted);margin-bottom:0.75rem;">' + why + '</div>' + body + '</div>';
+    const mLabel = k => new Date(k + '-15T12:00:00').toLocaleDateString('en-US', { month: 'short' });
+
+    // 1. New buyers per month
+    const newBars = healthBars(h.cohorts.map(c => c.newBuyers), h.cohorts.map(c => mLabel(c.month)), '#3aa0ff', v => v);
+    const lastFull = h.cohorts[h.cohorts.length - 2], prevFull = h.cohorts[h.cohorts.length - 3];
+    const newTrend = (lastFull && prevFull && prevFull.newBuyers) ? Math.round((lastFull.newBuyers - prevFull.newBuyers) / prevFull.newBuyers * 100) : null;
+
+    // 2. Cohort conversion
+    const convRows = h.cohorts.map(c => '<div style="display:flex;align-items:center;gap:0.6rem;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.8rem;">' +
+      '<span style="width:44px;color:var(--muted);">' + mLabel(c.month) + '</span>' +
+      '<span style="width:70px;">' + c.newBuyers + ' new</span>' +
+      '<div style="flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,0.06);overflow:hidden;"><i style="display:block;height:100%;width:' + (c.rate != null ? Math.round(c.rate * 100) : 0) + '%;background:' + pctColor(c.rate, 0.35, 0.15) + ';"></i></div>' +
+      '<span style="width:120px;text-align:right;font-weight:700;color:' + pctColor(c.rate, 0.35, 0.15) + ';">' + (c.tooEarly ? '<span style="color:var(--muted);font-weight:500;">too early</span>' : c.newBuyers ? c.converted + ' came back (' + Math.round(c.rate * 100) + '%)' : '—') + '</span>' +
+    '</div>').join('');
+
+    // 3. Whale churn
+    const wc = h.whaleChurn;
+    const nameOf = id => { const b = d.buyers.find(x => x.id === id); return b ? '@' + escHtml(b.username) : '?'; };
+    const churnBody = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.6rem;margin-bottom:0.6rem;">' +
+      '<div style="text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:#eab945;">' + wc.cur + '</div><div style="font-size:0.66rem;color:var(--muted);">whales now</div></div>' +
+      '<div style="text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:#2fbf71;">+' + wc.gained.length + '</div><div style="font-size:0.66rem;color:var(--muted);">new this month</div></div>' +
+      '<div style="text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:#f0603f;">−' + wc.churned.length + '</div><div style="font-size:0.66rem;color:var(--muted);">dropped off</div></div>' +
+      '<div style="text-align:center;"><div style="font-size:1.4rem;font-weight:800;">' + (wc.prev ? Math.round(wc.retained.length / wc.prev * 100) + '%' : '—') + '</div><div style="font-size:0.66rem;color:var(--muted);">retained</div></div>' +
+    '</div>' +
+    (wc.churned.length ? '<div style="font-size:0.76rem;"><span style="color:#f0603f;font-weight:700;">Dropped:</span> ' + wc.churned.slice(0, 8).map(id => '<span onclick="openBuyerProfile(\'' + id + '\')" style="cursor:pointer;color:var(--primary);">' + nameOf(id) + '</span>').join(', ') + (wc.churned.length > 8 ? ' +' + (wc.churned.length - 8) : '') + '</div>' : '') +
+    (wc.gained.length ? '<div style="font-size:0.76rem;margin-top:0.25rem;"><span style="color:#2fbf71;font-weight:700;">New whales:</span> ' + wc.gained.slice(0, 8).map(id => '<span onclick="openBuyerProfile(\'' + id + '\')" style="cursor:pointer;color:var(--primary);">' + nameOf(id) + '</span>').join(', ') + (wc.gained.length > 8 ? ' +' + (wc.gained.length - 8) : '') + '</div>' : '');
+
+    // 4. Concentration
+    const cc = h.concentration;
+    const concColor = cc.top10Share >= 0.6 ? '#f0603f' : cc.top10Share >= 0.4 ? '#f59e0b' : '#2fbf71';
+    const concBody = '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">' +
+      '<div><div style="font-size:1.6rem;font-weight:800;color:' + concColor + ';">' + Math.round(cc.top10Share * 100) + '%</div><div style="font-size:0.66rem;color:var(--muted);">of 90-day revenue from your top 10 buyers</div></div>' +
+      '<div><div style="font-size:1.6rem;font-weight:800;">' + Math.round(cc.top1Share * 100) + '%</div><div style="font-size:0.66rem;color:var(--muted);">from your single biggest buyer</div></div>' +
+      '<div><div style="font-size:1.6rem;font-weight:800;">' + cc.buyers + '</div><div style="font-size:0.66rem;color:var(--muted);">buyers · ' + fmt(cc.total90) + ' in 90 days</div></div>' +
+    '</div>' +
+    '<div style="font-size:0.74rem;color:var(--muted);margin-top:0.5rem;">' + (cc.top10Share >= 0.6 ? '⚠ Heavy concentration — losing two whales would hurt. Grow the Regulars bench.' : cc.top10Share >= 0.4 ? 'Moderate concentration. Keep converting New → Regular so it doesn\'t creep up.' : 'Healthy spread — revenue isn\'t hostage to a few accounts.') + '</div>';
+
+    // 5. Breaker attribution
+    const brRows = h.breakers.length ? h.breakers.map(s => '<tr>' +
+      '<td style="font-weight:700;">' + escHtml(breakerNameById(s.breaker_id)) + '</td>' +
+      '<td style="text-align:right;">' + fmt(s.revenue90) + '</td>' +
+      '<td style="text-align:right;">' + s.buyers90 + '</td>' +
+      '<td style="text-align:right;color:#eab945;font-weight:700;">' + s.whales90 + '</td>' +
+      '<td style="text-align:right;color:#3aa0ff;font-weight:700;">' + s.newBuyers90 + '</td>' +
+      '<td style="text-align:right;font-weight:700;color:' + pctColor(s.conversion, 0.35, 0.15) + ';">' + (s.conversion == null ? '<span style="color:var(--muted);font-weight:500;">n/a</span>' : Math.round(s.conversion * 100) + '% <span style="color:var(--muted);font-weight:500;">of ' + s.originatedMature + '</span>') + '</td>' +
+    '</tr>').join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);">No stream-attributed purchases yet.</td></tr>';
+    const brBody = '<div class="tbl-wrap" style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
+      '<th>Breaker</th><th style="text-align:right;">90d revenue</th><th style="text-align:right;">Buyers</th><th style="text-align:right;">Whales in room</th><th style="text-align:right;">New brought in</th><th style="text-align:right;">New → Regular</th>' +
+      '</tr></thead><tbody>' + brRows + '</tbody></table></div>' +
+      '<div style="font-size:0.7rem;color:var(--muted);margin-top:0.5rem;">"New brought in" = buyers whose first-ever purchase was on this breaker\'s stream (last 90d). "New → Regular" = of the buyers they originated at least 30 days ago, how many bought a second stream.</div>';
+
+    el.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">' +
+        panel('New buyers per month', 'Is the top of the funnel growing?' + (newTrend != null ? ' Last full month <strong style="color:' + (newTrend >= 0 ? '#2fbf71' : '#f0603f') + ';">' + (newTrend >= 0 ? '▲ +' : '▼ ') + newTrend + '%</strong> vs the month before.' : ''), newBars) +
+        panel('New → Regular conversion', 'Of each month\'s first-timers, how many came back for a second stream. This is the number that compounds.', convRows) +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">' +
+        panel('Whale churn', 'Whales ($' + WHALE_MIN.toLocaleString() + '+ / 30d) this month vs last month.', churnBody) +
+        panel('Revenue concentration', 'How much of your money depends on a handful of people.', concBody) +
+      '</div>' +
+      panel('Breaker attribution', 'Which breakers the whales show up for, and who actually grows the buyer base.', brBody);
+  } catch (err) {
+    el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load health: ' + escHtml(err.message) + '</div>';
   }
 }
 
@@ -10018,13 +10238,18 @@ async function openBuyerProfile(buyerId) {
     const nameCounts = {};
     purchases.forEach(p => { if (p.break_name) nameCounts[p.break_name] = (nameCounts[p.break_name] || 0) + 1; });
     const top3 = Object.entries(nameCounts).sort((a,b) => b[1]-a[1]).slice(0,3);
-    document.getElementById('bpPreferred').innerHTML = top3.length === 0
+    document.getElementById('bpPreferred').innerHTML = '<div id="bpAffinity"></div>' + (top3.length === 0
       ? '<div style="color:var(--muted);font-size:0.82rem;">No purchase history yet.</div>'
       : top3.map(function([name, count]) {
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.45rem 0;border-bottom:1px solid var(--border);">' +
             '<span style="font-size:0.88rem;font-weight:600;">' + escHtml(name) + '</span>' +
             '<span style="font-size:0.78rem;color:var(--muted);">' + count + 'x</span></div>';
-        }).join('');
+        }).join(''));
+    renderBpAffinity(buyerId);
+
+    // Outreach timeline + assignment
+    renderBpTouches(buyerId);
+    renderBpAssigned(buyer);
 
     // Hits
     const hits = hitsRes.data || [];
@@ -10131,10 +10356,101 @@ function renderBpPurchases() {
   }
 }
 
+// Inferred collect profile: category share of what was opened in the streams
+// this buyer spends in. Lazy — the facts load once and are cached.
+async function renderBpAffinity(buyerId) {
+  const el = document.getElementById('bpAffinity');
+  if (!el) return;
+  try {
+    const d = await ensureBuyerFacts();
+    if (_buyerProfileId !== buyerId) return;
+    const aff = d.affinity && d.affinity[buyerId];
+    if (!aff || !aff.length) { el.innerHTML = ''; return; }
+    const top = aff.filter(a => a.share >= 0.08).slice(0, 4);
+    el.innerHTML = '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;padding-bottom:0.5rem;margin-bottom:0.35rem;border-bottom:1px solid var(--border);">' +
+      '<span style="font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);">Collects</span>' +
+      top.map(a => '<span style="font-size:0.72rem;background:rgba(168,85,247,0.14);color:#c084fc;padding:2px 8px;border-radius:5px;font-weight:700;">' + escHtml(a.category) + ' ' + Math.round(a.share * 100) + '%</span>').join('') +
+      '<span style="font-size:0.66rem;color:var(--muted);" title="Weighted by spend across the streams they buy in, using the products actually opened">inferred</span>' +
+    '</div>';
+  } catch (e) { el.innerHTML = ''; }
+}
+
+function renderBpAssigned(buyer) {
+  const el = document.getElementById('bpAssigned');
+  if (!el) return;
+  const opts = buyersAssigneeOptions();
+  el.innerHTML = 'Assigned to <select onchange="assignBuyer(\'' + buyer.id + '\', this.value)" style="font-size:0.72rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text,inherit);">' +
+    '<option value="">nobody</option>' + opts.map(o => '<option value="' + o.id + '"' + (buyer.assigned_to === o.id ? ' selected' : '') + '>' + escHtml(o.name) + '</option>').join('') + '</select>';
+}
+
+const TOUCH_CHANNEL_META = { whatnot_dm: '💬 Whatnot DM', in_stream: '🎙 In stream', instagram: '📸 Instagram', text: '📱 Text', email: '✉️ Email', call: '📞 Call', other: '🔗 Other' };
+const TOUCH_OUTCOME_META = { returned: ['Came back', '#2fbf71'], replied: ['Replied', '#3aa0ff'], no_reply: ['No reply', '#f0603f'] };
+
+async function renderBpTouches(buyerId) {
+  const el = document.getElementById('bpTouches');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;">Loading…</div>';
+  const rows = await BuyerIntel.fetchBuyerTouches(sb, buyerId);
+  if (_buyerProfileId !== buyerId) return;
+  if (rows === null) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;">The outreach log needs <code>migrations/010_buyer_crm.sql</code> in Supabase.</div>';
+    document.getElementById('bpTouchForm').style.display = 'none';
+    return;
+  }
+  document.getElementById('bpTouchForm').style.display = '';
+  if (!rows.length) { el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;">No outreach logged yet. Every DM, shout-out or call you log here feeds the win-back rate.</div>'; return; }
+  el.innerHTML = rows.map(function (t) {
+    const who = t.user_id ? breakerNameById(t.user_id) : '—';
+    const oc = t.outcome && TOUCH_OUTCOME_META[t.outcome];
+    const when = new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + new Date(t.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return '<div style="display:flex;gap:0.6rem;padding:0.5rem 0;border-bottom:1px solid var(--border);align-items:flex-start;">' +
+      '<div style="font-size:0.78rem;white-space:nowrap;min-width:110px;">' + (TOUCH_CHANNEL_META[t.channel] || escHtml(t.channel || '')) + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        (t.note ? '<div style="font-size:0.84rem;">' + escHtml(t.note) + '</div>' : '') +
+        '<div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">' + escHtml(who) + ' · ' + when + (t.segment_at_touch ? ' · was ' + escHtml(t.segment_at_touch) : '') + '</div>' +
+      '</div>' +
+      '<div style="flex-shrink:0;">' + (oc
+        ? '<span style="font-size:0.66rem;font-weight:800;padding:2px 7px;border-radius:5px;background:' + oc[1] + '22;color:' + oc[1] + ';">' + oc[0] + '</span>'
+        : '<select onchange="bpSetTouchOutcome(\'' + t.id + '\', this.value, \'' + buyerId + '\')" style="font-size:0.66rem;padding:0.15rem 0.3rem;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text,inherit);"><option value="">waiting…</option><option value="replied">Replied</option><option value="returned">Came back</option><option value="no_reply">No reply</option></select>') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function bpSetTouchOutcome(touchId, outcome, buyerId) {
+  if (!outcome) return;
+  const { error } = await sb.from('buyer_touches').update({ outcome }).eq('id', touchId);
+  if (error) { showGlobalError('Couldn\'t update: ' + error.message); return; }
+  if (_bi) _bi.touches = await BuyerIntel.fetchTouches(sb, currentProfile.org_id, 180);
+  renderBpTouches(buyerId);
+}
+
+async function bpLogTouch() {
+  const buyerId = _buyerProfileId; if (!buyerId) return;
+  const btn = document.getElementById('bpTouchLogBtn');
+  const channel = document.getElementById('bpTouchChannel').value;
+  const note = document.getElementById('bpTouchNote').value.trim();
+  const outcome = document.getElementById('bpTouchOutcome').value || null;
+  const b = _bi && _bi.buyers.find(x => x.id === buyerId);
+  const segment = b ? (b._tier === 'regular' && b._fading ? 'fading' : b._tier) : null;
+  btn.disabled = true; btn.textContent = 'Logging…';
+  try {
+    await BuyerIntel.logTouch(sb, { orgId: currentProfile.org_id, buyerId, userId: currentUser.id, channel, note, outcome, segment });
+    document.getElementById('bpTouchNote').value = '';
+    document.getElementById('bpTouchOutcome').value = '';
+    if (_bi) { _bi.touches = await BuyerIntel.fetchTouches(sb, currentProfile.org_id, 180); if (b) b.last_cold_alert_at = new Date().toISOString(); }
+    renderBpTouches(buyerId);
+    if (_buyersMode === 'board') loadBuyersBoard();
+  } catch (e) {
+    showGlobalError(BuyerIntel.isMissingSchema(e) ? 'The outreach log needs migrations/010_buyer_crm.sql in Supabase first.' : 'Couldn\'t log: ' + e.message);
+  } finally { btn.disabled = false; btn.textContent = 'Log'; }
+}
+
 async function saveBuyerTag(buyerId, field, value) {
   const patch = { updated_at: new Date().toISOString() };
   patch[field] = value.trim() || null;
   const { error } = await sb.from('buyers').update(patch).eq('id', buyerId);
+  if (!error && _bi) { const b = _bi.buyers.find(x => x.id === buyerId); if (b) b[field] = patch[field]; }
   if (error) {
     console.error('tag save failed:', error.message);
     // If the columns aren't there yet, point the owner at the migration

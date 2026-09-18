@@ -190,11 +190,12 @@ function tierDisplayName(tier) {
 }
 
 async function runDailyDigest(sb, res) {
-  const results = { digest: { sent: [], skipped: [], errors: [] }, renewal: { sent: [], skipped: [], errors: [] }, buyerAlerts: { fired: 0 } };
+  const results = { digest: { sent: [], skipped: [], errors: [] }, renewal: { sent: [], skipped: [], errors: [] }, buyerAlerts: { fired: 0, orgs: 0, errors: [] }, slipNags: { fired: 0, streams: 0, errors: [] } };
   await Promise.all([
     runDigestEmails(sb, results.digest),
     runRenewalReminders(sb, results.renewal),
-    runBuyerAlerts(sb, results.buyerAlerts)
+    runBuyerAlerts(sb, results.buyerAlerts),
+    runSlipNags(sb, results.slipNags)
   ]);
   return res.status(200).json({ message: 'Done', results });
 }
@@ -274,28 +275,126 @@ async function runRenewalReminders(sb, results) {
   }
 }
 
+function isoDaysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; }
+function isMissingColumn(err) { return !!err && /does not exist|could not find|schema cache/i.test(err.message || ''); }
+
+// Going-cold alerts. Uses the SAME rule as the Buyer Board (buyer-intel.js):
+// a buyer who has spent whale-threshold+ lifetime and whose last purchase is
+// between cold_after_days and 120 days ago. Window-based, not "exactly day 21",
+// so a missed cron run can't silently skip anyone. Fires once per cold episode
+// (cold_notified_at resets the moment they buy again) to the owner and every
+// manager, with a deep link straight to the Board.
 async function runBuyerAlerts(sb, results) {
-  const twentyOneDaysAgo = new Date(); twentyOneDaysAgo.setDate(twentyOneDaysAgo.getDate() - 21);
-  const coldDate = twentyOneDaysAgo.toISOString().split('T')[0];
-  const { data: coldBuyers, error } = await sb.from('buyers').select('id, organization_id, username, total_spent').eq('last_purchase_date', coldDate);
-  if (error || !coldBuyers || coldBuyers.length === 0) return;
-  const byOrg = {};
-  for (const buyer of coldBuyers) { if (!byOrg[buyer.organization_id]) byOrg[buyer.organization_id] = []; byOrg[buyer.organization_id].push(buyer); }
-  for (const [orgId, buyers] of Object.entries(byOrg)) {
+  let orgsRes = await sb.from('organizations').select('id, whale_threshold, cold_after_days');
+  if (orgsRes.error && isMissingColumn(orgsRes.error)) orgsRes = await sb.from('organizations').select('id, whale_threshold');
+  if (orgsRes.error) { results.errors.push('orgs: ' + orgsRes.error.message); return; }
+
+  for (const org of (orgsRes.data || [])) {
     try {
-      const { data: sub } = await sb.from('subscriptions').select('tier').eq('org_id', orgId).maybeSingle();
+      const { data: sub } = await sb.from('subscriptions').select('tier').eq('org_id', org.id).maybeSingle();
       if (sub?.tier === 'exempt') continue;
-      const { data: top20 } = await sb.from('buyers').select('id').eq('organization_id', orgId).order('total_spent', { ascending: false }).limit(20);
-      const top20Ids = new Set((top20 || []).map(b => b.id));
-      const { data: owner } = await sb.from('profiles').select('id').eq('org_id', orgId).eq('role', 'owner').maybeSingle();
-      if (!owner) continue;
-      for (const buyer of buyers) {
-        if (!top20Ids.has(buyer.id)) continue;
-        const spent = parseFloat(buyer.total_spent || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-        await sb.from('notifications').insert({ organization_id: orgId, user_id: owner.id, type: 'buyer_cold', title: 'A top buyer went cold', body: '@' + buyer.username + ' hasn\'t purchased in over 20 days. They previously spent ' + spent + ' with you.', action_url: APP_URL + '/dashboard' }).catch(() => {});
-        results.fired++;
+      const whaleMin  = Number(org.whale_threshold) || 1000;
+      const coldAfter = Math.max(7, Number(org.cold_after_days) || 21);
+      const newest = isoDaysAgo(coldAfter), oldest = isoDaysAgo(120);
+
+      let q = await sb.from('buyers')
+        .select('id, username, total_spent, last_purchase_date, cold_notified_at, assigned_to')
+        .eq('organization_id', org.id).gte('total_spent', whaleMin)
+        .lte('last_purchase_date', newest).gte('last_purchase_date', oldest);
+      let haveStamp = true;
+      if (q.error && isMissingColumn(q.error)) {
+        // Migration 010 not run yet — fall back to the board's "contacted" stamp for de-duping.
+        haveStamp = false;
+        q = await sb.from('buyers')
+          .select('id, username, total_spent, last_purchase_date, last_cold_alert_at')
+          .eq('organization_id', org.id).gte('total_spent', whaleMin)
+          .lte('last_purchase_date', newest).gte('last_purchase_date', oldest);
       }
-    } catch (e) { console.error('buyer alert org error:', orgId, e); }
+      if (q.error) { results.errors.push(org.id + ': ' + q.error.message); continue; }
+
+      const due = (q.data || []).filter(b => {
+        const stamp = haveStamp ? b.cold_notified_at : b.last_cold_alert_at;
+        return !stamp || String(stamp).slice(0, 10) <= String(b.last_purchase_date);   // never notified since their last purchase
+      }).sort((a, b) => Number(b.total_spent) - Number(a.total_spent));
+      if (!due.length) continue;
+      results.orgs++;
+
+      const { data: staff } = await sb.from('profiles').select('id, role').eq('org_id', org.id).in('role', ['owner', 'manager', 'breaker/manager']);
+      if (!staff || !staff.length) continue;
+
+      const money = n => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
+      const days = d => Math.floor((Date.now() - new Date(d + 'T12:00:00Z').getTime()) / 86400000);
+      const atRisk = due.reduce((s, b) => s + (Number(b.total_spent) || 0), 0);
+      const names = due.slice(0, 5).map(b => '@' + b.username + ' (' + money(b.total_spent) + ', ' + days(b.last_purchase_date) + 'd)').join(', ') + (due.length > 5 ? ' +' + (due.length - 5) + ' more' : '');
+      const title = due.length === 1
+        ? '@' + due[0].username + ' is going cold — ' + money(due[0].total_spent) + ' buyer'
+        : due.length + ' big buyers are going cold — ' + money(atRisk) + ' at risk';
+      const body = (due.length === 1 ? 'Last bought ' + days(due[0].last_purchase_date) + ' days ago. ' : names + '. ') + 'Open the Board → Going Cold, copy a win-back DM, and log the touch.';
+
+      const rows = staff.map(p => ({
+        organization_id: org.id, user_id: p.id, type: 'buyer_cold', title, body,
+        action_url: APP_URL + (p.role === 'owner' ? '/dashboard?tab=buyers' : '/manager.html?tab=buyers')
+      }));
+      const ins = await sb.from('notifications').insert(rows);
+      if (ins.error) { results.errors.push(org.id + ': notify ' + ins.error.message); continue; }
+      results.fired += due.length;
+
+      if (haveStamp) {
+        const ids = due.map(b => b.id);
+        for (let i = 0; i < ids.length; i += 100) {
+          await sb.from('buyers').update({ cold_notified_at: new Date().toISOString() }).in('id', ids.slice(i, i + 100));
+        }
+      } else {
+        // Without the dedicated stamp we'd re-fire daily; mark contacted instead (pre-010 behaviour).
+        const ids = due.map(b => b.id);
+        for (let i = 0; i < ids.length; i += 100) {
+          await sb.from('buyers').update({ last_cold_alert_at: new Date().toISOString() }).in('id', ids.slice(i, i + 100));
+        }
+      }
+    } catch (e) { console.error('buyer alert org error:', org.id, e); results.errors.push(org.id + ': ' + e.message); }
+  }
+}
+
+// Slip nags. A closed stream with no packing slips imported is a hole in the
+// buyer CRM — whales, cold alerts and win-back stats are blind to it. ~20h after
+// closeout, if nothing's been imported or marked "no slips", the breaker gets
+// one nag per stream (slips_nag_sent_at). The owner sees the same gap on Home.
+async function runSlipNags(sb, results) {
+  const cutoff = new Date(Date.now() - 20 * 3600 * 1000).toISOString();
+  const { data: streams, error } = await sb.from('streams')
+    .select('id, org_id, breaker_id, stream_key, break_date, final_sales')
+    .eq('status', 'closed')
+    .is('slips_imported_at', null).is('slips_skipped_at', null).is('slips_nag_sent_at', null)
+    .lte('closed_at', cutoff).gte('break_date', isoDaysAgo(45))
+    .order('closed_at', { ascending: false }).limit(500);
+  if (error) { if (isMissingColumn(error)) return; results.errors.push(error.message); return; }
+  if (!streams || !streams.length) return;
+
+  const byBreaker = {};
+  for (const s of streams) { if (!s.breaker_id) continue; (byBreaker[s.breaker_id] = byBreaker[s.breaker_id] || []).push(s); }
+  const exemptCache = {};
+  for (const [breakerId, list] of Object.entries(byBreaker)) {
+    try {
+      const orgId = list[0].org_id;
+      if (exemptCache[orgId] === undefined) {
+        const { data: sub } = await sb.from('subscriptions').select('tier').eq('org_id', orgId).maybeSingle();
+        exemptCache[orgId] = sub?.tier === 'exempt';
+      }
+      if (exemptCache[orgId]) continue;
+      const fmtDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const sales = list.reduce((s, x) => s + (Number(x.final_sales) || 0), 0);
+      const keys = list.slice(0, 3).map(s => s.stream_key + ' (' + fmtDate(s.break_date) + ')').join(', ') + (list.length > 3 ? ' +' + (list.length - 3) + ' more' : '');
+      const ins = await sb.from('notifications').insert({
+        organization_id: orgId, user_id: breakerId, type: 'slips_missing',
+        title: list.length === 1 ? 'Packing slips still needed for ' + list[0].stream_key : list.length + ' streams still need packing slips',
+        body: keys + ' — $' + Math.round(sales).toLocaleString('en-US') + ' in sales isn\'t counting toward your buyers, whales or win-backs yet. Export the slips PDF from Whatnot and import it (10 seconds).',
+        action_url: APP_URL + '/break?tab=buyers'
+      });
+      if (ins.error) { results.errors.push(breakerId + ': ' + ins.error.message); continue; }
+      const ids = list.map(s => s.id);
+      await sb.from('streams').update({ slips_nag_sent_at: new Date().toISOString() }).in('id', ids);
+      results.fired++; results.streams += ids.length;
+    } catch (e) { results.errors.push(breakerId + ': ' + e.message); }
   }
 }
 

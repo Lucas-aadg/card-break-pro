@@ -15,6 +15,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="analytics.js"></script>
+  <script src="buyer-intel.js"></script>
   <style>
     :root {
       --bg: #0d0d14;
@@ -527,6 +528,8 @@
 <div class="main">
   <div id="errorBox" class="error-box"></div>
   <div id="successBox" class="success-box"></div>
+  <!-- Closed streams still missing packing slips — shows on every tab until handled -->
+  <div id="brkSlipBanner" style="display:none;margin-bottom:0.85rem;"></div>
 
   <div class="breaker-tab-content active" id="breaker-tab-entry">
 
@@ -720,11 +723,15 @@
       <span id="brkChannelDiag" style="font-size:0.7rem;color:var(--muted);"></span>
     </div>
 
-    <!-- SELL: search-first, then whales to tag + rising -->
+    <!-- SELL: live room first, then search, then whales to tag -->
     <div id="brkBuyersSellWrap">
-      <input type="text" id="brkBuyersSearch" placeholder="🔎  Who just bought? Type a username…" oninput="renderBrkSearch()" autocomplete="off" style="width:100%;padding:0.8rem 1rem;border:1px solid rgba(79,110,247,0.34);border-radius:12px;background:var(--card);color:var(--text,inherit);font-size:1rem;margin-bottom:0.75rem;">
+      <div id="brkLiveRoom" style="margin-bottom:0.75rem;"></div>
+      <input type="text" id="brkBuyersSearch" placeholder="🔎  Who just showed up / bought? Type a username…" oninput="renderBrkSearch()" autocomplete="off" style="width:100%;padding:0.8rem 1rem;border:1px solid rgba(79,110,247,0.34);border-radius:12px;background:var(--card);color:var(--text,inherit);font-size:1rem;margin-bottom:0.75rem;">
       <div id="brkSearchResults" style="margin-bottom:0.5rem;"></div>
+      <div id="brkMyQueue" style="margin-bottom:0.75rem;"></div>
       <div id="brkSellBody"><div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">Loading buyers…</div></div>
+      <div id="brkRecap" style="margin-top:1rem;"></div>
+      <div id="brkSlipsNeeded" style="margin-top:0.75rem;"></div>
     </div>
 
     <!-- HITS -->
@@ -909,6 +916,7 @@
         <h2 style="margin:0;font-size:1.2rem;">Import Buyer Slips</h2>
         <button onclick="skipSlipImport()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:0.25rem 0.5rem;" title="Skip">✕</button>
       </div>
+      <div id="siTargetLabel" style="display:none;margin:-0.75rem 0 0.9rem;font-size:0.78rem;color:var(--primary);font-weight:700;"></div>
       <div id="siDropZone" style="border:2px dashed rgba(79,110,247,0.4);border-radius:12px;padding:2rem 1.5rem;text-align:center;cursor:pointer;background:rgba(79,110,247,0.04);transition:.2s;" onclick="document.getElementById('siFileInput').click()">
         <div style="font-size:2.5rem;margin-bottom:0.6rem;">📄</div>
         <div style="font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:0.4rem;">Drop your Whatnot packing slip PDF here</div>
@@ -1191,6 +1199,10 @@ async function initAuth() {
     loadMyScheduleView();
     checkBreakerOnboarding();
     brkLoadGoalBar();
+    brkLoadSlipStatus();
+    // Honour ?tab= deep links (notifications land here)
+    const deepTab = new URLSearchParams(window.location.search).get('tab');
+    if (deepTab) { const tb = document.querySelector('.breaker-tab-btn[data-tab="' + deepTab + '"]'); if (tb) tb.click(); }
   } catch (err) {
     showError('Failed to initialize: ' + err.message);
     console.error(err);
@@ -1640,6 +1652,7 @@ async function onStreamKeyChange() {
       .eq('status', 'active')
       .maybeSingle();
 
+    const prevStreamId = currentStream ? currentStream.id : null;
     if (existing) {
       currentStream = existing;
       const breaks = await loadStreamBreaks(existing.id);
@@ -1653,6 +1666,7 @@ async function onStreamKeyChange() {
 
     renderRunningTotal();
     updateBreakDisplay();
+    if ((currentStream ? currentStream.id : null) !== prevStreamId) brkOnStreamChanged();
 
     // Write stream key back to the active schedule so clock log shows it
     if (activeShiftId && streamKey) {
@@ -1995,6 +2009,9 @@ async function handleConfirmClose() {
     submittedBreaks = [];
     breakNumber = 1;
     currentStream = null;
+    brkOnStreamChanged();
+    brkInvalidateBuyers();
+    setTimeout(function () { brkLoadSlipStatus(true); }, 800);   // the just-closed stream shows here if slips were skipped
 
     renderRunningTotal();
     updateBreakDisplay();
@@ -2712,7 +2729,7 @@ async function loadNotifCount() {
   } catch (e) {}
 }
 function notifTypeIcon(type) {
-  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳' };
+  const icons = { stream_closed:'📦', shift_reminder:'⏰', inventory_low:'⚠️', payment_failed:'💳', renewal_reminder:'🔄', trial_ending:'⏳', buyer_cold:'❄️', buyer_fading:'📉', slips_missing:'📄', buyer_assigned:'📬', stream_recap:'🧾', whale_in_room:'👑' };
   return icons[type] || '🔔';
 }
 async function renderNotifPanel() {
@@ -3204,12 +3221,12 @@ var _brkWhaleThresh = 0;
 var _brkTagSel = {};          // username -> selected for chat-tagging
 var _brkHitData = [];
 var _brkHitFilter = 'all';
-var BRK_WHALE_MIN = 1000, _brkWhaleMinLoaded = false;
+var BRK_WHALE_MIN = 1000, BRK_COLD_MIN = 21, _brkWhaleMinLoaded = false;
 async function brkEnsureWhaleMin() {
   if (_brkWhaleMinLoaded) return;
   _brkWhaleMinLoaded = true;
-  const { data, error } = await sb.from('organizations').select('whale_threshold').eq('id', currentProfile.org_id).maybeSingle();
-  if (!error && data && data.whale_threshold != null) BRK_WHALE_MIN = Number(data.whale_threshold) || 1000;
+  const s = await BuyerIntel.loadOrgSettings(sb, currentProfile.org_id);
+  BRK_WHALE_MIN = s.whaleMin; BRK_COLD_MIN = s.coldAfterDays;
 }
 const BRK_HIT_META = { case_hit:{label:'Case Hit',icon:'🎯'}, auto:{label:'Auto',icon:'✍️'}, patch:{label:'Patch',icon:'🧵'}, rookie:{label:'Rookie',icon:'🌟'}, other:{label:'Other',icon:'💎'} };
 
@@ -3235,38 +3252,31 @@ async function brkLoadChannels() {
   }
 }
 
-async function brkBuildChannelMap() {
-  if (_brkBuyerChannelMap && _brkBuyerChannelMap.size > 0) return _brkBuyerChannelMap;  // rebuild if a prior build came back empty
-  const org = currentProfile.org_id;
-  // Breakers can only read their OWN streams under RLS, so build the org-wide
-  // stream→channel map on the server (service role). Without this the map is
-  // empty and every account filter shows 0.
+// Server rollups (buyer_rollups) — lifetime + per-account figures for every
+// buyer in one call. Breakers can only read their OWN streams under RLS, so the
+// stream→account map comes from the service-role endpoint and the rollups
+// from a SECURITY DEFINER function; both are org-scoped server-side.
+var _brkRollups = null;
+var _brkAffinity = null;
+async function brkEnsureRollups() {
+  if (_brkRollups) return _brkRollups;
   const tok = await brkAuthToken();
-  const resp = await fetch('/api/features?feature=stream&action=channelmap', { headers: { Authorization: 'Bearer ' + tok } });
-  if (!resp.ok) { let m = 'HTTP ' + resp.status; try { m = (await resp.json()).error || m; } catch (e) {} throw new Error(m); }
-  const streamCh = (await resp.json()).streamChannels || {};
-  const map = new Map(); const stats = {}; let from = 0; const size = 1000;
-  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
-  const d60 = new Date(); d60.setDate(d60.getDate() - 60);
-  const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-  while (true) {
-    const { data, error } = await sb.from('buyer_purchases').select('buyer_id,stream_id,amount,purchase_date').eq('organization_id', org).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(p => {
-      const ch = p.stream_id ? streamCh[p.stream_id] : null; if (!ch) return;
-      if (!map.has(p.buyer_id)) map.set(p.buyer_id, new Set()); map.get(p.buyer_id).add(ch);
-      const bs = stats[p.buyer_id] = stats[p.buyer_id] || {};
-      const cs = bs[ch] = bs[ch] || { spent: 0, breaks: 0, streams: new Set(), first: null, last: null, recent30: 0, prior30: 0 };
-      const amt = Number(p.amount) || 0;
-      cs.spent += amt; cs.breaks += 1; if (p.stream_id) cs.streams.add(p.stream_id);
-      const d = p.purchase_date;
-      if (d) { if (!cs.first || d < cs.first) cs.first = d; if (!cs.last || d > cs.last) cs.last = d; if (d >= s30) cs.recent30 += amt; else if (d >= s60) cs.prior30 += amt; }
-    });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  _brkBuyerChannelMap = map; _brkStreamChannelMap = streamCh; _brkBuyerChannelStats = stats;
-  return map;
+  if (!_brkStreamChannelMap) _brkStreamChannelMap = await BuyerIntel.fetchStreamChannels(sb, currentProfile.org_id, { viaServer: true, token: tok });
+  _brkRollups = await BuyerIntel.fetchRollups(sb, currentProfile.org_id, { streamChannels: _brkStreamChannelMap, viaServer: true, token: tok });
+  _brkBuyerChannelStats = _brkRollups.byChannel;
+  _brkBuyerChannelMap = new Map();
+  Object.keys(_brkRollups.byChannel).forEach(function (id) { _brkBuyerChannelMap.set(id, new Set(Object.keys(_brkRollups.byChannel[id]))); });
+  // Collect-affinity (what they buy, inferred) loads in the background — chips fill in when it lands.
+  Promise.all([BuyerIntel.fetchStreamFacts(sb), BuyerIntel.fetchCategoryMix(sb)]).then(function (r) {
+    _brkAffinity = (r[0] && r[1]) ? BuyerIntel.buildAffinity(r[0], r[1]) : {};
+    if (_brkBuyersMode === 'sell') { renderBrkSell(); brkRenderRoster(); }
+  }).catch(function () { _brkAffinity = {}; });
+  return _brkRollups;
+}
+
+async function brkBuildChannelMap() {
+  await brkEnsureRollups();
+  return _brkBuyerChannelMap;
 }
 
 function brkBuyerInChannel(id) {
@@ -3322,29 +3332,14 @@ function setBrkBuyersMode(mode) {
 
 async function brkFetchAllBuyers() {
   if (_brkBuyersLoaded) return;
-  const cols = 'id,username,real_name,total_spent,total_breaks_purchased,total_streams_participated,last_purchase_date,first_seen_date,temperature,is_new_buyer,case_hits,last_cold_alert_at,fav_team,fav_player,fav_sport';
-  let all = [], from = 0; const size = 1000;
-  while (true) {
-    const { data, error } = await sb.from('buyers').select(cols).eq('organization_id', currentProfile.org_id).order('total_spent', { ascending: false }).range(from, from + size - 1);
-    if (error) throw error;
-    all = all.concat(data || []);
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  const map = {}; _brkBuyerHitStreams = {}; from = 0;
-  while (true) {
-    const { data, error } = await sb.from('buyer_hits').select('buyer_id,stream_id').eq('organization_id', currentProfile.org_id).range(from, from + size - 1);
-    if (error) throw error;
-    (data || []).forEach(h => {
-      map[h.buyer_id] = (map[h.buyer_id] || 0) + 1;
-      (_brkBuyerHitStreams[h.buyer_id] = _brkBuyerHitStreams[h.buyer_id] || []).push(h.stream_id || null);
-    });
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  all.forEach(b => { b._hitCount = map[b.id] || 0; });
+  const [all, hits] = await Promise.all([BuyerIntel.fetchBuyers(sb, currentProfile.org_id), BuyerIntel.fetchHitCounts(sb, currentProfile.org_id)]);
+  _brkBuyerHitStreams = hits.streams;
+  all.forEach(b => { b._hitCount = hits.counts[b.id] || 0; });
   _brkAllBuyers = all; _brkBuyersLoaded = true;
 }
+
+// Drop every cached buyer figure — call after an import or anything that changes spend.
+function brkInvalidateBuyers() { _brkBuyersLoaded = false; _brkRollups = null; _brkBuyerChannelMap = null; }
 
 var _brkBuyerHitStreams = {};
 function brkHitBadge(b) {
@@ -3356,48 +3351,13 @@ function brkHitBadge(b) {
   return streams.filter(s => s && _brkStreamChannelMap && _brkStreamChannelMap[s] === ch).length;
 }
 
-// Tag each buyer whale/rising/new + compute effective spend — per-account when
-// an account is selected, lifetime otherwise.
+// Tag each buyer whale/cold/regular/new + compute effective spend — the same
+// rule as the owner's board (buyer-intel.js). Per-account when an account is
+// selected, lifetime otherwise.
 async function brkEnrichBuyers() {
+  await brkEnsureRollups();
   const selCh = (document.getElementById('brkBuyersChannelFilter') || {}).value || '';
-  const recent = {}, prior = {};
-  if (!selCh) {
-    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
-    const d60 = new Date(); d60.setDate(d60.getDate() - 60);
-    const s30 = d30.toISOString().split('T')[0], s60 = d60.toISOString().split('T')[0];
-    let purch = [], _pf = 0;
-    while (true) {
-      const { data, error } = await sb.from('buyer_purchases').select('buyer_id,amount,purchase_date').eq('organization_id', currentProfile.org_id).gte('purchase_date', s60).range(_pf, _pf + 999);
-      if (error) throw error;
-      purch = purch.concat(data || []);
-      if (!data || data.length < 1000) break;
-      _pf += 1000;
-    }
-    (purch || []).forEach(p => { const a = Number(p.amount || 0); if (p.purchase_date >= s30) recent[p.buyer_id] = (recent[p.buyer_id] || 0) + a; else prior[p.buyer_id] = (prior[p.buyer_id] || 0) + a; });
-  }
-  const eff = {};
-  _brkAllBuyers.forEach(b => {
-    if (selCh) {
-      const cs = (_brkBuyerChannelStats[b.id] || {})[selCh];
-      eff[b.id] = cs ? { spent: cs.spent, breaks: cs.breaks, streams: cs.streams ? cs.streams.size : 0, first: cs.first, last: cs.last, rec: cs.recent30, pri: cs.prior30 }
-                     : { spent: 0, breaks: 0, streams: 0, first: null, last: null, rec: 0, pri: 0 };
-    } else {
-      eff[b.id] = { spent: Number(b.total_spent || 0), breaks: b.total_breaks_purchased || 0, streams: b.total_streams_participated || 0, first: b.first_seen_date, last: b.last_purchase_date, rec: recent[b.id] || 0, pri: prior[b.id] || 0 };
-    }
-  });
-  _brkAllBuyers.forEach(b => {
-    const e = eff[b.id];
-    b._eSpent = e.spent; b._eBreaks = e.breaks; b._eLast = e.last;
-    b._avgStream = e.streams > 0 ? e.spent / e.streams : e.spent;
-    b._recent30 = e.rec;
-    // Whale = spent >= threshold in last 30d. New = one-stream. Rest = regular.
-    if (e.spent <= 0) { b._tier = 'none'; return; }
-    const activeWhale = e.rec >= BRK_WHALE_MIN;
-    b._newBig = activeWhale && (e.streams || 0) <= 1;
-    if (activeWhale) b._tier = 'whale';
-    else if ((e.streams || 0) <= 1) b._tier = 'new';
-    else b._tier = 'regular';
-  });
+  BuyerIntel.enrich(_brkAllBuyers, _brkRollups, { channelId: selCh, whaleMin: BRK_WHALE_MIN, coldAfterDays: BRK_COLD_MIN });
 }
 
 async function loadBrkSell() {
@@ -3408,24 +3368,312 @@ async function loadBrkSell() {
     await brkEnsureWhaleMin();
     await brkFetchAllBuyers();
     await brkEnrichBuyers();
+    await brkLoadRoster();
     renderBrkSell();
     renderBrkSearch();
+    brkRenderRoster();
+    brkRenderQueue();
+    brkRenderRecap();
+    brkLoadSlipStatus();
   } catch (err) { body.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load buyers: ' + escHtml(err.message) + '</div>'; }
 }
 
-function brkTierBadge(tier) {
+function brkTierBadge(tier, b) {
   if (tier === 'whale')  return '<span style="font-size:0.6rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:rgba(233,185,73,0.16);color:#e9b949;">👑 Whale</span>';
-  if (tier === 'rising') return '<span style="font-size:0.6rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:rgba(40,199,111,0.16);color:#28c76f;">📈 Rising</span>';
+  if (tier === 'cold')   return '<span style="font-size:0.6rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:rgba(240,96,63,0.16);color:#f0603f;">❄️ Big buyer · quiet ' + (b && b._since !== Infinity ? b._since + 'd' : '') + '</span>';
   if (tier === 'new')    return '<span style="font-size:0.6rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:rgba(58,160,255,0.16);color:#3aa0ff;">🆕 New</span>';
+  if (b && b._fading)    return '<span style="font-size:0.6rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:rgba(245,158,11,0.16);color:#f59e0b;">⚠ Fading</span>';
   return '';
 }
 
-function brkTagText(b) { return [b.fav_sport, b.fav_team].filter(Boolean).join(' · ') || b.fav_player || ''; }
+function brkTagText(b) {
+  const manual = [b.fav_sport, b.fav_team].filter(Boolean).join(' · ') || b.fav_player || '';
+  if (manual) return manual;
+  const top = _brkAffinity ? BuyerIntel.topAffinity(_brkAffinity, b.id) : null;
+  return (top && top.share >= 0.4) ? top.category + ' ' + Math.round(top.share * 100) + '%' : '';
+}
+
+// ── Live room roster ──────────────────────────────────────
+// Tap buyers as they show up in the stream. Whales get flagged the moment they
+// land, the closeout suggests them for hits, and the recap knows who was in
+// the room but didn't buy.
+var _brkRoster = [];             // stream_attendees rows for currentStream
+var _brkRosterStreamId = null;
+var _brkRosterAvailable = true;  // false until migration 010 is run
+
+async function brkLoadRoster(force) {
+  if (!currentStream) { _brkRoster = []; _brkRosterStreamId = null; return; }
+  if (!force && _brkRosterStreamId === currentStream.id) return;
+  const { data, error } = await sb.from('stream_attendees').select('id,buyer_id,created_at').eq('stream_id', currentStream.id).order('created_at', { ascending: true });
+  if (error) {
+    _brkRosterAvailable = !BuyerIntel.isMissingSchema(error);
+    _brkRoster = []; _brkRosterStreamId = currentStream.id;
+    if (_brkRosterAvailable) console.error('roster load failed:', error.message);
+    return;
+  }
+  _brkRosterAvailable = true; _brkRoster = data || []; _brkRosterStreamId = currentStream.id;
+}
+
+function brkRosterHas(buyerId) { return _brkRoster.some(function (r) { return r.buyer_id === buyerId; }); }
+
+// Called from Break Entry whenever the active stream changes.
+async function brkOnStreamChanged() {
+  _brkRosterStreamId = null; _brkRoster = [];
+  if (_brkBuyersLoaded) { await brkLoadRoster(true); brkRenderRoster(); renderBrkSearch(); }
+}
+
+async function brkMarkHere(buyerId) {
+  if (!currentStream) { showGlobalError('Enter a Stream Key on Break Entry first — the room roster is tied to your live stream.'); return; }
+  if (brkRosterHas(buyerId)) return;
+  const { data, error } = await sb.from('stream_attendees')
+    .insert({ organization_id: currentProfile.org_id, stream_id: currentStream.id, buyer_id: buyerId, added_by: currentUser.id })
+    .select('id,buyer_id,created_at').single();
+  if (error) {
+    if (/duplicate|unique/i.test(error.message)) { await brkLoadRoster(true); brkRenderRoster(); return; }
+    showGlobalError(BuyerIntel.isMissingSchema(error) ? 'The live roster needs migrations/010_buyer_crm.sql — ask the owner to run it.' : 'Couldn\'t add: ' + error.message);
+    return;
+  }
+  _brkRoster.push(data); _brkRosterStreamId = currentStream.id;
+  const b = _brkAllBuyers.find(function (x) { return x.id === buyerId; });
+  if (b && (b._tier === 'whale' || b._tier === 'cold')) showGlobalSuccess((b._tier === 'cold' ? '❄️→🔥 Big buyer is BACK — @' : '👑 Whale in the room — @') + b.username + '. Shout them out.');
+  document.getElementById('brkBuyersSearch').value = '';
+  brkRenderRoster(); renderBrkSearch();
+}
+
+async function brkRemoveHere(attId) {
+  const { error } = await sb.from('stream_attendees').delete().eq('id', attId);
+  if (error) { showGlobalError('Couldn\'t remove: ' + error.message); return; }
+  _brkRoster = _brkRoster.filter(function (r) { return r.id !== attId; });
+  brkRenderRoster(); renderBrkSearch();
+}
+
+// Username not in the CRM yet (a first-timer in the room). Create the buyer
+// row now so they're on tonight's roster; the slip import fills in spend.
+async function brkAddUnknownHere(username) {
+  username = (username || '').trim().replace(/^@/, '').toLowerCase();
+  if (!username) return;
+  const now = new Date().toISOString();
+  const { data: existing } = await sb.from('buyers').select('id').eq('organization_id', currentProfile.org_id).ilike('username', username).maybeSingle();
+  let buyerId = existing && existing.id;
+  if (!buyerId) {
+    const ins = await sb.from('buyers').insert({
+      organization_id: currentProfile.org_id, platform: 'whatnot', username: username,
+      total_spent: 0, total_breaks_purchased: 0, total_streams_participated: 0,
+      is_new_buyer: true, temperature: 'cold', first_seen_date: today(), created_at: now, updated_at: now
+    }).select('id').single();
+    if (ins.error) { showGlobalError('Couldn\'t add @' + username + ': ' + ins.error.message); return; }
+    buyerId = ins.data.id;
+    _brkAllBuyers.push({ id: buyerId, username: username, total_spent: 0, total_breaks_purchased: 0, total_streams_participated: 0, is_new_buyer: true, first_seen_date: today(), _hitCount: 0, _tier: 'none', _eSpent: 0, _eBreaks: 0, _eStreams: 0, _avgStream: 0, _since: Infinity });
+  }
+  await brkMarkHere(buyerId);
+}
+
+function brkRosterChip(r, b) {
+  const t = b._tier;
+  const accent = t === 'whale' ? '#e9b949' : t === 'cold' ? '#f0603f' : t === 'new' || t === 'none' ? '#3aa0ff' : '#5b7cfa';
+  const tags = brkTagText(b);
+  const u = (b.username || '').replace(/'/g, "\\'");
+  const sel = !!_brkTagSel[b.username];
+  return '<div onclick="brkToggleTag(\'' + u + '\')" style="cursor:pointer;background:var(--card);border:1px solid ' + (sel ? accent : 'var(--border)') + ';border-left:3px solid ' + accent + ';border-radius:10px;padding:8px 10px;min-width:0;' + (sel ? 'box-shadow:0 0 0 1px ' + accent + '55;' : '') + '">' +
+    '<div style="display:flex;align-items:center;gap:6px;">' +
+      '<span style="font-weight:800;font-size:0.84rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (sel ? '✓ ' : '') + '@' + escHtml(b.username) + '</span>' +
+      '<span onclick="event.stopPropagation();brkRemoveHere(\'' + r.id + '\')" title="Remove from room" style="cursor:pointer;font-size:0.7rem;opacity:0.5;">✕</span>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:4px;">' + (brkTierBadge(t, b) || (t === 'none' ? '<span style="font-size:0.6rem;font-weight:800;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:rgba(58,160,255,0.16);color:#3aa0ff;">🆕 First time</span>' : '')) +
+      '<span style="font-size:0.68rem;color:var(--muted);">$' + Number(b._eSpent || 0).toFixed(0) + (b._avgStream ? ' · $' + Math.round(b._avgStream) + '/str' : '') + (brkHitBadge(b) > 0 ? ' · 🎯' + brkHitBadge(b) : '') + '</span>' +
+    '</div>' +
+    (tags ? '<div style="font-size:0.66rem;color:#93a6ff;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🏷 ' + escHtml(tags) + '</div>' : '') +
+  '</div>';
+}
+
+function brkRenderRoster() {
+  const el = document.getElementById('brkLiveRoom'); if (!el) return;
+  if (!currentStream) {
+    el.innerHTML = '<div style="background:rgba(79,110,247,0.06);border:1px dashed rgba(79,110,247,0.3);border-radius:12px;padding:0.7rem 0.9rem;font-size:0.78rem;color:var(--muted);">🎙 <strong style="color:var(--text);">No live stream.</strong> Enter a Stream Key on Break Entry and this becomes tonight\'s room — tap buyers as they show up, see the whales instantly, copy @tags to chat.</div>';
+    return;
+  }
+  if (!_brkRosterAvailable) {
+    el.innerHTML = '<div style="background:rgba(240,96,63,0.06);border:1px solid rgba(240,96,63,0.3);border-radius:12px;padding:0.7rem 0.9rem;font-size:0.78rem;color:var(--muted);">The live room roster needs <code>migrations/010_buyer_crm.sql</code> — ask the owner to run it.</div>';
+    return;
+  }
+  const rows = _brkRoster.map(function (r) { return { r: r, b: _brkAllBuyers.find(function (x) { return x.id === r.buyer_id; }) }; }).filter(function (x) { return x.b; });
+  const order = { cold: 0, whale: 1, regular: 2, new: 3, none: 4 };
+  rows.sort(function (a, c) { const d = (order[a.b._tier] || 0) - (order[c.b._tier] || 0); return d || (c.b._eSpent || 0) - (a.b._eSpent || 0); });
+  const whales = rows.filter(function (x) { return x.b._tier === 'whale' || x.b._tier === 'cold'; }).length;
+  const firstTimers = rows.filter(function (x) { return x.b._tier === 'new' || x.b._tier === 'none'; }).length;
+  const roomRev = rows.reduce(function (s, x) { return s + (x.b._eSpent || 0); }, 0);
+  const inRoomSel = rows.filter(function (x) { return _brkTagSel[x.b.username]; }).length;
+  el.innerHTML =
+    '<div style="background:linear-gradient(180deg,rgba(47,191,113,0.08),transparent);border:1px solid rgba(47,191,113,0.35);border-radius:14px;padding:0.75rem 0.85rem;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.55rem;">' +
+        '<div style="display:flex;align-items:center;gap:0.5rem;min-width:0;">' +
+          '<span style="width:8px;height:8px;border-radius:50%;background:#2fbf71;box-shadow:0 0 0 4px rgba(47,191,113,0.2);flex-shrink:0;"></span>' +
+          '<span style="font-weight:800;font-size:0.9rem;">LIVE · ' + escHtml(currentStream.stream_key || '') + '</span>' +
+          '<span style="font-size:0.72rem;color:var(--muted);">' + rows.length + ' in room' + (whales ? ' · <span style="color:#e9b949;font-weight:800;">👑 ' + whales + '</span>' : '') + (firstTimers ? ' · <span style="color:#3aa0ff;font-weight:700;">🆕 ' + firstTimers + '</span>' : '') + (roomRev ? ' · $' + Math.round(roomRev).toLocaleString() + ' lifetime in the room' : '') + '</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:0.35rem;">' +
+          '<button onclick="brkSelectRoom()" class="btn btn-sm btn-outline" style="padding:0.25rem 0.6rem;font-size:0.7rem;">Select room</button>' +
+          '<button onclick="brkCopyTags()" class="btn btn-sm" style="padding:0.25rem 0.7rem;font-size:0.72rem;">📋 Copy ' + (inRoomSel ? inRoomSel + ' @tag' + (inRoomSel > 1 ? 's' : '') : '@tags') + '</button>' +
+        '</div>' +
+      '</div>' +
+      (rows.length
+        ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.45rem;">' + rows.map(function (x) { return brkRosterChip(x.r, x.b); }).join('') + '</div>'
+        : '<div style="font-size:0.78rem;color:var(--muted);">Nobody marked yet. Type a username above and tap <strong>📍 Here</strong> as people show up — or add a first-timer on the spot.</div>') +
+    '</div>';
+}
+
+function brkSelectRoom() {
+  _brkRoster.forEach(function (r) { const b = _brkAllBuyers.find(function (x) { return x.id === r.buyer_id; }); if (b) _brkTagSel[b.username] = true; });
+  renderBrkSell(); brkRenderRoster();
+}
+
+// ── Assigned to me (win-back queue) ───────────────────────
+function brkRenderQueue() {
+  const el = document.getElementById('brkMyQueue'); if (!el) return;
+  const mine = _brkAllBuyers.filter(function (b) { return b.assigned_to === currentUser.id; })
+    .sort(function (a, c) { return (c._eSpent || 0) - (a._eSpent || 0); });
+  if (!mine.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:0.7rem 0.85rem;">' +
+    '<div style="font-size:0.7rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:#c084fc;margin-bottom:0.5rem;">📬 Assigned to you · ' + mine.length + ' win-back' + (mine.length > 1 ? 's' : '') + '</div>' +
+    mine.map(function (b) {
+      const contacted = BuyerIntel.contactedRecently(b);
+      const u = (b.username || '').replace(/'/g, "\\'");
+      return '<div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;border-top:1px solid var(--border);' + (contacted ? 'opacity:0.6;' : '') + '">' +
+        '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:0.86rem;">@' + escHtml(b.username) + ' ' + brkTierBadge(b._tier, b) + (contacted ? ' <span style="font-size:0.6rem;background:rgba(47,191,113,0.14);color:#2fbf71;padding:1px 6px;border-radius:4px;font-weight:800;">✓ reached out</span>' : '') + '</div>' +
+          '<div style="font-size:0.7rem;color:var(--muted);">$' + Number(b._eSpent || 0).toFixed(0) + ' lifetime · last buy ' + brkRelDate(b._eLast || b.last_purchase_date) + (brkTagText(b) ? ' · 🏷 ' + escHtml(brkTagText(b)) : '') + '</div></div>' +
+        '<button onclick="brkCopyWinback(\'' + b.id + '\',\'' + u + '\')" class="btn btn-sm' + (contacted ? ' btn-outline' : '') + '" style="padding:0.3rem 0.65rem;font-size:0.7rem;flex-shrink:0;">' + (contacted ? 'Again' : 'Win-back DM') + '</button>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+async function brkCopyWinback(buyerId, username) {
+  const msg = 'Hey @' + username + '! Haven\'t seen you in a bit — we\'ve got some fire breaks coming up I think you\'d love. Come hang soon 🔥';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(msg); showGlobalSuccess('Win-back copied — paste it into a Whatnot DM to @' + username + '. Logged.'); }
+    catch (e) { showGlobalError('Couldn\'t copy automatically. Message: ' + msg); }
+  } else { showGlobalError('Copy not supported here. Message: ' + msg); }
+  try {
+    const b = _brkAllBuyers.find(function (x) { return x.id === buyerId; });
+    await BuyerIntel.logTouch(sb, { orgId: currentProfile.org_id, buyerId: buyerId, userId: currentUser.id, channel: 'whatnot_dm', note: 'Win-back DM copied', segment: b ? (b._tier === 'regular' && b._fading ? 'fading' : b._tier) : 'cold' });
+    if (b) b.last_cold_alert_at = new Date().toISOString();
+    brkRenderQueue();
+  } catch (e) { showGlobalError('Couldn\'t log the outreach: ' + e.message); }
+}
+
+// ── Slips needed (data freshness) ─────────────────────────
+var _brkSlipStatus = null;
+async function brkLoadSlipStatus(force) {
+  if (!currentProfile) return null;
+  if (_brkSlipStatus && !force) { brkRenderSlipBanner(); brkRenderSlipsNeeded(); return _brkSlipStatus; }
+  try { _brkSlipStatus = await BuyerIntel.fetchSlipStatus(sb, currentProfile.org_id, { breakerId: currentUser.id, days: 45 }); }
+  catch (e) { console.error('slip status failed:', e.message); _brkSlipStatus = null; }
+  brkRenderSlipBanner(); brkRenderSlipsNeeded();
+  return _brkSlipStatus;
+}
+
+function brkFmtDate(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'; }
+
+function brkRenderSlipBanner() {
+  const el = document.getElementById('brkSlipBanner'); if (!el) return;
+  const st = _brkSlipStatus;
+  if (!st || !st.available || !st.missing.length) { el.style.display = 'none'; return; }
+  const n = st.missing.length;
+  const sales = st.missing.reduce(function (s, x) { return s + (parseFloat(x.final_sales) || 0); }, 0);
+  el.innerHTML = '<div style="background:rgba(240,96,63,0.08);border:1px solid rgba(240,96,63,0.35);border-radius:12px;padding:0.65rem 0.9rem;display:flex;align-items:center;justify-content:space-between;gap:0.6rem;flex-wrap:wrap;">' +
+    '<div style="font-size:0.8rem;"><strong style="color:#f0603f;">📄 ' + n + ' closed stream' + (n > 1 ? 's' : '') + ' still need packing slips</strong> <span style="color:var(--muted);">— ' + fmt(sales) + ' of your sales isn\'t counting toward buyers, whales or win-backs.</span></div>' +
+    '<button class="btn btn-sm" onclick="brkGoToSlips()" style="padding:0.3rem 0.8rem;font-size:0.72rem;flex-shrink:0;">Import now</button>' +
+  '</div>';
+  el.style.display = '';
+}
+
+function brkGoToSlips() {
+  const btn = document.querySelector('.breaker-tab-btn[data-tab="buyers"]');
+  if (btn) btn.click();
+  setBrkBuyersMode('sell');
+  setTimeout(function () { const el = document.getElementById('brkSlipsNeeded'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 250);
+}
+
+function brkRenderSlipsNeeded() {
+  const el = document.getElementById('brkSlipsNeeded'); if (!el) return;
+  const st = _brkSlipStatus;
+  if (!st || !st.available || !st.missing.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="panel" style="margin:0;border-color:rgba(240,96,63,0.3);">' +
+    '<div style="font-size:0.7rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:#f0603f;margin-bottom:0.15rem;">📄 Slips needed</div>' +
+    '<div style="font-size:0.74rem;color:var(--muted);margin-bottom:0.5rem;">Export the packing slips PDF from Whatnot for each stream and import it here. 10 seconds each.</div>' +
+    st.missing.map(function (s) {
+      return '<div style="display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0;border-top:1px solid var(--border);flex-wrap:wrap;">' +
+        '<div style="flex:1;min-width:120px;"><div style="font-weight:700;font-size:0.86rem;">' + escHtml(s.stream_key) + '</div><div style="font-size:0.7rem;color:var(--muted);">' + brkFmtDate(s.break_date) + ' · ' + fmt(s.final_sales || 0) + ' sales</div></div>' +
+        '<button onclick="openSlipImportFor(\'' + s.id + '\')" class="btn btn-sm" style="padding:0.3rem 0.7rem;font-size:0.72rem;">Import slips</button>' +
+        '<button onclick="brkSkipSlips(\'' + s.id + '\')" class="btn btn-sm btn-outline" style="padding:0.3rem 0.6rem;font-size:0.7rem;" title="No paid orders on this stream">No slips</button>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+// Import slips for a stream that's already closed (missed at closeout).
+var _slipImportTarget = null;
+function openSlipImportFor(streamId) {
+  const s = _brkSlipStatus && _brkSlipStatus.missing.find(function (x) { return x.id === streamId; });
+  if (!s) return;
+  _slipImportTarget = s;
+  initSlipImportModal();
+  const lbl = document.getElementById('siTargetLabel');
+  if (lbl) { lbl.textContent = 'Importing for ' + s.stream_key + ' · ' + brkFmtDate(s.break_date); lbl.style.display = ''; }
+  document.getElementById('slipImportModal').classList.add('active');
+}
+
+async function brkSkipSlips(streamId) {
+  if (!window.confirm('Mark this stream as having no packing slips (no paid orders)? It will stop showing here.')) return;
+  const { error } = await sb.from('streams').update({ slips_skipped_at: new Date().toISOString(), slips_skip_reason: 'no_sales' }).eq('id', streamId);
+  if (error) { showGlobalError(BuyerIntel.isMissingSchema(error) ? 'This needs migrations/010_buyer_crm.sql — ask the owner.' : 'Couldn\'t update: ' + error.message); return; }
+  await brkLoadSlipStatus(true);
+}
+
+// ── Last stream recap ─────────────────────────────────────
+async function brkRenderRecap() {
+  const el = document.getElementById('brkRecap'); if (!el) return;
+  try {
+    const { data: streams, error } = await sb.from('streams')
+      .select('id,stream_key,break_date,final_sales,slips_imported_at')
+      .eq('org_id', currentProfile.org_id).eq('breaker_id', currentUser.id).eq('status', 'closed')
+      .not('slips_imported_at', 'is', null).order('break_date', { ascending: false }).limit(1);
+    if (error || !streams || !streams.length) { el.innerHTML = ''; return; }
+    const s = streams[0];
+    const [pr, ar] = await Promise.all([
+      sb.from('buyer_purchases').select('buyer_id,amount').eq('stream_id', s.id),
+      sb.from('stream_attendees').select('buyer_id').eq('stream_id', s.id)
+    ]);
+    const sums = {};
+    (pr.data || []).forEach(function (p) { sums[p.buyer_id] = (sums[p.buyer_id] || 0) + (Number(p.amount) || 0); });
+    const buyerIds = Object.keys(sums);
+    const byId = {}; _brkAllBuyers.forEach(function (b) { byId[b.id] = b; });
+    const top = buyerIds.map(function (id) { return { b: byId[id], amt: sums[id] }; }).filter(function (x) { return x.b; }).sort(function (a, c) { return c.amt - a.amt; }).slice(0, 3);
+    const newCount = buyerIds.filter(function (id) { return byId[id] && byId[id].first_seen_date === s.break_date; }).length;
+    const whaleCount = buyerIds.filter(function (id) { return byId[id] && (byId[id]._tier === 'whale' || byId[id]._tier === 'cold'); }).length;
+    const attendees = (ar.data || []).map(function (a) { return a.buyer_id; });
+    const noBuy = attendees.filter(function (id) { return !sums[id] && byId[id]; }).map(function (id) { return byId[id]; });
+    const rev = buyerIds.reduce(function (t, id) { return t + sums[id]; }, 0);
+    el.innerHTML = '<div class="panel" style="margin:0;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">' +
+        '<div style="font-size:0.7rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);">🧾 Last stream recap · ' + escHtml(s.stream_key) + ' · ' + brkFmtDate(s.break_date) + '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:0.5rem;margin-bottom:0.6rem;">' +
+        '<div style="text-align:center;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;padding:7px 4px;"><div style="font-weight:800;font-size:0.95rem;">' + buyerIds.length + '</div><div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">buyers</div></div>' +
+        '<div style="text-align:center;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;padding:7px 4px;"><div style="font-weight:800;font-size:0.95rem;color:#3aa0ff;">' + newCount + '</div><div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">first-timers</div></div>' +
+        '<div style="text-align:center;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;padding:7px 4px;"><div style="font-weight:800;font-size:0.95rem;color:#e9b949;">' + whaleCount + '</div><div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">whales</div></div>' +
+        '<div style="text-align:center;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;padding:7px 4px;"><div style="font-weight:800;font-size:0.95rem;">$' + Math.round(rev).toLocaleString() + '</div><div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">buyer spend</div></div>' +
+      '</div>' +
+      (top.length ? '<div style="font-size:0.78rem;"><span style="color:var(--muted);">Top:</span> ' + top.map(function (x) { return '<strong>@' + escHtml(x.b.username) + '</strong> $' + Math.round(x.amt); }).join(' · ') + '</div>' : '') +
+      (noBuy.length ? '<div style="font-size:0.76rem;margin-top:0.3rem;color:var(--muted);">In the room, didn\'t buy: ' + noBuy.slice(0, 6).map(function (b) { return '@' + escHtml(b.username); }).join(', ') + (noBuy.length > 6 ? ' +' + (noBuy.length - 6) : '') + ' <span style="opacity:0.7;">— worth a shout-out next time.</span></div>' : '') +
+    '</div>';
+  } catch (e) { el.innerHTML = ''; }
+}
 
 function renderBrkSell() {
   const body = document.getElementById('brkSellBody');
   if (!body) return;
-  const whales = _brkAllBuyers.filter(b => b._tier === 'whale' && brkBuyerInChannel(b.id)).sort((a, b) => (b._eSpent || 0) - (a._eSpent || 0));
+  const whales = _brkAllBuyers.filter(b => (b._tier === 'whale' || b._tier === 'cold') && brkBuyerInChannel(b.id)).sort((a, b) => (b._eSpent || 0) - (a._eSpent || 0));
   const regulars = _brkAllBuyers.filter(b => b._tier === 'regular' && brkBuyerInChannel(b.id)).sort((a, b) => (b._eSpent || 0) - (a._eSpent || 0));
   const selCount = Object.keys(_brkTagSel).filter(u => _brkTagSel[u]).length;
   const copyLabel = selCount > 0 ? '📋 Copy ' + selCount + ' @tag' + (selCount > 1 ? 's' : '') : '📋 Copy @tags';
@@ -3441,10 +3689,10 @@ function renderBrkSell() {
     '</div>';
 
   let html = '';
-  // Whales
+  // Whales (a big buyer who's gone quiet is still worth tagging — that's how you bring them back)
   html += tagBar('👑 Whales · tap to tag into chat', '#e9b949', "brkSelectAllTier('whale')");
   html += whales.length
-    ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.5rem;margin-bottom:1.25rem;">' + whales.map(function(b) { return brkTagChip(b, '#e9b949', 'rgba(233,185,73,0.45)'); }).join('') + '</div>'
+    ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.5rem;margin-bottom:1.25rem;">' + whales.map(function(b) { return brkTagChip(b, b._tier === 'cold' ? '#f0603f' : '#e9b949', b._tier === 'cold' ? 'rgba(240,96,63,0.45)' : 'rgba(233,185,73,0.45)'); }).join('') + '</div>'
     : '<div style="padding:1.25rem;text-align:center;color:var(--muted);font-size:0.85rem;margin-bottom:1.25rem;">No whales yet — import some slips to build them.</div>';
   // Regulars — same tap-to-tag treatment
   html += tagBar('📊 Regulars · tap to tag into chat', '#93a6ff', "brkSelectAllTier('regular')");
@@ -3465,14 +3713,14 @@ function brkTagChip(b, accent, glow) {
       '<span style="font-weight:800;font-size:0.85rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@' + escHtml(b.username) + '</span>' +
       '<span onclick="event.stopPropagation();openBrkTagEdit(\'' + b.id + '\')" title="Edit tags" style="cursor:pointer;font-size:0.72rem;opacity:0.55;flex-shrink:0;">✏️</span>' +
     '</div>' +
-    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b._eSpent != null ? b._eSpent : (b.total_spent || 0)).toFixed(0) + ' · $' + Math.round(b._avgStream || 0) + '/str' + (brkHitBadge(b) > 0 ? ' · 🎯' + brkHitBadge(b) : '') + '</div>' +
+    '<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">$' + Number(b._eSpent != null ? b._eSpent : (b.total_spent || 0)).toFixed(0) + ' · $' + Math.round(b._avgStream || 0) + '/str' + (brkHitBadge(b) > 0 ? ' · 🎯' + brkHitBadge(b) : '') + (b._tier === 'cold' ? ' · <span style="color:#f0603f;font-weight:700;">quiet ' + b._since + 'd</span>' : b._fading ? ' · <span style="color:#f59e0b;font-weight:700;">fading</span>' : '') + (currentStream && brkRosterHas(b.id) ? ' · <span style="color:#2fbf71;font-weight:700;">📍 here</span>' : '') + '</div>' +
     (tags ? '<div style="font-size:0.68rem;color:#93a6ff;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(tags) + '</div>' : '') +
   '</div>';
 }
 
-function brkToggleTag(u) { if (_brkTagSel[u]) delete _brkTagSel[u]; else _brkTagSel[u] = true; renderBrkSell(); }
-function brkSelectAllTier(tier) { _brkAllBuyers.filter(b => b._tier === tier && brkBuyerInChannel(b.id)).forEach(b => { _brkTagSel[b.username] = true; }); renderBrkSell(); }
-function brkClearTags() { _brkTagSel = {}; renderBrkSell(); }
+function brkToggleTag(u) { if (_brkTagSel[u]) delete _brkTagSel[u]; else _brkTagSel[u] = true; renderBrkSell(); brkRenderRoster(); }
+function brkSelectAllTier(tier) { _brkAllBuyers.filter(b => (b._tier === tier || (tier === 'whale' && b._tier === 'cold')) && brkBuyerInChannel(b.id)).forEach(b => { _brkTagSel[b.username] = true; }); renderBrkSell(); brkRenderRoster(); }
+function brkClearTags() { _brkTagSel = {}; renderBrkSell(); brkRenderRoster(); }
 
 async function brkCopyTags() {
   let names = Object.keys(_brkTagSel).filter(u => _brkTagSel[u]);
@@ -3490,11 +3738,17 @@ function renderBrkSearch() {
   if (!el) return;
   const q = (document.getElementById('brkBuyersSearch').value || '').trim().toLowerCase().replace(/^@/, '');
   if (!q) { el.innerHTML = ''; return; }
-  let list = _brkAllBuyers.filter(b => (Number(b.total_spent || 0) > 0 || (b._hitCount || 0) > 0) && brkBuyerInChannel(b.id) && ((b.username || '').toLowerCase().includes(q) || (b.real_name || '').toLowerCase().includes(q)));
+  let list = _brkAllBuyers.filter(b => (Number(b.total_spent || 0) > 0 || (b._hitCount || 0) > 0 || (currentStream && brkRosterHas(b.id))) && brkBuyerInChannel(b.id) && ((b.username || '').toLowerCase().includes(q) || (b.real_name || '').toLowerCase().includes(q)));
   list.sort((a, b) => Number(b.total_spent) - Number(a.total_spent));
   const total = list.length; list = list.slice(0, 6);
-  if (!list.length) { el.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--muted);font-size:0.85rem;">No buyer matches "' + escHtml(q) + '".</div>'; return; }
-  el.innerHTML = list.map(brkFactsCard).join('') + (total > 6 ? '<div style="font-size:0.7rem;color:var(--muted);text-align:center;padding:0.3rem;">+' + (total - 6) + ' more — keep typing.</div>' : '');
+  const qEsc = q.replace(/'/g, "\\'");
+  const exact = _brkAllBuyers.some(b => (b.username || '').toLowerCase() === q);
+  // Live: a username nobody's seen before is a first-timer in the room — add them on the spot.
+  const addUnknown = (currentStream && _brkRosterAvailable && !exact && /^[a-z0-9._-]{2,40}$/.test(q))
+    ? '<div style="text-align:center;padding:0.4rem 0 0.2rem;"><button onclick="brkAddUnknownHere(\'' + qEsc + '\')" class="btn btn-sm btn-outline" style="padding:0.3rem 0.8rem;font-size:0.72rem;">🆕 Add @' + escHtml(q) + ' as a first-timer &amp; mark here</button></div>'
+    : '';
+  if (!list.length) { el.innerHTML = '<div style="padding:1rem 1rem 0.4rem;text-align:center;color:var(--muted);font-size:0.85rem;">No buyer matches "' + escHtml(q) + '".</div>' + addUnknown; return; }
+  el.innerHTML = list.map(brkFactsCard).join('') + (total > 6 ? '<div style="font-size:0.7rem;color:var(--muted);text-align:center;padding:0.3rem;">+' + (total - 6) + ' more — keep typing.</div>' : '') + addUnknown;
 }
 
 function brkFactsCard(b) {
@@ -3510,11 +3764,19 @@ function brkFactsCard(b) {
     ['🎯 ' + brkHitBadge(b), 'Hits'],
     [eLast ? brkRelDate(eLast) : '—', 'Last buy']
   ];
-  return '<div style="background:var(--card);border:1px solid ' + (b._tier === 'whale' ? 'rgba(233,185,73,0.4)' : 'var(--border)') + ';border-radius:12px;padding:13px 15px;margin-bottom:0.6rem;">' +
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;"><span style="font-size:1.05rem;font-weight:800;">@' + escHtml(b.username) + '</span>' + brkTierBadge(b._tier) + '</div>' +
+  const here = currentStream && brkRosterHas(b.id);
+  const inferred = !tags && _brkAffinity ? BuyerIntel.topAffinity(_brkAffinity, b.id) : null;
+  const hereBtn = currentStream && _brkRosterAvailable
+    ? (here ? '<span style="font-size:0.72rem;font-weight:800;color:#2fbf71;flex-shrink:0;">📍 In the room</span>'
+            : '<button onclick="brkMarkHere(\'' + b.id + '\')" class="btn btn-sm" style="padding:0.32rem 0.8rem;font-size:0.74rem;flex-shrink:0;">📍 Here</button>')
+    : '';
+  return '<div style="background:var(--card);border:1px solid ' + (b._tier === 'whale' ? 'rgba(233,185,73,0.4)' : b._tier === 'cold' ? 'rgba(240,96,63,0.4)' : 'var(--border)') + ';border-radius:12px;padding:13px 15px;margin-bottom:0.6rem;">' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;"><span style="font-size:1.05rem;font-weight:800;flex:1;">@' + escHtml(b.username) + ' ' + brkTierBadge(b._tier, b) + '</span>' + hereBtn + '</div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px;">' + stats.map(function(s) { return '<div style="flex:1;min-width:56px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:9px;padding:7px 4px;text-align:center;"><div style="font-weight:800;font-size:0.88rem;">' + s[0] + '</div><div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">' + s[1] + '</div></div>'; }).join('') + '</div>' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
-      (tags ? '<span style="font-size:0.78rem;color:#93a6ff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🏷 ' + escHtml(tags) + '</span>' : '<span style="font-size:0.75rem;color:var(--muted);">No collect tags yet</span>') +
+      (tags ? '<span style="font-size:0.78rem;color:#93a6ff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🏷 ' + escHtml(tags) + '</span>'
+            : inferred && inferred.share >= 0.4 ? '<span style="font-size:0.78rem;color:#c084fc;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="Inferred from what was opened in the streams they buy in">🧠 Buys ' + escHtml(inferred.category) + ' (' + Math.round(inferred.share * 100) + '%)</span>'
+            : '<span style="font-size:0.75rem;color:var(--muted);">No collect tags yet</span>') +
       '<button onclick="openBrkTagEdit(\'' + b.id + '\')" class="btn btn-sm btn-outline" style="padding:0.28rem 0.65rem;font-size:0.7rem;flex-shrink:0;">✏️ ' + (tags ? 'Edit tags' : 'Add fav team') + '</button>' +
     '</div>' +
   '</div>';
@@ -3549,6 +3811,7 @@ async function saveBrkTags() {
   showGlobalSuccess('Tags saved for @' + (b ? b.username : 'buyer') + '.');
   renderBrkSell();
   renderBrkSearch();
+  brkRenderRoster();
 }
 
 async function loadBrkHitBoard() {
@@ -3692,18 +3955,21 @@ function siStatCard(value, label) {
 
 async function confirmSlipImport() {
   if (!_parsedSlipData || !currentProfile) { skipSlipImport(); return; }
+  // A past-stream import (from "Slips needed") targets that stream; otherwise the live one.
+  var target = _slipImportTarget || currentStream;
   // Clear, specific reasons the import can't proceed — beats a vague downstream error.
   if (!_parsedSlipData.buyers || !_parsedSlipData.buyers.length) {
     showGlobalError('This slip parsed 0 paying buyers — the PDF may not be a standard Whatnot packing slip, or it only had giveaways. Nothing to import.');
     return;
   }
-  if (!currentStream || !currentStream.id) {
+  if (!target || !target.id) {
     showGlobalError('No active stream is loaded, so the slip can\'t be tied to a stream. Re-enter the Stream Key, then try again.');
     return;
   }
   var btn = document.getElementById('siConfirmBtn');
   btn.disabled = true;
   btn.textContent = 'Importing…';
+  var ok = false;
   try {
     var tok = await brkAuthToken();
     var resp = await fetch('/api/process-import', {
@@ -3711,9 +3977,9 @@ async function confirmSlipImport() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
       body: JSON.stringify({
         orgId: currentProfile.org_id,
-        streamId: currentStream ? currentStream.id : null,
+        streamId: target.id,
         buyers: _parsedSlipData.buyers,
-        streamDate: _parsedSlipData.streamDate,
+        streamDate: _parsedSlipData.streamDate || target.break_date,
         importedBy: currentUser.id,
         rawFilename: _parsedSlipData._filename || null
       })
@@ -3722,11 +3988,17 @@ async function confirmSlipImport() {
     if (!resp.ok) throw new Error(result.error || 'Import failed');
     _currentImportId = result.importId;
     _importedBuyers = _parsedSlipData.buyers || [];
+    ok = true;
     // Don't hide partial failures — tell the breaker exactly what didn't save
     if (result.errors && result.errors > 0) {
       showGlobalError(result.errors + ' of ' + (result.processed + result.errors) + ' buyers failed to import. Re-import this stream to retry.');
     } else {
-      showGlobalSuccess((result.processed || _importedBuyers.length) + ' buyers imported.');
+      var inRoomNoBuy = 0;
+      if (!_slipImportTarget && _brkRoster.length) {
+        var bought = {}; _importedBuyers.forEach(function (b) { bought[(b.username || '').toLowerCase()] = true; });
+        inRoomNoBuy = _brkRoster.filter(function (r) { var b = _brkAllBuyers.find(function (x) { return x.id === r.buyer_id; }); return b && !bought[(b.username || '').toLowerCase()]; }).length;
+      }
+      showGlobalSuccess((result.processed || _importedBuyers.length) + ' buyers imported' + (result.newBuyers ? ' · ' + result.newBuyers + ' first-timers' : '') + (inRoomNoBuy ? ' · ' + inRoomNoBuy + ' in the room didn\'t buy' : '') + '.');
     }
   } catch (err) {
     console.error('Import process error:', err.message);
@@ -3736,13 +4008,22 @@ async function confirmSlipImport() {
     btn.disabled = false;
     btn.textContent = 'Confirm Import';
   }
+  brkInvalidateBuyers();
   document.getElementById('slipImportModal').classList.remove('active');
+  if (_slipImportTarget) {
+    // Past-stream import: no closeout to continue — just refresh what depends on it.
+    _slipImportTarget = null;
+    document.getElementById('siTargetLabel').style.display = 'none';
+    if (ok) { brkLoadSlipStatus(true); if (_brkBuyersMode === 'sell') loadBrkSell(); }
+    return;
+  }
   openHitLoggingModal();
 }
 
 function skipSlipImport() {
   _importedBuyers = [];
   document.getElementById('slipImportModal').classList.remove('active');
+  if (_slipImportTarget) { _slipImportTarget = null; document.getElementById('siTargetLabel').style.display = 'none'; return; }
   openHitLoggingModal();
 }
 
@@ -3752,6 +4033,11 @@ var _hitBuyerOptions = [];
 function openHitLoggingModal() {
   document.getElementById('hitRows').innerHTML = '';
   _hitBuyerOptions = _importedBuyers.map(function(b) { return b.username; });
+  // Anyone marked "here" tonight is a hit candidate too (giveaway winners aren't on the slip)
+  _brkRoster.forEach(function (r) {
+    var b = _brkAllBuyers.find(function (x) { return x.id === r.buyer_id; });
+    if (b && _hitBuyerOptions.indexOf(b.username) === -1) _hitBuyerOptions.push(b.username);
+  });
 
   // Populate the buyer suggestion list (typing is still allowed for anyone not
   // on the slip — e.g. a giveaway winner who pulled the big hit)
