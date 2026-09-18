@@ -29,7 +29,7 @@ WHERE m.stream_id = s.id AND s.channel_id IS NULL;
 UPDATE public.streams s
 SET channel_id = one.channel_id
 FROM (
-  SELECT org_id, min(id) AS channel_id
+  SELECT org_id, (array_agg(id))[1] AS channel_id   -- no min(uuid) in Postgres; with count=1 any pick is the only one
   FROM public.channels
   GROUP BY org_id
   HAVING count(*) = 1
