@@ -2549,11 +2549,20 @@ async function ensureBuyerData(force) {
     _mgrBuyerChannelMap = new Map();
     Object.keys(rollups.byChannel).forEach(id => { _mgrBuyerChannelMap.set(id, new Set(Object.keys(rollups.byChannel[id]))); });
     _bi = { buyers, hits, rollups, streamCh, touches, facts: undefined, mix: undefined, affinity: null, loadedAt: Date.now() };
-    const src = document.getElementById('buyersDataSource');
-    if (src) src.textContent = rollups.source === 'client' ? '· computing in browser — ask the owner to run migration 010' : '';
+    updateBuyersDiag();
     return _bi;
   })();
   try { return await _biPromise; } catch (e) { _biPromise = null; throw e; }
+}
+
+function updateBuyersDiag() {
+  const el = document.getElementById('buyersDataSource');
+  if (!el || !_bi) return;
+  const d = BuyerIntel.channelDiagnostic(_bi.rollups, _bi.streamCh, mgrSelCh());
+  let text = d.text;
+  if (_bi.rollups.source === 'client') text = (text ? text + ' · ' : '') + 'computing in browser — ask the owner to run migration 010';
+  el.textContent = text;
+  el.style.color = d.level === 'warn' ? '#f0603f' : 'var(--muted)';
 }
 
 async function ensureBuyerFacts() {
@@ -2756,8 +2765,11 @@ async function loadMgrBuyersBoard() {
       const mine = b => b.assigned_to === currentUser.id;
       ['cold', 'whales', 'regulars', 'fresh', 'fading'].forEach(k => { seg[k] = seg[k].filter(mine); });
     }
+    updateBuyersDiag();
     if (!seg.spenders) {
-      el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No spending buyers yet.</div>';
+      const diag = BuyerIntel.channelDiagnostic(d.rollups, d.streamCh, selCh);
+      el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">' +
+        (selCh ? 'No buyers on this account yet.' + (diag.text ? '<div style="margin-top:0.4rem;font-size:0.78rem;color:#f0603f;">' + escHtml(diag.text) + '</div>' : '') : 'No spending buyers yet.') + '</div>';
       _mgrBoardData = null;
       return;
     }
@@ -3038,6 +3050,7 @@ async function onMgrBuyersChannelChange() {
   const el = document.getElementById(_mgrBuyersMode === 'board' ? 'mgrBuyersBoard' : _mgrBuyersMode === 'hits' ? 'mgrBuyersHits' : _mgrBuyersMode === 'health' ? 'buyersHealth' : 'mgrBuyersLeaderboard');
   try { await ensureBuyerData(); }
   catch (err) { if (el) el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load account data: ' + escHtml(err.message) + '</div>'; return; }
+  updateBuyersDiag();
   if (_mgrBuyersMode === 'board') loadMgrBuyersBoard();
   else if (_mgrBuyersMode === 'hits') { renderMgrHitFilter(); renderMgrHitBoard(); }
   else if (_mgrBuyersMode === 'health') loadMgrBuyersHealth();

@@ -115,11 +115,19 @@
   function emptyRoll() { return { spent: 0, breaks: 0, streams: 0, first: null, last: null, recent30: 0, prior30: 0, recent90: 0, purchaseDays: 0, medianGap: null }; }
 
   // Returns { lifetime: {buyer_id: roll}, byChannel: {buyer_id: {channel_id: roll}}, source }
+  //
+  // source: 'rpc'        — everything from buyer_rollups()
+  //         'rpc+client' — totals from the RPC, per-account figures computed here
+  //                        (the RPC returned none although streams ARE tagged)
+  //         'client'     — RPC unavailable (migration not run), all computed here
   async function fetchRollups(sb, orgId, opts) {
     opts = opts || {};
+    let streamCh = opts.streamChannels || null;
+    const taggedStreams = () => streamCh ? Object.keys(streamCh).length : 0;
     try {
       const rows = await pageAll(() => sb.rpc('buyer_rollups'));
       const lifetime = {}, byChannel = {};
+      let channelRows = 0;
       rows.forEach(r => {
         const roll = {
           spent: Number(r.spent) || 0, breaks: Number(r.breaks) || 0, streams: Number(r.streams) || 0,
@@ -127,15 +135,33 @@
           recent30: Number(r.recent30) || 0, prior30: Number(r.prior30) || 0, recent90: Number(r.recent90) || 0,
           purchaseDays: Number(r.purchase_days) || 0, medianGap: r.median_gap_days != null ? Number(r.median_gap_days) : null
         };
-        if (r.is_total) lifetime[r.buyer_id] = roll;
-        else if (r.channel_id) (byChannel[r.buyer_id] = byChannel[r.buyer_id] || {})[r.channel_id] = roll;
+        const total = r.is_total === true || r.is_total === 't' || r.is_total === 'true' || (r.is_total == null && !r.channel_id);
+        if (total) lifetime[r.buyer_id] = roll;
+        else if (r.channel_id) { channelRows++; (byChannel[r.buyer_id] = byChannel[r.buyer_id] || {})[r.channel_id] = roll; }
       });
-      return { lifetime, byChannel, source: 'rpc' };
+      // Safety net: streams are tagged to accounts but the server gave us no
+      // per-account rows — compute them here rather than show an empty board.
+      if (!channelRows) {
+        if (!streamCh) { try { streamCh = await fetchStreamChannels(sb, orgId, opts); } catch (e) { streamCh = {}; } }
+        if (taggedStreams() > 0) {
+          const c = await computeRollupsFromPurchases(sb, orgId, streamCh);
+          return { lifetime, byChannel: c.byChannel, source: 'rpc+client', rowCount: rows.length, channelRows: Object.keys(c.byChannel).length };
+        }
+      }
+      return { lifetime, byChannel, source: 'rpc', rowCount: rows.length, channelRows };
     } catch (e) {
       if (!isMissingSchema(e)) throw e;
     }
     // Fallback: same numbers, computed here from every purchase row.
-    const streamCh = opts.streamChannels || await fetchStreamChannels(sb, orgId, opts);
+    if (!streamCh) streamCh = await fetchStreamChannels(sb, orgId, opts);
+    const c = await computeRollupsFromPurchases(sb, orgId, streamCh);
+    return { lifetime: c.lifetime, byChannel: c.byChannel, source: 'client', rowCount: c.purchases, channelRows: Object.keys(c.byChannel).length };
+  }
+
+  // Browser-side rollups from every buyer_purchases row. Slower than the RPC;
+  // used as the fallback and as the per-account safety net.
+  async function computeRollupsFromPurchases(sb, orgId, streamCh) {
+    streamCh = streamCh || {};
     const s30 = isoDaysAgo(30), s60 = isoDaysAgo(60), s90 = isoDaysAgo(90);
     const purchases = await pageAll(() => sb.from('buyer_purchases').select('buyer_id,stream_id,amount,purchase_date').eq('organization_id', orgId));
     const lifetime = {}, byChannel = {}, streamSets = {}, dateSets = {};
@@ -175,7 +201,25 @@
       }
       Object.keys(byChannel[id] || {}).forEach(ch => { byChannel[id][ch].streams = (streamSets[id + '|' + ch] || new Set()).size; });
     });
-    return { lifetime, byChannel, source: 'client' };
+    return { lifetime, byChannel, purchases: purchases.length };
+  }
+
+  // Plain-words explanation of what the account filter is working with, so
+  // "nothing shows up" is never silent. Mirrors the breaker's on-screen diag.
+  function channelDiagnostic(rollups, streamCh, channelId) {
+    streamCh = streamCh || {};
+    const taggedTotal = Object.keys(streamCh).length;
+    if (!channelId) {
+      if (!taggedTotal) return { level: 'warn', text: '⚠ no streams are tagged to any account yet — the account filter has nothing to work with' };
+      return { level: 'ok', text: '' };
+    }
+    const streamsInCh = Object.keys(streamCh).filter(sid => streamCh[sid] === channelId).length;
+    let buyersInCh = 0;
+    Object.keys((rollups && rollups.byChannel) || {}).forEach(id => { if (rollups.byChannel[id][channelId]) buyersInCh++; });
+    if (!taggedTotal) return { level: 'warn', text: '⚠ no streams are tagged to any account yet' };
+    if (!streamsInCh) return { level: 'warn', text: '⚠ 0 streams tagged to this account — streams get an account from the schedule/shift the breaker clocked into' };
+    if (!buyersInCh) return { level: 'warn', text: '⚠ ' + streamsInCh + ' streams on this account but no imported buyers from them yet (' + (rollups && rollups.source || '?') + ')' };
+    return { level: 'ok', text: buyersInCh + ' buyers · ' + streamsInCh + ' streams on this account' + (rollups && rollups.source !== 'rpc' ? ' · ' + rollups.source : '') };
   }
 
   // rows of buyer_stream_facts() — null if the migration isn't in yet
@@ -499,7 +543,7 @@
   global.BuyerIntel = {
     COLD_MAX_DAYS, CONTACTED_WINDOW_DAYS,
     daysSince, relDate, money, mono, isoDaysAgo, isMissingSchema, pageAll,
-    loadOrgSettings, fetchBuyers, fetchHitCounts, fetchStreamChannels, fetchRollups,
+    loadOrgSettings, fetchBuyers, fetchHitCounts, fetchStreamChannels, fetchRollups, computeRollupsFromPurchases, channelDiagnostic,
     fetchStreamFacts, fetchCategoryMix, fetchTouches, fetchBuyerTouches, logTouch,
     effective, inChannel, enrich, segment, contactedRecently,
     winbackStats, buildAffinity, topAffinity, healthMetrics, fetchSlipStatus

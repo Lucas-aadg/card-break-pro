@@ -9221,11 +9221,22 @@ async function ensureBuyerData(force) {
     _buyerChannelMap = new Map();
     Object.keys(rollups.byChannel).forEach(id => { _buyerChannelMap.set(id, new Set(Object.keys(rollups.byChannel[id]))); });
     _bi = { buyers, hits, rollups, streamCh, touches, facts: undefined, mix: undefined, affinity: null, loadedAt: Date.now() };
-    const src = document.getElementById('buyersDataSource');
-    if (src) src.textContent = rollups.source === 'client' ? '· computing in browser — run migration 010 for server rollups' : '';
+    updateBuyersDiag();
     return _bi;
   })();
   try { return await _biPromise; } catch (e) { _biPromise = null; throw e; }
+}
+
+// Plain-words status next to the account filter — what the filter is working
+// with and where the numbers came from. Never let "nothing shows up" be silent.
+function updateBuyersDiag() {
+  const el = document.getElementById('buyersDataSource');
+  if (!el || !_bi) return;
+  const d = BuyerIntel.channelDiagnostic(_bi.rollups, _bi.streamCh, buyersSelCh());
+  let text = d.text;
+  if (_bi.rollups.source === 'client') text = (text ? text + ' · ' : '') + 'computing in browser — run migration 010 for server rollups';
+  el.textContent = text;
+  el.style.color = d.level === 'warn' ? '#f0603f' : 'var(--muted)';
 }
 
 // Stream facts + category mix are only needed by Health, affinity and the
@@ -9456,8 +9467,12 @@ async function loadBuyersBoard() {
     // breaker pages use. Effective figures follow the account filter.
     BuyerIntel.enrich(d.buyers, d.rollups, { channelId: selCh, whaleMin: WHALE_MIN, coldAfterDays: COLD_MIN_DAYS });
     const seg = BuyerIntel.segment(d.buyers);
+    updateBuyersDiag();
     if (!seg.spenders) {
-      el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">No spending buyers yet. Import packing slips at closeout to build your board.</div>';
+      const diag = BuyerIntel.channelDiagnostic(d.rollups, d.streamCh, selCh);
+      el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">' +
+        (selCh ? 'No buyers on this account yet.' + (diag.text ? '<div style="margin-top:0.4rem;font-size:0.78rem;color:#f0603f;">' + escHtml(diag.text) + '</div>' : '')
+               : 'No spending buyers yet. Import packing slips at closeout to build your board.') + '</div>';
       _boardData = null;
       return;
     }
@@ -9746,6 +9761,7 @@ async function onBuyersChannelChange() {
   const el = document.getElementById(_buyersMode === 'board' ? 'buyersBoard' : _buyersMode === 'hits' ? 'buyersHits' : _buyersMode === 'health' ? 'buyersHealth' : 'buyersLeaderboard');
   try { await ensureBuyerData(); }
   catch (err) { if (el) el.innerHTML = '<div style="padding:1.5rem;color:var(--red);font-size:0.85rem;">Failed to load account data: ' + escHtml(err.message) + '</div>'; return; }
+  updateBuyersDiag();
   // Re-render whichever view is active
   if (_buyersMode === 'board') loadBuyersBoard();
   else if (_buyersMode === 'hits') { renderHitFilter(); renderHitBoard(); }
