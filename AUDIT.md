@@ -167,7 +167,7 @@ Product decision taken alongside the fixes: **sorters are hourly, full stop.** P
 | BL-9 / BL-10 | Fixed — `adjust_stock()` / `adjust_stock_admin()` do `current_stock = current_stock + delta` atomically and write the log line; stock may go negative and shows as "OVER-USED"; all 4 writers switched (breaker submit, owner edit-stream, manager restock, stream delete) with a non-atomic fallback until 013 runs | migration 013; breaker.html; owner.html; manager.html; features.js |
 | BL-11 | Fixed — `recompute_stream_totals()` rebuilds `streams.total_*` from `breaks` after every submit | migration 013; breaker.html `handleSubmitBreak` |
 | BL-12 | Fixed — insert skips dates the person already has (same time), reports skipped count; partial unique index attempted in 013 (skips with a NOTICE if duplicates already exist) | owner.html `setupSchedSave`; migration 013 §10 |
-| BL-13 | Fixed in code — `SHIFT_REMINDER_MODE=day` (default; works on a daily cron): every unreminded shift *later today, org-local*; `30min` mode restores the original ping for a 5-minute cron. Times interpreted in the org timezone. **Plan decision still open** (see SC-8). | cron.js `runShiftReminders` |
+| BL-13 | Fixed — cron runs every 5 min (Vercel Pro); `30min` mode is the default, times interpreted in the org timezone. `SHIFT_REMINDER_MODE=day` is the fallback for a once-a-day cron. | cron.js `runShiftReminders`; vercel.json |
 | BL-15 | Fixed — leaderboard snapshot month = the stream's `break_date` month; live fallback buckets by `break_date`; one paged query instead of N | features.js `updateLeaderboardOnStreamClose`, leaderboard fallback |
 | BL-16 | Fixed — dropped the nonexistent `commission_amount`; streak computed from `break_date`; Achievements tab also awards `streak_days` now; `commission_earned` milestones documented as unawardable | features.js `checkMilestoneTriggers`, milestones GET |
 | BL-17 / SC-9 | Fixed — `recalc_leaderboard_ranks()` window-function UPDATE, loop fallback | migration 013; features.js |
@@ -188,7 +188,7 @@ Product decision taken alongside the fixes: **sorters are hourly, full stop.** P
 | SC-5 | Fixed — composite indexes on streams / breaks / schedules / sort_tasks / tips / notifications / buyer_purchases (each wrapped so a table missing from the repo skips with a NOTICE) | migration 013 §9 |
 | SC-6 | Fixed for the three heaviest pages (dashboard, ROI, performance → SQL). Payroll is still per-staff queries (bounded by team size, paged) | migration 013 §8 |
 | SC-7 | Fixed — `recompute_buyer_totals(org, ids[])` one UPDATE; loop fallback | migration 013 §5; process-import.js |
-| SC-8 / CQ-6 | **Open — plan decision.** Code is now correct on either plan; `SHIFT_REMINDER_MODE=30min` + a `*/5 * * * *` cron needs Vercel Pro (or pg_cron). | — |
+| SC-8 / CQ-6 | Resolved — Vercel Pro confirmed; shift reminders every 5 min, digest hourly. The 12-function cap no longer applies (features.js can be split when convenient). | vercel.json |
 | CQ-1 | Fixed — `shared.js` (timezone, "today", period edges, prorated hours, salary proration, paging, error capture) used by all four pages and required by cron | shared.js |
 | CQ-2 | Improved — `CBP.captureError` → PostHog exception capture; the swallowed writes called out in the audit now read and report `error`. Remaining `.catch(() => {})` are on notification inserts (best-effort by design) | shared.js; pages; features.js |
 | CQ-3 | **Open** — needs `supabase db dump --schema-only` from a machine with DB access; not doable from here | — |

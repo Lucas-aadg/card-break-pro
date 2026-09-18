@@ -39,7 +39,8 @@ module.exports = async (req, res) => {
   try {
     if (type === 'trial')             return await runTrialEmails(sb, res);
     if (type === 'shift-reminder')    return await runShiftReminders(sb, res);
-    if (type === 'daily-digest')      return await runDailyDigest(sb, res);
+    if (type === 'digest')            return await runDigestOnly(sb, res);     // hourly: owner digests at their chosen local time
+    if (type === 'daily-digest')      return await runDailyDigest(sb, res);   // daily: renewals, cold alerts, slip nags (+ digest catch-up)
     if (type === 'annual-renewal')    return await runAnnualRenewalReminders(sb, res);
     if (type === 'goal-prompt')       return await runGoalPrompt(sb, res);
     if (type === 'leaderboard-reset') return await runLeaderboardReset(sb, res);
@@ -115,7 +116,9 @@ async function runTrialEmails(sb, res) {
 // The old code did '30min' logic on a daily cron, and treated scheduled_time as
 // UTC, so it matched nothing (AUDIT BL-13).
 async function runShiftReminders(sb, res) {
-  const mode = process.env.SHIFT_REMINDER_MODE === '30min' ? '30min' : 'day';
+  // vercel.json runs this every 5 minutes (Pro plan) → '30min' is the default.
+  // Set SHIFT_REMINDER_MODE=day if the cron ever goes back to once a day.
+  const mode = process.env.SHIFT_REMINDER_MODE === 'day' ? 'day' : '30min';
   const now = new Date();
   const results = { mode, sent: [], skipped: [], errors: [] };
 
@@ -225,6 +228,12 @@ const TIER_NAMES  = { standard: 'CardBreakPro' };
 function tierDisplayName(tier) {
   if (!tier) return 'Plan';
   return TIER_NAMES[tier] || (tier.charAt(0).toUpperCase() + tier.slice(1));
+}
+
+async function runDigestOnly(sb, res) {
+  const results = { digest: { sent: [], skipped: [], errors: [] } };
+  await runDigestEmails(sb, results.digest);
+  return res.status(200).json({ message: 'Done', results });
 }
 
 async function runDailyDigest(sb, res) {

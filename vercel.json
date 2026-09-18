@@ -50,7 +50,11 @@
     },
     {
       "path": "/api/cron?type=shift-reminder",
-      "schedule": "0 8 * * *"
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron?type=digest",
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron?type=daily-digest",
