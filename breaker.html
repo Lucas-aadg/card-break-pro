@@ -1600,8 +1600,9 @@ function recalcTotals() {
     }
   }
 
-  // Break Even: box cost + (box cost × fee rate) — what you need to earn to not lose money
-  const breakEvenTotal = boxCost + (boxCost * feeRate);
+  // Break Even: the gross you must sell so that, after the platform's cut, the
+  // boxes are paid for → cost / (1 − fee). (The old cost × (1 + fee) understated it.)
+  const breakEvenTotal = feeRate < 1 ? boxCost / (1 - feeRate) : boxCost;
   const breakEvenSpot = spots > 0 ? breakEvenTotal / spots : null;
   const beEl = document.getElementById('statBreakEven');
   const beSpotEl = document.getElementById('statBreakEvenSpot');

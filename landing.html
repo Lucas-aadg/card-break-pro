@@ -8,12 +8,13 @@
   <meta property="og:title" content="CardBreakPro — The Business OS for Live Card Breakers" />
   <meta property="og:description" content="Stop running your operation on spreadsheets. CardBreakPro gives live card breakers instant profit tracking, automated payroll, buyer CRM, and product ROI — all in one platform." />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://cardbreakpro.com/landing.html" />
-  <meta property="og:image" content="https://cardbreakpro.com/og-image.png" />
+  <meta property="og:url" content="https://cardbreakpro.com/" />
+  <meta property="og:image" content="https://cardbreakpro.com/logo.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="CardBreakPro — The Business OS for Live Card Breakers" />
   <meta name="twitter:description" content="Stop running your operation on spreadsheets. Know your numbers instantly." />
-  <link rel="canonical" href="https://cardbreakpro.com/landing.html" />
+  <link rel="canonical" href="https://cardbreakpro.com/" />
+  <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1389,7 +1390,7 @@
 
   <!-- ── NAV ── -->
   <nav>
-    <a href="/landing.html" class="nav-logo">CARD<span class="logo-break">BREAK</span>PRO</a>
+    <a href="/" class="nav-logo">CARD<span class="logo-break">BREAK</span>PRO</a>
     <div class="nav-center">
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
@@ -1427,7 +1428,7 @@
         <a href="/register" class="btn-green-lg">Start Free Trial</a>
         <a href="#features" class="btn-ghost-lg">See Features</a>
       </div>
-      <p class="hero-fine">No credit card required &nbsp;·&nbsp; Setup in 10 minutes</p>
+      <p class="hero-fine">30-day free trial &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; Setup in 10 minutes</p>
     </div>
 
     <div class="hero-right">
@@ -1494,23 +1495,23 @@
     </div>
   </section>
 
-  <!-- Stats strip -->
-  <div class="hero-stats">
+  <!-- Stats strip — only real numbers, filled from /api/platform-stats; hidden until they arrive -->
+  <div class="hero-stats" id="heroStats" style="display:none;">
     <div class="stat-item fu">
-      <div class="stat-num" id="s1">0</div>
+      <div class="stat-num" id="s1">—</div>
       <div class="stat-label">Breaks Tracked</div>
     </div>
     <div class="stat-item fu">
-      <div class="stat-num">$2.1M+</div>
-      <div class="stat-label">Revenue Processed</div>
+      <div class="stat-num" id="s3">—</div>
+      <div class="stat-label">Sales Tracked</div>
     </div>
     <div class="stat-item fu">
-      <div class="stat-num" id="s2">0</div>
-      <div class="stat-label">Streams Tracked</div>
+      <div class="stat-num" id="s2">—</div>
+      <div class="stat-label">Streams Closed</div>
     </div>
     <div class="stat-item fu">
-      <div class="stat-num">$0</div>
-      <div class="stat-label">Setup Cost</div>
+      <div class="stat-num" id="s4">—</div>
+      <div class="stat-label">Buyers Tracked</div>
     </div>
   </div>
 
@@ -1526,7 +1527,7 @@
         <span class="marquee-item">PRODUCT <span class="mg">ROI</span></span><span class="marquee-sep">·</span>
         <span class="marquee-item">PAYROLL AUTOMATION</span><span class="marquee-sep">·</span>
         <span class="marquee-item">INVENTORY <span class="mg">TRACKING</span></span><span class="marquee-sep">·</span>
-        <span class="marquee-item">AI <span class="mg">INSIGHTS</span></span><span class="marquee-sep">·</span>
+        <span class="marquee-item">STOCK <span class="mg">AUDIT</span></span><span class="marquee-sep">·</span>
       </div>
       <div class="marquee-content" aria-hidden="true">
         <span class="marquee-item">BREAK EVEN CALCULATOR</span><span class="marquee-sep">·</span>
@@ -1537,7 +1538,7 @@
         <span class="marquee-item">PRODUCT <span class="mg">ROI</span></span><span class="marquee-sep">·</span>
         <span class="marquee-item">PAYROLL AUTOMATION</span><span class="marquee-sep">·</span>
         <span class="marquee-item">INVENTORY <span class="mg">TRACKING</span></span><span class="marquee-sep">·</span>
-        <span class="marquee-item">AI <span class="mg">INSIGHTS</span></span><span class="marquee-sep">·</span>
+        <span class="marquee-item">STOCK <span class="mg">AUDIT</span></span><span class="marquee-sep">·</span>
       </div>
     </div>
   </div>
@@ -1624,10 +1625,10 @@
         <div class="feat-desc">Organize the chaos after a break. Assign hits, track fulfillment, and keep every buyer updated in real time.</div>
       </div>
       <div class="feat-card fu">
-        <div class="feat-icon">🤖</div>
+        <div class="feat-icon">💡</div>
         <div class="feat-badge fb-pro">Included</div>
-        <div class="feat-title">AI Insights</div>
-        <div class="feat-desc">Smart suggestions on what to run, what to cut, and when to go live — based on your actual data, not gut feeling.</div>
+        <div class="feat-title">Insights</div>
+        <div class="feat-desc">Plain-English callouts computed from your own streams — which products are carrying you, which are bleeding, which nights pay best. Data, not gut feeling.</div>
       </div>
     </div>
   </section>
@@ -1694,7 +1695,7 @@
 
           <div class="calc-result-wrap">
             <div class="calc-result-label">Break-Even Per Spot</div>
-            <div class="calc-result-num" id="cr">$7.36</div>
+            <div class="calc-result-num" id="cr">$8.70</div>
             <div class="calc-result-sub">Minimum price per spot to cover costs</div>
           </div>
         </div>
@@ -1737,23 +1738,23 @@
         <div class="role-badge rb-breaker">Breaker</div>
         <div class="role-title">Breaker</div>
         <ul class="role-features">
-          <li>Live stream tools</li>
-          <li>Hit logging &amp; submission</li>
-          <li>Personal commission tracking</li>
-          <li>Sort queue access</li>
-          <li>Break submission</li>
-          <li>Stream close-out</li>
+          <li>Live break calculator (phone-first)</li>
+          <li>Break-even &amp; profit per spot, live</li>
+          <li>One-tap close-out with packing-slip import</li>
+          <li>Big-hit logging</li>
+          <li>Their own pay &amp; commission view</li>
+          <li>Schedule, clock in/out, shift reminders</li>
         </ul>
       </div>
       <div class="role-card fu">
         <div class="role-badge rb-sorter">Sorter</div>
         <div class="role-title">Sorter</div>
         <ul class="role-features">
-          <li>Sort queue management</li>
-          <li>Hit verification</li>
-          <li>Fulfillment tracking</li>
-          <li>Buyer communication</li>
-          <li>Package queue access</li>
+          <li>Sort queue — claim, sort, ship</li>
+          <li>Per-stream break sheets</li>
+          <li>Clock in/out &amp; hours worked</li>
+          <li>Shift schedule &amp; swap requests</li>
+          <li>Nothing financial — by design</li>
         </ul>
       </div>
     </div>
@@ -1831,8 +1832,8 @@
         <div class="price-trial">&#10003; 30-day free trial</div>
         <div class="price-divider"></div>
         <div class="price-limits">
-          <div class="pl-row"><span class="pl-key">Organizations</span><span class="pl-val-green">Unlimited</span></div>
           <div class="pl-row"><span class="pl-key">Team seats</span><span class="pl-val-green">Unlimited</span></div>
+          <div class="pl-row"><span class="pl-key">Whatnot accounts</span><span class="pl-val-green">Unlimited</span></div>
         </div>
         <ul class="price-features">
           <li class="pf-unlimited">Instant profit tracking</li>
@@ -1846,7 +1847,7 @@
           <li class="pf-unlimited">Team management — <span class="pf-green">unlimited seats</span></li>
           <li>Sort queue &amp; scheduling tools</li>
           <li>Daily digest &amp; notifications</li>
-          <li class="pf-unlimited">AI Insights</li>
+          <li class="pf-unlimited">Insights &amp; stock audit</li>
           <li>Custom reporting</li>
           <li>Referral program access</li>
           <li>Priority support</li>
@@ -1872,7 +1873,7 @@
     <div class="faq-grid">
       <div class="faq-item fu">
         <div class="faq-q">Does this work with Whatnot, TikTok Shop, and YouTube?</div>
-        <div class="faq-a">Yes. CardBreakPro works alongside any streaming platform. You run your break wherever you want — we handle the business backend. Platform agnostic by design.</div>
+        <div class="faq-a">The break calculator, payroll, inventory and scheduling work for any platform — you enter the running total and we do the rest. Buyer intelligence is built on Whatnot packing-slip exports today; other platforms' order exports are on the roadmap.</div>
       </div>
       <div class="faq-item fu">
         <div class="faq-q">How long does setup take?</div>
@@ -1884,7 +1885,7 @@
       </div>
       <div class="faq-item fu">
         <div class="faq-q">How many team members can I add?</div>
-        <div class="faq-a">As many as you want. One plan, unlimited seats — breakers, sorters, and managers are all included at no extra cost. Run one organization or ten; the price doesn't change.</div>
+        <div class="faq-a">As many as you want. One plan, unlimited seats — breakers, sorters, and managers are all included at no extra cost, and so are all of your Whatnot accounts. The price doesn't change as you grow.</div>
       </div>
       <div class="faq-item fu">
         <div class="faq-q">What happens to my data if I cancel?</div>
@@ -1908,14 +1909,14 @@
         <span class="fh-strike">SPREADSHEETS.</span>
         <span class="fh-green">START KNOWING.</span>
       </h2>
-      <p class="final-sub">Join thousands of card breakers who finally know their numbers.</p>
+      <p class="final-sub">Built inside a working break operation, on real streams, every week. Now open to yours.</p>
       <a href="/register" class="btn-green-lg">Start Your Free Trial</a>
     </div>
   </section>
 
   <!-- ── FOOTER ── -->
   <footer>
-    <a href="/landing.html" class="footer-logo">CARD<span class="flb">BREAK</span>PRO</a>
+    <a href="/" class="footer-logo">CARD<span class="flb">BREAK</span>PRO</a>
     <div class="footer-links">
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
@@ -1942,45 +1943,45 @@
       observer.observe(el);
     });
 
-    // ── Counter animations ──
-    var countersStarted = false;
-
-    function startCounters() {
-      if (countersStarted) return;
-      countersStarted = true;
-
-      function animateCounter(el, target, duration) {
-        var start = 0;
-        var steps = duration / 16;
-        var increment = target / steps;
-        var current = 0;
-        var timer = setInterval(function() {
-          current += increment;
-          if (current >= target) {
-            current = target;
-            clearInterval(timer);
-          }
-          el.textContent = Math.floor(current).toLocaleString();
-        }, 16);
-      }
-
-      var s1El = document.getElementById('s1');
-      var s2El = document.getElementById('s2');
-      if (s1El) animateCounter(s1El, 12847, 2000);
-      if (s2El) animateCounter(s2El, 3204, 2000);
+    // ── Counter animations (real platform numbers only — no invented figures) ──
+    function animateCounter(el, target, duration, fmt) {
+      var steps = Math.max(1, duration / 16);
+      var increment = target / steps;
+      var current = 0;
+      var timer = setInterval(function() {
+        current += increment;
+        if (current >= target) { current = target; clearInterval(timer); }
+        el.textContent = fmt(current);
+      }, 16);
     }
-
-    var statsObserver = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting) {
-          startCounters();
-          statsObserver.disconnect();
-        }
-      });
-    }, { threshold: 0.1 });
-
-    var statsSection = document.querySelector('.hero-stats');
-    if (statsSection) statsObserver.observe(statsSection);
+    function fmtInt(n) { return Math.floor(n).toLocaleString('en-US'); }
+    function fmtMoney(n) {
+      if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return '$' + Math.floor(n / 1e3).toLocaleString('en-US') + 'K';
+      return '$' + Math.floor(n).toLocaleString('en-US');
+    }
+    function showStats(data) {
+      var strip = document.getElementById('heroStats');
+      if (!strip || !data) return;
+      var rows = [
+        ['s1', data.breaks_tracked, fmtInt],
+        ['s3', data.sales_tracked, fmtMoney],
+        ['s2', data.streams_closed, fmtInt],
+        ['s4', data.buyers_tracked, fmtInt]
+      ].filter(function(r) { return Number(r[1]) > 0; });
+      if (rows.length < 2) return;   // nothing worth bragging about yet
+      strip.style.display = '';
+      var started = false;
+      var obs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (!entry.isIntersecting || started) return;
+          started = true;
+          rows.forEach(function(r) { var el = document.getElementById(r[0]); if (el) animateCounter(el, Number(r[1]), 1600, r[2]); });
+          obs.disconnect();
+        });
+      }, { threshold: 0.1 });
+      obs.observe(strip);
+    }
 
     // ── Live calculator ──
     function calcBreakEven() {
@@ -1988,7 +1989,10 @@
       var feePercent = parseFloat(document.getElementById('cf2').value) || 0;
       var spots = parseFloat(document.getElementById('cs').value) || 1;
       if (spots < 1) spots = 1;
-      var result = (boxCost - (boxCost * feePercent / 100)) / spots;
+      // Break-even: you must GROSS enough that, after the platform takes its
+      // cut, the box is paid for → cost / (1 − fee), spread over the spots.
+      var feeFrac = Math.min(Math.max(feePercent / 100, 0), 0.99);
+      var result = (boxCost / (1 - feeFrac)) / spots;
       if (result < 0) result = 0;
       document.getElementById('cr').textContent = '$' + result.toFixed(2);
     }
@@ -2019,20 +2023,12 @@
       document.getElementById('toggleAnnual').classList.toggle('active', mode === 'annual');
     }
 
-    // ── Platform stats (silent fail) ──
+    // ── Platform stats (real, aggregated; the strip stays hidden if unavailable) ──
     (async function() {
       try {
         var res = await fetch('/api/platform-stats');
         if (!res.ok) return;
-        var data = await res.json();
-        if (data.breaks_tracked && !countersStarted) {
-          var el = document.getElementById('s1');
-          if (el) el.textContent = Number(data.breaks_tracked).toLocaleString();
-        }
-        if (data.active_buyers && !countersStarted) {
-          var el2 = document.getElementById('s2');
-          if (el2) el2.textContent = Number(data.active_buyers).toLocaleString();
-        }
+        showStats(await res.json());
       } catch (e) {}
     })();
   </script>
