@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CardBreakPro — The Back Office for Whatnot Card Breakers</title>
-  <meta name="description" content="Close the stream, see the real profit, pay the team. CardBreakPro is the back office for live card break operations: phone-first break calculator, close-out, payroll, inventory with a stock audit, and a buyer CRM built from your Whatnot packing slips." />
+  <meta name="description" content="Close the stream, see the real profit, pay the team. CardBreakPro is the back office for live card break operations: a live break calculator for the breaker's second screen, close-out, payroll, inventory with a stock audit, and a buyer CRM built from your Whatnot packing slips." />
   <meta property="og:title" content="CardBreakPro — Close the stream. See the profit. Pay the team." />
   <meta property="og:description" content="The back office for Whatnot break operations: live break calculator, real net at close-out, payroll that computes itself, honest inventory, and a buyer CRM built from packing slips. $99/mo flat, unlimited team." />
   <meta property="og:type" content="website" />
@@ -148,8 +148,27 @@
     .btn-ghost-lg:hover { border-color: rgba(255,255,255,0.3); color: var(--w); }
     .hero-fine { font-size: 12px; color: var(--w40); }
 
-    /* Hero visual: the breaker's phone + two owner cards */
-    .hero-visual { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; min-height: 600px; }
+    /* Hero visual: the breaker's second screen (browser window) + two owner cards under it */
+    .hero-visual { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 14px; }
+    .win-wrap { position: relative; z-index: 2; width: 100%; }
+    .win {
+      background: #0b0d14; border: 1px solid var(--border2); border-radius: 14px; overflow: hidden;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .win-bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; background: var(--s2); border-bottom: 1px solid var(--border); }
+    .win-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--w20); flex-shrink: 0; }
+    .win-dot.r { background: #ff5f57; } .win-dot.y { background: #febc2e; } .win-dot.g { background: #28c840; }
+    .win-url { margin-left: 8px; flex: 1; min-width: 0; background: var(--s3); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 10px; color: var(--w40); letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .win-url b { color: var(--w60); font-weight: 600; }
+    .win-bar .ps-pill { margin-left: 8px; flex-shrink: 0; }
+    .win-body { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; padding: 14px; background: #0d0d14; }
+    .win-col { min-width: 0; }
+    .ps-fields.three { grid-template-columns: 1fr 1fr 1fr; }
+    .win .ps-stats { grid-template-columns: 1fr 1fr; }
+    .win .ps-total { flex-wrap: wrap; gap: 6px; }
+    .ps-foot { margin-top: 10px; font-size: 10px; color: var(--w40); text-align: center; }
+    .ps-foot .g { color: var(--green); font-weight: 700; }
+    .hero-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .phone {
       width: 322px; background: #0b0d14; border: 1px solid var(--border2); border-radius: 34px; padding: 11px;
       box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04); position: relative; z-index: 2;
@@ -190,14 +209,12 @@
     .ps-stat-v.g { color: var(--green); } .ps-stat-v.y { color: var(--yellow); }
     .ps-btn { margin-top: 10px; background: var(--green); color: #000; font-weight: 800; font-size: 11px; text-align: center; border-radius: 8px; padding: 9px; letter-spacing: 0.06em; }
 
-    /* The two owner cards only kiss the phone's edge (~30px) so nothing on the
-       screen is covered; they spill into the section gutters instead. */
+    /* What the owner sees of the same stream — sits under the breaker's window */
     .float-card {
-      position: absolute; right: -66px; bottom: 64px; width: 246px;
       background: var(--s1); border: 1px solid var(--border2); border-left: 3px solid var(--green); border-radius: 12px;
-      padding: 12px 14px; box-shadow: 0 30px 60px rgba(0,0,0,0.6); z-index: 3;
+      padding: 12px 14px; box-shadow: 0 30px 60px rgba(0,0,0,0.5); min-width: 0;
     }
-    .float-card.fc2 { left: -82px; top: 44px; right: auto; bottom: auto; border-left-color: var(--purple2); width: 236px; }
+    .float-card.fc2 { border-left-color: var(--purple2); }
     .float-card-l { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: var(--green); margin-bottom: 4px; }
     .fc2 .float-card-l { color: var(--purple2); }
     .float-card-t { font-size: 12px; font-weight: 600; color: var(--w80); margin-bottom: 8px; }
@@ -446,19 +463,140 @@
     .footer-links a:hover { color: var(--w80); }
     .footer-copy { font-size: 12px; color: var(--w20); }
 
+    /* ── MOTION ── */
+    @keyframes fade-up { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+    @keyframes rise-in { from { opacity: 0; transform: translateY(60px) scale(0.96); } to { opacity: 1; transform: none; } }
+    @keyframes slide-in-l { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+    @keyframes slide-in-r { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+    @keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+    @keyframes floaty2 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+    @keyframes drift1 { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(70px,-50px) scale(1.15); } }
+    @keyframes drift2 { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-60px,60px) scale(1.1); } }
+    @keyframes shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+    @keyframes blink-live { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    @keyframes pop-in { 0% { transform: scale(0.4); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.14); } 100% { transform: scale(1); } }
+    @keyframes flash-btn { 0% { background: var(--green); } 35% { background: #ffffff; } 100% { background: var(--green); } }
+
+    .scroll-progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; background: linear-gradient(90deg, var(--green), var(--purple2)); z-index: 1001; }
+    nav { transition: height .25s ease, box-shadow .25s ease, background .25s ease; }
+    nav.scrolled { height: 54px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); background: rgba(6,7,9,0.94); }
+    .nav-center a.active { color: var(--green); }
+
+    .hero-glow { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
+    .hero-glow.g1 { width: 680px; height: 680px; left: 36%; top: 6%; background: radial-gradient(circle, rgba(57,255,133,0.11) 0%, transparent 62%); animation: drift1 18s ease-in-out infinite; }
+    .hero-glow.g2 { width: 540px; height: 540px; left: -10%; top: 50%; background: radial-gradient(circle, rgba(139,92,246,0.14) 0%, transparent 62%); animation: drift2 22s ease-in-out infinite; }
+
+    /* hero entrance — runs once on load */
+    .hero-badge, .hero-headline span, .hero-hr, .hero-sub, .hero-ctas, .hero-fine { opacity: 0; animation: fade-up 0.8s cubic-bezier(.2,.7,.2,1) forwards; }
+    .hero-badge { animation-delay: 0.05s; }
+    .hero-headline .hl-white { animation-delay: 0.15s; }
+    .hero-headline .hl-dim { animation-delay: 0.41s; }
+    .hero-headline .hl-green {
+      background: linear-gradient(100deg, var(--green) 0%, #c8ffdd 45%, var(--green) 60%);
+      background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+      animation: fade-up 0.8s cubic-bezier(.2,.7,.2,1) 0.28s forwards, shimmer 7s linear 1.5s infinite;
+    }
+    .hero-hr { animation-delay: 0.5s; }
+    .hero-sub { animation-delay: 0.58s; }
+    .hero-ctas { animation-delay: 0.68s; }
+    .hero-fine { animation-delay: 0.78s; }
+    .win-wrap { opacity: 0; animation: rise-in 1s cubic-bezier(.2,.7,.2,1) 0.35s forwards; }
+    .hero-visual { perspective: 1400px; }
+    .win { transform-style: preserve-3d; transition: transform .18s ease-out; will-change: transform; }
+    .float-card.fc2 { opacity: 0; animation: slide-in-l 0.8s cubic-bezier(.2,.7,.2,1) 1.0s forwards, floaty 7s ease-in-out 1.8s infinite; }
+    .float-card:not(.fc2) { opacity: 0; animation: slide-in-r 0.8s cubic-bezier(.2,.7,.2,1) 1.2s forwards, floaty2 8s ease-in-out 2s infinite; }
+
+    /* live demo controls on the phone */
+    .demo-hint { position: absolute; top: -36px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green); white-space: nowrap; opacity: 0; animation: fade-up .6s ease 1.7s forwards; transition: opacity .4s; }
+    .demo-hint.done { opacity: 0 !important; }
+    .demo-hint .hero-badge-dot { width: 6px; height: 6px; }
+    .ps-step { display: inline-flex; align-items: center; border: 1px solid var(--border2); border-radius: 6px; background: var(--s3); overflow: hidden; }
+    .ps-step button { width: 20px; height: 22px; background: transparent; border: none; color: var(--w60); font-size: 13px; font-weight: 800; cursor: pointer; line-height: 1; padding: 0; font-family: inherit; transition: background .15s, color .15s; }
+    .ps-step button:hover { background: rgba(57,255,133,0.16); color: var(--green); }
+    .ps-step button:active { background: rgba(57,255,133,0.3); }
+    .ps-step b { min-width: 18px; text-align: center; font-size: 11px; color: var(--w); }
+    .ps-step.lg b { min-width: 30px; font-size: 10px; color: var(--w60); }
+    .ps-row.selected .ps-name { color: var(--w); }
+    .ps-stat-v.rd { color: var(--red); }
+    .ps-stat-v.bump { animation: bump .35s ease; }
+    .ps-btn { cursor: pointer; transition: transform .15s, opacity .15s; user-select: none; }
+    .ps-btn:hover { transform: translateY(-1px); }
+    .ps-btn.flash { animation: flash-btn .6s ease; }
+    .ps-toast { position: absolute; left: 50%; bottom: 16px; transform: translate(-50%, 10px); background: var(--s3); border: 1px solid var(--gborder); color: var(--w); font-size: 11px; font-weight: 600; padding: 7px 12px; border-radius: 100px; white-space: nowrap; opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none; z-index: 4; box-shadow: 0 12px 30px rgba(0,0,0,0.5); }
+    .ps-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    /* buttons: light sweep on hover */
+    .btn-green-lg, .btn-green, .btn-price-purple { position: relative; overflow: hidden; }
+    .btn-green-lg::after, .btn-green::after, .btn-price-purple::after { content: ''; position: absolute; top: -60%; left: -80%; width: 45%; height: 220%; background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%); transform: skewX(-20deg); transition: left .6s ease; pointer-events: none; }
+    .btn-green-lg:hover::after, .btn-green:hover::after, .btn-price-purple:hover::after { left: 130%; }
+
+    /* reveal variants + staggering */
+    .fu-l { transform: translateX(-36px); }
+    .fu-r { transform: translateX(36px); }
+    .fu.vis .tbl tbody tr, .fu.vis .buyer-row, .fu.vis .kpi, .fu.vis .roi-row, .fu.vis .note-line { opacity: 1; transform: none; }
+    .fu .tbl tbody tr, .fu .buyer-row, .fu .kpi, .fu .roi-row, .fu .note-line { opacity: 0; transform: translateY(10px); transition: opacity .55s ease, transform .55s ease; }
+    .fu.vis .tbl tbody tr:nth-child(1), .fu.vis .buyer-row:nth-child(2), .fu.vis .kpi:nth-child(1), .fu.vis .roi-row:nth-child(2) { transition-delay: .15s; }
+    .fu.vis .tbl tbody tr:nth-child(2), .fu.vis .buyer-row:nth-child(3), .fu.vis .kpi:nth-child(2), .fu.vis .roi-row:nth-child(3) { transition-delay: .3s; }
+    .fu.vis .tbl tbody tr:nth-child(3), .fu.vis .buyer-row:nth-child(4), .fu.vis .kpi:nth-child(3), .fu.vis .roi-row:nth-child(4) { transition-delay: .45s; }
+    .fu.vis .tbl tbody tr:nth-child(4), .fu.vis .buyer-row:nth-child(5), .fu.vis .kpi:nth-child(4), .fu.vis .roi-row:nth-child(5) { transition-delay: .6s; }
+    .fu.vis .note-line { transition-delay: .9s; }
+    .badge.live { animation: blink-live 1.6s ease-in-out infinite; }
+    .roi-bar-fill { width: 0; transition: width 1.3s cubic-bezier(.2,.7,.2,1); }
+    .fu.vis .roi-bar-fill { width: var(--w); }
+    .fu.vis .roi-row:nth-child(3) .roi-bar-fill { transition-delay: .15s; }
+    .fu.vis .roi-row:nth-child(4) .roi-bar-fill { transition-delay: .3s; }
+    .fu.vis .roi-row:nth-child(5) .roi-bar-fill { transition-delay: .45s; }
+
+    /* features: spotlight follows the cursor */
+    .feat-card { position: relative; overflow: hidden; }
+    .fu.vis.feat-card { transition: transform .25s ease, background .2s; }
+    .feat-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(57,255,133,0.12), transparent 60%); opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .feat-card:hover::before { opacity: 1; }
+    .fu.vis.feat-card:hover { transform: translateY(-4px); }
+    .feat-icon { display: inline-block; transition: transform .35s cubic-bezier(.2,.7,.2,1); }
+    .feat-card:hover .feat-icon { transform: scale(1.18) rotate(-6deg); }
+    .role-card, .faq-item, .ba-outcome { transition: transform .25s ease, border-color .2s, opacity .6s ease; }
+    .fu.vis.role-card:hover, .fu.vis.ba-outcome:hover { transform: translateY(-4px); border-color: var(--gborder); }
+
+    /* before / after: items check in one by one */
+    .ba-list li { opacity: 0; transform: translateX(-10px); transition: opacity .5s ease, transform .5s ease; }
+    .fu.vis .ba-list li { opacity: 1; transform: none; }
+    .fu.vis .ba-list li:nth-child(1) { transition-delay: .1s; } .fu.vis .ba-list li:nth-child(2) { transition-delay: .22s; }
+    .fu.vis .ba-list li:nth-child(3) { transition-delay: .34s; } .fu.vis .ba-list li:nth-child(4) { transition-delay: .46s; }
+    .fu.vis .ba-list li:nth-child(5) { transition-delay: .58s; } .fu.vis .ba-list li:nth-child(6) { transition-delay: .7s; }
+    .fu.vis .bc-after .ba-list li::before { animation: pop-in .45s ease both; }
+    .fu.vis .bc-after .ba-list li:nth-child(1)::before { animation-delay: .25s; } .fu.vis .bc-after .ba-list li:nth-child(2)::before { animation-delay: .37s; }
+    .fu.vis .bc-after .ba-list li:nth-child(3)::before { animation-delay: .49s; } .fu.vis .bc-after .ba-list li:nth-child(4)::before { animation-delay: .61s; }
+    .fu.vis .bc-after .ba-list li:nth-child(5)::before { animation-delay: .73s; } .fu.vis .bc-after .ba-list li:nth-child(6)::before { animation-delay: .85s; }
+
+    /* calculator verdict */
+    .calc-verdict { margin-top: 18px; padding: 12px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-align: center; border: 1px solid var(--border2); background: var(--s3); color: var(--w80); transition: background .3s, border-color .3s, color .3s; line-height: 1.5; }
+    .calc-verdict.ok { background: var(--gdim); border-color: var(--gborder); color: var(--green); }
+    .calc-verdict.bad { background: rgba(255,68,68,0.08); border-color: rgba(255,68,68,0.3); color: #ff8080; }
+    .calc-bar { position: relative; height: 6px; background: var(--w08); border-radius: 100px; margin-top: 10px; overflow: visible; }
+    .calc-bar i { display: block; height: 100%; border-radius: 100px; background: var(--green); width: 0; transition: width .45s cubic-bezier(.2,.7,.2,1), background .3s; }
+    .calc-bar.bad i { background: var(--red); }
+    .calc-bar em { position: absolute; top: -5px; left: 66.66%; width: 2px; height: 16px; background: var(--yellow); border-radius: 2px; }
+    .calc-bar-lbl { display: flex; justify-content: space-between; font-size: 10px; color: var(--w40); margin-top: 8px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .calc-bar-lbl b { color: var(--yellow); font-weight: 700; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; transition-delay: 0s !important; }
+      .hero-glow { display: none; }
+    }
+
     /* ── RESPONSIVE ── */
-    @media (max-width: 1200px) {
-      .float-card { display: none; }   /* not enough gutter to sit beside the phone without covering it */
+    @media (max-width: 640px) {
+      .win-body { grid-template-columns: 1fr; }
     }
     @media (max-width: 900px) {
       nav { padding: 0 1.2rem; }
       .nav-center { display: none; }
-      .hero { grid-template-columns: 1fr; padding: 90px 1.2rem 50px; min-height: auto; gap: 2.5rem; }
+      .hero { grid-template-columns: 1fr; padding: 90px 1.2rem 50px; min-height: auto; gap: 3.5rem; }
       .hero-deco-num { display: none; }
       .scroll-hint { display: none; }
       .hero-visual { min-height: auto; }
-      .float-card { display: none; }
-      .phone { width: 300px; }
       .hero-stats { grid-template-columns: repeat(2, 1fr); gap: 1.5rem; padding: 28px 1.2rem; }
       section { padding: 60px 1.2rem; }
       .how-step { grid-template-columns: 1fr; gap: 1.6rem; padding: 32px 20px; }
@@ -483,7 +621,12 @@
       .roles-grid { grid-template-columns: 1fr; }
       .hero-headline { font-size: 46px; }
       .hero-badge { white-space: normal; line-height: 1.4; font-size: 11px; padding: 6px 12px; }
+      .hero-cards { grid-template-columns: 1fr; }
+      .ps-fields.three { grid-template-columns: 1fr 1fr; }
       .frame-body { padding: 10px; overflow-x: auto; }
+      .tbl { font-size: 10px; }
+      .tbl th, .tbl td { padding: 6px 5px; }
+      .hide-sm { display: none; }
       .kv { grid-template-columns: 1fr 1fr; }
       .how-step { padding: 28px 16px; }
     }
@@ -491,6 +634,7 @@
 </head>
 <body>
 
+  <div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
   <nav>
     <a href="/" class="nav-logo">CARD<span class="logo-break">BREAK</span>PRO</a>
     <div class="nav-center">
@@ -507,6 +651,8 @@
 
   <!-- ── HERO ── -->
   <section class="hero">
+    <div class="hero-glow g1" aria-hidden="true"></div>
+    <div class="hero-glow g2" aria-hidden="true"></div>
     <div class="hero-deco-num" aria-hidden="true">+$1,885</div>
 
     <div class="hero-left">
@@ -524,7 +670,7 @@
       <div class="hero-hr"></div>
 
       <p class="hero-sub">
-        A <b>phone-first break calculator</b> for your breakers, a close-out that produces the <b>real net</b>, payroll that <b>computes itself</b>, inventory that stays honest, and a <b>buyer CRM built from your packing slips</b>. One login for the owner, the breakers and the sorters.
+        A <b>live break calculator</b> on the breaker's second screen, a close-out that produces the <b>real net</b>, payroll that <b>computes itself</b>, inventory that stays honest, and a <b>buyer CRM built from your packing slips</b>. One login for the owner, the breakers and the sorters.
       </p>
 
       <div class="hero-ctas">
@@ -535,79 +681,89 @@
     </div>
 
     <div class="hero-visual" aria-label="Product preview">
-      <!-- Owner: the stream just closed -->
-      <div class="float-card fc2">
-        <div class="float-card-l">&#9679; STREAM CLOSED</div>
-        <div class="float-card-t">FRI-NIGHT-042 · 6 breaks · Main account</div>
-        <div class="float-row"><span>Final platform total</span><b>$4,918.40</b></div>
-        <div class="float-row"><span>Box cost</span><b>$2,988.00</b></div>
-        <div class="float-row"><span>Other costs</span><b>$45.00</b></div>
-        <div class="float-row"><span>Net profit</span><span class="g">+$1,885.40</span></div>
-      </div>
-
-      <!-- Breaker: the live calculator -->
-      <div class="phone">
-        <div class="phone-screen">
-          <div class="ps-top">
-            <div class="ps-title">CARD<span class="dlb">BREAK</span>PRO</div>
-            <div class="ps-pill">&#9679; CLOCKED IN</div>
+      <!-- Breaker: the live calculator on their second screen — a working demo, click the boxes -->
+      <div class="win-wrap">
+        <div class="demo-hint" id="demoHint"><span class="hero-badge-dot"></span> Live demo — click the boxes</div>
+        <div class="win" id="demoPhone">
+          <div class="win-bar">
+            <span class="win-dot r"></span><span class="win-dot y"></span><span class="win-dot g"></span>
+            <div class="win-url">cardbreakpro.com/<b>break</b> · Break Entry</div>
+            <div class="ps-pill">&#9679; CLOCKED IN · 7:02 PM</div>
           </div>
-          <div class="ps-body">
-            <div class="ps-sec">Session</div>
-            <div class="ps-fields">
-              <div class="ps-field">Stream<b>FRI-NIGHT-042</b></div>
-              <div class="ps-field">Account<b>&#9673; Main</b></div>
+          <div class="win-body">
+            <div class="win-col">
+              <div class="ps-sec">Session</div>
+              <div class="ps-fields three">
+                <div class="ps-field">Stream<b>FRI-NIGHT-042</b></div>
+                <div class="ps-field">Date<b>Fri, Sep 18</b></div>
+                <div class="ps-field">Account<b>&#9673; Main</b></div>
+              </div>
+
+              <div class="ps-sec">Products · Main account · <span id="d-breakLbl">Break #3</span></div>
+              <div class="ps-pills">
+                <span class="ps-cat">All</span><span class="ps-cat on">Baseball</span><span class="ps-cat">Basketball</span><span class="ps-cat on">Giveaway</span>
+              </div>
+              <div class="ps-row selected" id="dr-topps">
+                <div class="ps-name">2024 Topps Chrome Hobby<span class="ps-sub">Baseball · $185.00 · <span id="dl-topps">9 left</span></span></div>
+                <div class="ps-step"><button type="button" onclick="demoQty('topps',-1)" aria-label="one less">&minus;</button><b id="dq-topps">2</b><button type="button" onclick="demoQty('topps',1)" aria-label="one more">+</button></div>
+                <div class="ps-ext" id="dx-topps">$370.00</div>
+              </div>
+              <div class="ps-row selected" id="dr-prizm">
+                <div class="ps-name">Prizm Basketball Blaster<span class="ps-sub">Basketball · $32.00 · <span id="dl-prizm">23 left</span></span></div>
+                <div class="ps-step"><button type="button" onclick="demoQty('prizm',-1)" aria-label="one less">&minus;</button><b id="dq-prizm">1</b><button type="button" onclick="demoQty('prizm',1)" aria-label="one more">+</button></div>
+                <div class="ps-ext" id="dx-prizm">$32.00</div>
+              </div>
+              <div class="ps-row selected" id="dr-give">
+                <div class="ps-name">Giveaway pack<span class="ps-sub">Giveaway · $10.00 · <span id="dl-give">39 left</span></span></div>
+                <div class="ps-step"><button type="button" onclick="demoQty('give',-1)" aria-label="one less">&minus;</button><b id="dq-give">1</b><button type="button" onclick="demoQty('give',1)" aria-label="one more">+</button></div>
+                <div class="ps-ext" id="dx-give">$10.00</div>
+              </div>
+              <div class="ps-strip">
+                <div class="ps-strip-title" id="d-strip">In this break — 4 boxes · $412.00</div>
+                <div class="ps-chips" id="d-chips"><span class="ps-chip">Topps Chrome <span>×2</span></span><span class="ps-chip">Prizm Blaster <span>×1</span></span><span class="ps-chip">Giveaway <span>×1</span></span></div>
+              </div>
             </div>
 
-            <div class="ps-sec">Products · Main account · Break #3</div>
-            <div class="ps-pills">
-              <span class="ps-cat">All</span><span class="ps-cat on">Baseball</span><span class="ps-cat">Basketball</span><span class="ps-cat on">Giveaway</span>
+            <div class="win-col">
+              <div class="ps-sec">This break</div>
+              <div class="ps-total">
+                <div class="ps-total-l">Platform running total<b id="d-total">$1,860.00</b></div>
+                <div class="ps-step lg" title="Nudge the running total"><button type="button" onclick="demoTotal(-50)" aria-label="fifty less">&minus;</button><b>$50</b><button type="button" onclick="demoTotal(50)" aria-label="fifty more">+</button></div>
+                <div class="ps-total-r">This break<b id="d-rev">$860.00</b></div>
+              </div>
+              <div class="ps-stats">
+                <div class="ps-stat"><div class="ps-stat-l">Box cost</div><div class="ps-stat-v" id="d-cost">$412.00</div></div>
+                <div class="ps-stat"><div class="ps-stat-l">Fees (8%)</div><div class="ps-stat-v" id="d-fees">$68.80</div></div>
+                <div class="ps-stat"><div class="ps-stat-l">Profit</div><div class="ps-stat-v g" id="d-profit">+$379.20</div></div>
+                <div class="ps-stat"><div class="ps-stat-l">Per spot (30)</div><div class="ps-stat-v g" id="d-pps">+$12.64</div></div>
+                <div class="ps-stat"><div class="ps-stat-l">Break-even</div><div class="ps-stat-v y" id="d-be">$447.83</div></div>
+                <div class="ps-stat"><div class="ps-stat-l">BE / spot</div><div class="ps-stat-v y" id="d-bes">$14.93</div></div>
+              </div>
+              <div class="ps-btn" id="d-btn" onclick="demoSubmit()" role="button" tabindex="0">SUBMIT BREAK #3</div>
+              <div class="ps-foot">Stream so far · 2 breaks · $2,120.00 · <span class="g">+$797.40</span></div>
             </div>
-            <div class="ps-row">
-              <div class="ps-name">2024 Topps Chrome Hobby<span class="ps-sub">Baseball · $185.00 · 11 left</span></div>
-              <div class="ps-qty">2</div>
-              <div class="ps-ext">$370.00</div>
-            </div>
-            <div class="ps-row">
-              <div class="ps-name">Prizm Basketball Blaster<span class="ps-sub">Basketball · $32.00 · 24 left</span></div>
-              <div class="ps-qty">1</div>
-              <div class="ps-ext">$32.00</div>
-            </div>
-            <div class="ps-row">
-              <div class="ps-name">Giveaway pack<span class="ps-sub">Giveaway · $10.00 · 40 left</span></div>
-              <div class="ps-qty">1</div>
-              <div class="ps-ext">$10.00</div>
-            </div>
-            <div class="ps-strip">
-              <div class="ps-strip-title">In this break — 4 boxes · $412.00</div>
-              <div class="ps-chips"><span class="ps-chip">Topps Chrome <span>×2</span></span><span class="ps-chip">Prizm Blaster <span>×1</span></span><span class="ps-chip">Giveaway <span>×1</span></span></div>
-            </div>
-
-            <div class="ps-sec">This break</div>
-            <div class="ps-total">
-              <div class="ps-total-l">Platform running total<b>$1,860.00</b></div>
-              <div class="ps-total-r">This break<b>$860.00</b></div>
-            </div>
-            <div class="ps-stats">
-              <div class="ps-stat"><div class="ps-stat-l">Box cost</div><div class="ps-stat-v">$412.00</div></div>
-              <div class="ps-stat"><div class="ps-stat-l">Fees (8%)</div><div class="ps-stat-v">$68.80</div></div>
-              <div class="ps-stat"><div class="ps-stat-l">Profit</div><div class="ps-stat-v g">+$379.20</div></div>
-              <div class="ps-stat"><div class="ps-stat-l">Per spot (30)</div><div class="ps-stat-v g">$12.64</div></div>
-              <div class="ps-stat"><div class="ps-stat-l">Break-even</div><div class="ps-stat-v y">$447.83</div></div>
-              <div class="ps-stat"><div class="ps-stat-l">BE / spot</div><div class="ps-stat-v y">$14.93</div></div>
-            </div>
-            <div class="ps-btn">SUBMIT BREAK #3</div>
           </div>
         </div>
+        <div class="ps-toast" id="demoToast"></div>
       </div>
 
-      <!-- Owner: payroll writes itself -->
-      <div class="float-card">
-        <div class="float-card-l">PAYROLL — OWED NOW</div>
-        <div class="float-card-t">This week · 3 people</div>
-        <div class="float-row"><span>Breaker · 15% commission</span><span class="g">$282.81</span></div>
-        <div class="float-row"><span>Sorter · 6.5 h × $18</span><span class="g">$117.00</span></div>
-        <div class="float-row"><span>Manager · salary, prorated</span><span class="g">$230.77</span></div>
+      <!-- Owner: the same stream from the dashboard -->
+      <div class="hero-cards">
+        <div class="float-card fc2">
+          <div class="float-card-l">&#9679; STREAM CLOSED</div>
+          <div class="float-card-t">FRI-NIGHT-042 · 6 breaks · Main account</div>
+          <div class="float-row"><span>Final platform total</span><b>$4,918.40</b></div>
+          <div class="float-row"><span>Box cost</span><b>$2,988.00</b></div>
+          <div class="float-row"><span>Other costs</span><b>$45.00</b></div>
+          <div class="float-row"><span>Net profit</span><span class="g" data-count>+$1,885.40</span></div>
+        </div>
+        <div class="float-card">
+          <div class="float-card-l">PAYROLL — OWED NOW</div>
+          <div class="float-card-t">This week · 3 people</div>
+          <div class="float-row"><span>Breaker · 15% commission</span><span class="g" data-count>$282.81</span></div>
+          <div class="float-row"><span>Sorter · 6.5 h × $18</span><span class="g" data-count>$117.00</span></div>
+          <div class="float-row"><span>Manager · salary, prorated</span><span class="g" data-count>$230.77</span></div>
+        </div>
       </div>
     </div>
 
@@ -666,8 +822,8 @@
       <div class="how-step fu">
         <div class="how-text">
           <div class="how-num">01 — DURING THE STREAM</div>
-          <h3 class="how-title">The breaker runs the break from their phone.</h3>
-          <p class="how-body">Pick the account you're streaming on, tap the boxes you're opening — any categories, giveaways included — and type the platform's <b>running total</b>. CardBreakPro derives this break's revenue, fees, profit and the per-spot price you needed to break even. Stock comes off the shelf count on its own.</p>
+          <h3 class="how-title">The breaker runs the break on a second screen.</h3>
+          <p class="how-body">Pick the account you're streaming on, click the boxes you're opening — any categories, giveaways included — and type the platform's <b>running total</b>. CardBreakPro derives this break's revenue, fees, profit and the per-spot price you needed to break even. Stock comes off the shelf count on its own.</p>
           <ul class="how-list">
             <li>No per-order data entry. One number per break.</li>
             <li>Only that account's products show; nothing selected is ever hidden by a filter.</li>
@@ -679,13 +835,13 @@
           <div class="frame-bar"><div class="frame-dot"></div><div class="frame-dot"></div><div class="frame-dot"></div><div class="frame-title">STREAM RUNNING TOTAL · FRI-NIGHT-042</div></div>
           <div class="frame-body">
             <table class="tbl">
-              <thead><tr><th>Break</th><th class="r">Revenue</th><th class="r">Boxes</th><th class="r">Fees</th><th class="r">Profit</th><th class="r">/ spot</th></tr></thead>
+              <thead><tr><th>Break</th><th class="r">Revenue</th><th class="r">Boxes</th><th class="r">Fees</th><th class="r">Profit</th><th class="r hide-sm">/ spot</th></tr></thead>
               <tbody>
-                <tr><td>#1 · 3 boxes</td><td class="r">$1,000.00</td><td class="r">$555.00</td><td class="r">$80.00</td><td class="r g">+$365.00</td><td class="r">$12.17</td></tr>
-                <tr><td>#2 · 4 boxes</td><td class="r">$1,120.00</td><td class="r">$598.00</td><td class="r">$89.60</td><td class="r g">+$432.40</td><td class="r">$14.41</td></tr>
-                <tr><td>#3 · 4 boxes <span class="badge g">live</span></td><td class="r">$860.00</td><td class="r">$412.00</td><td class="r">$68.80</td><td class="r g">+$379.20</td><td class="r">$12.64</td></tr>
+                <tr><td>#1 · 3 boxes</td><td class="r">$1,000.00</td><td class="r">$555.00</td><td class="r">$80.00</td><td class="r g">+$365.00</td><td class="r hide-sm">$12.17</td></tr>
+                <tr><td>#2 · 4 boxes</td><td class="r">$1,120.00</td><td class="r">$598.00</td><td class="r">$89.60</td><td class="r g">+$432.40</td><td class="r hide-sm">$14.41</td></tr>
+                <tr><td>#3 · 4 boxes <span class="badge g live">live</span></td><td class="r">$860.00</td><td class="r">$412.00</td><td class="r">$68.80</td><td class="r g">+$379.20</td><td class="r hide-sm">$12.64</td></tr>
               </tbody>
-              <tfoot><tr><td>Stream so far</td><td class="r">$2,980.00</td><td class="r">$1,565.00</td><td class="r">$238.40</td><td class="r g">+$1,176.60</td><td class="r"></td></tr></tfoot>
+              <tfoot><tr><td>Stream so far</td><td class="r">$2,980.00</td><td class="r">$1,565.00</td><td class="r">$238.40</td><td class="r g">+$1,176.60</td><td class="r hide-sm"></td></tr></tfoot>
             </table>
             <div class="note-line"><span class="badge gr">Topps Chrome 11 → 9 left</span><span class="badge gr">Prizm Blaster 24 → 23</span><span class="badge y">Giveaway pack LOW · 4 left</span></div>
           </div>
@@ -719,10 +875,10 @@
               <tfoot><tr><td>Totals</td><td class="r">$5,320.00</td><td class="r">$2,988.00</td><td class="r">$425.60</td><td class="r">$45.00</td></tr></tfoot>
             </table>
             <div class="kv" style="margin-top:12px;">
-              <div class="kpi"><div class="kpi-l">Final platform total</div><div class="kpi-v">$4,918.40</div></div>
-              <div class="kpi"><div class="kpi-l">Final fee</div><div class="kpi-v">$401.60</div></div>
-              <div class="kpi"><div class="kpi-l">Net profit</div><div class="kpi-v g">+$1,885.40</div></div>
-              <div class="kpi"><div class="kpi-l">Commission 15%</div><div class="kpi-v p">$282.81</div></div>
+              <div class="kpi"><div class="kpi-l">Final platform total</div><div class="kpi-v" data-count>$4,918.40</div></div>
+              <div class="kpi"><div class="kpi-l">Final fee</div><div class="kpi-v" data-count>$401.60</div></div>
+              <div class="kpi"><div class="kpi-l">Net profit</div><div class="kpi-v g" data-count>+$1,885.40</div></div>
+              <div class="kpi"><div class="kpi-l">Commission 15%</div><div class="kpi-v p" data-count>$282.81</div></div>
             </div>
             <div class="note-line"><span class="badge p">Packing slip imported</span><span>148 buyers · 31 first-timers · 4 whale-sized spends · $4,918 in orders</span></div>
           </div>
@@ -746,18 +902,18 @@
           <div class="frame-bar"><div class="frame-dot"></div><div class="frame-dot"></div><div class="frame-dot"></div><div class="frame-title">OWNER DASHBOARD · LAST 7 DAYS · ALL ACCOUNTS</div></div>
           <div class="frame-body">
             <div class="kv">
-              <div class="kpi"><div class="kpi-l">Sales</div><div class="kpi-v">$18,640</div></div>
-              <div class="kpi"><div class="kpi-l">Net profit</div><div class="kpi-v g">+$6,212</div></div>
-              <div class="kpi"><div class="kpi-l">Streams</div><div class="kpi-v">5</div></div>
-              <div class="kpi"><div class="kpi-l">Whales in room</div><div class="kpi-v p">7</div></div>
+              <div class="kpi"><div class="kpi-l">Sales</div><div class="kpi-v" data-count>$18,640</div></div>
+              <div class="kpi"><div class="kpi-l">Net profit</div><div class="kpi-v g" data-count>+$6,212</div></div>
+              <div class="kpi"><div class="kpi-l">Streams</div><div class="kpi-v" data-count>5</div></div>
+              <div class="kpi"><div class="kpi-l">Whales in room</div><div class="kpi-v p" data-count>7</div></div>
             </div>
             <table class="tbl">
-              <thead><tr><th>Payroll · this week</th><th>Basis</th><th class="r">Earned</th><th class="r">Paid</th><th class="r">Owed now</th></tr></thead>
+              <thead><tr><th>Payroll · this week</th><th class="hide-sm">Basis</th><th class="r">Earned</th><th class="r">Paid</th><th class="r">Owed now</th></tr></thead>
               <tbody>
-                <tr><td>Breaker A</td><td>15% of net</td><td class="r">$931.80</td><td class="r">$450.00</td><td class="r g">$481.80</td></tr>
-                <tr><td>Breaker B</td><td>$20/h + 5%</td><td class="r">$612.40</td><td class="r">$0.00</td><td class="r g">$612.40</td></tr>
-                <tr><td>Sorter</td><td>21.5 h × $18</td><td class="r">$387.00</td><td class="r">$0.00</td><td class="r g">$387.00</td></tr>
-                <tr><td>Manager</td><td>salary, prorated</td><td class="r">$230.77</td><td class="r">$230.77</td><td class="r">$0.00</td></tr>
+                <tr><td>Breaker A</td><td class="hide-sm">15% of net</td><td class="r">$931.80</td><td class="r">$450.00</td><td class="r g">$481.80</td></tr>
+                <tr><td>Breaker B</td><td class="hide-sm">$20/h + 5%</td><td class="r">$612.40</td><td class="r">$0.00</td><td class="r g">$612.40</td></tr>
+                <tr><td>Sorter</td><td class="hide-sm">21.5 h × $18</td><td class="r">$387.00</td><td class="r">$0.00</td><td class="r g">$387.00</td></tr>
+                <tr><td>Manager</td><td class="hide-sm">salary, prorated</td><td class="r">$230.77</td><td class="r">$230.77</td><td class="r">$0.00</td></tr>
               </tbody>
             </table>
             <div class="note-line"><span class="badge r">Stock audit: 2 products off</span><span class="badge y">12 buyers went cold — win-back queue</span><span class="badge g">Digest sent 9:00 AM</span></div>
@@ -799,12 +955,12 @@
       <div class="section-eyebrow ey-green">What's inside</div>
       <h2 class="section-headline">EVERY TOOL A BREAK OPERATION NEEDS. NOTHING IT DOESN'T.</h2>
     </div>
-    <div class="feat-grid">
+    <div class="feat-grid stagger">
       <div class="feat-card fu">
         <div class="feat-icon">⚡</div>
         <div class="feat-badge fb-core">Core</div>
         <div class="feat-title">Live Break Calculator</div>
-        <div class="feat-desc">Phone-first. Account-scoped products, any mix of categories, running-total entry, live profit, per-spot and break-even. Stock deducts atomically.</div>
+        <div class="feat-desc">Built for the monitor next to the stream. Account-scoped products, any mix of categories, running-total entry, live profit, per-spot and break-even. Stock deducts atomically.</div>
       </div>
       <div class="feat-card fu">
         <div class="feat-icon">✅</div>
@@ -840,7 +996,7 @@
         <div class="feat-icon">📅</div>
         <div class="feat-badge fb-core">Core</div>
         <div class="feat-title">Scheduling &amp; Clock</div>
-        <div class="feat-desc">Shifts per account, clock in/out from the phone, swap requests, shift reminders, and hours that flow straight into payroll.</div>
+        <div class="feat-desc">Shifts per account, clock in/out from any device, swap requests, shift reminders, and hours that flow straight into payroll.</div>
       </div>
       <div class="feat-card fu">
         <div class="feat-icon">📤</div>
@@ -861,7 +1017,7 @@
   <!-- ── BUYER CRM ── -->
   <section class="split">
     <div class="split-inner">
-      <div class="split-text fu">
+      <div class="split-text fu fu-l">
         <div class="section-eyebrow ey-purple">Buyer Intelligence</div>
         <h2 class="section-headline">YOUR BUYERS, FROM YOUR PACKING SLIPS.</h2>
         <p class="split-body">Whatnot gives you a packing-slip PDF for every stream. Drop it in at close-out and CardBreakPro turns it into a CRM: <b>who spent what, who's new, who's gone cold, who's a whale</b>. Your breakers see who's in the room and who's due a win-back message — with the message already written.</p>
@@ -873,23 +1029,23 @@
           <li>Recap notification the moment the slips import</li>
         </ul>
       </div>
-      <div class="frame fu">
+      <div class="frame fu fu-r">
         <div class="frame-bar"><div class="frame-dot"></div><div class="frame-dot"></div><div class="frame-dot"></div><div class="frame-title">BUYERS · MAIN ACCOUNT · SORTED BY SPEND</div></div>
         <div class="buyer-row">
           <div><div class="buyer-name">@slabhunter_ <span class="badge p">🐋 Whale</span></div><div class="buyer-meta">14 streams · last seen 2 days ago · 3 hits logged</div></div>
-          <div class="buyer-spend">$6,240<small>LIFETIME</small></div>
+          <div class="buyer-spend"><span data-count>$6,240</span><small>LIFETIME</small></div>
         </div>
         <div class="buyer-row">
           <div><div class="buyer-name">@mtl_collects <span class="badge r">❄ Cold · 41 days</span></div><div class="buyer-meta">9 streams · win-back due · message ready</div></div>
-          <div class="buyer-spend">$2,105<small>LIFETIME</small></div>
+          <div class="buyer-spend"><span data-count>$2,105</span><small>LIFETIME</small></div>
         </div>
         <div class="buyer-row">
           <div><div class="buyer-name">@pc_grail <span class="badge g">🔥 Hot</span></div><div class="buyer-meta">3 streams · first seen Aug 30 · bought tonight</div></div>
-          <div class="buyer-spend">$412<small>LIFETIME</small></div>
+          <div class="buyer-spend"><span data-count>$412</span><small>LIFETIME</small></div>
         </div>
         <div class="buyer-row">
           <div><div class="buyer-name">@rookiechase <span class="badge y">★ First-timer</span></div><div class="buyer-meta">1 stream · tonight · shout them out next stream</div></div>
-          <div class="buyer-spend">$95<small>LIFETIME</small></div>
+          <div class="buyer-spend"><span data-count>$95</span><small>LIFETIME</small></div>
         </div>
         <div class="frame-body" style="border-top:1px solid var(--border);padding:10px 14px;"><div class="note-line" style="margin:0;"><span class="badge y">Win-back queue · 12 buyers · $18,430 lifetime</span><span class="badge gr">Slips current through last night</span></div></div>
       </div>
@@ -899,7 +1055,7 @@
   <!-- ── PRODUCT ROI ── -->
   <section class="split alt">
     <div class="split-inner flip">
-      <div class="split-text fu">
+      <div class="split-text fu fu-r">
         <div class="section-eyebrow ey-green">Product ROI</div>
         <h2 class="section-headline">KNOW WHAT TO RUN. KNOW WHAT TO DROP.</h2>
         <p class="split-body">Every box you open is tied to the break it went into and the sales that break made. So the question "is this product worth it?" finally has a number next to it — per product, per account, per period. <b>Run more of what works. Stop buying what doesn't.</b></p>
@@ -909,12 +1065,12 @@
           <li>Low-stock alerts before a product runs out mid-stream</li>
         </ul>
       </div>
-      <div class="frame fu">
+      <div class="frame fu fu-l">
         <div class="frame-bar"><div class="frame-dot"></div><div class="frame-dot"></div><div class="frame-dot"></div><div class="frame-title">PRODUCT ROI · LAST 30 DAYS</div></div>
-        <div class="roi-row"><div class="roi-product">Donruss Draft Hobby<small>38 boxes · $9,120 sales</small></div><div class="roi-bar-wrap"><div class="roi-bar-fill" style="width:92%;background:var(--green);"></div></div><div class="roi-pct" style="color:var(--green);">+118%</div></div>
-        <div class="roi-row"><div class="roi-product">Optic Football Hobby<small>22 boxes · $6,480 sales</small></div><div class="roi-bar-wrap"><div class="roi-bar-fill" style="width:60%;background:var(--yellow);"></div></div><div class="roi-pct" style="color:var(--yellow);">+67%</div></div>
-        <div class="roi-row"><div class="roi-product">2024 Topps Chrome Hobby<small>41 boxes · $10,640 sales</small></div><div class="roi-bar-wrap"><div class="roi-bar-fill" style="width:40%;background:var(--purple2);"></div></div><div class="roi-pct" style="color:var(--purple2);">+41%</div></div>
-        <div class="roi-row"><div class="roi-product">2023 Prizm Hobby<small>17 boxes · $3,210 sales</small></div><div class="roi-bar-wrap"><div class="roi-bar-fill" style="width:8%;background:var(--red);"></div></div><div class="roi-pct" style="color:var(--red);">−6%</div></div>
+        <div class="roi-row"><div class="roi-product">Donruss Draft Hobby<small>38 boxes · $9,120 sales</small></div><div class="roi-bar-wrap"><div class="roi-bar-fill" style="--w:92%;background:var(--green);"></div></div><div class="roi-pct" style="color:var(--green);" data-count>+118%</div></div>
+        <div class="roi-row"><div class="roi-product">Optic Football Hobby<small>22 boxes · $6,480 sales</small></div><div class="roi-bar-wrap"><div class="roi-bar-fill" style="--w:60%;background:var(--yellow);"></div></div><div class="roi-pct" style="color:var(--yellow);" data-count>+67%</div></div>
+        <div class="roi-row"><div class="roi-product">2024 Topps Chrome Hobby<small>41 boxes · $10,640 sales</small></div><div class="roi-bar-wrap"><div class="roi-bar-fill" style="--w:40%;background:var(--purple2);"></div></div><div class="roi-pct" style="color:var(--purple2);" data-count>+41%</div></div>
+        <div class="roi-row"><div class="roi-product">2023 Prizm Hobby<small>17 boxes · $3,210 sales</small></div><div class="roi-bar-wrap"><div class="roi-bar-fill" style="--w:8%;background:var(--red);"></div></div><div class="roi-pct" style="color:var(--red);" data-count>−6%</div></div>
       </div>
     </div>
   </section>
@@ -936,10 +1092,15 @@
           <input type="number" id="cf2" class="calc-input" value="8" min="0" max="99" step="0.1" placeholder="8" />
           <div class="calc-label">Number of Spots</div>
           <input type="number" id="cs" class="calc-input" value="30" min="1" step="1" placeholder="30" />
+          <div class="calc-label">Your Spot Price ($)</div>
+          <input type="number" id="cp" class="calc-input" value="12" min="0" step="0.25" placeholder="12" />
           <div class="calc-result-wrap">
             <div class="calc-result-label">Break-Even Per Spot</div>
             <div class="calc-result-num" id="cr">$8.70</div>
             <div class="calc-result-sub">Gross needed: <b id="crt">$260.87</b> · minimum per spot to cover the box</div>
+            <div class="calc-verdict ok" id="cv">At $12.00 × 30 spots you gross $360.00 → <b>+$91.20 profit on this box</b></div>
+            <div class="calc-bar" id="cbar"><i id="cbarFill"></i><em title="break-even"></em></div>
+            <div class="calc-bar-lbl"><span>$0</span><span><b>break-even</b></span><span>1.5× BE</span></div>
           </div>
         </div>
       </div>
@@ -952,7 +1113,7 @@
       <div class="section-eyebrow ey-purple">Team Access</div>
       <h2 class="section-headline">ONE LOGIN PER PERSON. EACH SEES ONLY THEIR JOB.</h2>
     </div>
-    <div class="roles-grid">
+    <div class="roles-grid stagger">
       <div class="role-card fu">
         <div class="role-badge rb-owner">Owner</div>
         <div class="role-title">Owner</div>
@@ -978,7 +1139,7 @@
       <div class="role-card fu">
         <div class="role-badge rb-breaker">Breaker</div>
         <div class="role-title">Breaker</div>
-        <div class="role-sub">Everything for the stream, on a phone.</div>
+        <div class="role-sub">Everything for the stream, on the second monitor.</div>
         <ul class="role-features">
           <li>Live break calculator &amp; close-out</li>
           <li>Packing-slip import, big-hit logging</li>
@@ -1030,7 +1191,7 @@
         </ul>
       </div>
     </div>
-    <div class="ba-outcomes">
+    <div class="ba-outcomes stagger">
       <div class="ba-outcome fu"><div class="ba-outcome-num">&lt;10</div><div class="ba-outcome-label">Min of admin per stream</div></div>
       <div class="ba-outcome fu"><div class="ba-outcome-num">1</div><div class="ba-outcome-label">Number everyone trusts</div></div>
       <div class="ba-outcome fu"><div class="ba-outcome-num">0</div><div class="ba-outcome-label">Spreadsheets</div></div>
@@ -1097,7 +1258,7 @@
       <div class="section-eyebrow ey-green">FAQ</div>
       <h2 class="section-headline">GOT QUESTIONS.</h2>
     </div>
-    <div class="faq-grid">
+    <div class="faq-grid stagger">
       <div class="faq-item fu">
         <div class="faq-q">Does this work with Whatnot, TikTok Shop and YouTube?</div>
         <div class="faq-a">The break calculator, close-out, payroll, inventory, scheduling and exports work for any platform — you enter the running total and the final payout, we do the rest. Buyer intelligence is built on Whatnot packing-slip exports today; other platforms' order exports are on the roadmap.</div>
@@ -1166,12 +1327,172 @@
 
   <script>
     // ── Scroll animations ──
+    // Children of a .stagger container reveal one after another.
+    document.querySelectorAll('.stagger').forEach(function(p) {
+      Array.prototype.forEach.call(p.children, function(c, i) { if (c.classList.contains('fu')) c.style.transitionDelay = (i * 80) + 'ms'; });
+    });
     var observer = new IntersectionObserver(function(entries) {
       entries.forEach(function(entry) {
         if (entry.isIntersecting) { entry.target.classList.add('vis'); observer.unobserve(entry.target); }
       });
     }, { threshold: 0.06 });
     document.querySelectorAll('.fu').forEach(function(el) { observer.observe(el); });
+
+    // ── Nav: progress bar, compact-on-scroll, current section ──
+    var progressEl = document.getElementById('scrollProgress');
+    var navEl = document.querySelector('nav');
+    function onScroll() {
+      var h = document.documentElement;
+      var max = h.scrollHeight - h.clientHeight;
+      if (progressEl) progressEl.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+      if (navEl) navEl.classList.toggle('scrolled', h.scrollTop > 40);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-center a'));
+    var sectionObs = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) {
+        if (!e.isIntersecting) return;
+        navLinks.forEach(function(a) { a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-35% 0px -55% 0px' });
+    ['how', 'features', 'pricing', 'faq'].forEach(function(id) { var s = document.getElementById(id); if (s) sectionObs.observe(s); });
+
+    // ── Numbers count up when they scroll into view ──
+    function fmtCount(prefix, v, decimals, suffix) {
+      return prefix + v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix;
+    }
+    function countUp(el) {
+      var raw = el.getAttribute('data-count');
+      var m = raw.match(/^([^\d]*)([\d,]+(?:\.\d+)?)(.*)$/);
+      if (!m) { el.textContent = raw; return; }
+      var prefix = m[1], suffix = m[3], target = parseFloat(m[2].replace(/,/g, ''));
+      var decimals = (m[2].split('.')[1] || '').length;
+      var start = null, dur = 1300;
+      function frame(t) {
+        if (start === null) start = t;
+        var p = Math.min(1, (t - start) / dur), e = 1 - Math.pow(1 - p, 3);
+        el.textContent = fmtCount(prefix, target * e, decimals, suffix);
+        if (p < 1) requestAnimationFrame(frame); else el.textContent = raw;
+      }
+      requestAnimationFrame(frame);
+    }
+    var countObs = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) { if (e.isIntersecting) { countUp(e.target); countObs.unobserve(e.target); } });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('[data-count]').forEach(function(el) {
+      var raw = el.textContent.trim();
+      el.setAttribute('data-count', raw);
+      var m = raw.match(/^([^\d]*)([\d,]+(?:\.\d+)?)(.*)$/);
+      if (m) el.textContent = fmtCount(m[1], 0, (m[2].split('.')[1] || '').length, m[3]);
+      countObs.observe(el);
+    });
+
+    // ── Feature cards: spotlight follows the cursor ──
+    document.querySelectorAll('.feat-card').forEach(function(card) {
+      card.addEventListener('mousemove', function(e) {
+        var r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+        card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+      });
+    });
+
+    // ── Hero phone: tilts toward the cursor (mouse devices only) ──
+    var tiltWrap = document.querySelector('.hero-visual'), phoneEl = document.getElementById('demoPhone');
+    if (tiltWrap && phoneEl && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      var tx = 0, ty = 0, cx = 0, cy = 0, tiltRaf = null;
+      function tiltStep() {
+        cx += (tx - cx) * 0.12; cy += (ty - cy) * 0.12;
+        phoneEl.style.transform = 'rotateX(' + cy.toFixed(2) + 'deg) rotateY(' + cx.toFixed(2) + 'deg)';
+        if (Math.abs(tx - cx) > 0.05 || Math.abs(ty - cy) > 0.05) tiltRaf = requestAnimationFrame(tiltStep); else tiltRaf = null;
+      }
+      tiltWrap.addEventListener('mousemove', function(e) {
+        var r = tiltWrap.getBoundingClientRect();
+        tx = ((e.clientX - r.left) / r.width - 0.5) * 6;
+        ty = -((e.clientY - r.top) / r.height - 0.5) * 4;
+        if (!tiltRaf) tiltRaf = requestAnimationFrame(tiltStep);
+      });
+      tiltWrap.addEventListener('mouseleave', function() { tx = 0; ty = 0; if (!tiltRaf) tiltRaf = requestAnimationFrame(tiltStep); });
+    }
+
+    // ── Live demo: the hero phone is a working (simplified) break calculator ──
+    var DEMO = {
+      fee: 0.08, spots: 30, prev: 1000, total: 1860, breakNo: 3, touched: false,
+      items: [
+        { id: 'topps', name: 'Topps Chrome', unit: 185, stock: 11, qty: 2 },
+        { id: 'prizm', name: 'Prizm Blaster', unit: 32, stock: 24, qty: 1 },
+        { id: 'give',  name: 'Giveaway',      unit: 10, stock: 40, qty: 1 }
+      ]
+    };
+    function money(n) { return (n < 0 ? '−$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function signed(n) { return (n >= 0 ? '+' : '') + money(n); }
+    function setText(id, text, bump) {
+      var el = document.getElementById(id); if (!el) return;
+      el.textContent = text;
+      if (bump) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    }
+    function demoRender(bump) {
+      var boxes = 0, cost = 0;
+      DEMO.items.forEach(function(it) {
+        boxes += it.qty; cost += it.qty * it.unit;
+        setText('dq-' + it.id, String(it.qty));
+        setText('dx-' + it.id, money(it.qty * it.unit));
+        setText('dl-' + it.id, (it.stock - it.qty) + ' left');
+        var row = document.getElementById('dr-' + it.id); if (row) row.classList.toggle('selected', it.qty > 0);
+      });
+      var rev = DEMO.total - DEMO.prev, fees = rev * DEMO.fee, profit = rev - cost - fees, be = cost / (1 - DEMO.fee);
+      setText('d-strip', 'In this break — ' + boxes + ' box' + (boxes !== 1 ? 'es' : '') + ' · ' + money(cost));
+      var chips = DEMO.items.filter(function(it) { return it.qty > 0; })
+        .map(function(it) { return '<span class="ps-chip">' + it.name + ' <span>×' + it.qty + '</span></span>'; }).join('');
+      var chipEl = document.getElementById('d-chips');
+      if (chipEl) chipEl.innerHTML = chips || '<span style="font-size:9px;color:var(--w40);">tap + on a product to add boxes</span>';
+      setText('d-total', money(DEMO.total), bump);
+      setText('d-rev', money(rev), bump);
+      setText('d-cost', money(cost), bump);
+      setText('d-fees', money(fees), bump);
+      var pEl = document.getElementById('d-profit'); if (pEl) { pEl.textContent = signed(profit); pEl.className = 'ps-stat-v ' + (profit >= 0 ? 'g' : 'rd') + (bump ? ' bump' : ''); }
+      var ppsEl = document.getElementById('d-pps'); if (ppsEl) { var pps = profit / DEMO.spots; ppsEl.textContent = signed(pps); ppsEl.className = 'ps-stat-v ' + (pps >= 0 ? 'g' : 'rd') + (bump ? ' bump' : ''); }
+      setText('d-be', money(be), bump);
+      setText('d-bes', money(be / DEMO.spots), bump);
+      setText('d-btn', 'SUBMIT BREAK #' + DEMO.breakNo);
+      setText('d-breakLbl', 'Break #' + DEMO.breakNo);
+    }
+    function demoTouched() {
+      if (DEMO.touched) return;
+      DEMO.touched = true;
+      var hint = document.getElementById('demoHint'); if (hint) hint.classList.add('done');
+    }
+    function demoQty(id, d) {
+      var it = DEMO.items.filter(function(x) { return x.id === id; })[0]; if (!it) return;
+      it.qty = Math.max(0, Math.min(it.stock, it.qty + d));
+      demoTouched(); demoRender(true);
+    }
+    function demoTotal(d) {
+      DEMO.total = Math.max(DEMO.prev, DEMO.total + d);
+      demoTouched(); demoRender(true);
+    }
+    var toastTimer = null;
+    function demoToast(msg) {
+      var t = document.getElementById('demoToast'); if (!t) return;
+      t.textContent = msg; t.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(function() { t.classList.remove('show'); }, 2600);
+    }
+    function demoSubmit() {
+      demoTouched();
+      var boxes = DEMO.items.reduce(function(s, it) { return s + it.qty; }, 0);
+      var rev = DEMO.total - DEMO.prev;
+      if (!boxes && rev <= 0) { demoToast('Add boxes or sales first'); return; }
+      var cost = DEMO.items.reduce(function(s, it) { return s + it.qty * it.unit; }, 0);
+      var profit = rev - cost - rev * DEMO.fee;
+      var btn = document.getElementById('d-btn');
+      if (btn) { btn.classList.remove('flash'); void btn.offsetWidth; btn.classList.add('flash'); }
+      demoToast('Break #' + DEMO.breakNo + ' submitted · profit ' + signed(profit) + ' · stream total ' + money(DEMO.total));
+      DEMO.items.forEach(function(it) { it.stock -= it.qty; it.qty = 0; });
+      DEMO.prev = DEMO.total;
+      DEMO.breakNo += 1;
+      demoRender(false);
+    }
+    demoRender(false);
 
     // ── Counter animations (real platform numbers only — no invented figures) ──
     function animateCounter(el, target, duration, fmt) {
@@ -1220,14 +1541,27 @@
       var boxCost = parseFloat(document.getElementById('cb').value) || 0;
       var feePercent = parseFloat(document.getElementById('cf2').value) || 0;
       var spots = parseFloat(document.getElementById('cs').value) || 1;
+      var price = parseFloat(document.getElementById('cp').value) || 0;
       if (spots < 1) spots = 1;
       var feeFrac = Math.min(Math.max(feePercent / 100, 0), 0.99);
       var gross = boxCost / (1 - feeFrac);
       var perSpot = gross / spots;
       document.getElementById('cr').textContent = '$' + perSpot.toFixed(2);
       document.getElementById('crt').textContent = '$' + gross.toFixed(2);
+
+      // Verdict at the price you're thinking of
+      var yourGross = price * spots;
+      var net = yourGross * (1 - feeFrac) - boxCost;
+      var v = document.getElementById('cv'), bar = document.getElementById('cbar'), fill = document.getElementById('cbarFill');
+      var ok = net >= 0;
+      v.className = 'calc-verdict ' + (ok ? 'ok' : 'bad');
+      v.innerHTML = 'At $' + price.toFixed(2) + ' × ' + spots + ' spots you gross $' + yourGross.toFixed(2) + ' → <b>' +
+        (ok ? '+$' + net.toFixed(2) + ' profit on this box' : '−$' + Math.abs(net).toFixed(2) + ' loss on this box') + '</b>';
+      var ratio = perSpot > 0 ? price / perSpot : 0;          // 1.0 = break-even, marker sits at 2/3 of the bar
+      fill.style.width = Math.max(0, Math.min(100, ratio / 1.5 * 100)) + '%';
+      bar.className = 'calc-bar' + (ok ? '' : ' bad');
     }
-    ['cb', 'cf2', 'cs'].forEach(function(id) {
+    ['cb', 'cf2', 'cs', 'cp'].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener('input', calcBreakEven);
     });
