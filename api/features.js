@@ -82,6 +82,7 @@ module.exports = async (req, res) => {
       case 'goals':         return await goalsHandler(req, res, sb, action);
       case 'notify':        return await notifyHandler(req, res, sb, action);
       case 'analytics':     return await analyticsHandler(req, res, sb, action);
+      case 'stats':         return await statsHandler(req, res, sb, action);
       case 'stream':        return await streamHandler(req, res, sb, action);
       case 'team':          return await teamHandler(req, res, sb, action);
       default:              return fail(res, 400, 'Unknown feature: ' + feature);
@@ -1057,6 +1058,39 @@ function buildInventoryLowHtml(name, productName, stock, inventoryUrl) {
 // ═════════════════════════════════════════════════════════════════════════════
 // ANALYTICS
 // ═════════════════════════════════════════════════════════════════════════════
+
+// ─── Public platform stats (landing-page proof strip) ────────────────────────
+// Aggregated across every org, no auth, edge-cached for an hour. OFF unless
+// PUBLIC_STATS_ENABLED=1 so nothing about volume is published by accident;
+// the landing page hides the strip when it gets { enabled: false }.
+async function statsHandler(req, res, sb, action) {
+  if (req.method !== 'GET') return fail(res, 405, 'Method not allowed');
+  res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+  if (process.env.PUBLIC_STATS_ENABLED !== '1') return res.status(200).json({ enabled: false });
+
+  const count = async (table, mod) => {
+    let q = sb.from(table).select('id', { count: 'exact', head: true });
+    if (mod) q = mod(q);
+    const { count: c, error } = await q;
+    if (error) throw error;
+    return c || 0;
+  };
+  const [streams, breaks, buyers, sales] = await Promise.all([
+    count('streams', q => q.eq('status', 'closed')),
+    count('breaks'),
+    count('buyers'),
+    pageAll(() => sb.from('streams').select('final_sales').eq('status', 'closed').order('id'))
+      .then(rows => rows.reduce((s, r) => s + (Number(r.final_sales) || 0), 0))
+  ]);
+  return res.status(200).json({
+    enabled: true,
+    streams_closed: streams,
+    breaks_tracked: breaks,
+    buyers_tracked: buyers,
+    sales_tracked: Math.round(sales),
+    generated_at: new Date().toISOString()
+  });
+}
 
 async function analyticsHandler(req, res, sb, action) {
   if (req.method !== 'GET') return fail(res, 405, 'Method not allowed');

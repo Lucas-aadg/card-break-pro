@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CardBreakPro OG card</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* Rendered headlessly at 1200×630 → og-image.png. Not linked from the site. */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 1200px; height: 630px; overflow: hidden; }
+    body {
+      background: #060709; color: #fff; font-family: 'DM Sans', system-ui, sans-serif;
+      position: relative;
+    }
+    .glow1 { position: absolute; width: 900px; height: 900px; left: 60%; top: 50%; transform: translate(-50%,-50%); background: radial-gradient(circle, rgba(57,255,133,0.10) 0%, transparent 62%); }
+    .glow2 { position: absolute; width: 600px; height: 600px; left: 15%; top: 80%; transform: translate(-50%,-50%); background: radial-gradient(circle, rgba(139,92,246,0.14) 0%, transparent 62%); }
+    .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(circle at 50% 40%, #000 30%, transparent 75%); -webkit-mask-image: radial-gradient(circle at 50% 40%, #000 30%, transparent 75%); }
+    .wrap { position: relative; z-index: 1; padding: 64px 72px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+    .logo { font-family: 'Bebas Neue', sans-serif; font-size: 34px; letter-spacing: 0.06em; }
+    .logo span { color: #a78bfa; }
+    .badge { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #39ff85; border: 1px solid rgba(57,255,133,0.3); background: rgba(57,255,133,0.07); border-radius: 100px; padding: 8px 18px; margin-bottom: 26px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #39ff85; }
+    h1 { font-family: 'Bebas Neue', sans-serif; font-size: 118px; line-height: 0.92; letter-spacing: 0.02em; }
+    h1 .w { color: #fff; display: block; } h1 .g { color: #39ff85; display: block; } h1 .d { color: rgba(255,255,255,0.28); display: block; }
+    .foot { display: flex; justify-content: space-between; align-items: flex-end; }
+    .sub { font-size: 22px; color: rgba(255,255,255,0.62); max-width: 760px; line-height: 1.4; }
+    .sub b { color: #fff; font-weight: 600; }
+    .url { font-size: 18px; color: rgba(255,255,255,0.4); letter-spacing: 0.04em; }
+    .price { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: #fff; letter-spacing: 0.04em; text-align: right; }
+    .price small { display: block; font-family: 'DM Sans', sans-serif; font-size: 13px; color: rgba(255,255,255,0.45); letter-spacing: 0.1em; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="glow1"></div><div class="glow2"></div><div class="grid"></div>
+  <div class="wrap">
+    <div>
+      <div class="logo">CARD<span>BREAK</span>PRO</div>
+    </div>
+    <div>
+      <div class="badge"><span class="dot"></span> The back office for Whatnot break operations</div>
+      <h1><span class="w">CLOSE THE STREAM.</span><span class="g">SEE THE PROFIT.</span><span class="d">PAY THE TEAM.</span></h1>
+    </div>
+    <div class="foot">
+      <div>
+        <div class="sub"><b>Live break calculator</b> · real net at close-out · payroll that computes itself · honest inventory · <b>buyer CRM from packing slips</b></div>
+        <div class="url" style="margin-top:14px;">cardbreakpro.com</div>
+      </div>
+      <div class="price">$99 / MONTH<small>flat · unlimited team · 30-day trial</small></div>
+    </div>
+  </div>
+</body>
+</html>

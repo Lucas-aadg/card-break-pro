@@ -40,6 +40,7 @@
     { "source": "/api/notify-inventory-low", "destination": "/api/features?feature=notify&action=inventory-low" },
 
     { "source": "/api/analytics", "destination": "/api/features?feature=analytics&action=get" },
+    { "source": "/api/platform-stats", "destination": "/api/features?feature=stats&action=public" },
     { "source": "/api/stream/delete", "destination": "/api/features?feature=stream&action=delete" },
     { "source": "/api/team/remove", "destination": "/api/features?feature=team&action=remove" }
   ],
