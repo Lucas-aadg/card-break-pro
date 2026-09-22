@@ -196,3 +196,20 @@ Product decision taken alongside the fixes: **sorters are hourly, full stop.** P
 | CQ-5 | Fixed — dead leaderboard branches, split code, `psSorterType` cards removed | — |
 
 **Deploy order:** run `migrations/013_audit_fixes.sql` → push → (optional) set `SHIFT_REMINDER_MODE` and decide the cron plan.
+
+---
+
+## 7. Launch punch list — 2026-09-22 (from 4 months of GasPack use)
+
+| # | Report | Root cause(s) found | Fix |
+|---|---|---|---|
+| 1.3 | "Other costs" not in the final total | `handleSubmitBreak` rebuilt the cached stream as `{ ...stream, total_submitted_revenue, break_count }` — `total_other_costs` stayed stale; close-out read it from the cache, so the **last break's other costs were always dropped** from Net Profit and commission. Owner break entry had the same defect. Close-out table had no Other column, so nobody could see it. | Close-out sums `other_costs` from the `breaks` table (source of truth) and shows an Other column; submit carries all five recomputed totals. breaker.html, owner.html |
+| 1.4 | Account-scoped inventory | Breaker `loadProducts()` had no channel filter at all; `products.channel_id` was never read on that page. | Product list scoped to the stream's account + shared (untagged) products; re-scopes when the Account picker changes; foreign-account boxes dropped with a message. |
+| 1.5 | Can't combine categories | Category pills were single-select; selections on hidden rows *were* still counted, but invisibly. `selectedQtys` was keyed by row index. | Multi-select pills; always-visible "In this break" strip with per-box remove; quantities keyed by product id. |
+| 1.1 | Boxes miscounting | Three contributors: (a) qty input **clamped to the system count** on both calculators (and owner's clamped at 0), so under-counted stock forced under-reporting → drift compounds; (b) owner/manager manual stock edits overwrote the number with **no log line**; (c) owner break entry still did read-modify-write. The concurrent-overwrite race was already fixed in 013. | Clamps removed (over-use flagged); every stock change goes through `CBP.adjustStock` → `adjust_stock` RPC, corrections logged as `adjust_in`/`adjust_out` with who/from/to; **Stock Audit** panel (`inventory_reconciliation()` RPC, migration 014) shows system count vs. log balance per product with "Enter shelf count" / "Log as correct" fixes; log paged + labelled. |
+| 1.2 | 150-slip import "didn't register" | (a) A second file for the same stream **deleted the first file's purchases** (process-import step 2). (b) Vercel 4.5 MB body cap / 30 s on `/api/import-slip` → non-JSON error for big exports. (c) Failed attempts were never written to `stream_slip_imports`. (d) In the breaker close-out flow the failure toast was rendered behind the next modal and replaced by "Stream closed" success. | Merge-by-order-number import (replace is an explicit owner option); PDF parsed in the browser via shared `slip-parser.js` (server = second opinion); one `stream_slip_imports` row per attempt incl. failures; modal stays open with the error + Retry. Still to verify against the actual PDF — see open questions. |
+| 2.4 | Export/archive testing | Every export query was unpaged (1,000-row cap); errors were swallowed into an empty-but-plausible file; member earnings used `closed_at` and recomputed commission at the current rate (≠ Payroll); sorters still had per-break pay. | All queries paged with deterministic order, errors fail loudly, earnings on the Payroll basis (break_date, locked commission, prorated hours in org tz), sorters hours-only, inventory report reconciles with the Stock Audit. |
+
+Open questions for the owner: the actual 150-slip PDF (to run both parsers against it), one concrete inventory example (product + dates + direction of drift), and the definition of a "Giveaway" in the calculator (2.2).
+
+**Deploy order:** run `migrations/014_inventory_audit_slips.sql` → push. Everything falls back cleanly if 014 hasn't run yet (4-arg `adjust_stock`, client-side reconciliation, base import columns).
