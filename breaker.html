@@ -17,6 +17,7 @@
   <script src="analytics.js"></script>
   <script src="shared.js"></script>
   <script src="buyer-intel.js"></script>
+  <script src="slip-parser.js"></script>
   <style>
     :root {
       --bg: #0d0d14;
@@ -954,9 +955,11 @@
         <h2 style="margin:0;font-size:1.2rem;">Import Preview</h2>
         <span style="font-size:0.72rem;color:var(--muted);background:var(--bg);padding:0.25rem 0.65rem;border-radius:100px;border:1px solid var(--border);">Step 1 of 3</span>
       </div>
-      <div id="siStats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem;margin-bottom:1.1rem;"></div>
+      <div id="siStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:0.6rem;margin-bottom:0.6rem;"></div>
+      <div id="siParseWarnings" style="display:none;font-size:0.74rem;color:#f0b429;margin-bottom:0.8rem;line-height:1.4;"></div>
       <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Top Spenders This Stream</div>
       <div id="siTopList" style="margin-bottom:1.1rem;"></div>
+      <div id="siImportError" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;border-radius:8px;padding:0.6rem 0.8rem;font-size:0.8rem;margin-bottom:0.9rem;line-height:1.45;"></div>
       <div class="modal-btn-row">
         <button class="btn btn-outline" onclick="skipSlipImport()">Skip</button>
         <button class="btn" id="siConfirmBtn" onclick="confirmSlipImport()">Confirm Import</button>
@@ -4047,9 +4050,10 @@ function brkRenderHitBoard() {
 <script>
 'use strict';
 
-var _parsedSlipData = null;   // result from /api/import-slip
+var _parsedSlipData = null;   // result from SlipParser.parseSlipFile (browser, server fallback)
 var _importedBuyers = [];     // buyers after confirmed import
 var _currentImportId = null;
+var _lastImportError = null;
 
 // ── Drag-and-drop wiring ──────────────────────────────────
 function initSlipImportModal() {
@@ -4078,14 +4082,11 @@ async function handleSlipFile(file) {
   document.getElementById('siParsingStatus').style.display = 'block';
   document.getElementById('siUploadError').style.display = 'none';
   try {
-    var formData = new FormData();
-    formData.append('file', file);
-    var resp = await fetch('/api/import-slip', { method: 'POST', body: formData });
-    var json = await resp.json();
-    if (!resp.ok) {
-      if (json.raw_sample) console.error('SLIP RAW TEXT:\n' + json.raw_sample);
-      throw new Error(json.error || 'Parse failed');
-    }
+    // Parsed in the browser (no upload size/time limits — a 150-slip export
+    // used to hit Vercel's 4.5 MB cap); the server is asked for a second
+    // opinion only when the browser finds no buyers.
+    var json = await SlipParser.parseSlipFile(file, { serverUrl: '/api/import-slip' });
+    if (json._rawSample && !(json.buyers || []).length) console.error('SLIP RAW TEXT:\n' + json._rawSample);
     _parsedSlipData = json;
     _parsedSlipData._filename = file.name;
     showSlipPreview(json);
@@ -4102,6 +4103,13 @@ function showSlipError(msg) {
   el.textContent = msg;
   el.style.display = 'block';
 }
+// Error shown inside the preview step (the page-level toast is hidden behind the modal)
+function showSlipImportError(msg) {
+  var el = document.getElementById('siImportError');
+  if (!el) { showGlobalError(msg); return; }
+  el.textContent = msg;
+  el.style.display = 'block';
+}
 
 function showSlipPreview(data) {
   document.getElementById('siUploadStep').style.display = 'none';
@@ -4111,7 +4119,16 @@ function showSlipPreview(data) {
   var stats = document.getElementById('siStats');
   stats.innerHTML = siStatCard(data.totalBuyersFound, 'Buyers Found') +
     siStatCard(data.totalNewBuyers, 'New Buyers') +
-    siStatCard('$' + (data.totalRevenueParsed || 0).toFixed(2), 'Revenue');
+    siStatCard('$' + (data.totalRevenueParsed || 0).toFixed(2), 'Revenue') +
+    siStatCard(data._pages || data.totalPagesFound || '—', 'Pages read');
+  var warnEl = document.getElementById('siParseWarnings');
+  if (warnEl) {
+    var w = data._warnings || [];
+    warnEl.style.display = w.length ? '' : 'none';
+    warnEl.textContent = w.length ? '⚠ ' + w.length + ' slip' + (w.length > 1 ? 's' : '') + ' where the line items didn\'t add up to the printed total — the printed total was used.' : '';
+  }
+  var errEl = document.getElementById('siImportError');
+  if (errEl) errEl.style.display = 'none';
 
   // Top spenders (up to 5)
   var sorted = (data.buyers || []).slice().sort(function(a,b){ return (b.totalSpent||0)-(a.totalSpent||0); }).slice(0,5);
@@ -4162,10 +4179,14 @@ async function confirmSlipImport() {
         buyers: _parsedSlipData.buyers,
         streamDate: _parsedSlipData.streamDate || target.break_date,
         importedBy: currentUser.id,
-        rawFilename: _parsedSlipData._filename || null
+        rawFilename: _parsedSlipData._filename || null,
+        mode: 'merge',
+        parseSource: _parsedSlipData._parseSource || null,
+        fileSize: _parsedSlipData._fileSize || null
       })
     });
-    var result = await resp.json();
+    var result = null;
+    try { result = await resp.json(); } catch (e) { throw new Error('Server error ' + resp.status + (resp.status === 413 ? ' (file too large)' : resp.status === 504 ? ' (timed out)' : '')); }
     if (!resp.ok) throw new Error(result.error || 'Import failed');
     _currentImportId = result.importId;
     _importedBuyers = _parsedSlipData.buyers || [];
@@ -4183,11 +4204,18 @@ async function confirmSlipImport() {
     }
   } catch (err) {
     console.error('Import process error:', err.message);
-    showGlobalError('Import failed: ' + err.message + '. Your slip was parsed but not saved — try Confirm Import again.');
-    _importedBuyers = _parsedSlipData ? (_parsedSlipData.buyers || []) : [];
+    _importedBuyers = [];
+    _lastImportError = err.message || 'unknown error';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Confirm Import';
+    btn.textContent = ok ? 'Confirm Import' : 'Retry Import';
+  }
+  if (!ok) {
+    // Stay in the modal with the error in view. Closing here used to hand off
+    // to hit-logging + close-out, whose success toast replaced the message —
+    // the breaker never learned the import had failed.
+    showSlipImportError('Import failed: ' + _lastImportError + ' — nothing was saved. Tap Retry Import, or Skip to continue without it (the stream stays under "Slips needed" so it can be imported later).');
+    return;
   }
   brkInvalidateBuyers();
   document.getElementById('slipImportModal').classList.remove('active');

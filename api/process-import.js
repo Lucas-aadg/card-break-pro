@@ -2,11 +2,15 @@ const { createClient } = require('@supabase/supabase-js');
 
 // Idempotent, batched slip importer.
 // buyer_purchases is the source of truth; buyers.total_* is a cache RECOMPUTED
-// from it. Re-importing the same stream deletes that stream's purchases, inserts
-// the new set, then recomputes each affected buyer's totals from ALL their
-// remaining purchases. Running it twice yields the same result (no double-count),
-// a partial failure is fixed by simply retrying, and there's no read-modify-write
-// on totals so concurrent imports can't lose each other's revenue.
+// from it. Two modes:
+//   merge   (default) — rows for the SAME order numbers are replaced, everything
+//                       else already on the stream is kept. Uploading a slip
+//                       export in two parts, or re-uploading after adding a
+//                       page, adds up instead of the last file wiping the first.
+//   replace           — the old behaviour: drop every purchase on the stream,
+//                       then insert this file. Owner-only "start over".
+// Every attempt is recorded in stream_slip_imports (status complete/failed) so
+// a failed import can never again disappear without a trace.
 
 const MAX_BUYERS = 2000;   // slips can be big; batched writes keep us well under the serverless time limit
 const CHUNK = 400;         // rows per bulk insert
@@ -21,13 +25,30 @@ module.exports = async (req, res) => {
 
 function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
 function round2(n) { return Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100; }
+function isMissingColumn(err) { return /column .* does not exist|schema cache|could not find the/i.test(String(err && err.message || '')); }
+
+// Insert an import record; if migration 014's extra columns aren't there yet,
+// retry with the original columns only. Never throws.
+async function recordImport(sb, row) {
+  const extras = ['mode', 'purchases_count', 'orders_replaced', 'parse_source', 'file_size', 'error_message'];
+  let r = await sb.from('stream_slip_imports').insert(row).select('id').single();
+  if (r.error && isMissingColumn(r.error)) {
+    const slim = Object.assign({}, row);
+    extras.forEach(k => { if (k !== 'error_message') delete slim[k]; });
+    r = await sb.from('stream_slip_imports').insert(slim).select('id').single();
+    if (r.error && isMissingColumn(r.error)) { delete slim.error_message; r = await sb.from('stream_slip_imports').insert(slim).select('id').single(); }
+  }
+  if (r.error) console.error('stream_slip_imports insert failed:', r.error.message);
+  return r.data ? r.data.id : null;
+}
 
 async function handleImport(req, res) {
   let body;
   try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
   catch (e) { return res.status(400).json({ error: 'Invalid JSON' }); }
 
-  const { orgId, streamId, buyers, streamDate, importedBy, rawFilename } = body;
+  const { orgId, streamId, buyers, streamDate, importedBy, rawFilename, parseSource, fileSize } = body;
+  const mode = body.mode === 'replace' ? 'replace' : 'merge';
   if (!orgId || !Array.isArray(buyers) || buyers.length === 0) return res.status(400).json({ error: 'Missing required fields: orgId, buyers' });
   if (!/^[0-9a-f-]{36}$/.test(orgId)) return res.status(400).json({ error: 'Invalid orgId' });
   // streamId is REQUIRED — imports are keyed to a stream so a re-import stays idempotent.
@@ -56,11 +77,17 @@ async function handleImport(req, res) {
     const spent = Number(b.totalSpent) || 0;
     if (spent === 0 && items.length === 0) continue; // truly empty row
     if (!byUname[uname]) byUname[uname] = { realName: b.realName || null, isNew: !!b.isNew, items: [] };
-    for (const it of items) byUname[uname].items.push({ breakName: (it.breakName || '').slice(0, 120), orderNumber: it.orderNumber || null, amount: Number(it.amount) || 0 });
+    for (const it of items) byUname[uname].items.push({ breakName: (it.breakName || '').slice(0, 120), orderNumber: it.orderNumber ? String(it.orderNumber) : null, amount: Number(it.amount) || 0 });
     if (b.realName && !byUname[uname].realName) byUname[uname].realName = b.realName;
   }
   const unames = Object.keys(byUname);
   if (!unames.length) return res.status(400).json({ error: 'No valid buyers to import.' });
+
+  const importMeta = {
+    organization_id: orgId, stream_id: streamId, imported_by: importedBy || null,
+    raw_filename: rawFilename || null, mode, parse_source: parseSource || null,
+    file_size: Number.isFinite(Number(fileSize)) ? Number(fileSize) : null
+  };
 
   try {
     // ── 1. Buyers previously tied to this stream (so removed ones also recompute) ──
@@ -74,10 +101,11 @@ async function handleImport(req, res) {
       f += 1000;
     }
 
-    // ── 2. Idempotent reset: drop this stream's purchases + old import record ──
-    const { error: delErr } = await sb.from('buyer_purchases').delete().eq('organization_id', orgId).eq('stream_id', streamId);
-    if (delErr) throw new Error('clear old purchases failed: ' + delErr.message);
-    await sb.from('stream_slip_imports').delete().eq('organization_id', orgId).eq('stream_id', streamId).then(null, () => {});
+    // ── 2. replace mode: drop everything on the stream first ──
+    if (mode === 'replace') {
+      const { error: delErr } = await sb.from('buyer_purchases').delete().eq('organization_id', orgId).eq('stream_id', streamId);
+      if (delErr) throw new Error('clear old purchases failed: ' + delErr.message);
+    }
 
     // ── 3. Resolve buyer ids (fetch existing, bulk-create the new ones) ──
     const unameToId = {};
@@ -107,7 +135,7 @@ async function handleImport(req, res) {
       }
     }
 
-    // ── 4. Bulk-insert this stream's purchases ──
+    // ── 4. Build this file's purchase rows ──
     const purchRows = [];
     for (const u of unames) {
       const id = unameToId[u]; if (!id) continue;
@@ -115,12 +143,33 @@ async function handleImport(req, res) {
         purchRows.push({ organization_id: orgId, buyer_id: id, stream_id: streamId, break_name: it.breakName, order_number: it.orderNumber, amount: it.amount, purchase_date: purchaseDate, platform: 'whatnot' });
       }
     }
+
+    // ── 4b. merge mode: replace only what this file re-imports ──
+    // Same order number on the same stream → the new row wins (a re-upload
+    // never double-counts). Rows without an order number can't be matched, so
+    // for the buyers in THIS file their order-less rows are replaced too.
+    let ordersReplaced = 0;
+    if (mode === 'merge') {
+      const orderNums = Array.from(new Set(purchRows.map(r => r.order_number).filter(Boolean)));
+      for (const grp of chunk(orderNums, IN_CHUNK)) {
+        const { data, error } = await sb.from('buyer_purchases').delete().eq('organization_id', orgId).eq('stream_id', streamId).in('order_number', grp).select('id');
+        if (error) throw new Error('replace matching orders failed: ' + error.message);
+        ordersReplaced += (data || []).length;
+      }
+      const orderlessBuyers = Array.from(new Set(purchRows.filter(r => !r.order_number).map(r => r.buyer_id)));
+      for (const grp of chunk(orderlessBuyers, IN_CHUNK)) {
+        const { error } = await sb.from('buyer_purchases').delete().eq('organization_id', orgId).eq('stream_id', streamId).is('order_number', null).in('buyer_id', grp);
+        if (error) throw new Error('replace order-less rows failed: ' + error.message);
+      }
+    }
+
+    // ── 5. Bulk-insert ──
     for (const grp of chunk(purchRows, CHUNK)) {
       const { error } = await sb.from('buyer_purchases').insert(grp);
       if (error) throw new Error('insert purchases failed: ' + error.message);
     }
 
-    // ── 5. Recompute totals from buyer_purchases (idempotent, concurrency-safe) ──
+    // ── 6. Recompute totals from buyer_purchases (idempotent, concurrency-safe) ──
     const affected = new Set();
     unames.forEach(u => { if (unameToId[u]) affected.add(unameToId[u]); });
     oldBuyerIds.forEach(id => affected.add(id));
@@ -184,18 +233,17 @@ async function handleImport(req, res) {
     for (const grp of chunk(affectedIds, 25)) await Promise.all(grp.map(updateOne));
     } // end fallback (migration 013 not run)
 
-    // ── 6. Record the import ──
-    let importId = null;
-    const impRes = await sb.from('stream_slip_imports').insert({
-      organization_id: orgId, stream_id: streamId, imported_by: importedBy || null,
+    // ── 7. Record the attempt (appended — history is kept) ──
+    const importId = await recordImport(sb, Object.assign({}, importMeta, {
       buyers_found: unames.length,
       new_buyers_found: newUnames.length,
       total_revenue_parsed: round2(purchRows.reduce((s, r) => s + (r.amount || 0), 0)),
-      raw_filename: rawFilename || null, status: 'complete'
-    }).select('id').single();
-    if (!impRes.error && impRes.data) importId = impRes.data.id;
+      purchases_count: purchRows.length,
+      orders_replaced: ordersReplaced,
+      status: 'complete'
+    }));
 
-    // ── 7. Stamp the stream (data freshness) + recap the breaker ──
+    // ── 8. Stamp the stream (data freshness) + recap the breaker ──
     // Both are best-effort: the import is already committed and idempotent.
     await sb.from('streams').update({ slips_imported_at: nowIso }).eq('id', streamId).eq('org_id', orgId).then(null, () => {});
     try {
@@ -225,13 +273,20 @@ async function handleImport(req, res) {
 
     return res.status(200).json({
       success: true,
+      mode,
       processed: unames.length,
       newBuyers: newUnames.length,
       purchases: purchRows.length,
+      ordersReplaced,
       importId
     });
   } catch (e) {
     console.error('process-import error:', e);
+    // The failure itself is recorded — a silent "didn't register" is no longer possible.
+    await recordImport(sb, Object.assign({}, importMeta, {
+      buyers_found: unames.length, new_buyers_found: 0, total_revenue_parsed: 0,
+      status: 'failed', error_message: String(e && e.message || e).slice(0, 1000)
+    }));
     // Idempotent by design: the client can safely retry the same import.
     return res.status(500).json({ error: (e && e.message ? e.message : 'Import failed') + ' — safe to try the import again.' });
   }

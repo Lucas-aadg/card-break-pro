@@ -19,6 +19,7 @@
   <script src="analytics.js"></script>
   <script src="shared.js"></script>
   <script src="buyer-intel.js"></script>
+  <script src="slip-parser.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -2656,6 +2657,10 @@
             <div class="es-slip-label">PDF only · Max 50MB</div>
           </div>
           <input type="file" id="esSlipInput" accept="application/pdf,.pdf" style="display:none;" onchange="esSlipSelected(this)" />
+          <label id="esSlipReplaceWrap" style="display:none;align-items:flex-start;gap:0.5rem;margin-top:0.6rem;font-size:0.78rem;color:var(--muted);cursor:pointer;font-weight:400;">
+            <input type="checkbox" id="esSlipReplace" style="width:14px;height:14px;margin-top:2px;flex-shrink:0;" />
+            <span>Replace the previous import for this stream (start over). Leave unchecked to <strong>add</strong> this file — same order numbers are updated, everything else on the stream is kept.</span>
+          </label>
         </div>
 
       </div>
@@ -4628,10 +4633,8 @@ function setupCloseOutModal() {
         coResetSlipDrop();
         try {
           btn.textContent = 'Parsing slip…';
-          const fd = new FormData(); fd.append('file', slipFile);
-          const parseResp = await fetch('/api/import-slip', { method: 'POST', body: fd });
-          const parsed = await parseResp.json();
-          if (!parseResp.ok) throw new Error(parsed.error || 'Slip parse failed');
+          // Browser-side parse (no 4.5 MB / 30 s server limits); server as a second opinion
+          const parsed = await SlipParser.parseSlipFile(slipFile, { serverUrl: '/api/import-slip' });
           coShowSlipPreview(parsed, currentProfile.org_id, _closedStreamId, slipFile.name);
         } catch (slipErr) {
           showGlobalError('Slip parse failed: ' + escHtml(slipErr.message));
@@ -4799,12 +4802,15 @@ var _coPreviewStreamId = null;
 var _coPreviewStreamDate = null;
 var _coPreviewFilename = null;
 
+var _coPreviewMeta = null;
+
 function coShowSlipPreview(parsed, orgId, streamId, filename) {
   _coPreviewOrgId = orgId;
   _coPreviewBuyers = parsed.buyers || [];
   _coPreviewStreamId = streamId;
   _coPreviewStreamDate = parsed.streamDate || null;
   _coPreviewFilename = filename || null;
+  _coPreviewMeta = { parseSource: parsed._parseSource || null, fileSize: parsed._fileSize || null, pages: parsed._pages || parsed.totalPagesFound || null, warnings: (parsed._warnings || []).length };
   var msg        = document.getElementById('slipPreviewMsg');
   var listEl     = document.getElementById('slipPreviewList');
   var dbg        = document.getElementById('slipRawDebug');
@@ -4816,7 +4822,10 @@ function coShowSlipPreview(parsed, orgId, streamId, filename) {
     if (dbg) dbg.style.display = 'none';
     confirmBtn.style.display = 'none';
   } else {
-    msg.textContent = 'Found ' + _coPreviewBuyers.length + ' buyer' + (_coPreviewBuyers.length !== 1 ? 's' : '') + '. Review and confirm to save.';
+    msg.textContent = 'Found ' + _coPreviewBuyers.length + ' buyer' + (_coPreviewBuyers.length !== 1 ? 's' : '') +
+      (_coPreviewMeta && _coPreviewMeta.pages ? ' across ' + _coPreviewMeta.pages + ' pages' : '') +
+      '. Review and confirm to save.' +
+      (_coPreviewMeta && _coPreviewMeta.warnings ? ' ⚠ ' + _coPreviewMeta.warnings + ' slip(s) used the printed total because line items didn\'t add up.' : '');
     listEl.style.display = 'block';
     if (dbg) dbg.style.display = 'none';
     confirmBtn.style.display = '';
@@ -4850,10 +4859,14 @@ function setupSlipPreviewModal() {
           buyers: _coPreviewBuyers,
           streamDate: _coPreviewStreamDate,
           importedBy: currentUser ? currentUser.id : null,
-          rawFilename: _coPreviewFilename
+          rawFilename: _coPreviewFilename,
+          mode: 'merge',
+          parseSource: _coPreviewMeta ? _coPreviewMeta.parseSource : null,
+          fileSize: _coPreviewMeta ? _coPreviewMeta.fileSize : null
         })
       });
-      const result = await resp.json();
+      let result = null;
+      try { result = await resp.json(); } catch (e) { throw new Error('Server error ' + resp.status + (resp.status === 413 ? ' (payload too large)' : resp.status === 504 ? ' (timed out)' : '')); }
       if (!resp.ok) throw new Error(result.error || 'Import failed');
       cbpTrack('slip_imported', { org_id: _coPreviewOrgId, buyer_count: result.processed || _coPreviewBuyers.length });
       document.getElementById('slipPreviewModal').classList.remove('active');
@@ -5860,7 +5873,8 @@ async function openEditStream(streamId) {
       sb.from('breaks').select('id, break_number, products_used, revenue, total_product_cost')
         .eq('stream_id', streamId).eq('org_id', currentProfile.org_id)
         .order('break_number', { ascending: true }),
-      sb.from('stream_slip_imports').select('id').eq('stream_id', streamId).eq('status', 'complete').maybeSingle()
+      // One row per attempt now — take the latest completed one (maybeSingle() throws on >1)
+      sb.from('stream_slip_imports').select('id,import_date,buyers_found').eq('stream_id', streamId).eq('status', 'complete').order('import_date', { ascending: false }).limit(1)
     ]);
 
     if (streamRes.error) throw streamRes.error;
@@ -5871,7 +5885,7 @@ async function openEditStream(streamId) {
       return { id: b.id, break_number: b.break_number || (i + 1), products_used: b.products_used || [], _new: false, _deleted: false };
     });
 
-    _esHasSlip = !!slipRes.data;
+    _esHasSlip = !!(slipRes.data && slipRes.data.length);
 
     // Render
     document.getElementById('esSubtitle').textContent = escHtml(_esStreamData.stream_key || '') + ' · ' + escHtml(_esStreamData.break_date || '');
@@ -5895,8 +5909,10 @@ async function openEditStream(streamId) {
     // Always show slip section — label changes based on whether one exists
     document.getElementById('esSlipSection').style.display = '';
     const slipLabel = document.getElementById('esSlipStatusLabel');
-    if (slipLabel) slipLabel.textContent = _esHasSlip ? 'Replace existing import' : 'No slip on file';
+    if (slipLabel) slipLabel.textContent = _esHasSlip ? ('Slips on file' + (slipRes.data[0].buyers_found ? ' · ' + slipRes.data[0].buyers_found + ' buyers' : '') + ' — a new file adds to it') : 'No slip on file';
     if (slipLabel) slipLabel.style.color = _esHasSlip ? 'var(--muted)' : 'var(--yellow)';
+    const esReplaceWrap = document.getElementById('esSlipReplaceWrap');
+    if (esReplaceWrap) { esReplaceWrap.style.display = _esHasSlip ? 'flex' : 'none'; document.getElementById('esSlipReplace').checked = false; }
 
     esRenderAllBreaks();
     esUpdateTotals();
@@ -6194,30 +6210,32 @@ async function confirmEditStream() {
     // ── Process slip if uploaded ─────────────────────────────────────────
     if (_esSlipFile) {
       const tok = (await sb.auth.getSession()).data.session.access_token;
-      const fd = new FormData(); fd.append('file', _esSlipFile);
       btn.textContent = 'Parsing slip…';
-      const parseResp = await fetch('/api/import-slip', { method: 'POST', body: fd });
-      const parsed = await parseResp.json();
-      if (!parseResp.ok) throw new Error('Slip parse failed: ' + (parsed.error || parseResp.status));
-      if (parsed.buyers && parsed.buyers.length > 0) {
-        btn.textContent = 'Importing buyers…';
-        const importResp = await fetch('/api/process-import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-          body: JSON.stringify({
-            orgId: currentProfile.org_id,
-            streamId: _esStreamId,
-            buyers: parsed.buyers,
-            streamDate: parsed.streamDate || _esStreamData.break_date,
-            importedBy: currentUser.id,
-            rawFilename: _esSlipFile.name
-          })
-        });
-        if (!importResp.ok) {
-          const importErr = await importResp.json().catch(() => ({}));
-          throw new Error('Buyer import failed: ' + (importErr.error || importResp.status));
-        }
-      }
+      // Browser-side parse (no 4.5 MB / 30 s server limits); server as a second opinion
+      let parsed;
+      try { parsed = await SlipParser.parseSlipFile(_esSlipFile, { serverUrl: '/api/import-slip' }); }
+      catch (pe) { throw new Error('Slip parse failed: ' + pe.message); }
+      if (!parsed.buyers || !parsed.buyers.length) throw new Error('Slip parsed 0 paying buyers — is this a Whatnot packing slip export? Nothing was imported.');
+      const replaceAll = !!(document.getElementById('esSlipReplace') && document.getElementById('esSlipReplace').checked);
+      btn.textContent = 'Importing ' + parsed.buyers.length + ' buyers…';
+      const importResp = await fetch('/api/process-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({
+          orgId: currentProfile.org_id,
+          streamId: _esStreamId,
+          buyers: parsed.buyers,
+          streamDate: parsed.streamDate || _esStreamData.break_date,
+          importedBy: currentUser.id,
+          rawFilename: _esSlipFile.name,
+          mode: replaceAll ? 'replace' : 'merge',
+          parseSource: parsed._parseSource || null,
+          fileSize: parsed._fileSize || null
+        })
+      });
+      const importRes = await importResp.json().catch(() => ({}));
+      if (!importResp.ok) throw new Error('Buyer import failed: ' + (importRes.error || importResp.status));
+      showGlobalSuccess((importRes.processed || parsed.buyers.length) + ' buyers imported' + (importRes.ordersReplaced ? ' (' + importRes.ordersReplaced + ' orders updated)' : '') + '.');
     }
 
     closeEditStream();
