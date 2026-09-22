@@ -2401,7 +2401,7 @@
   <div class="modal">
     <h2>Close Out Stream</h2>
     <table class="modal-table">
-      <thead><tr><th>Break #</th><th>Revenue</th><th>Box Cost</th><th>Est. Fees</th></tr></thead>
+      <thead><tr><th>Break #</th><th>Revenue</th><th>Box Cost</th><th>Est. Fees</th><th>Other</th></tr></thead>
       <tbody id="coTableBody"></tbody>
       <tfoot>
         <tr>
@@ -2409,6 +2409,7 @@
           <td style="font-weight:800;color:var(--primary);" id="coTotalRev">$0.00</td>
           <td style="font-weight:800;color:var(--primary);" id="coTotalBox">$0.00</td>
           <td style="font-weight:800;color:var(--primary);font-size:0.82rem;color:var(--muted);" id="coTotalFees">$0.00 (est.)</td>
+          <td style="font-weight:800;color:var(--primary);" id="coTotalOther">$0.00</td>
         </tr>
       </tfoot>
     </table>
@@ -4099,8 +4100,10 @@ function beUpdateProductRow(input) {
   const unitCost = parseFloat(input.dataset.unitCost) || 0;
   const stock = parseInt(input.dataset.stock, 10) || 0;
   const minAlert = parseInt(input.dataset.min, 10) || 5;
-  const qty = Math.max(0, Math.min(parseInt(input.value, 10) || 0, stock));
-  input.value = qty;
+  // No clamp to the system count — record what was actually opened; over-use
+  // is flagged, not silently trimmed (trimming is how counts drift).
+  const qty = Math.max(0, parseInt(input.value, 10) || 0);
+  if (input.value !== '' && String(qty) !== input.value) input.value = qty;
 
   const extEl = document.getElementById('be-extCost_' + idx);
   if (extEl) extEl.textContent = fmt(qty * unitCost);
@@ -4108,8 +4111,8 @@ function beUpdateProductRow(input) {
   const afterEl = document.getElementById('be-stockAfter_' + idx);
   if (afterEl) {
     const remaining = stock - qty;
-    afterEl.textContent = remaining === 0 ? '0 — OUT' : remaining <= minAlert ? remaining + ' — LOW' : remaining;
-    afterEl.className = remaining === 0 ? 'stock-out' : remaining <= minAlert ? 'stock-low' : 'stock-ok';
+    afterEl.textContent = remaining < 0 ? remaining + ' — OVER (recount)' : remaining === 0 ? '0 — OUT' : remaining <= minAlert ? remaining + ' — LOW' : remaining;
+    afterEl.className = remaining <= 0 ? 'stock-out' : remaining <= minAlert ? 'stock-low' : 'stock-ok';
   }
 }
 
@@ -4360,50 +4363,67 @@ async function beHandleSubmit() {
       cbpTrack('owner_first_break_logged', { org_id: currentProfile.org_id });
     }
 
-    // Deduct stock + log usage
+    // Deduct stock atomically (adjust_stock RPC writes the log line too). Same
+    // path as the breaker page: no read-modify-write, no clamp at zero — an
+    // over-used product goes negative so the log always matches what was opened.
+    const stockNote = 'Break #' + beBreakNumber + (stream ? ' — stream ' + stream.stream_key : '');
     for (const used of productsUsed) {
       const product = orgProducts.find(function (p) { return p.id === used.product_id; });
       if (!product) continue;
-      const newStock = Math.max(0, product.current_stock - used.qty);
+      const rpc = await sb.rpc('adjust_stock', { p_product_id: used.product_id, p_delta: -used.qty, p_action: 'used', p_notes: stockNote });
+      if (!rpc.error) { product.current_stock = rpc.data; continue; }
+      if (!CBP.isMissingSchema(rpc.error)) {
+        CBP.captureError(rpc.error, 'adjust_stock (owner break)');
+        showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.');
+        continue;
+      }
+      // Migration 013 not run yet — last-resort non-atomic path
+      const { data: fresh } = await sb.from('products').select('current_stock').eq('id', used.product_id).maybeSingle();
+      const newStock = ((fresh && fresh.current_stock != null) ? fresh.current_stock : product.current_stock) - used.qty;
       const { error: stkErr } = await sb.from('products').update({ current_stock: newStock }).eq('id', used.product_id).eq('org_id', currentProfile.org_id);
       if (stkErr) { console.error('Stock update error:', stkErr); showGlobalError('Heads up — ' + product.name + ' stock may not have updated. Check inventory.'); }
-      else { product.current_stock = newStock; } // only trust the cache when the write actually landed
-      // Log box usage
+      else { product.current_stock = newStock; }
       await sb.from('inventory_log').insert({
-        org_id: currentProfile.org_id,
-        product_id: used.product_id,
-        product_name: product.name,
-        action: 'used',
-        quantity: used.qty,
-        unit_cost: product.unit_cost,
-        notes: 'Break #' + (beBreakNumber - 1) + (beCurrentStream ? ' — stream ' + beCurrentStream.stream_key : '')
+        org_id: currentProfile.org_id, product_id: used.product_id, product_name: product.name,
+        action: 'used', quantity: used.qty, unit_cost: product.unit_cost, notes: stockNote
       });
     }
 
-    // Update stream
-    const newRevTotal = (parseFloat(stream.total_submitted_revenue) || 0) + revenue;
-    const newBoxTotal = (parseFloat(stream.total_product_cost) || 0) + boxCost;
-    const newFeesTotal = (parseFloat(stream.total_fees) || 0) + fees;
-    const newOtherTotal = (parseFloat(stream.total_other_costs) || 0) + otherCosts;
-    const newBreakCount = (stream.break_count || 0) + 1;
-
-    const { error: stUpdErr } = await sb.from('streams').update({
-      total_submitted_revenue: newRevTotal,
-      total_product_cost: newBoxTotal,
-      total_fees: newFeesTotal,
-      total_other_costs: newOtherTotal,
-      break_count: newBreakCount
-    }).eq('id', stream.id);
-    if (stUpdErr) {
-      console.error('Stream total update error:', stUpdErr);
-      showGlobalError('Break saved, but the stream running total didn\'t update — refresh to re-sync your totals.');
+    // Stream totals recomputed from the breaks table (RPC), with the old running
+    // sum as fallback. All five totals are carried into the cached stream so
+    // close-out never reads a stale total_other_costs.
+    let newTotals = {
+      total_submitted_revenue: (parseFloat(stream.total_submitted_revenue) || 0) + revenue,
+      total_product_cost: (parseFloat(stream.total_product_cost) || 0) + boxCost,
+      total_fees: (parseFloat(stream.total_fees) || 0) + fees,
+      total_other_costs: (parseFloat(stream.total_other_costs) || 0) + otherCosts,
+      break_count: (stream.break_count || 0) + 1
+    };
+    const tot = await sb.rpc('recompute_stream_totals', { p_stream_id: stream.id });
+    if (!tot.error && tot.data && tot.data.length) {
+      const t = tot.data[0];
+      newTotals = {
+        total_submitted_revenue: parseFloat(t.total_submitted_revenue) || 0,
+        total_product_cost: parseFloat(t.total_product_cost) || 0,
+        total_fees: parseFloat(t.total_fees) || 0,
+        total_other_costs: parseFloat(t.total_other_costs) || 0,
+        break_count: t.break_count || newTotals.break_count
+      };
+    } else {
+      if (tot.error && !CBP.isMissingSchema(tot.error)) CBP.captureError(tot.error, 'recompute_stream_totals (owner)');
+      const { error: stUpdErr } = await sb.from('streams').update(newTotals).eq('id', stream.id);
+      if (stUpdErr) {
+        console.error('Stream total update error:', stUpdErr);
+        showGlobalError('Break saved, but the stream running total didn\'t update — refresh to re-sync your totals.');
+      }
     }
 
-    beSubmittedBreaks.push({ break_number: beBreakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed });
+    beSubmittedBreaks.push({ break_number: beBreakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed,
+      total_product_cost: boxCost, estimated_fees: fees, other_costs: otherCosts });
     beLastBreakProducts = productsUsed;
     document.getElementById('be-repeatBreakBtn').style.display = '';
     beBreakNumber += 1;
-    beCurrentStream = { ...stream, total_submitted_revenue: newRevTotal, break_count: newBreakCount };
+    beCurrentStream = { ...stream, ...newTotals };
 
     // Clear inputs
     document.getElementById('be-revenue').value = '';
@@ -4437,13 +4457,14 @@ async function beOpenCloseOut() {
 
   const tbody = document.getElementById('coTableBody');
   tbody.innerHTML = '';
-  let totalRev = 0, totalBox = 0, totalFees = 0;
+  let totalRev = 0, totalBox = 0, totalFees = 0, totalOther = 0;
 
+  // The breaks table is the source of truth for every close-out total.
   let fullBreaks = beSubmittedBreaks;
   if (beCurrentStream) {
     try {
-      const { data } = await sb.from('breaks').select('*').eq('stream_id', beCurrentStream.id).order('break_number');
-      fullBreaks = data || beSubmittedBreaks;
+      const { data } = await sb.from('breaks').select('*').eq('stream_id', beCurrentStream.id).eq('org_id', currentProfile.org_id).order('break_number');
+      if (data && data.length) fullBreaks = data;
     } catch (e) { /* use local */ }
   }
 
@@ -4453,16 +4474,19 @@ async function beOpenCloseOut() {
       '<td>Break ' + b.break_number + '</td>' +
       '<td>' + fmt(b.revenue) + '</td>' +
       '<td>' + fmt(b.total_product_cost) + '</td>' +
-      '<td>' + fmt(b.estimated_fees) + '</td>';
+      '<td>' + fmt(b.estimated_fees) + '</td>' +
+      '<td>' + fmt(b.other_costs) + '</td>';
     tbody.appendChild(tr);
     totalRev += parseFloat(b.revenue) || 0;
     totalBox += parseFloat(b.total_product_cost) || 0;
     totalFees += parseFloat(b.estimated_fees) || 0;
+    totalOther += parseFloat(b.other_costs) || 0;
   });
 
   document.getElementById('coTotalRev').textContent = fmt(totalRev);
   document.getElementById('coTotalBox').textContent = fmt(totalBox);
   document.getElementById('coTotalFees').textContent = fmt(totalFees) + ' (est.)';
+  document.getElementById('coTotalOther').textContent = fmt(totalOther);
   document.getElementById('coFinalSales').value = '';
   document.getElementById('coNotes').value = '';
   document.getElementById('coNetPreview').textContent = '—';
@@ -4473,7 +4497,7 @@ async function beOpenCloseOut() {
   modal.dataset.totalBox = totalBox;
   modal.dataset.totalFees = totalFees;
   modal.dataset.totalRev = totalRev;
-  modal.dataset.totalOther = beCurrentStream ? (parseFloat(beCurrentStream.total_other_costs) || 0) : 0;
+  modal.dataset.totalOther = totalOther;
   coResetSlipDrop();
   modal.classList.add('active');
 }

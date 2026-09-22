@@ -596,6 +596,7 @@
       <span id="productSearchClear" onclick="clearProductSearch()" style="display:none;position:absolute;right:0.6rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:1rem;cursor:pointer;line-height:1;">✕</span>
     </div>
     <div id="categoryFilter" style="display:none;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;"></div>
+    <div id="selectedBoxesStrip" style="display:none;margin-bottom:0.85rem;"></div>
     <div id="productsLoading" style="color:var(--muted);font-size:0.85rem;">Loading products…</div>
     <div id="productsWrap" style="display:none;overflow-x:auto;">
       <table class="product-table">
@@ -1051,6 +1052,7 @@
           <th>Revenue</th>
           <th>Box Cost</th>
           <th>Est. Fees</th>
+          <th>Other</th>
         </tr>
       </thead>
       <tbody id="closeOutTableBody"></tbody>
@@ -1060,6 +1062,7 @@
           <td class="modal-total" id="coTotalRevenue">$0.00</td>
           <td class="modal-total" id="coTotalBoxCost">$0.00</td>
           <td class="modal-total" id="coTotalFees">$0.00</td>
+          <td class="modal-total" id="coTotalOther">$0.00</td>
         </tr>
       </tfoot>
     </table>
@@ -1301,11 +1304,51 @@ async function loadProducts() {
   }
 }
 
-let activeCategory = 'All';
+// Category pills are multi-select (empty set = all). A breaker can pull boxes
+// from several categories of the same account into one break.
+let activeCategories = new Set();
 let productSearchTerm = '';
-// Source of truth for entered box quantities (product index -> qty). Survives
-// search/category filtering, which re-renders the table and drops DOM inputs.
+// Source of truth for entered box quantities (product id -> qty). Keyed by id,
+// not row index, so it survives search/category/account filtering and product
+// reloads that reorder the list.
 let selectedQtys = {};
+
+function productById(id) { return products.find(function (p) { return p.id === id; }); }
+
+// Account the calculator is scoped to: the picker, else the loaded stream's account.
+function brkSelectedChannelId() {
+  const sel = document.getElementById('streamChannel');
+  return (sel && sel.value) || (currentStream && currentStream.channel_id) || '';
+}
+
+// Products the breaker may pick from: the stream's account plus shared (untagged)
+// products. No account picked (or a single-account org) → everything.
+function brkScopedProducts() {
+  const ch = brkSelectedChannelId();
+  if (!ch) return products;
+  return products.filter(function (p) { return !p.channel_id || p.channel_id === ch; });
+}
+
+// Re-scope the product list when the stream's account changes. Boxes from
+// another account can't stay in this break, so they're dropped (and said so).
+let _brkAppliedScope = '';
+function brkApplyProductScope() {
+  const ch = brkSelectedChannelId();
+  if (ch === _brkAppliedScope) return;
+  _brkAppliedScope = ch;
+  onStreamAccountChanged();
+}
+function onStreamAccountChanged() {
+  if (!products.length) return;
+  const allowed = {};
+  brkScopedProducts().forEach(function (p) { allowed[p.id] = true; });
+  const dropped = Object.keys(selectedQtys).filter(function (id) { return !allowed[id]; });
+  dropped.forEach(function (id) { delete selectedQtys[id]; });
+  if (dropped.length) showGlobalError(dropped.length + ' selected box' + (dropped.length > 1 ? 'es' : '') + ' belonged to a different account and ' + (dropped.length > 1 ? 'were' : 'was') + ' removed from this break.');
+  activeCategories.clear();
+  buildCategoryFilter();
+  renderProductTable();
+}
 
 function onProductSearch() {
   const el = document.getElementById('productSearch');
@@ -1324,35 +1367,74 @@ function clearProductSearch() {
 }
 
 function buildCategoryFilter() {
-  const categories = ['All', ...new Set(products.map(function (p) { return p.category || 'Uncategorized'; }))];
-  if (categories.length <= 1) return;
-
   const filterEl = document.getElementById('categoryFilter');
+  const scoped = brkScopedProducts();
+  const categories = [...new Set(scoped.map(function (p) { return p.category || 'Uncategorized'; }))].sort();
+  // Forget selections for categories that don't exist in this account
+  Array.from(activeCategories).forEach(function (c) { if (categories.indexOf(c) === -1) activeCategories.delete(c); });
+  if (categories.length <= 1) { filterEl.style.display = 'none'; filterEl.innerHTML = ''; return; }
+
   filterEl.style.display = 'flex';
   filterEl.innerHTML = '';
-
-  categories.forEach(function (cat) {
+  const mk = function (label, isActive, onClick) {
     const btn = document.createElement('button');
-    btn.textContent = cat;
+    btn.type = 'button';
+    btn.textContent = label;
     btn.style.cssText = 'padding:0.35rem 0.9rem;border-radius:100px;border:1px solid var(--border);background:' +
-      (cat === activeCategory ? 'var(--primary)' : 'var(--bg)') +
-      ';color:' + (cat === activeCategory ? '#fff' : 'var(--muted)') +
+      (isActive ? 'var(--primary)' : 'var(--bg)') +
+      ';color:' + (isActive ? '#fff' : 'var(--muted)') +
       ';font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s;';
-    btn.addEventListener('click', function () {
-      activeCategory = cat;
-      buildCategoryFilter();
-      renderProductTable();
-    });
-    filterEl.appendChild(btn);
+    btn.addEventListener('click', onClick);
+    return btn;
+  };
+  filterEl.appendChild(mk('All', activeCategories.size === 0, function () {
+    activeCategories.clear(); buildCategoryFilter(); renderProductTable();
+  }));
+  categories.forEach(function (cat) {
+    filterEl.appendChild(mk(cat, activeCategories.has(cat), function () {
+      if (activeCategories.has(cat)) activeCategories.delete(cat); else activeCategories.add(cat);
+      buildCategoryFilter(); renderProductTable();
+    }));
   });
+  const hint = document.createElement('span');
+  hint.style.cssText = 'font-size:0.7rem;color:var(--muted);width:100%;';
+  hint.textContent = 'Tap categories to combine them — boxes you select stay in the break when you switch.';
+  filterEl.appendChild(hint);
+}
+
+// Always-visible summary of what's in this break, independent of search,
+// category or account filters — nothing selected is ever hidden.
+function renderSelectedStrip() {
+  const el = document.getElementById('selectedBoxesStrip'); if (!el) return;
+  const ids = Object.keys(selectedQtys).filter(function (id) { return selectedQtys[id] > 0 && productById(id); });
+  if (!ids.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  let units = 0, cost = 0;
+  const chips = ids.map(function (id) {
+    const p = productById(id); const q = selectedQtys[id];
+    units += q; cost += q * (parseFloat(p.unit_cost) || 0);
+    return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(79,110,247,0.12);border:1px solid rgba(79,110,247,0.35);color:var(--text);border-radius:100px;padding:0.2rem 0.6rem;font-size:0.76rem;font-weight:600;">' +
+      escHtml(p.name) + ' <span style="color:var(--primary);">×' + q + '</span>' +
+      '<button type="button" onclick="brkRemoveSelected(\'' + p.id + '\')" title="Remove from this break" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.85rem;line-height:1;padding:0 0 0 0.15rem;">✕</button></span>';
+  }).join('');
+  el.innerHTML = '<div style="font-size:0.68rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:0.35rem;">In this break — ' + units + ' box' + (units !== 1 ? 'es' : '') + ' · ' + fmt(cost) + '</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:0.4rem;">' + chips + '</div>';
+  el.style.display = '';
+}
+function brkRemoveSelected(pid) {
+  delete selectedQtys[pid];
+  const input = document.querySelector('.qty-input[data-pid="' + pid + '"]');
+  if (input) { input.value = 0; updateProductRow(input); }
+  renderSelectedStrip();
+  recalcTotals();
 }
 
 function renderProductTable() {
   const tbody = document.getElementById('productTableBody');
   tbody.innerHTML = '';
 
-  const filtered = products.filter(function (p) {
-    const catOk = activeCategory === 'All' || (p.category || 'Uncategorized') === activeCategory;
+  const scoped = brkScopedProducts();
+  const filtered = scoped.filter(function (p) {
+    const catOk = activeCategories.size === 0 || activeCategories.has(p.category || 'Uncategorized');
     if (!catOk) return false;
     if (!productSearchTerm) return true;
     return (p.name || '').toLowerCase().includes(productSearchTerm) ||
@@ -1360,12 +1442,16 @@ function renderProductTable() {
   });
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1.1rem;font-size:0.85rem;">No products match "' + escHtml(productSearchTerm) + '"</td></tr>';
+    const why = productSearchTerm ? 'No products match "' + escHtml(productSearchTerm) + '"'
+      : scoped.length ? 'No products in the selected categories'
+      : 'No products are assigned to this account yet — the owner tags products to accounts under Inventory.';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1.1rem;font-size:0.85rem;">' + why + '</td></tr>';
+    renderSelectedStrip();
+    recalcTotals();
     return;
   }
 
   filtered.forEach(function (p) {
-    const idx = products.indexOf(p);
     const tr = document.createElement('tr');
     const stockClass = p.current_stock <= 0 ? 'stock-out' : p.current_stock <= p.min_stock_alert ? 'stock-low' : 'stock-ok';
     const stockLabel = p.current_stock < 0 ? p.current_stock + ' — OVER-USED' : p.current_stock === 0 ? '0 — OUT' : p.current_stock <= p.min_stock_alert ? p.current_stock + ' — LOW' : p.current_stock;
@@ -1374,9 +1460,9 @@ function renderProductTable() {
       '<td data-label="Product">' + escHtml(p.name) + '</td>' +
       '<td data-label="Category" style="color:var(--muted);">' + escHtml(p.category || '—') + '</td>' +
       '<td data-label="Unit Cost">' + fmt(p.unit_cost) + '</td>' +
-      '<td data-label="Qty Used"><input type="number" class="qty-input" data-idx="' + idx + '" data-unit-cost="' + p.unit_cost + '" data-stock="' + p.current_stock + '" min="0" max="' + p.current_stock + '" value="0" placeholder="0" /></td>' +
-      '<td data-label="Ext. Cost" class="ext-cost" id="extCost_' + idx + '">$0.00</td>' +
-      '<td data-label="Stock After" class="' + stockClass + '" id="stockAfter_' + idx + '">' + stockLabel + '</td>';
+      '<td data-label="Qty Used"><input type="number" class="qty-input" data-pid="' + p.id + '" data-unit-cost="' + p.unit_cost + '" data-stock="' + p.current_stock + '" min="0" inputmode="numeric" value="0" placeholder="0" /></td>' +
+      '<td data-label="Ext. Cost" class="ext-cost" id="extCost_' + p.id + '">$0.00</td>' +
+      '<td data-label="Stock After" class="' + stockClass + '" id="stockAfter_' + p.id + '">' + stockLabel + '</td>';
 
     tbody.appendChild(tr);
   });
@@ -1385,48 +1471,50 @@ function renderProductTable() {
   tbody.querySelectorAll('.qty-input').forEach(function (input) {
     input.addEventListener('input', function () {
       updateProductRow(input);
+      renderSelectedStrip();
       recalcTotals();
     });
-    if (selectedQtys[input.dataset.idx]) {
-      input.value = selectedQtys[input.dataset.idx];
+    if (selectedQtys[input.dataset.pid]) {
+      input.value = selectedQtys[input.dataset.pid];
       updateProductRow(input);
     }
   });
+  renderSelectedStrip();
   recalcTotals();
 }
 
 function updateProductRow(input) {
-  const idx = parseInt(input.dataset.idx, 10);
+  const pid = input.dataset.pid;
+  const p = productById(pid);
   const unitCost = parseFloat(input.dataset.unitCost) || 0;
   const stock = parseInt(input.dataset.stock, 10) || 0;
-  const qty = Math.max(0, Math.min(parseInt(input.value, 10) || 0, stock));
-  input.value = qty;
-  if (qty > 0) selectedQtys[idx] = qty; else delete selectedQtys[idx];
+  // Never clamp to the system count. If the shelf has more than the app thinks,
+  // the breaker must still record what was actually opened — clamping is how
+  // counts drift and stay wrong. Over-use is shown as a warning instead.
+  const qty = Math.max(0, parseInt(input.value, 10) || 0);
+  if (input.value !== '' && String(qty) !== input.value) input.value = qty;
+  if (qty > 0) selectedQtys[pid] = qty; else delete selectedQtys[pid];
 
-  const extCost = qty * unitCost;
-  document.getElementById('extCost_' + idx).textContent = fmt(extCost);
+  const extEl = document.getElementById('extCost_' + pid);
+  if (extEl) extEl.textContent = fmt(qty * unitCost);
 
   const remaining = stock - qty;
-  const stockCell = document.getElementById('stockAfter_' + idx);
-  stockCell.textContent = remaining === 0 ? '0 — OUT' : remaining <= products[idx].min_stock_alert ? remaining + ' — LOW' : remaining;
-  stockCell.className = remaining === 0 ? 'stock-out' : remaining <= products[idx].min_stock_alert ? 'stock-low' : 'stock-ok';
+  const minAlert = p ? (p.min_stock_alert || 0) : 0;
+  const stockCell = document.getElementById('stockAfter_' + pid);
+  if (!stockCell) return;
+  stockCell.textContent = remaining < 0 ? remaining + ' — OVER (tell your owner to recount)' : remaining === 0 ? '0 — OUT' : remaining <= minAlert ? remaining + ' — LOW' : remaining;
+  stockCell.className = remaining <= 0 ? 'stock-out' : remaining <= minAlert ? 'stock-low' : 'stock-ok';
 }
 
 // All three read from selectedQtys (source of truth) so quantities on rows
-// hidden by search/category filtering are still counted.
+// hidden by search/category/account filtering are still counted.
 function getProductsUsed() {
   const used = [];
-  Object.keys(selectedQtys).forEach(function (k) {
-    const idx = parseInt(k, 10);
-    const qty = selectedQtys[k] || 0;
-    if (qty > 0 && products[idx]) {
-      used.push({
-        product_id: products[idx].id,
-        name: products[idx].name,
-        qty,
-        unit_cost: products[idx].unit_cost,
-        ext_cost: qty * products[idx].unit_cost
-      });
+  Object.keys(selectedQtys).forEach(function (id) {
+    const qty = selectedQtys[id] || 0;
+    const p = productById(id);
+    if (qty > 0 && p) {
+      used.push({ product_id: p.id, name: p.name, qty, unit_cost: p.unit_cost, ext_cost: qty * p.unit_cost });
     }
   });
   return used;
@@ -1434,16 +1522,16 @@ function getProductsUsed() {
 
 function getTotalBoxCost() {
   let total = 0;
-  Object.keys(selectedQtys).forEach(function (k) {
-    const idx = parseInt(k, 10);
-    if (products[idx]) total += (selectedQtys[k] || 0) * (products[idx].unit_cost || 0);
+  Object.keys(selectedQtys).forEach(function (id) {
+    const p = productById(id);
+    if (p) total += (selectedQtys[id] || 0) * (p.unit_cost || 0);
   });
   return total;
 }
 
 function getTotalUnitsUsed() {
   let total = 0;
-  Object.keys(selectedQtys).forEach(function (k) { total += selectedQtys[k] || 0; });
+  Object.keys(selectedQtys).forEach(function (id) { if (productById(id)) total += selectedQtys[id] || 0; });
   return total;
 }
 
@@ -1611,8 +1699,13 @@ async function brkGuessChannel(streamKey, breakDate) {
 }
 
 // Keep the picker in sync with the loaded stream; if the loaded stream has no
-// account but we have a good guess, repair it on the spot.
+// account but we have a good guess, repair it on the spot. Whatever the picker
+// lands on also scopes the product list.
 async function brkSyncStreamChannel() {
+  try { await brkSyncStreamChannelInner(); }
+  finally { brkApplyProductScope(); }
+}
+async function brkSyncStreamChannelInner() {
   const sel = document.getElementById('streamChannel'); if (!sel) return;
   const hint = document.getElementById('streamChannelHint');
   const chans = await brkEnsureOrgChannels();
@@ -1636,6 +1729,7 @@ async function brkSetStreamChannel(channelId, silent) {
   const hint = document.getElementById('streamChannelHint');
   if (sel && sel.value !== channelId) sel.value = channelId || '';
   try { if (channelId) localStorage.setItem(brkChannelPrefKey(), channelId); } catch (e) {}
+  brkApplyProductScope();
   if (!currentStream || !channelId) return;
   const { error } = await sb.from('streams').update({ channel_id: channelId }).eq('id', currentStream.id);
   if (error) { showGlobalError('Couldn\'t set the account: ' + error.message); return; }
@@ -1867,37 +1961,42 @@ async function handleSubmitBreak() {
 
     // Stream totals are recomputed from the breaks table server-side (never a
     // running sum that can drift). Falls back to the old read-modify-write
-    // until migration 013 is run.
-    let newTotalRevenue = (parseFloat(stream.total_submitted_revenue) || 0) + revenue;
-    let newBreakCount = (stream.break_count || 0) + 1;
+    // until migration 013 is run. ALL five totals are carried into the cached
+    // stream — close-out used to read a stale total_other_costs from here and
+    // silently drop the last break's other costs.
+    let newTotals = {
+      total_submitted_revenue: (parseFloat(stream.total_submitted_revenue) || 0) + revenue,
+      total_product_cost: (parseFloat(stream.total_product_cost) || 0) + boxCost,
+      total_fees: (parseFloat(stream.total_fees) || 0) + fees,
+      total_other_costs: (parseFloat(stream.total_other_costs) || 0) + otherCosts,
+      break_count: (stream.break_count || 0) + 1
+    };
     const tot = await sb.rpc('recompute_stream_totals', { p_stream_id: stream.id });
     if (!tot.error && tot.data && tot.data.length) {
-      newTotalRevenue = parseFloat(tot.data[0].total_submitted_revenue) || newTotalRevenue;
-      newBreakCount = tot.data[0].break_count || newBreakCount;
+      const t = tot.data[0];
+      newTotals = {
+        total_submitted_revenue: parseFloat(t.total_submitted_revenue) || 0,
+        total_product_cost: parseFloat(t.total_product_cost) || 0,
+        total_fees: parseFloat(t.total_fees) || 0,
+        total_other_costs: parseFloat(t.total_other_costs) || 0,
+        break_count: t.break_count || newTotals.break_count
+      };
     } else {
       if (tot.error && !CBP.isMissingSchema(tot.error)) CBP.captureError(tot.error, 'recompute_stream_totals');
-      const { error: streamErr } = await sb
-        .from('streams')
-        .update({
-          total_submitted_revenue: newTotalRevenue,
-          total_product_cost: (parseFloat(stream.total_product_cost) || 0) + boxCost,
-          total_fees: (parseFloat(stream.total_fees) || 0) + fees,
-          total_other_costs: (parseFloat(stream.total_other_costs) || 0) + otherCosts,
-          break_count: newBreakCount
-        })
-        .eq('id', stream.id);
+      const { error: streamErr } = await sb.from('streams').update(newTotals).eq('id', stream.id);
       if (streamErr) {
         CBP.captureError(streamErr, 'stream totals update');
         showGlobalError('Break saved, but the stream running total didn\'t update — refresh to re-sync your totals.');
       }
     }
 
-    // Update local state — store individual revenue, cumulative total, and products used for repeat
-    submittedBreaks.push({ break_number: breakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed });
+    // Update local state — per-break figures (close-out sums these), cumulative total, and products used for repeat
+    submittedBreaks.push({ break_number: breakNumber, revenue, cumulativeTotal: currentWhatnotTotal, productsUsed,
+      total_product_cost: boxCost, estimated_fees: fees, other_costs: otherCosts });
     lastBreakProducts = productsUsed;
     document.getElementById('repeatBreakBtn').style.display = '';
     breakNumber += 1;
-    currentStream = { ...stream, total_submitted_revenue: newTotalRevenue, break_count: newBreakCount };
+    currentStream = { ...stream, ...newTotals };
     saveSessionState();
 
     // Clear inputs
@@ -1943,14 +2042,15 @@ async function openCloseOutModal() {
   // Populate modal table
   const tbody = document.getElementById('closeOutTableBody');
   tbody.innerHTML = '';
-  let totalRev = 0, totalBox = 0, totalFees = 0;
+  let totalRev = 0, totalBox = 0, totalFees = 0, totalOther = 0;
 
-  // Load full break data for the current stream
+  // Load full break data for the current stream — the breaks table is the
+  // source of truth for every close-out total (not the cached stream row).
   let breaksForModal = submittedBreaks;
   if (currentStream) {
     try {
       const fullBreaks = await loadStreamBreaks(currentStream.id);
-      breaksForModal = fullBreaks;
+      if (fullBreaks.length) breaksForModal = fullBreaks;
     } catch (err) {
       console.warn('Could not load full breaks for modal:', err);
     }
@@ -1962,17 +2062,20 @@ async function openCloseOutModal() {
       '<td>Break ' + b.break_number + '</td>' +
       '<td>' + fmt(b.revenue) + '</td>' +
       '<td>' + fmt(b.total_product_cost) + '</td>' +
-      '<td>' + fmt(b.estimated_fees) + '</td>';
+      '<td>' + fmt(b.estimated_fees) + '</td>' +
+      '<td>' + fmt(b.other_costs) + '</td>';
     tbody.appendChild(tr);
     totalRev += parseFloat(b.revenue) || 0;
     totalBox += parseFloat(b.total_product_cost) || 0;
     totalFees += parseFloat(b.estimated_fees) || 0;
+    totalOther += parseFloat(b.other_costs) || 0;
   });
 
   const totalRevenue = totalRev;
   document.getElementById('coTotalRevenue').textContent = fmt(totalRevenue);
   document.getElementById('coTotalBoxCost').textContent = fmt(totalBox);
   document.getElementById('coTotalFees').textContent = fmt(totalFees);
+  document.getElementById('coTotalOther').textContent = fmt(totalOther);
 
   document.getElementById('finalSalesInput').value = '';
   document.getElementById('closeNotes').value = '';
@@ -1983,8 +2086,7 @@ async function openCloseOutModal() {
   document.getElementById('closeOutModal').dataset.totalRevenue = totalRevenue;
   document.getElementById('closeOutModal').dataset.totalBox = totalBox;
   document.getElementById('closeOutModal').dataset.totalFees = totalFees;
-  document.getElementById('closeOutModal').dataset.totalOther =
-    currentStream ? (parseFloat(currentStream.total_other_costs) || 0) : 0;
+  document.getElementById('closeOutModal').dataset.totalOther = totalOther;
   document.getElementById('finalFeeRow').style.display = 'none';
 
   // Open slip import modal first; final closeout opens after import + hit logging
@@ -2049,9 +2151,10 @@ async function handleConfirmClose() {
 
     if (error) throw error;
 
-    // Save stream id and key before clearing state
+    // Save stream id, key and break count before clearing state
     const closedStreamId = currentStream.id;
     const closedStreamKey = currentStream.stream_key || '';
+    const closedBreakCount = submittedBreaks.length;
 
     // Sync each break's net_profit to use the actual fee rate from final_sales
     try {
@@ -2128,7 +2231,7 @@ async function handleConfirmClose() {
         body: JSON.stringify({
           stream_id: closedStreamId,
           stream_key: closedStreamKey,
-          break_count: submittedBreaks.length
+          break_count: closedBreakCount
         })
       }).catch(function() {});
     });
@@ -2176,8 +2279,7 @@ function setupEventListeners() {
     // currently hidden by search/category filtering).
     selectedQtys = {};
     lastBreakProducts.forEach(function (used) {
-      const idx = products.findIndex(function (p) { return p.id === used.product_id; });
-      if (idx > -1) selectedQtys[idx] = used.qty;
+      if (productById(used.product_id)) selectedQtys[used.product_id] = used.qty;
     });
     renderProductTable();
     recalcTotals();
