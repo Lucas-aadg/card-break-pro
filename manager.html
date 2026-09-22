@@ -1927,29 +1927,34 @@ async function pmHandleSave() {
       if (!freshErr && fresh && fresh.current_stock != null) baseStock = fresh.current_stock;
     }
 
-    // Restock is an atomic increment (adjust_stock RPC) so a breaker opening
-    // boxes at the same moment can't lose the update; the weighted-average cost
-    // is written alongside. Manual corrections still set the absolute value.
-    let restocked = false;
+    // Every stock change is an atomic, logged delta (CBP.adjustStock → RPC):
+    // a restock adds N at the batch cost; a manual correction is applied as
+    // the difference against the LIVE count and logged as a correction, so a
+    // breaker opening boxes at the same moment can't be overwritten and the
+    // Stock Audit can always explain the number.
     if (restock > 0) {
       const existingCost = p.unit_cost || cost;
       if (existingCost > 0 && (baseStock + restock) > 0) {
         updates.unit_cost = (baseStock * existingCost + restock * restockCost) / (baseStock + restock);
       }
-      const rpc = await sb.rpc('adjust_stock', { p_product_id: id, p_delta: restock, p_action: 'restock', p_notes: 'Restock by manager' });
-      if (!rpc.error) restocked = true;
-      else if (!CBP.isMissingSchema(rpc.error)) throw rpc.error;
-      else {
-        updates.current_stock = baseStock + restock;   // migration 013 not run yet
-        const { error: logErr } = await sb.from('inventory_log').insert({ org_id: currentProfile.org_id, product_id: id, product_name: name, action: 'restock', quantity: restock, unit_cost: restockCost, notes: 'Restock by manager' });
-        if (logErr) CBP.captureError(logErr, 'inventory_log restock (manager)');
-      }
-    } else if (stockManuallyEdited) {
-      updates.current_stock = baseStock; // owner-style manual correction
     }
-
     const { error } = await sb.from('products').update(updates).eq('id', id);
     if (error) throw error;
+
+    const who = currentProfile.display_name || 'manager';
+    if (stockManuallyEdited) {
+      const { data: live } = await sb.from('products').select('current_stock').eq('id', id).maybeSingle();
+      const liveStock = (live && live.current_stock != null) ? live.current_stock : openedStock;
+      const d = stock - liveStock;
+      if (d !== 0) {
+        const r = await CBP.adjustStock(sb, { productId: id, delta: d, action: d > 0 ? 'adjust_in' : 'adjust_out', notes: 'Manual correction by ' + who + ': ' + liveStock + ' → ' + stock });
+        if (r.error) throw r.error;
+      }
+    }
+    if (restock > 0) {
+      const r = await CBP.adjustStock(sb, { productId: id, delta: restock, action: 'restock', unitCost: restockCost || null, notes: 'Restock by ' + who + (restockCost ? ' — batch cost $' + restockCost.toFixed(2) + '/box' : '') });
+      if (r.error) throw r.error;
+    }
     document.getElementById('editProductModal').classList.remove('active');
     await loadInventory();
     showGlobalSuccess('Product updated.');

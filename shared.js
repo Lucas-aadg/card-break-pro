@@ -105,6 +105,44 @@
     return { total: perDay * days, days };
   }
 
+  // ── inventory log ───────────────────────────────────────────────────────
+  // inventory_log.quantity is always stored positive; the action carries the
+  // sign. One rule for the owner/manager logs, the exports and the stock audit.
+  const LOG_OUT_ACTIONS = { used: true, adjust_out: true };
+  function logDelta(row) {
+    const q = Math.abs(Number(row && row.quantity) || 0);
+    return LOG_OUT_ACTIONS[row && row.action] ? -q : q;
+  }
+  const LOG_ACTION_LABELS = { initial: 'Initial', restock: 'Restock', used: 'Used', restored: 'Restored', adjust_in: 'Correction +', adjust_out: 'Correction −' };
+  function logActionLabel(action) { return LOG_ACTION_LABELS[action] || (action || '—'); }
+
+  // Atomic stock change through the adjust_stock RPC (migrations 013/014):
+  // UPDATE … current_stock = current_stock + delta plus the log line, in one
+  // statement. Tries the 5-arg signature (batch unit cost), then the 4-arg one,
+  // and only if the function doesn't exist at all falls back to a
+  // read-modify-write — still writing the log row, so nothing is ever unlogged.
+  // Returns { stock, via } or { error }.
+  async function adjustStock(sb, o) {
+    const delta = Math.trunc(Number(o.delta) || 0);
+    if (!delta) return { stock: null, skipped: true };
+    const base = { p_product_id: o.productId, p_delta: delta, p_action: o.action || 'used', p_notes: o.notes || null };
+    let r = await sb.rpc('adjust_stock', o.unitCost != null ? Object.assign({ p_unit_cost: o.unitCost }, base) : base);
+    if (r.error && o.unitCost != null && isMissingSchema(r.error)) r = await sb.rpc('adjust_stock', base);
+    if (!r.error) return { stock: r.data, via: 'rpc' };
+    if (!isMissingSchema(r.error)) return { error: r.error };
+    const { data: prod, error: readErr } = await sb.from('products').select('org_id,name,unit_cost,current_stock').eq('id', o.productId).maybeSingle();
+    if (readErr || !prod) return { error: readErr || new Error('product not found') };
+    const newStock = (Number(prod.current_stock) || 0) + delta;
+    const { error: upErr } = await sb.from('products').update({ current_stock: newStock }).eq('id', o.productId);
+    if (upErr) return { error: upErr };
+    const { error: logErr } = await sb.from('inventory_log').insert({
+      org_id: prod.org_id, product_id: o.productId, product_name: prod.name, action: o.action || 'used',
+      quantity: Math.abs(delta), unit_cost: o.unitCost != null ? o.unitCost : prod.unit_cost, notes: o.notes || null
+    });
+    if (logErr) captureError(logErr, 'inventory_log insert (adjustStock fallback)');
+    return { stock: newStock, via: 'fallback' };
+  }
+
   async function pageAll(makeQuery, pageSize) {
     const PAGE = pageSize || 1000;
     let all = [], from = 0;
@@ -152,6 +190,7 @@
     get tz() { return _tz; }, setTz(tz) { if (tz) _tz = tz; },
     loadOrgTz, partsIn, tzOffsetMinutes, dateInTz, todayIn, localMidnightISO, localTimeISO, dayEndISO, addDays,
     periodBounds, hoursOverlap, sumHours, shiftHours, applyShiftWindow, salaryForRange,
+    logDelta, logActionLabel, adjustStock,
     pageAll, isMissingSchema, captureError
   };
 })(typeof window !== 'undefined' ? window : module.exports);

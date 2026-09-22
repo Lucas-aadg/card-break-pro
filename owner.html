@@ -1276,6 +1276,28 @@
         </table>
       </div>
     </div>
+
+    <!-- Stock audit: system count vs. the movement log -->
+    <div class="panel" id="invAuditPanel">
+      <div class="panel-header" style="flex-wrap:wrap;gap:0.75rem;align-items:flex-start;">
+        <div style="flex:1;min-width:240px;">
+          <div class="panel-title" style="margin:0;">Stock Audit</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:0.25rem;line-height:1.45;">Compares each product's count with what the inventory log says it should be. Drift means a change happened without a log line (or a line was deleted). Fix it here so the shelf, the count and the log all agree.</div>
+        </div>
+        <div class="btn-row" style="align-items:center;">
+          <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--muted);cursor:pointer;margin:0;"><input type="checkbox" id="invAuditOnlyDrift" checked onchange="invRenderReconciliation()" style="width:14px;height:14px;" /> Only show drift</label>
+          <button class="btn btn-primary btn-sm" id="invAuditRun" onclick="invRunReconciliation()">Run audit</button>
+        </div>
+      </div>
+      <div id="invAuditSummary" style="display:none;font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;"></div>
+      <div class="tbl-wrap">
+        <table class="data-table" id="invAuditTable" style="display:none;">
+          <thead><tr><th>Product</th><th>System count</th><th>Log says</th><th>Drift</th><th>Log lines</th><th>Last movement</th><th>Fix</th></tr></thead>
+          <tbody id="invAuditBody"></tbody>
+        </table>
+      </div>
+      <div id="invAuditEmpty" style="font-size:0.82rem;color:var(--muted);font-style:italic;">Run the audit to see whether any product is off.</div>
+    </div>
   </div>
 
   <!-- ═══════════════════════════════════════════
@@ -1301,6 +1323,9 @@
             <option value="restock">Restocks</option>
             <option value="initial">Initial Stock</option>
             <option value="used">Box Usage</option>
+            <option value="restored">Restored (stream deleted)</option>
+            <option value="adjust_in">Corrections +</option>
+            <option value="adjust_out">Corrections −</option>
           </select>
           <select id="invLogProduct" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;max-width:180px;">
             <option value="">All Products</option>
@@ -4967,34 +4992,29 @@ async function loadInvLog() {
   const prodFilter = document.getElementById('invLogProduct').value;
 
   try {
-    let query = sb
-      .from('inventory_log')
-      .select('*')
-      .eq('org_id', currentProfile.org_id)
-      .order('created_at', { ascending: false });
-
-    // When a channel is active, scope to products belonging to that channel
-    if (activeChannel) {
-      const chProductIds = orgProducts.map(function(p){ return p.id; });
-      if (chProductIds.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No inventory log entries for this channel.</td></tr>';
-        return;
-      }
-      query = query.in('product_id', chProductIds);
+    // When a channel is active, scope to products belonging to that channel.
+    // Small lists go in the URL; big ones are filtered client-side (URL cap).
+    const chProductIds = activeChannel ? orgProducts.map(function(p){ return p.id; }) : null;
+    if (chProductIds && chProductIds.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No inventory log entries for this channel.</td></tr>';
+      return;
     }
+    const inUrl = chProductIds && chProductIds.length <= 100;
+    const makeQuery = function () {
+      let q = sb.from('inventory_log').select('*').eq('org_id', currentProfile.org_id).order('created_at', { ascending: false });
+      if (inUrl) q = q.in('product_id', chProductIds);
+      if (fromDate) q = q.gte('created_at', fromDate + 'T00:00:00');
+      if (actionFilter) q = q.eq('action', actionFilter);
+      if (prodFilter) q = q.eq('product_id', prodFilter);
+      return q;
+    };
+    // Paged past PostgREST's 1,000-row cap — "All Time" used to silently truncate.
+    let rows = await CBP.pageAll(makeQuery);
+    if (chProductIds && !inUrl) { const ok = {}; chProductIds.forEach(function (id) { ok[id] = true; }); rows = rows.filter(function (r) { return ok[r.product_id]; }); }
 
-    if (fromDate) query = query.gte('created_at', fromDate + 'T00:00:00');
-    if (actionFilter) query = query.eq('action', actionFilter);
-    if (prodFilter) query = query.eq('product_id', prodFilter);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const rows = data || [];
-
-    // Summary stats
-    const boxesIn = rows.filter(function (r) { return r.action !== 'used'; }).reduce(function (s, r) { return s + r.quantity; }, 0);
-    const boxesOut = rows.filter(function (r) { return r.action === 'used'; }).reduce(function (s, r) { return s + r.quantity; }, 0);
+    // Summary stats (sign comes from the action — see CBP.logDelta)
+    const boxesIn = rows.reduce(function (s, r) { const d = CBP.logDelta(r); return d > 0 ? s + d : s; }, 0);
+    const boxesOut = rows.reduce(function (s, r) { const d = CBP.logDelta(r); return d < 0 ? s - d : s; }, 0);
     document.getElementById('ilStatIn').textContent = boxesIn.toLocaleString();
     document.getElementById('ilStatOut').textContent = boxesOut.toLocaleString();
     const net = boxesIn - boxesOut;
@@ -5010,13 +5030,15 @@ async function loadInvLog() {
     tbody.innerHTML = '';
     rows.forEach(function (row) {
       const tr = document.createElement('tr');
-      const actionLabel =
-        row.action === 'restock' ? '<span class="badge badge-green">Restock</span>' :
-        row.action === 'initial' ? '<span class="badge badge-gray">Initial</span>' :
-        '<span class="badge badge-red">Used</span>';
-      const qtyDisplay = row.action === 'used'
-        ? '<span style="color:var(--red);">−' + row.quantity + '</span>'
-        : '<span style="color:var(--green);">+' + row.quantity + '</span>';
+      const delta = CBP.logDelta(row);
+      const badgeCls = (row.action === 'restock' || row.action === 'restored') ? 'badge-green'
+        : row.action === 'initial' ? 'badge-gray'
+        : (row.action === 'adjust_in' || row.action === 'adjust_out') ? 'badge-yellow'
+        : 'badge-red';
+      const actionLabel = '<span class="badge ' + badgeCls + '">' + escHtml(CBP.logActionLabel(row.action)) + '</span>';
+      const qtyDisplay = delta < 0
+        ? '<span style="color:var(--red);">−' + Math.abs(delta) + '</span>'
+        : '<span style="color:var(--green);">+' + delta + '</span>';
       const d = new Date(row.created_at);
       tr.innerHTML =
         '<td style="white-space:nowrap;">' + d.toLocaleDateString() + ' <span style="color:var(--muted);font-size:0.8rem;">' + fmtTime(d) + '</span></td>' +
@@ -5036,8 +5058,8 @@ async function loadInvLog() {
         const productName = btn.dataset.productName;
         const action = btn.dataset.action;
         const qty = btn.dataset.qty;
-        const actionLabel = action === 'used' ? 'used' : action === 'restock' ? 'restock' : 'initial';
-        if (!confirm('Delete this ' + actionLabel + ' entry for "' + productName + '" (' + (action === 'used' ? '−' : '+') + qty + ' boxes)?\n\nThis removes the log record only — inventory stock will not be adjusted.')) return;
+        const sign = CBP.logDelta({ action: action, quantity: qty }) < 0 ? '−' : '+';
+        if (!confirm('Delete this "' + CBP.logActionLabel(action) + '" entry for "' + productName + '" (' + sign + qty + ' boxes)?\n\nThis removes the log record only — stock will NOT change, so the Stock Audit will show this product as off by ' + qty + ' until you reconcile it. Prefer a correction (edit the product) over deleting history.')) return;
         showLoading('Deleting entry…');
         try {
           await sb.from('inventory_log').delete().eq('id', logId);
@@ -5176,6 +5198,149 @@ function invRenderFilteredProducts() {
   });
 }
 
+// ══════════════════════════════════════════════════════════
+//  STOCK AUDIT — system count vs. inventory log
+// ══════════════════════════════════════════════════════════
+let _invAuditRows = null;
+
+async function invLoadReconciliation() {
+  const r = await sb.rpc('inventory_reconciliation', { p_channel: activeChannel ? activeChannel.id : null });
+  if (!r.error) return r.data || [];
+  if (!CBP.isMissingSchema(r.error)) throw r.error;
+  // Migration 014 not run yet — derive it client-side from the full log
+  const prods = orgProducts;
+  const logs = await CBP.pageAll(function () {
+    return sb.from('inventory_log').select('product_id,action,quantity,created_at').eq('org_id', currentProfile.org_id).order('created_at', { ascending: true });
+  });
+  const byProd = {};
+  logs.forEach(function (l) {
+    const a = byProd[l.product_id] || (byProd[l.product_id] = { bal: 0, rows: 0, first: null, last: null });
+    a.bal += CBP.logDelta(l); a.rows++;
+    if (!a.first || l.created_at < a.first) a.first = l.created_at;
+    if (!a.last || l.created_at > a.last) a.last = l.created_at;
+  });
+  return prods.map(function (p) {
+    const a = byProd[p.id] || { bal: 0, rows: 0, first: null, last: null };
+    return { product_id: p.id, name: p.name, category: p.category, channel_id: p.channel_id, active: p.active, current_stock: p.current_stock, unit_cost: p.unit_cost, log_balance: a.bal, log_rows: a.rows, first_movement: a.first, last_movement: a.last };
+  });
+}
+
+async function invRunReconciliation() {
+  const btn = document.getElementById('invAuditRun');
+  btn.disabled = true; btn.textContent = 'Auditing…';
+  try {
+    _invAuditRows = await invLoadReconciliation();
+    invRenderReconciliation();
+  } catch (e) {
+    showGlobalError('Audit failed: ' + escHtml(e.message));
+  } finally { btn.disabled = false; btn.textContent = 'Run audit'; }
+}
+
+function invAuditDrift(r) { return (Number(r.current_stock) || 0) - (Number(r.log_balance) || 0); }
+
+function invRenderReconciliation() {
+  if (!_invAuditRows) return;
+  const rows = _invAuditRows;
+  const onlyDrift = document.getElementById('invAuditOnlyDrift').checked;
+  const table = document.getElementById('invAuditTable'), body = document.getElementById('invAuditBody');
+  const empty = document.getElementById('invAuditEmpty'), sum = document.getElementById('invAuditSummary');
+  const drifted = rows.filter(function (r) { return invAuditDrift(r) !== 0; });
+  const shown = onlyDrift ? drifted : rows;
+  const driftUnits = drifted.reduce(function (s, r) { return s + Math.abs(invAuditDrift(r)); }, 0);
+  sum.style.display = '';
+  sum.innerHTML = rows.length + ' product' + (rows.length !== 1 ? 's' : '') + ' checked · ' +
+    '<strong style="color:' + (drifted.length ? 'var(--red)' : 'var(--green)') + ';">' + drifted.length + ' off</strong>' +
+    (drifted.length ? ' by ' + driftUnits + ' box' + (driftUnits !== 1 ? 'es' : '') + ' in total' : ' — every count matches its log') +
+    (activeChannel ? ' · ' + escHtml(activeChannel.name) + ' only' : '') +
+    ' · <span style="color:var(--muted);">' + new Date().toLocaleTimeString() + '</span>';
+  if (!shown.length) {
+    table.style.display = 'none'; empty.style.display = '';
+    empty.textContent = onlyDrift ? '✓ No drift — every product matches its log.' : 'No products to audit.';
+    return;
+  }
+  empty.style.display = 'none'; table.style.display = '';
+  body.innerHTML = shown.map(function (r) {
+    const sys = Number(r.current_stock) || 0, log = Number(r.log_balance) || 0, d = sys - log;
+    const dLabel = d === 0 ? '<span class="badge badge-green">0</span>' : '<span class="badge badge-red">' + (d > 0 ? '+' : '') + d + '</span>';
+    const last = r.last_movement ? new Date(r.last_movement).toLocaleDateString() : '—';
+    const hint = d === 0 ? ''
+      : Number(r.log_rows) === 0 ? '<div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">no log history — the count was set without a log line</div>'
+      : d > 0 ? '<div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">count is HIGHER than the log explains (unlogged add, or a "Used" line deleted)</div>'
+      : '<div style="font-size:0.72rem;color:var(--muted);margin-top:0.15rem;">count is LOWER than the log explains (unlogged removal, or a restock line deleted)</div>';
+    return '<tr>' +
+      '<td><strong>' + escHtml(r.name) + '</strong>' + (r.active ? '' : ' <span class="badge badge-gray">inactive</span>') + hint + '</td>' +
+      '<td style="font-weight:700;">' + sys + '</td>' +
+      '<td>' + log + '</td>' +
+      '<td>' + dLabel + '</td>' +
+      '<td style="color:var(--muted);">' + (Number(r.log_rows) || 0) + '</td>' +
+      '<td style="color:var(--muted);white-space:nowrap;">' + last + '</td>' +
+      '<td>' + (d === 0 ? '—' : '<div class="btn-row">' +
+        '<button class="btn btn-outline btn-sm" style="padding:0.25rem 0.55rem;font-size:0.72rem;" onclick="invSetPhysicalCount(\'' + r.product_id + '\')" title="Count the shelf and enter the real number — stock is set to it and both changes are logged">Enter shelf count</button>' +
+        '<button class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.72rem;background:rgba(79,110,247,0.12);color:var(--primary);" onclick="invAcceptSystemCount(\'' + r.product_id + '\')" title="Keep the system count and write a correction line so the log matches it">Log as correct</button>' +
+      '</div>') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// Log-only correction: brings the log balance to `target` without touching
+// stock. Used after a physical count (remaining drift) or to accept the count.
+async function invWriteLogBaseline(r, target, why) {
+  const d = target - (Number(r.log_balance) || 0);
+  if (!d) return;
+  const { error } = await sb.from('inventory_log').insert({
+    org_id: currentProfile.org_id, product_id: r.product_id, product_name: r.name,
+    action: d > 0 ? 'adjust_in' : 'adjust_out', quantity: Math.abs(d), unit_cost: r.unit_cost,
+    notes: why + ' by ' + (currentProfile.display_name || 'owner') + ' (stock audit)'
+  });
+  if (error) throw error;
+}
+
+async function invAfterAuditFix() {
+  await loadProducts(); invRenderFilteredProducts();
+  if (typeof oclRefresh === 'function') oclRefresh();
+  _invAuditRows = await invLoadReconciliation(); invRenderReconciliation();
+}
+
+async function invSetPhysicalCount(pid) {
+  const r = (_invAuditRows || []).find(function (x) { return x.product_id === pid; }); if (!r) return;
+  const val = prompt('Physical count for "' + r.name + '" — how many are actually on the shelf right now?', String(r.current_stock || 0));
+  if (val === null) return;
+  const n = parseInt(val, 10);
+  if (Number.isNaN(n) || n < 0) { showGlobalError('Enter a whole number.'); return; }
+  showLoading('Updating stock…');
+  try {
+    // Re-read live so a break submitted meanwhile isn't overwritten
+    const { data: fresh } = await sb.from('products').select('current_stock').eq('id', pid).maybeSingle();
+    const live = (fresh && fresh.current_stock != null) ? fresh.current_stock : (Number(r.current_stock) || 0);
+    const d = n - live;
+    let logBalance = Number(r.log_balance) || 0;
+    if (d !== 0) {
+      const res = await CBP.adjustStock(sb, { productId: pid, delta: d, action: d > 0 ? 'adjust_in' : 'adjust_out',
+        notes: 'Physical count by ' + (currentProfile.display_name || 'owner') + ': ' + live + ' → ' + n + ' (stock audit)' });
+      if (res.error) throw res.error;
+      logBalance += d;
+    }
+    // Whatever drift remains is history the log can't explain — baseline it.
+    await invWriteLogBaseline(Object.assign({}, r, { log_balance: logBalance }), n, 'Reconciled to physical count');
+    await invAfterAuditFix();
+    showGlobalSuccess(r.name + ' set to ' + n + ' and reconciled.');
+  } catch (e) { showGlobalError('Couldn\'t update: ' + escHtml(e.message)); }
+  finally { hideLoading(); }
+}
+
+async function invAcceptSystemCount(pid) {
+  const r = (_invAuditRows || []).find(function (x) { return x.product_id === pid; }); if (!r) return;
+  const d = invAuditDrift(r);
+  if (!confirm('Keep "' + r.name + '" at ' + r.current_stock + ' and write a ' + (d > 0 ? '+' : '') + d + ' correction line so the log matches?')) return;
+  showLoading('Writing correction…');
+  try {
+    await invWriteLogBaseline(r, Number(r.current_stock) || 0, 'Accepted system count');
+    await invAfterAuditFix();
+    showGlobalSuccess('Correction logged for ' + r.name + '.');
+  } catch (e) { showGlobalError('Couldn\'t write the correction: ' + escHtml(e.message)); }
+  finally { hideLoading(); }
+}
+
 function invClearForm() {
   document.getElementById('invEditId').value = '';
   document.getElementById('invFormTitle').textContent = 'Add Product';
@@ -5293,22 +5458,20 @@ async function pmHandleSave() {
 
   if (!name) { showGlobalError('Product name is required.'); return; }
 
-  // Guard against clobbering stock with a stale cached number. Re-read the live
-  // stock; only treat the stock field as an intentional correction if the owner
-  // actually changed it from what the modal opened with.
+  // Every stock change goes through adjust_stock (atomic + logged). Two cases:
+  //  - restock: +N at the batch cost
+  //  - manual correction: the owner typed a number different from what the
+  //    modal opened with → applied as a delta against the LIVE count and logged
+  //    as a correction. Manual edits used to overwrite the count with no log
+  //    line, which is exactly what makes "why is this off?" unanswerable.
   const openedStock = parseInt(document.getElementById('pm-stock').dataset.opened, 10);
   const stockManuallyEdited = !Number.isNaN(openedStock) && existingStock !== openedStock;
-  let baseStock = existingStock;
-  if (!stockManuallyEdited) {
-    const { data: fresh, error: freshErr } = await sb.from('products').select('current_stock').eq('id', id).eq('org_id', currentProfile.org_id).maybeSingle();
-    if (!freshErr && fresh && fresh.current_stock != null) baseStock = fresh.current_stock;
-  }
+  const { data: fresh } = await sb.from('products').select('current_stock').eq('id', id).eq('org_id', currentProfile.org_id).maybeSingle();
+  const liveStock = (fresh && fresh.current_stock != null) ? fresh.current_stock : (Number.isNaN(openedStock) ? existingStock : openedStock);
+  const baseStock = stockManuallyEdited ? existingStock : liveStock;
 
-  // Compute final stock and unit cost
   let finalStock = baseStock;
   let finalUnitCost = existingUnitCost;
-  let logEntry = null;
-
   if (restock > 0) {
     finalStock = baseStock + restock;
     if (avgCost && (baseStock + restock) > 0) {
@@ -5316,17 +5479,6 @@ async function pmHandleSave() {
       finalUnitCost = ((baseStock * existingUnitCost) + (restock * restockCost)) / (baseStock + restock);
       finalUnitCost = Math.round(finalUnitCost * 100) / 100; // round to cents
     }
-    logEntry = {
-      org_id: currentProfile.org_id,
-      product_id: id,
-      product_name: name,
-      action: 'restock',
-      quantity: restock,
-      unit_cost: restockCost || existingUnitCost,
-      notes: avgCost
-        ? 'Avg cost applied — new unit cost: $' + finalUnitCost.toFixed(2)
-        : (restockCost ? 'Batch cost: $' + restockCost.toFixed(2) + '/box' : null)
-    };
   }
 
   const channelId = document.getElementById('pm-channel').value || null;
@@ -5339,7 +5491,6 @@ async function pmHandleSave() {
     const { error } = await sb.from('products').update({
       name, category: category || null,
       unit_cost: finalUnitCost,
-      current_stock: finalStock,
       min_stock_alert: minAlert,
       display_order: displayOrder,
       notes: notes || null,
@@ -5347,9 +5498,19 @@ async function pmHandleSave() {
     }).eq('id', id);
     if (error) throw error;
 
-    // Log the restock
-    if (logEntry) {
-      await sb.from('inventory_log').insert(logEntry);
+    const who = currentProfile.display_name || 'owner';
+    if (stockManuallyEdited && existingStock !== liveStock) {
+      const d = existingStock - liveStock;
+      const r = await CBP.adjustStock(sb, { productId: id, delta: d, action: d > 0 ? 'adjust_in' : 'adjust_out',
+        notes: 'Manual correction by ' + who + ': ' + liveStock + ' → ' + existingStock });
+      if (r.error) throw r.error;
+      if (r.stock != null) finalStock = r.stock;
+    }
+    if (restock > 0) {
+      const r = await CBP.adjustStock(sb, { productId: id, delta: restock, action: 'restock', unitCost: restockCost || existingUnitCost,
+        notes: avgCost ? 'Avg cost applied — new unit cost: $' + finalUnitCost.toFixed(2) : (restockCost ? 'Batch cost: $' + restockCost.toFixed(2) + '/box' : null) });
+      if (r.error) throw r.error;
+      if (r.stock != null) finalStock = r.stock;
     }
 
     document.getElementById('productEditModal').classList.remove('active');
