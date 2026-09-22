@@ -37,10 +37,13 @@ module.exports = async (req, res) => {
   );
 
   try {
+    // ?mode=day|30min comes from the cron path in vercel.json so the schedule
+    // and the job's assumptions can't drift apart (Hobby = daily crons only).
+    const mode = String(req.query.mode || process.env.SHIFT_REMINDER_MODE || 'day') === '30min' ? '30min' : 'day';
     if (type === 'trial')             return await runTrialEmails(sb, res);
-    if (type === 'shift-reminder')    return await runShiftReminders(sb, res);
-    if (type === 'digest')            return await runDigestOnly(sb, res);     // hourly: owner digests at their chosen local time
-    if (type === 'daily-digest')      return await runDailyDigest(sb, res);   // daily: renewals, cold alerts, slip nags (+ digest catch-up)
+    if (type === 'shift-reminder')    return await runShiftReminders(sb, res, mode);
+    if (type === 'digest')            return await runDigestOnly(sb, res, mode);   // day: send to everyone due today; 30min/hourly: at their chosen local time
+    if (type === 'daily-digest')      return await runDailyDigest(sb, res);        // daily: renewals, cold alerts, slip nags (+ digest catch-up)
     if (type === 'annual-renewal')    return await runAnnualRenewalReminders(sb, res);
     if (type === 'goal-prompt')       return await runGoalPrompt(sb, res);
     if (type === 'leaderboard-reset') return await runLeaderboardReset(sb, res);
@@ -108,17 +111,16 @@ async function runTrialEmails(sb, res) {
 // ─────────────────────────────────────────────────────────────────────────────
 // SHIFT REMINDERS  (30-min window)
 // ─────────────────────────────────────────────────────────────────────────────
-// Two modes, chosen by SHIFT_REMINDER_MODE:
+// Two modes, chosen by ?mode= on the cron path (fallback SHIFT_REMINDER_MODE):
 //   'day'   (default) — a heads-up for every shift LATER TODAY in the org's
 //                       timezone. Works on a once-a-day cron (Vercel Hobby).
 //   '30min'           — the original "starts in 30 minutes" ping. Only correct
 //                       when this job runs every ~5 minutes (Vercel Pro / pg_cron).
 // The old code did '30min' logic on a daily cron, and treated scheduled_time as
-// UTC, so it matched nothing (AUDIT BL-13).
-async function runShiftReminders(sb, res) {
-  // vercel.json runs this every 5 minutes (Pro plan) → '30min' is the default.
-  // Set SHIFT_REMINDER_MODE=day if the cron ever goes back to once a day.
-  const mode = process.env.SHIFT_REMINDER_MODE === 'day' ? 'day' : '30min';
+// UTC, so it matched nothing (AUDIT BL-13). Vercel Hobby rejects any cron more
+// frequent than daily at deploy time, so 'day' is the default that always works.
+async function runShiftReminders(sb, res, mode) {
+  mode = mode === '30min' ? '30min' : 'day';
   const now = new Date();
   const results = { mode, sent: [], skipped: [], errors: [] };
 
@@ -230,9 +232,11 @@ function tierDisplayName(tier) {
   return TIER_NAMES[tier] || (tier.charAt(0).toUpperCase() + tier.slice(1));
 }
 
-async function runDigestOnly(sb, res) {
-  const results = { digest: { sent: [], skipped: [], errors: [] } };
-  await runDigestEmails(sb, results.digest);
+async function runDigestOnly(sb, res, mode) {
+  const results = { mode: mode || 'day', digest: { sent: [], skipped: [], errors: [] } };
+  // On a once-a-day cron the owner's chosen time can't be honoured (the job
+  // only runs at one fixed hour), so 'day' sends to everyone not yet sent today.
+  await runDigestEmails(sb, results.digest, { anyTime: (mode || 'day') === 'day' });
   return res.status(200).json({ message: 'Done', results });
 }
 
@@ -251,7 +255,8 @@ async function runDailyDigest(sb, res) {
 // owner's chosen digest time (org timezone). The old check required the cron
 // to run in the exact same minute as the setting — on a daily cron that meant
 // it effectively never sent (AUDIT AB-4).
-async function runDigestEmails(sb, results) {
+async function runDigestEmails(sb, results, opts) {
+  const anyTime = !!(opts && opts.anyTime);
   const now = new Date();
 
   const { data: prefs, error: prefsErr } = await sb.from('notification_preferences')
@@ -282,7 +287,7 @@ async function runDigestEmails(sb, results) {
       if (pref.last_digest_sent && pref.last_digest_sent >= localToday) continue;          // already sent today
       const digestTime = (pref.daily_digest_time || '08:30').slice(0, 5);
       const dueAt = new Date(CBP.localTimeISO(localToday, digestTime, tz)).getTime();
-      if (now.getTime() < dueAt) { results.skipped.push(pref.user_id + ':not-yet'); continue; } // before their chosen time
+      if (!anyTime && now.getTime() < dueAt) { results.skipped.push(pref.user_id + ':not-yet'); continue; } // before their chosen time
 
       const yesterday = CBP.addDays(localToday, -1);
       const stats = await compileStats(sb, orgId, CBP.localMidnightISO(yesterday, tz), CBP.localMidnightISO(localToday, tz));
