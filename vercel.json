@@ -5,9 +5,11 @@
     "api/cron.js": { "maxDuration": 60 },
     "api/features.js": { "maxDuration": 30 }
   },
+  "redirects": [
+    { "source": "/landing.html", "destination": "/", "permanent": true }
+  ],
   "rewrites": [
-    { "source": "/", "destination": "/landing.html" },
-    { "source": "/login", "destination": "/index.html" },
+    { "source": "/login", "destination": "/login.html" },
     { "source": "/register", "destination": "/register.html" },
     { "source": "/join", "destination": "/join.html" },
     { "source": "/dashboard", "destination": "/owner.html" },

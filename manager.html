@@ -922,7 +922,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Sign out
   document.getElementById('signOutBtn').addEventListener('click', async function(){
     await sb.auth.signOut();
-    window.location.href = 'index.html';
+    window.location.href = '/login';
   });
 
   // Schedule
@@ -1007,11 +1007,11 @@ async function init() {
   showLoading('Loading…');
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
+    if (!session) { window.location.href = '/login'; return; }
     currentUser = session.user;
 
     const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-    if (!profile || (profile.role !== 'manager' && profile.role !== 'breaker/manager')) { window.location.href = 'index.html'; return; }
+    if (!profile || (profile.role !== 'manager' && profile.role !== 'breaker/manager')) { window.location.href = '/login'; return; }
     currentProfile = profile;
     document.getElementById('mgrBadge').textContent = profile.display_name || '';
     if (profile.role === 'breaker/manager') {

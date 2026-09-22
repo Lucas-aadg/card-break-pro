@@ -3717,16 +3717,16 @@ async function initAuth() {
   showLoading('Checking session…');
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
+    if (!session) { window.location.href = '/login'; return; }
     currentUser = session.user;
 
     const { data: profile, error } = await sb
       .from('profiles').select('*').eq('id', currentUser.id).single();
 
-    if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
+    if (error || !profile) { await sb.auth.signOut(); window.location.href = '/login'; return; }
     if (profile.role !== 'owner') {
       const roleMap = { breaker: 'breaker.html', sorter: 'sorter.html', manager: 'manager.html', 'breaker/manager': 'breaker.html' };
-      window.location.href = roleMap[profile.role] || 'index.html'; return;
+      window.location.href = roleMap[profile.role] || '/login'; return;
     }
 
     // Check subscription status — retry if returning from Stripe checkout (webhook may be slow)
@@ -3766,7 +3766,7 @@ async function initAuth() {
             <div style="color:#64748b;margin-bottom:24px;font-size:0.95rem;">Your subscription is ${['active','past_due','cancelled','inactive'].includes(sub?.status) ? sub.status : 'inactive'}. Activate your subscription to access the dashboard.</div>
             <a href="/billing.html" style="display:inline-block;background:#4f6ef7;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;text-decoration:none;margin-bottom:12px;">Manage Subscription</a>
             <br>
-            <button onclick="sb.auth.signOut().then(()=>location.href='/index.html')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.85rem;margin-top:8px;">Sign Out</button>
+            <button onclick="sb.auth.signOut().then(()=>location.href='/login')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.85rem;margin-top:8px;">Sign Out</button>
           </div>
         </div>
       `;
@@ -3933,7 +3933,7 @@ function setupTabNav() {
 function setupGlobalButtons() {
   document.getElementById('signOutBtn').addEventListener('click', async function () {
     await sb.auth.signOut();
-    window.location.href = 'index.html';
+    window.location.href = '/login';
   });
 
   document.getElementById('resetDataBtn').addEventListener('click', function () {

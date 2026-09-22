@@ -1174,7 +1174,7 @@ async function initAuth() {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) {
-      window.location.href = 'index.html';
+      window.location.href = '/login';
       return;
     }
     currentUser = session.user;
@@ -1187,13 +1187,13 @@ async function initAuth() {
 
     if (error || !profile) {
       await sb.auth.signOut();
-      window.location.href = 'index.html';
+      window.location.href = '/login';
       return;
     }
 
     if (profile.role !== 'breaker' && profile.role !== 'breaker/manager') {
       const roleMap = { owner: 'owner.html', sorter: 'sorter.html', manager: 'manager.html' };
-      window.location.href = roleMap[profile.role] || 'index.html'; return;
+      window.location.href = roleMap[profile.role] || '/login'; return;
     }
 
     currentProfile = profile;
@@ -2253,7 +2253,7 @@ async function handleConfirmClose() {
 function setupEventListeners() {
   document.getElementById('signOutBtn').addEventListener('click', async function () {
     await sb.auth.signOut();
-    window.location.href = 'index.html';
+    window.location.href = '/login';
   });
 
   document.getElementById('submitBreakBtn').addEventListener('click', handleSubmitBreak);

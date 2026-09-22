@@ -296,12 +296,12 @@
     async function init() {
       try {
         const { data: { session } } = await sb.auth.getSession();
-        if (!session) { window.location.href = 'index.html'; return; }
+        if (!session) { window.location.href = '/login'; return; }
         currentSession = session;
 
         const { data: profile, error: profileError } = await sb
           .from('profiles').select('role, org_id').eq('id', session.user.id).single();
-        if (profileError || !profile) { window.location.href = 'index.html'; return; }
+        if (profileError || !profile) { window.location.href = '/login'; return; }
         if (profile.role !== 'owner') { window.location.href = 'breaker.html'; return; }
 
         const { data: sub, error: subError } = await sb
@@ -533,7 +533,7 @@
 
     document.getElementById('signOutBtn').addEventListener('click', async function () {
       await sb.auth.signOut();
-      window.location.href = 'index.html';
+      window.location.href = '/login';
     });
 
     init();

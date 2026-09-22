@@ -736,7 +736,7 @@ function showClockedInBanner(shift) {
 // ── Buttons ───────────────────────────────────────────────
 document.getElementById('signOutBtn').addEventListener('click', async function () {
   await sb.auth.signOut();
-  window.location.href = 'index.html';
+  window.location.href = '/login';
 });
 
 document.getElementById('refreshQueueBtn').addEventListener('click', loadSortQueue);
@@ -746,16 +746,16 @@ async function initAuth() {
   showLoading('Loading…');
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
+    if (!session) { window.location.href = '/login'; return; }
     currentUser = session.user;
 
     const { data: profile, error } = await sb
       .from('profiles').select('*').eq('id', currentUser.id).single();
 
-    if (error || !profile) { await sb.auth.signOut(); window.location.href = 'index.html'; return; }
+    if (error || !profile) { await sb.auth.signOut(); window.location.href = '/login'; return; }
     if (profile.role !== 'sorter') {
       const roleMap = { owner: 'owner.html', breaker: 'breaker.html', manager: 'manager.html' };
-      window.location.href = roleMap[profile.role] || 'index.html'; return;
+      window.location.href = roleMap[profile.role] || '/login'; return;
     }
 
     currentProfile = profile;
