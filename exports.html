@@ -14,6 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
   <script src="config.js"></script>
+  <script src="shared.js"></script>
   <script src="analytics.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -458,6 +459,7 @@ async function initAuth() {
 
     const { data: org } = await sb.from('organizations').select('name').eq('id', profile.org_id).single();
     orgName = org?.name || 'Organization';
+    await CBP.loadOrgTz(sb, profile.org_id);   // hours math in the business's timezone
 
     await Promise.all([loadTeamMembers(), loadPayrollRuns()]);
     setDefaultDates();
@@ -614,7 +616,8 @@ async function runExport(type, params) {
     }
 
     else if (type === 'redownload' && params) {
-      ({ csv, filename } = await regenExport(params));
+      await redownloadLog(params);
+      return;
     }
 
     if (csv && filename) downloadCSV(csv, filename);
@@ -627,23 +630,46 @@ async function runExport(type, params) {
   }
 }
 
+// ── Data loaders ─────────────────────────────────────────────
+// Every export reads through CBP.pageAll: PostgREST caps a single request at
+// 1,000 rows, so a busy year used to be silently truncated in the tax file.
+// Errors now throw (the export fails loudly) instead of producing an empty
+// report that looks legitimate.
+
+function closedStreams(period, cols) {
+  return CBP.pageAll(function () {
+    return sb.from('streams').select(cols)
+      .eq('org_id', currentProfile.org_id).eq('status', 'closed')
+      .gte('break_date', period.start).lte('break_date', period.end)
+      .order('break_date').order('id');
+  });
+}
+function payrollRunsIn(period, cols) {
+  return CBP.pageAll(function () {
+    return sb.from('payroll_runs').select(cols)
+      .eq('org_id', currentProfile.org_id)
+      .gte('period_from', period.start).lte('period_to', period.end)
+      .order('period_from').order('id');
+  });
+}
+function orgChannels() {
+  return CBP.pageAll(function () { return sb.from('channels').select('id,name').eq('org_id', currentProfile.org_id).order('id'); });
+}
+function fmtTimeTz(iso) {
+  try { return new Date(iso).toLocaleTimeString('en-US', { timeZone: CBP.tz, hour: 'numeric', minute: '2-digit' }); } catch (e) { return iso; }
+}
+
 // ── P&L Builder ──────────────────────────────────────────────
 
 async function buildPL(period) {
-  const [streamsRes, payrollRes, channelsRes] = await Promise.all([
-    sb.from('streams').select('id,channel_id,break_date,final_sales,total_product_cost,total_fees,total_other_costs,commission_payout,break_count')
-      .eq('org_id', currentProfile.org_id).eq('status','closed')
-      .gte('break_date', period.start).lte('break_date', period.end),
-    sb.from('payroll_runs').select('period_from,period_to,total_paid,staff_count')
-      .eq('org_id', currentProfile.org_id)
-      .gte('period_from', period.start).lte('period_to', period.end),
-    sb.from('channels').select('id,name').eq('org_id', currentProfile.org_id)
+  const [streams, payrollRuns, channels] = await Promise.all([
+    closedStreams(period, 'id,channel_id,break_date,final_sales,total_product_cost,total_fees,total_other_costs,commission_payout,break_count'),
+    payrollRunsIn(period, 'id,period_from,period_to,total_paid,staff_count'),
+    orgChannels()
   ]);
 
-  const streams = streamsRes.data || [];
-  const payrollRuns = payrollRes.data || [];
   const channelMap = {};
-  (channelsRes.data || []).forEach(function(c){ channelMap[c.id] = c.name; });
+  channels.forEach(function(c){ channelMap[c.id] = c.name; });
 
   const totRev = streams.reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
   const totFees = streams.reduce(function(s,x){ return s+(parseFloat(x.total_fees)||0); }, 0);
@@ -725,20 +751,16 @@ async function buildPL(period) {
 // ── Revenue Detail Builder ───────────────────────────────────
 
 async function buildRevenueDetail(period) {
-  const [streamsRes, channelsRes, profilesRes] = await Promise.all([
-    sb.from('streams').select('id,break_date,channel_id,breaker_id,final_sales,total_fees,total_product_cost,total_other_costs,commission_payout,break_count,net_profit')
-      .eq('org_id', currentProfile.org_id).eq('status','closed')
-      .gte('break_date', period.start).lte('break_date', period.end)
-      .order('break_date'),
-    sb.from('channels').select('id,name').eq('org_id', currentProfile.org_id),
-    sb.from('profiles').select('id,display_name').eq('org_id', currentProfile.org_id)
+  const [streams, channels, profiles] = await Promise.all([
+    closedStreams(period, 'id,break_date,channel_id,breaker_id,final_sales,total_fees,total_product_cost,total_other_costs,commission_payout,break_count,net_profit'),
+    orgChannels(),
+    CBP.pageAll(function () { return sb.from('profiles').select('id,display_name').eq('org_id', currentProfile.org_id).order('id'); })
   ]);
 
-  const streams = streamsRes.data || [];
   const channelMap = {};
-  (channelsRes.data || []).forEach(function(c){ channelMap[c.id] = c.name; });
+  channels.forEach(function(c){ channelMap[c.id] = c.name; });
   const profileMap = {};
-  (profilesRes.data || []).forEach(function(p){ profileMap[p.id] = p.display_name; });
+  profiles.forEach(function(p){ profileMap[p.id] = p.display_name; });
 
   let csv = csvFileHeader('Monthly Revenue Detail', period.label);
 
@@ -777,41 +799,59 @@ async function buildRevenueDetail(period) {
 async function buildMemberEarnings(member, period) {
   if (!member) throw new Error('Team member not found');
 
-  const fromTs = period.start + 'T00:00:00';
-  const toTs = period.end + 'T23:59:59';
+  // Org-local period edges (toISO is exclusive) — the same math Payroll uses,
+  // so a shift straddling midnight or a period edge is prorated identically.
+  const fromISO = CBP.localMidnightISO(period.start);
+  const toISO = CBP.dayEndISO(period.end);
+
+  const clockedShifts = function (roleCol) {
+    return CBP.pageAll(function () {
+      return CBP.applyShiftWindow(
+        sb.from('schedules').select('id,scheduled_date,clocked_in_at,clocked_out_at')
+          .eq(roleCol, member.id).eq('org_id', currentProfile.org_id)
+          .not('clocked_in_at', 'is', null).not('clocked_out_at', 'is', null),
+        fromISO, toISO).order('clocked_in_at').order('id');
+    });
+  };
 
   let csv = csvFileHeader('Earnings Summary — ' + member.display_name, period.label);
   csv += csvRow('Name', member.display_name);
   csv += csvRow('Role', member.role);
-  csv += csvRow('Pay Type', member.pay_type || 'Not configured');
+  csv += csvRow('Pay Type', member.role === 'sorter' ? 'hourly' : (member.pay_type || 'Not configured'));
+  csv += csvRow('Timezone', CBP.tz);
   csv += '\n';
 
-  // Pull streams this breaker worked
+  // Pull streams this breaker worked (by break date — same basis as Payroll)
   if (member.role === 'breaker' || member.role === 'breaker/manager') {
-    const { data: streams } = await sb.from('streams')
-      .select('break_date,final_sales,total_product_cost,total_other_costs,commission_payout,break_count')
-      .eq('breaker_id', member.id).eq('org_id', currentProfile.org_id).eq('status','closed')
-      .gte('closed_at', fromTs).lte('closed_at', toTs)
-      .order('break_date');
+    const streams = await CBP.pageAll(function () {
+      return sb.from('streams')
+        .select('id,break_date,final_sales,total_product_cost,total_other_costs,commission_payout,break_count')
+        .eq('breaker_id', member.id).eq('org_id', currentProfile.org_id).eq('status','closed')
+        .gte('break_date', period.start).lte('break_date', period.end)
+        .order('break_date').order('id');
+    });
 
     const type = member.pay_type;
     let totalEarned = 0;
 
     if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
       csv += csvRow('COMMISSION EARNINGS');
-      csv += csvRow('Stream Date','Gross Revenue (USD)','Box Cost (USD)','Other Costs (USD)','Net Profit Base (USD)','Commission Rate','Commission Earned (USD)');
+      csv += csvRow('Stream Date','Gross Revenue (USD)','Box Cost (USD)','Other Costs (USD)','Net Profit Base (USD)','Commission Rate','Commission Earned (USD)','Basis');
 
       const rate = (parseFloat(member.commission_rate)||0)/100;
       let tBase=0, tComm=0;
 
-      (streams||[]).forEach(function(s) {
+      streams.forEach(function(s) {
         const rev = parseFloat(s.final_sales)||0;
         const cogs = parseFloat(s.total_product_cost)||0;
         const other = parseFloat(s.total_other_costs)||0;
         const profit = Math.max(0, rev - cogs - other);
-        const comm = profit * rate;
+        // The amount locked at close-out is what Payroll pays; older streams
+        // without a snapshot are computed at the member's current rate.
+        const hasSnap = s.commission_payout != null && s.commission_payout !== '';
+        const comm = hasSnap ? (parseFloat(s.commission_payout)||0) : profit * rate;
         tBase += profit; tComm += comm;
-        csv += csvRow(s.break_date, n2(rev), n2(cogs), n2(other), n2(profit), (parseFloat(member.commission_rate)||0)+'%', n2(comm));
+        csv += csvRow(s.break_date, n2(rev), n2(cogs), n2(other), n2(profit), (parseFloat(member.commission_rate)||0)+'%', n2(comm), hasSnap ? 'locked at close-out' : 'current rate');
       });
 
       csv += csvRow('Subtotal','','','', n2(tBase), '', n2(tComm));
@@ -821,22 +861,17 @@ async function buildMemberEarnings(member, period) {
 
     if (type === 'hourly' || type === 'hourly_commission') {
       csv += csvRow('HOURLY EARNINGS');
-      csv += csvRow('Date','Hours Worked','Hourly Rate (USD)','Earned (USD)');
-      const { data: shifts } = await sb.from('schedules')
-        .select('scheduled_date,clocked_in_at,clocked_out_at')
-        .eq('breaker_id', member.id).eq('org_id', currentProfile.org_id)
-        .not('clocked_in_at','is',null).not('clocked_out_at','is',null)
-        .gte('clocked_in_at', fromTs).lte('clocked_out_at', toTs);
-
+      csv += csvRow('Date','Clock In','Clock Out','Hours in Period','Hourly Rate (USD)','Earned (USD)');
+      const shifts = await clockedShifts('breaker_id');
       const rate = parseFloat(member.hourly_rate)||0;
       let tHours=0, tHourly=0;
-      (shifts||[]).forEach(function(sh) {
-        const hrs = (new Date(sh.clocked_out_at) - new Date(sh.clocked_in_at)) / 3600000;
+      shifts.forEach(function(sh) {
+        const hrs = CBP.hoursOverlap(sh, fromISO, toISO);
         const earned = hrs * rate;
         tHours += hrs; tHourly += earned;
-        csv += csvRow(sh.scheduled_date||sh.clocked_in_at.split('T')[0], hrs.toFixed(2), n2(rate), n2(earned));
+        csv += csvRow(sh.scheduled_date||CBP.dateInTz(new Date(sh.clocked_in_at)), fmtTimeTz(sh.clocked_in_at), fmtTimeTz(sh.clocked_out_at), hrs.toFixed(2), n2(rate), n2(earned));
       });
-      csv += csvRow('Subtotal', tHours.toFixed(2), n2(rate), n2(tHourly));
+      csv += csvRow('Subtotal', '', '', tHours.toFixed(2), n2(rate), n2(tHourly));
       totalEarned += tHourly;
       csv += '\n';
     }
@@ -846,7 +881,7 @@ async function buildMemberEarnings(member, period) {
       csv += csvRow('Stream Date','Breaks Count','Rate per Break (USD)','Earned (USD)');
       const perRate = parseFloat(member.per_break_rate)||0;
       let tPB = 0;
-      (streams||[]).forEach(function(s) {
+      streams.forEach(function(s) {
         const brks = parseInt(s.break_count)||0;
         const earned = brks * perRate;
         tPB += earned;
@@ -858,93 +893,60 @@ async function buildMemberEarnings(member, period) {
     }
 
     if (type === 'salary' || type === 'salary_commission') {
-      const sal = parseFloat(member.salary_amount)||0;
+      const sal = CBP.salaryForRange(member.salary_amount, member.salary_period, period.start, period.end);
       csv += csvRow('SALARY');
-      csv += csvRow('Salary Amount (USD)', 'Period', n2(sal), member.salary_period||'period');
-      totalEarned += sal;
+      csv += csvRow('Salary Amount (USD)', 'Per', 'Days in Period', 'Prorated Salary (USD)');
+      csv += csvRow(n2(member.salary_amount), member.salary_period||'weekly', sal.days, n2(sal.total));
+      totalEarned += sal.total;
       csv += '\n';
     }
 
     // Tips
-    const { data: tips } = await sb.from('tips').select('amount,created_at')
-      .eq('breaker_id', member.id).eq('org_id', currentProfile.org_id)
-      .gte('created_at', fromTs).lte('created_at', toTs);
-    if (tips && tips.length) {
+    const tips = await CBP.pageAll(function () {
+      return sb.from('tips').select('id,amount,created_at')
+        .eq('breaker_id', member.id).eq('org_id', currentProfile.org_id)
+        .gte('created_at', fromISO).lt('created_at', toISO).order('created_at').order('id');
+    });
+    if (tips.length) {
       const tTips = tips.reduce(function(s,t){ return s+(parseFloat(t.amount)||0); }, 0);
       csv += csvRow('TIPS');
       csv += csvRow('Date','Amount (USD)');
-      tips.forEach(function(t){ csv += csvRow(t.created_at.split('T')[0], n2(t.amount)); });
-      csv += csvRow('Tips Total', '', n2(tTips));
+      tips.forEach(function(t){ csv += csvRow(CBP.dateInTz(new Date(t.created_at)), n2(t.amount)); });
+      csv += csvRow('Tips Total', n2(tTips));
       totalEarned += tTips;
       csv += '\n';
     }
 
     csv += csvRow('TOTAL EARNINGS (USD)', n2(totalEarned));
-    csv += csvRow('Streams Worked', (streams||[]).length);
+    csv += csvRow('Streams Worked', streams.length);
   }
 
   else if (member.role === 'sorter') {
-    const { data: tasks } = await sb.from('sort_tasks')
-      .select('id,completed_at,created_at,stream_id')
-      .eq('sorter_id', member.id).eq('org_id', currentProfile.org_id).eq('status','completed');
+    // Sorters are hourly only (industry standard): clocked hours × rate.
+    const shifts = await clockedShifts('sorter_id');
+    const rate = parseFloat(member.hourly_rate)||0;
+    csv += csvRow('HOURS WORKED');
+    csv += csvRow('Date','Clock In','Clock Out','Hours in Period','Hourly Rate (USD)','Earned (USD)');
+    let tHours = 0;
+    shifts.forEach(function(sh) {
+      const hrs = CBP.hoursOverlap(sh, fromISO, toISO);
+      tHours += hrs;
+      csv += csvRow(sh.scheduled_date||CBP.dateInTz(new Date(sh.clocked_in_at)), fmtTimeTz(sh.clocked_in_at), fmtTimeTz(sh.clocked_out_at), hrs.toFixed(2), n2(rate), n2(hrs * rate));
+    });
+    if (!shifts.length) csv += csvRow('No clocked shifts in this period');
+    csv += csvRow('Subtotal', '', '', tHours.toFixed(2), n2(rate), n2(tHours * rate));
+    csv += '\n';
 
-    const filteredTasks = (tasks||[]).filter(function(t) {
-      const d = t.completed_at||t.created_at;
-      return d >= fromTs && d <= toTs;
+    const tasks = await CBP.pageAll(function () {
+      return sb.from('sort_tasks').select('id,completed_at')
+        .eq('sorter_id', member.id).eq('org_id', currentProfile.org_id).eq('status','completed')
+        .gte('completed_at', fromISO).lt('completed_at', toISO).order('completed_at').order('id');
     });
 
-    const type = member.pay_type;
-    let totalEarned = 0;
-
-    if (type === 'hourly' || type === 'hourly_per_break') {
-      csv += csvRow('HOURLY EARNINGS');
-      csv += csvRow('Date','Hours Worked','Hourly Rate (USD)','Earned (USD)');
-      const { data: shifts } = await sb.from('schedules')
-        .select('scheduled_date,clocked_in_at,clocked_out_at')
-        .eq('sorter_id', member.id).eq('org_id', currentProfile.org_id)
-        .not('clocked_in_at','is',null).not('clocked_out_at','is',null)
-        .gte('clocked_in_at', fromTs).lte('clocked_out_at', toTs);
-
-      const rate = parseFloat(member.hourly_rate)||0;
-      let tHours=0, tHourly=0;
-      (shifts||[]).forEach(function(sh) {
-        const hrs = (new Date(sh.clocked_out_at) - new Date(sh.clocked_in_at)) / 3600000;
-        const earned = hrs * rate;
-        tHours += hrs; tHourly += earned;
-        csv += csvRow(sh.scheduled_date||sh.clocked_in_at.split('T')[0], hrs.toFixed(2), n2(rate), n2(earned));
-      });
-      csv += csvRow('Subtotal', tHours.toFixed(2), '', n2(tHourly));
-      totalEarned += tHourly;
-      csv += '\n';
-    }
-
-    if (type === 'per_break' || type === 'hourly_per_break') {
-      csv += csvRow('PER-BREAK SORT EARNINGS');
-      csv += csvRow('Date','Breaks Sorted','Rate per Break (USD)','Earned (USD)');
-      const rate = parseFloat(member.per_break_rate)||0;
-      let tEarned = 0;
-
-      const streamIds = [...new Set(filteredTasks.map(function(t){ return t.stream_id; }).filter(Boolean))];
-      let breaksByStream = {};
-      if (streamIds.length) {
-        const { data: bks } = await sb.from('breaks').select('stream_id').in('stream_id', streamIds);
-        (bks||[]).forEach(function(b){ breaksByStream[b.stream_id] = (breaksByStream[b.stream_id]||0)+1; });
-      }
-
-      filteredTasks.forEach(function(t) {
-        const d = (t.completed_at||t.created_at).split('T')[0];
-        const brks = breaksByStream[t.stream_id]||1;
-        const earned = brks * rate;
-        tEarned += earned;
-        csv += csvRow(d, brks, n2(rate), n2(earned));
-      });
-      csv += csvRow('Subtotal', '', '', n2(tEarned));
-      totalEarned += tEarned;
-      csv += '\n';
-    }
-
-    csv += csvRow('TOTAL EARNINGS (USD)', n2(totalEarned));
-    csv += csvRow('Sort Tasks Completed', filteredTasks.length);
+    csv += csvRow('TOTAL EARNINGS (USD)', n2(tHours * rate));
+    csv += csvRow('Shifts', shifts.length);
+    csv += csvRow('Hours', tHours.toFixed(2));
+    csv += csvRow('Sort Tasks Completed', tasks.length);
   }
 
   csv += '\n';
@@ -992,18 +994,11 @@ async function buildTaxSummary(year, period) {
     months.push(p);
   }
 
-  // Fetch all streams and payroll for the year
-  const [streamsRes, payrollRes] = await Promise.all([
-    sb.from('streams').select('break_date,final_sales,total_fees,total_product_cost,total_other_costs,commission_payout,break_count')
-      .eq('org_id', currentProfile.org_id).eq('status','closed')
-      .gte('break_date', period.start).lte('break_date', period.end),
-    sb.from('payroll_runs').select('period_from,period_to,total_paid,details')
-      .eq('org_id', currentProfile.org_id)
-      .gte('period_from', period.start).lte('period_to', period.end)
+  // Fetch all streams and payroll for the year (paged — no 1,000-row cap)
+  const [allStreams, allPayroll] = await Promise.all([
+    closedStreams(period, 'id,break_date,final_sales,total_fees,total_product_cost,total_other_costs,commission_payout,break_count'),
+    payrollRunsIn(period, 'id,period_from,period_to,total_paid,details')
   ]);
-
-  const allStreams = streamsRes.data || [];
-  const allPayroll = payrollRes.data || [];
 
   // Year totals
   const yRev = allStreams.reduce(function(s,x){ return s+(parseFloat(x.final_sales)||0); }, 0);
@@ -1090,24 +1085,28 @@ async function buildTaxSummary(year, period) {
 // ── Inventory Cost Report ────────────────────────────────────
 
 async function buildInventoryCost(period) {
-  const { data: logs } = await sb.from('inventory_log')
-    .select('product_id,product_name,action,quantity,unit_cost,created_at')
-    .eq('org_id', currentProfile.org_id)
-    .gte('created_at', period.start + 'T00:00:00')
-    .lte('created_at', period.end + 'T23:59:59')
-    .order('created_at');
-
-  const { data: products } = await sb.from('products')
-    .select('id,name,category,current_stock,unit_cost')
-    .eq('org_id', currentProfile.org_id);
-
-  const entries = logs || [];
-  const prods = products || [];
+  const fromISO = CBP.localMidnightISO(period.start);
+  const toISO = CBP.dayEndISO(period.end);
+  const [entries, prods] = await Promise.all([
+    CBP.pageAll(function () {
+      return sb.from('inventory_log')
+        .select('id,product_id,product_name,action,quantity,unit_cost,created_at')
+        .eq('org_id', currentProfile.org_id)
+        .gte('created_at', fromISO).lt('created_at', toISO)
+        .order('created_at').order('id');
+    }),
+    CBP.pageAll(function () {
+      return sb.from('products').select('id,name,category,current_stock,unit_cost').eq('org_id', currentProfile.org_id).order('name').order('id');
+    })
+  ]);
 
   // Purchases
   const purchased = entries.filter(function(e){ return e.action === 'restock' || e.action === 'initial'; });
   // Usage
   const used = entries.filter(function(e){ return e.action === 'used'; });
+  // Everything else (stream-delete restores, stock corrections) — shown so the
+  // report reconciles with the Stock Audit, not folded into purchases or COGS.
+  const other = entries.filter(function(e){ return e.action !== 'restock' && e.action !== 'initial' && e.action !== 'used'; });
 
   // Aggregate by product
   const purchByProd = {};
@@ -1156,6 +1155,19 @@ async function buildInventoryCost(period) {
   if (!Object.keys(usedByProd).length) csv += csvRow('No usage recorded for this period');
   csv += csvRow('TOTAL COGS', '', '', n2(tUsedCost));
   csv += '\n';
+
+  if (other.length) {
+    csv += csvRow('OTHER STOCK MOVEMENTS (corrections and restores — not purchases or COGS)');
+    csv += csvRow('Date','Product','Type','Boxes (+/−)','Unit Cost (USD)');
+    let tOther = 0;
+    other.forEach(function(e) {
+      const d = CBP.logDelta(e);
+      tOther += d;
+      csv += csvRow(CBP.dateInTz(new Date(e.created_at)), e.product_name||'Unknown', CBP.logActionLabel(e.action), (d > 0 ? '+' : '') + d, n2(e.unit_cost));
+    });
+    csv += csvRow('NET OTHER MOVEMENTS', '', '', (tOther > 0 ? '+' : '') + tOther, '');
+    csv += '\n';
+  }
 
   csv += csvRow('ENDING INVENTORY VALUE (current as of export date)');
   csv += csvRow('Product','Category','Boxes on Hand','Current Unit Cost (USD)','Inventory Value (USD)');
