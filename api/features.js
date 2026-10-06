@@ -24,10 +24,15 @@ async function authenticate(req, sb) {
   const { data: { user }, error } = await sb.auth.getUser(token);
   if (error || !user) return { err: { status: 401, msg: 'Invalid token' } };
   const { data: profile } = await sb.from('profiles')
-    .select('id, org_id, role, display_name')
+    .select('id, org_id, role, display_name, deleted_at')
     .eq('id', user.id)
     .maybeSingle();
   if (!profile || !profile.org_id) return { err: { status: 401, msg: 'Profile not found' } };
+  // Deactivated account: the owner banned this user (migrations/016). Their
+  // access token can still be technically valid for a while — this uses the
+  // service-role client, which bypasses RLS, so it's the one place that MUST
+  // check deleted_at explicitly rather than rely on get_my_org_id() failing.
+  if (profile.deleted_at) return { err: { status: 403, msg: 'This account has been deactivated' } };
   return { user, profile };
 }
 
@@ -1382,39 +1387,82 @@ async function streamHandler(req, res, sb, action) {
 // Instead we orphan the profile from the org (org_id = NULL) and ban the auth user.
 // Their historical streams/breaks/sales stay intact for reports and leaderboards.
 async function teamHandler(req, res, sb, action) {
-  if (action === 'remove' && req.method === 'DELETE') {
+  // ── Deactivate a team member (soft delete — migrations/016) ──────────────
+  // Never hard-deletes the row and never touches org_id or any foreign key:
+  // the profile stays exactly where it is so every stream, break, payroll
+  // run and sort task that references it keeps resolving a real name. Three
+  // things happen instead: (1) deleted_at is stamped, which is what every
+  // "active team" list and assignment dropdown filters on, and what
+  // get_my_org_id() now checks so org-scoped RLS/RPC access dies immediately
+  // even if their current token hasn't expired yet; (2) the auth user is
+  // banned for ~100 years, blocking any future sign-in or token refresh;
+  // (3) best-effort client-side kick via CBP.enforceActive happens on their
+  // next page load/poll — see owner.html/manager.html/breaker.html/
+  // sorter.html/exports.html/billing.html initAuth.
+  if (action === 'deactivate' && req.method === 'POST') {
     const { err, profile } = await authenticate(req, sb);
     if (err) return fail(res, err.status, err.msg);
     if (profile.role !== 'owner') return fail(res, 403, 'Owner only');
 
-    const memberId = req.query.memberId;
+    const memberId = (req.body && req.body.memberId) || req.query.memberId;
     if (!memberId || !/^[0-9a-f-]{36}$/.test(memberId)) return fail(res, 400, 'Invalid memberId');
-    if (memberId === profile.id) return fail(res, 400, 'You cannot remove yourself');
+    if (memberId === profile.id) return fail(res, 400, 'You cannot deactivate yourself');
 
     // Verify target is in this owner's org and is not the owner
     const { data: target } = await sb.from('profiles')
-      .select('id, role, org_id, display_name').eq('id', memberId).maybeSingle();
+      .select('id, role, org_id, display_name, deleted_at').eq('id', memberId).maybeSingle();
     if (!target || target.org_id !== profile.org_id) return fail(res, 404, 'Member not found');
-    if (target.role === 'owner') return fail(res, 400, 'Cannot remove an owner');
+    if (target.role === 'owner') return fail(res, 400, 'Cannot deactivate an owner');
+    if (target.deleted_at) return res.status(200).json({ ok: true, already: true });
 
     try {
-      // 1. Clean up org-scoped access/assignments (history rows are left untouched)
-      await sb.from('channel_assignments').delete().eq('profile_id', memberId).then(null, () => {});
-
-      // 2. Orphan the profile from the org → drops them from the team list and RLS scope
       const { error: updErr } = await sb.from('profiles')
-        .update({ org_id: null }).eq('id', memberId);
+        .update({ deleted_at: new Date().toISOString() }).eq('id', memberId);
       if (updErr) throw updErr;
 
-      // 3. Ban the auth user so they can no longer sign in anywhere (best-effort)
+      // Best-effort: block future sign-ins/refreshes. Non-fatal — the
+      // deleted_at flag above is what actually governs access (see
+      // get_my_org_id() in migrations/016), so a ban failure here doesn't
+      // leave the account usable, it just leaves the auth.users row un-banned
+      // alongside an already-deactivated profile.
       await sb.auth.admin.updateUserById(memberId, { ban_duration: '876000h' })
         .then(null, function (e) { console.error('ban user failed (non-fatal):', e && e.message); });
 
       return res.status(200).json({ ok: true });
     } catch (e) {
-      console.error('team remove error:', e);
+      console.error('team deactivate error:', e);
       return fail(res, 500, e.message);
     }
   }
+
+  // ── Restore a previously-deactivated team member ──────────────────────
+  if (action === 'restore' && req.method === 'POST') {
+    const { err, profile } = await authenticate(req, sb);
+    if (err) return fail(res, err.status, err.msg);
+    if (profile.role !== 'owner') return fail(res, 403, 'Owner only');
+
+    const memberId = (req.body && req.body.memberId) || req.query.memberId;
+    if (!memberId || !/^[0-9a-f-]{36}$/.test(memberId)) return fail(res, 400, 'Invalid memberId');
+
+    const { data: target } = await sb.from('profiles')
+      .select('id, org_id, deleted_at').eq('id', memberId).maybeSingle();
+    if (!target || target.org_id !== profile.org_id) return fail(res, 404, 'Member not found');
+    if (!target.deleted_at) return res.status(200).json({ ok: true, already: true });
+
+    try {
+      const { error: updErr } = await sb.from('profiles')
+        .update({ deleted_at: null }).eq('id', memberId);
+      if (updErr) throw updErr;
+
+      await sb.auth.admin.updateUserById(memberId, { ban_duration: 'none' })
+        .then(null, function (e) { console.error('unban user failed (non-fatal):', e && e.message); });
+
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      console.error('team restore error:', e);
+      return fail(res, 500, e.message);
+    }
+  }
+
   return fail(res, 400, 'Unknown team action: ' + action);
 }

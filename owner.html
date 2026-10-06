@@ -1701,7 +1701,13 @@
 
     <!-- Team Members -->
     <div class="panel">
-      <div class="panel-title">Team Members</div>
+      <div class="panel-header">
+        <div class="panel-title" style="margin:0;">Team Members</div>
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:var(--muted);cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0;">
+          <span class="toggle-switch"><input type="checkbox" id="teamShowInactive" /><span class="toggle-slider"></span></span>
+          Show inactive
+        </label>
+      </div>
       <div class="tbl-wrap">
         <table class="data-table">
           <thead>
@@ -3724,6 +3730,7 @@ async function initAuth() {
       .from('profiles').select('*').eq('id', currentUser.id).single();
 
     if (error || !profile) { await sb.auth.signOut(); window.location.href = '/login'; return; }
+    if (await CBP.enforceActive(sb, profile)) { window.location.href = '/login?deactivated=1'; return; }
     if (profile.role !== 'owner') {
       const roleMap = { breaker: 'breaker.html', sorter: 'sorter.html', manager: 'manager.html', 'breaker/manager': 'breaker.html' };
       window.location.href = roleMap[profile.role] || '/login'; return;
@@ -4000,9 +4007,19 @@ async function loadAllProfiles() {
   allProfiles = data || [];
 }
 
+// Team roster eligible to be handed NEW work (shifts, reassignment, sort
+// tasks, milestone awards, outreach, goal targets…) — everyone on allProfiles
+// minus anyone the owner has deactivated. allProfiles itself always stays
+// the FULL roster (deactivated included) because history, payroll and
+// reports need to keep resolving their names — see AUDIT / soft-delete notes.
+function activeTeam() {
+  return allProfiles.filter(function (p) { return !p.deleted_at; });
+}
+
 function getProfileName(breakerId) {
   const p = allProfiles.find(function (x) { return x.id === breakerId; });
-  return p ? p.display_name : '—';
+  if (!p) return '—';
+  return p.display_name + (p.deleted_at ? ' (inactive)' : '');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6887,7 +6904,9 @@ async function loadTeam() {
     // non-fatal, show empty chips
   }
 
-  // Team members
+  // Team members — active by default; the "Show inactive" toggle reveals
+  // deactivated staff too (dimmed, with a Restore button). allProfiles keeps
+  // the full roster either way; filtering here only controls what's drawn.
   const tbody = document.getElementById('teamTableBody');
   tbody.innerHTML = '';
 
@@ -6896,10 +6915,20 @@ async function loadTeam() {
     return;
   }
 
-  allProfiles.forEach(function (p) {
+  const showInactive = !!document.getElementById('teamShowInactive').checked;
+  const rows = showInactive ? allProfiles : activeTeam();
+  const inactiveCount = allProfiles.length - activeTeam().length;
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No active team members' + (inactiveCount ? ' — ' + inactiveCount + ' deactivated. Toggle "Show inactive" to see them.' : ' yet.') + '</td></tr>';
+    return;
+  }
+
+  rows.forEach(function (p) {
     const tr = document.createElement('tr');
     const isMe = p.id === currentUser.id;
     const isOwner = p.role === 'owner';
+    const isInactive = !!p.deleted_at;
+    if (isInactive) tr.style.opacity = '0.55';
     const payLabel = isOwner ? '—' : formatPayStructureLabel(p);
 
     // Build channel chips
@@ -6917,16 +6946,20 @@ async function loadTeam() {
     }
 
     tr.innerHTML =
-      '<td><strong>' + escHtml(p.display_name) + '</strong>' + (isMe ? ' <span style="color:var(--muted);font-size:0.75rem;">(you)</span>' : '') + '</td>' +
+      '<td><strong>' + escHtml(p.display_name) + '</strong>' +
+        (isMe ? ' <span style="color:var(--muted);font-size:0.75rem;">(you)</span>' : '') +
+        (isInactive ? ' <span class="badge badge-gray">Inactive</span>' : '') + '</td>' +
       '<td><span class="badge ' + (isOwner ? 'badge-blue' : (p.role === 'breaker' || p.role === 'breaker/manager') ? 'badge-green' : p.role === 'manager' ? 'badge-purple' : 'badge-gray') + '">' + escHtml(p.role) + '</span></td>' +
       '<td style="font-size:0.82rem;color:var(--muted);">' + payLabel + '</td>' +
-      '<td><div style="display:flex;flex-wrap:wrap;gap:0.15rem;align-items:center;">' + chipsHtml + (!isOwner ? ' <button class="btn btn-outline btn-sm" data-action="assign" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.15rem 0.5rem;font-size:0.7rem;margin-left:0.25rem;">Assign</button>' : '') + '</div></td>' +
+      '<td><div style="display:flex;flex-wrap:wrap;gap:0.15rem;align-items:center;">' + chipsHtml + (!isOwner && !isInactive ? ' <button class="btn btn-outline btn-sm" data-action="assign" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.15rem 0.5rem;font-size:0.7rem;margin-left:0.25rem;">Assign</button>' : '') + '</div></td>' +
       '<td>' + fmtDate(p.created_at) + '</td>' +
       '<td><div class="btn-row">' +
-        (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="pay" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Pay Settings</button>' : '') +
-        (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="role" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" data-role="' + escHtml(p.role) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Change Role</button>' : '') +
-        (!isMe && !isOwner ? '<button class="btn btn-sm" data-action="remove" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:rgba(239,68,68,0.15);color:var(--red);">Remove</button>' : '') +
-        (isOwner ? '—' : '') +
+        (isInactive
+          ? '<button class="btn btn-outline btn-sm" data-action="restore" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Restore</button>'
+          : (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="pay" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Pay Settings</button>' : '') +
+            (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="role" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" data-role="' + escHtml(p.role) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Change Role</button>' : '') +
+            (!isMe && !isOwner ? '<button class="btn btn-sm" data-action="deactivate" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;background:rgba(239,68,68,0.15);color:var(--red);">Deactivate</button>' : '') +
+            (isOwner ? '—' : '')) +
       '</div></td>';
     tbody.appendChild(tr);
   });
@@ -6950,32 +6983,59 @@ async function loadTeam() {
     });
   });
 
-  tbody.querySelectorAll('[data-action="remove"]').forEach(function (btn) {
+  tbody.querySelectorAll('[data-action="deactivate"]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       const id = btn.dataset.id;
       const name = btn.dataset.name;
       openConfirm(
-        'Remove Team Member',
-        'Remove "' + name + '" from your team? They will immediately lose access to the platform. Their past streams, breaks, and sales history are kept for your reports.',
+        'Deactivate Team Member',
+        'Deactivate "' + name + '"? They will immediately lose access to the platform and stop appearing in schedule/assignment pickers. Their past streams, breaks, pay and sales history are kept exactly as-is for your reports — you can restore them any time from "Show inactive."',
         async function () {
           try {
             const token = await ownerAuthToken();
-            const resp = await fetch('/api/team/remove?memberId=' + encodeURIComponent(id), {
-              method: 'DELETE',
+            const resp = await fetch('/api/team/deactivate?memberId=' + encodeURIComponent(id), {
+              method: 'POST',
               headers: { 'Authorization': 'Bearer ' + token }
             });
             const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || 'Remove failed');
+            if (!resp.ok) throw new Error(data.error || 'Deactivate failed');
             await loadTeam();
-            showGlobalSuccess(name + ' has been removed from the team.');
+            showGlobalSuccess(name + ' has been deactivated.');
           } catch (err) {
-            showGlobalError('Remove failed: ' + escHtml(err.message));
+            showGlobalError('Deactivate failed: ' + escHtml(err.message));
           }
         }
       );
     });
   });
+
+  tbody.querySelectorAll('[data-action="restore"]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const id = btn.dataset.id;
+      const name = btn.dataset.name;
+      btn.disabled = true; btn.textContent = 'Restoring…';
+      try {
+        const token = await ownerAuthToken();
+        const resp = await fetch('/api/team/restore?memberId=' + encodeURIComponent(id), {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Restore failed');
+        await loadTeam();
+        showGlobalSuccess(name + ' has been restored and can sign in again.');
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Restore';
+        showGlobalError('Restore failed: ' + escHtml(err.message));
+      }
+    });
+  });
 }
+
+(function () {
+  const toggle = document.getElementById('teamShowInactive');
+  if (toggle) toggle.addEventListener('change', loadTeam);
+})();
 
 // ── Change Role ────────────────────────────────────────────
 function openChangeRole(profileId, displayName, currentRole) {
@@ -8038,7 +8098,7 @@ async function loadScheduleBreakers() {
   sel.innerHTML = '<option value="">Select person…</option>';
   const hint = document.getElementById('ownerSchedChannelHint');
 
-  let pool = allProfiles.filter(function(p) { return p.role !== 'owner' && p.role !== 'manager'; });
+  let pool = activeTeam().filter(function(p) { return p.role !== 'owner' && p.role !== 'manager'; });
   if (ownerSchedChannel) {
     pool = pool.filter(function(p) { return (ownerSchedAssignments[p.id] || []).includes(ownerSchedChannel.id); });
     if (hint) {
@@ -8339,8 +8399,8 @@ function renderWeekGrid() {
     }
   });
 
-  const breakers = allProfiles.filter(function(p){ return p.role==='breaker'||p.role==='breaker/manager'; });
-  const sorters = allProfiles.filter(function(p){ return p.role==='sorter'; });
+  const breakers = activeTeam().filter(function(p){ return p.role==='breaker'||p.role==='breaker/manager'; });
+  const sorters = activeTeam().filter(function(p){ return p.role==='sorter'; });
 
   function makeChip(s) {
     const cls = s.status==='completed'?'sc sc-done':s.status==='in_progress'?'sc sc-live':'sc';
@@ -8431,7 +8491,7 @@ function openReassign(shiftId) {
   const sel = document.getElementById('reassignPersonSelect');
   sel.innerHTML = '<option value="">— select person —</option>';
   // Only people payroll can pay for a shift (owner/manager hours are never counted)
-  allProfiles.filter(function (p) { return ['breaker', 'breaker/manager', 'sorter'].includes(p.role); }).forEach(function(p){
+  activeTeam().filter(function (p) { return ['breaker', 'breaker/manager', 'sorter'].includes(p.role); }).forEach(function(p){
     const opt=document.createElement('option');
     opt.value=p.id; opt.textContent=p.display_name+' ('+p.role+')';
     sel.appendChild(opt);
@@ -8758,7 +8818,7 @@ function openCompleteSort(taskId, streamKey) {
   // Populate sorter dropdown from allProfiles
   const sel = document.getElementById('completeSortSorterSelect');
   sel.innerHTML = '<option value="">— Select sorter —</option>';
-  const sorters = allProfiles.filter(function(p) { return p.role === 'sorter'; });
+  const sorters = activeTeam().filter(function(p) { return p.role === 'sorter'; });
   sorters.forEach(function(p) {
     const opt = document.createElement('option');
     opt.value = p.id;
@@ -9782,7 +9842,7 @@ async function loadBuyersBoard() {
 
 // Team members a cold buyer can be assigned to for outreach (owner, managers, breakers).
 function buyersAssigneeOptions() {
-  return (allProfiles || [])
+  return activeTeam()
     .filter(p => ['owner', 'manager', 'breaker', 'breaker/manager'].includes(p.role))
     .map(p => ({ id: p.id, name: p.display_name || 'Unnamed' }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -11015,7 +11075,7 @@ async function settLoadMilestonesTab() {
 
     const staffSel = document.getElementById('settMsAwardStaff');
     const msSel = document.getElementById('settMsAwardMilestone');
-    if (staffSel) staffSel.innerHTML = '<option value="">— select —</option>' + (allProfiles || []).map(function(p){ return '<option value="' + p.id + '">' + escHtml(p.display_name) + ' (' + p.role + ')</option>'; }).join('');
+    if (staffSel) staffSel.innerHTML = '<option value="">— select —</option>' + activeTeam().map(function(p){ return '<option value="' + p.id + '">' + escHtml(p.display_name) + ' (' + p.role + ')</option>'; }).join('');
     if (msSel) msSel.innerHTML = '<option value="">— select —</option>' + manualMs.map(function(m){ return '<option value="' + m.id + '">' + escHtml(m.badge_icon + ' ' + m.name) + '</option>'; }).join('');
   } catch (e) { console.error('settLoadMilestonesTab', e); }
 }
@@ -11366,7 +11426,7 @@ async function submitNewMilestone() {
 function ownerInitGoalStaffSelect() {
   const sel = document.getElementById('newGoalStaff');
   if (!sel) return;
-  sel.innerHTML = '<option value="">Whole team</option>' + (allProfiles || []).map(function(p){ return '<option value="' + p.id + '">' + escHtml(p.display_name) + ' (' + p.role + ')</option>'; }).join('');
+  sel.innerHTML = '<option value="">Whole team</option>' + activeTeam().map(function(p){ return '<option value="' + p.id + '">' + escHtml(p.display_name) + ' (' + p.role + ')</option>'; }).join('');
 }
 
 function toggleCustomGoalName() {

@@ -105,6 +105,21 @@
     return { total: perDay * days, days };
   }
 
+  // ── soft-deleted (deactivated) users ───────────────────────────────────
+  // A profile with deleted_at set has been deactivated by the owner: banned
+  // server-side and no longer able to read/write anything org-scoped (see
+  // migrations/016 — get_my_org_id() returns NULL for them), but a session
+  // they already had open stays technically "logged in" client-side until
+  // this check runs. Every page's auth bootstrap calls this right after
+  // loading the profile; a true result means the caller must stop (the
+  // sign-out + redirect already happened).
+  function isDeactivated(profile) { return !!(profile && profile.deleted_at); }
+  async function enforceActive(sb, profile) {
+    if (!isDeactivated(profile)) return false;
+    try { await sb.auth.signOut(); } catch (e) {}
+    return true;
+  }
+
   // ── inventory log ───────────────────────────────────────────────────────
   // inventory_log.quantity is always stored positive; the action carries the
   // sign. One rule for the owner/manager logs, the exports and the stock audit.
@@ -191,6 +206,7 @@
     loadOrgTz, partsIn, tzOffsetMinutes, dateInTz, todayIn, localMidnightISO, localTimeISO, dayEndISO, addDays,
     periodBounds, hoursOverlap, sumHours, shiftHours, applyShiftWindow, salaryForRange,
     logDelta, logActionLabel, adjustStock,
+    isDeactivated, enforceActive,
     pageAll, isMissingSchema, captureError
   };
 })(typeof window !== 'undefined' ? window : module.exports);

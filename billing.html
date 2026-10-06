@@ -300,8 +300,9 @@
         currentSession = session;
 
         const { data: profile, error: profileError } = await sb
-          .from('profiles').select('role, org_id').eq('id', session.user.id).single();
+          .from('profiles').select('role, org_id, deleted_at').eq('id', session.user.id).single();
         if (profileError || !profile) { window.location.href = '/login'; return; }
+        if (profile.deleted_at) { try { await sb.auth.signOut(); } catch (e) {} window.location.href = '/login?deactivated=1'; return; }
         if (profile.role !== 'owner') { window.location.href = 'breaker.html'; return; }
 
         const { data: sub, error: subError } = await sb

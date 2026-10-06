@@ -753,6 +753,7 @@ async function initAuth() {
       .from('profiles').select('*').eq('id', currentUser.id).single();
 
     if (error || !profile) { await sb.auth.signOut(); window.location.href = '/login'; return; }
+    if (await CBP.enforceActive(sb, profile)) { window.location.href = '/login?deactivated=1'; return; }
     if (profile.role !== 'sorter') {
       const roleMap = { owner: 'owner.html', breaker: 'breaker.html', manager: 'manager.html' };
       window.location.href = roleMap[profile.role] || '/login'; return;
@@ -925,7 +926,7 @@ let srtAllProfiles = [];
 
 async function loadMyScheduleView() {
   if (!srtAllProfiles.length) {
-    const { data } = await sb.from('profiles').select('id, display_name, role').eq('org_id', currentProfile.org_id).neq('id', currentUser.id);
+    const { data } = await sb.from('profiles').select('id, display_name, role').eq('org_id', currentProfile.org_id).neq('id', currentUser.id).is('deleted_at', null);
     srtAllProfiles = data || [];
   }
   renderMyWeekGrid();

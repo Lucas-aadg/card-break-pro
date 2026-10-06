@@ -1522,6 +1522,10 @@ let currentUser = null;
 let currentProfile = null;
 let orgProducts = [];
 let allProfiles = [];
+// Assignable roster (new shifts, reassignment, sort tasks, outreach) — everyone
+// minus anyone the owner has deactivated. allProfiles itself stays the FULL
+// roster (deactivated included) so history/reports keep resolving names.
+function activeTeam() { return allProfiles.filter(function (p) { return !p.deleted_at; }); }
 let confirmCallback = null;
 const CAL_MIN_YEAR = 2026;
 const CAL_MIN_MONTH = 4; // May (0-indexed)
@@ -1718,6 +1722,7 @@ async function init() {
 
     const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
     if (!profile || (profile.role !== 'manager' && profile.role !== 'breaker/manager')) { window.location.href = '/login'; return; }
+    if (await CBP.enforceActive(sb, profile)) { window.location.href = '/login?deactivated=1'; return; }
     currentProfile = profile;
     document.getElementById('mgrBadge').textContent = profile.display_name || '';
     if (profile.role === 'breaker/manager') {
@@ -1880,9 +1885,9 @@ function populateScheduleDropdown() {
   const sel = document.getElementById('schedBreaker');
   sel.innerHTML = '<option value="">Select person…</option>';
   const hint = document.getElementById('schedChannelHint');
-  let filtered = allProfiles;
+  let filtered = activeTeam();
   if (scheduleChannel) {
-    filtered = allProfiles.filter(function(p) {
+    filtered = filtered.filter(function(p) {
       return (schedChannelAssignments[p.id] || []).includes(scheduleChannel.id);
     });
     if (hint) {
@@ -2367,7 +2372,7 @@ function openReassign(shiftId) {
   calHidePopup();
   const sel = document.getElementById('reassignPersonSelect');
   sel.innerHTML = '<option value="">— select person —</option>';
-  allProfiles.forEach(function(p){
+  activeTeam().forEach(function(p){
     const opt=document.createElement('option');
     opt.value=p.id; opt.textContent=p.display_name+' ('+p.role+')';
     sel.appendChild(opt);
@@ -2799,7 +2804,7 @@ function openCompleteSort(taskId, streamKey) {
   document.getElementById('completeSortStreamKey').textContent = streamKey;
   const sel = document.getElementById('completeSortSorterSelect');
   sel.innerHTML = '<option value="">— select sorter —</option>';
-  allProfiles.filter(function(p){ return p.role === 'sorter'; }).forEach(function(p){
+  activeTeam().filter(function(p){ return p.role === 'sorter'; }).forEach(function(p){
     const opt = document.createElement('option');
     opt.value = p.id; opt.textContent = p.display_name;
     sel.appendChild(opt);
@@ -3118,8 +3123,12 @@ async function loadTeam() {
   });
 
   tbody.innerHTML = '';
-  if (!allProfiles.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No team members yet.</td></tr>'; return; }
-  allProfiles.forEach(function(p){
+  // Manager has view-only access here — no deactivate/restore, so the list
+  // simply shows the active roster (matches every other staff-list/assignment
+  // surface). Owner's Team tab is where deactivation and restore happen.
+  const active = activeTeam();
+  if (!active.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No active team members yet.</td></tr>'; return; }
+  active.forEach(function(p){
     const roleBadge = p.role === 'breaker' ? '<span class="badge badge-green">breaker</span>'
       : p.role === 'sorter' ? '<span class="badge badge-blue">sorter</span>'
       : '<span class="badge badge-purple">manager</span>';
@@ -3298,12 +3307,13 @@ function mgrSelCh() { const sel = document.getElementById('mgrBuyersChannelFilte
 
 function breakerNameById(id) {
   const p = (allProfiles || []).find(x => x.id === id);
-  return p ? p.display_name : 'Unknown';
+  if (!p) return 'Unknown';
+  return p.display_name + (p.deleted_at ? ' (inactive)' : '');
 }
 function fmtShortDate(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'; }
 
 function buyersAssigneeOptions() {
-  return (allProfiles || [])
+  return activeTeam()
     .filter(p => ['owner', 'manager', 'breaker', 'breaker/manager'].includes(p.role))
     .map(p => ({ id: p.id, name: p.display_name || 'Unnamed' }))
     .sort((a, b) => a.name.localeCompare(b.name));

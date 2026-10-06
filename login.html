@@ -214,11 +214,19 @@
       try {
         const { data: profile, error } = await sb
           .from('profiles')
-          .select('role')
+          .select('role, deleted_at')
           .eq('id', userId)
           .single();
 
         if (error || !profile) return;
+
+        if (profile.deleted_at) {
+          // A session from before deactivation can still be "valid" for a
+          // while (see migrations/016) — don't let it back into the app.
+          try { await sb.auth.signOut(); } catch (e) {}
+          showError('This account has been deactivated. Contact your organization owner if you believe this is a mistake.');
+          return;
+        }
 
         if (profile.role === 'owner') {
           window.location.href = 'owner.html';
@@ -300,6 +308,9 @@
       }
     });
 
+    if (new URLSearchParams(window.location.search).get('deactivated') === '1') {
+      showError('This account has been deactivated. Contact your organization owner if you believe this is a mistake.');
+    }
     checkExistingSession();
   </script>
 </body>

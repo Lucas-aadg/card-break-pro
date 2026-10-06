@@ -1191,6 +1191,8 @@ async function initAuth() {
       return;
     }
 
+    if (await CBP.enforceActive(sb, profile)) { window.location.href = '/login?deactivated=1'; return; }
+
     if (profile.role !== 'breaker' && profile.role !== 'breaker/manager') {
       const roleMap = { owner: 'owner.html', sorter: 'sorter.html', manager: 'manager.html' };
       window.location.href = roleMap[profile.role] || '/login'; return;
@@ -2403,7 +2405,7 @@ let brkAllProfiles = [];
 
 async function loadMyScheduleView() {
   if (!brkAllProfiles.length) {
-    const { data } = await sb.from('profiles').select('id, display_name, role').eq('org_id', currentProfile.org_id).neq('id', currentUser.id);
+    const { data } = await sb.from('profiles').select('id, display_name, role').eq('org_id', currentProfile.org_id).neq('id', currentUser.id).is('deleted_at', null);
     brkAllProfiles = data || [];
   }
   renderMyWeekGrid();

@@ -452,6 +452,7 @@ async function initAuth() {
 
     const { data: profile, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
     if (error || !profile) { await sb.auth.signOut(); window.location.href = '/login'; return; }
+    if (await CBP.enforceActive(sb, profile)) { window.location.href = '/login?deactivated=1'; return; }
     if (profile.role !== 'owner') { window.location.href = '/dashboard'; return; }
 
     currentProfile = profile;
