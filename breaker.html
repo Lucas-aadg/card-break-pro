@@ -933,7 +933,7 @@
       <div id="siTargetLabel" style="display:none;margin:-0.75rem 0 0.9rem;font-size:0.78rem;color:var(--primary);font-weight:700;"></div>
       <div id="siDropZone" style="border:2px dashed rgba(79,110,247,0.4);border-radius:12px;padding:2rem 1.5rem;text-align:center;cursor:pointer;background:rgba(79,110,247,0.04);transition:.2s;" onclick="document.getElementById('siFileInput').click()">
         <div style="font-size:2.5rem;margin-bottom:0.6rem;">📄</div>
-        <div style="font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:0.4rem;">Drop your Whatnot packing slip PDF here</div>
+        <div style="font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:0.4rem;">Drop your Whatnot or TikTok Shop packing slip PDF here</div>
         <div style="font-size:0.8rem;color:var(--muted);">or tap to select file</div>
         <div style="font-size:0.75rem;color:var(--muted);margin-top:0.6rem;">PDF only · Max 50MB</div>
       </div>
@@ -955,6 +955,7 @@
         <h2 style="margin:0;font-size:1.2rem;">Import Preview</h2>
         <span style="font-size:0.72rem;color:var(--muted);background:var(--bg);padding:0.25rem 0.65rem;border-radius:100px;border:1px solid var(--border);">Step 1 of 3</span>
       </div>
+      <div id="siPlatformDetected" style="font-size:0.74rem;font-weight:700;color:var(--primary);margin-bottom:0.6rem;"></div>
       <div id="siStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:0.6rem;margin-bottom:0.6rem;"></div>
       <div id="siParseWarnings" style="display:none;font-size:0.74rem;color:#f0b429;margin-bottom:0.8rem;line-height:1.4;"></div>
       <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Top Spenders This Stream</div>
@@ -1670,7 +1671,7 @@ var _brkOrgChannels = null;
 async function brkEnsureOrgChannels() {
   if (_brkOrgChannels) return _brkOrgChannels;
   try {
-    const { data } = await sb.from('channels').select('id,name,icon,sort_order').eq('org_id', currentProfile.org_id).order('sort_order', { ascending: true });
+    const { data } = await sb.from('channels').select('id,name,icon,sort_order,platform').eq('org_id', currentProfile.org_id).order('sort_order', { ascending: true });
     _brkOrgChannels = data || [];
   } catch (e) { _brkOrgChannels = []; }
   const wrap = document.getElementById('streamChannelWrap');
@@ -1683,6 +1684,13 @@ async function brkEnsureOrgChannels() {
 }
 
 function brkChannelName(id) { const c = (_brkOrgChannels || []).find(function (x) { return x.id === id; }); return c ? (c.icon ? c.icon + ' ' : '') + c.name : ''; }
+// Which marketplace tonight's account is on — tags buyers created live (case
+// hits, room roster) before any slip is imported so they match the platform
+// the slip importer finds later instead of becoming an orphaned duplicate.
+function brkStreamPlatform(stream) {
+  const ch = stream && stream.channel_id ? (_brkOrgChannels || []).find(function (c) { return c.id === stream.channel_id; }) : null;
+  return (ch && ch.platform) || 'whatnot';
+}
 function brkChannelPrefKey() { return 'cbp_stream_channel_' + (currentUser ? currentUser.id : 'anon'); }
 
 // Best guess for a NEW stream: schedule with this key → any shift today on an
@@ -3320,7 +3328,7 @@ function setupLiveHitModal() {
         // Create placeholder — slip import will fill in spend later
         const { data: nb, error: insErr } = await sb.from('buyers').insert({
           organization_id:           currentProfile.org_id,
-          platform:                  'whatnot',
+          platform:                  brkStreamPlatform(currentStream),
           username:                  username.toLowerCase(),
           case_hits:                 hitType === 'case_hit' ? 1 : 0,
           total_spent:               0,
@@ -3644,7 +3652,7 @@ async function brkAddUnknownHere(username) {
   let buyerId = existing && existing.id;
   if (!buyerId) {
     const ins = await sb.from('buyers').insert({
-      organization_id: currentProfile.org_id, platform: 'whatnot', username: username,
+      organization_id: currentProfile.org_id, platform: brkStreamPlatform(currentStream), username: username,
       total_spent: 0, total_breaks_purchased: 0, total_streams_participated: 0,
       is_new_buyer: true, temperature: 'cold', first_seen_date: today(), created_at: now, updated_at: now
     }).select('id').single();
@@ -4124,6 +4132,8 @@ function showSlipPreview(data) {
     siStatCard(data.totalNewBuyers, 'New Buyers') +
     siStatCard('$' + (data.totalRevenueParsed || 0).toFixed(2), 'Revenue') +
     siStatCard(data._pages || data.totalPagesFound || '—', 'Pages read');
+  var platEl = document.getElementById('siPlatformDetected');
+  if (platEl) platEl.textContent = 'Detected: ' + (data.platform === 'tiktok' ? 'TikTok Shop' : 'Whatnot');
   var warnEl = document.getElementById('siParseWarnings');
   if (warnEl) {
     var w = data._warnings || [];
@@ -4160,7 +4170,7 @@ async function confirmSlipImport() {
   var target = _slipImportTarget || currentStream;
   // Clear, specific reasons the import can't proceed — beats a vague downstream error.
   if (!_parsedSlipData.buyers || !_parsedSlipData.buyers.length) {
-    showGlobalError('This slip parsed 0 paying buyers — the PDF may not be a standard Whatnot packing slip, or it only had giveaways. Nothing to import.');
+    showGlobalError('This slip parsed 0 paying buyers — the PDF may not be a standard Whatnot or TikTok Shop packing slip, or it only had giveaways. Nothing to import.');
     return;
   }
   if (!target || !target.id) {
@@ -4185,7 +4195,8 @@ async function confirmSlipImport() {
         rawFilename: _parsedSlipData._filename || null,
         mode: 'merge',
         parseSource: _parsedSlipData._parseSource || null,
-        fileSize: _parsedSlipData._fileSize || null
+        fileSize: _parsedSlipData._fileSize || null,
+        platform: _parsedSlipData.platform || 'whatnot'
       })
     });
     var result = null;
@@ -4334,7 +4345,7 @@ async function submitAllHits() {
         // Create placeholder — a later slip import fills in spend
         var ins = await sb.from('buyers').insert({
           organization_id: currentProfile.org_id,
-          platform: 'whatnot',
+          platform: brkStreamPlatform(currentStream),
           username: hit.username.toLowerCase(),
           case_hits: hit.type === 'case_hit' ? 1 : 0,
           total_spent: 0,

@@ -1,8 +1,10 @@
 const busboy = require('busboy');
 const pdfParse = require('pdf-parse');
-// Same parser the browser uses (slip-parser.js) — one set of rules, two text sources.
+// Same parser the browser uses (slip-parser.js) — one set of rules, two text
+// sources. parseSlipText auto-detects Whatnot vs TikTok Shop from the PDF's
+// own text, same as the browser path.
 const { SlipParser } = require('../slip-parser.js');
-const parseWhatnotSlips = SlipParser.parseWhatnotSlips;
+const parseSlipText = SlipParser.parseSlipText;
 
 module.exports.config = { api: { bodyParser: false } };
 
@@ -20,10 +22,10 @@ module.exports = async (req, res) => {
     }
 
     if (!rawText || rawText.trim().length < 20) {
-      return res.status(500).json({ error: 'PDF has no extractable text. Make sure this is a Whatnot packing slip PDF.' });
+      return res.status(500).json({ error: 'PDF has no extractable text. Make sure this is a Whatnot or TikTok Shop packing slip PDF.' });
     }
 
-    const result = parseWhatnotSlips(rawText);
+    const result = parseSlipText(rawText);
     return res.status(200).json(result);
   } catch (err) {
     console.error('import-slip error:', err.message);

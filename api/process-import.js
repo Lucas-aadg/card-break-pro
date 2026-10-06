@@ -49,6 +49,14 @@ async function handleImport(req, res) {
 
   const { orgId, streamId, buyers, streamDate, importedBy, rawFilename, parseSource, fileSize } = body;
   const mode = body.mode === 'replace' ? 'replace' : 'merge';
+  // Which marketplace this slip came from — SlipParser auto-detects it from the
+  // PDF itself and the client passes it straight through. 'whatnot' is the
+  // default both for backward compatibility (older clients never sent this
+  // field) and because that's still the common case. buyers.platform /
+  // buyer_purchases.platform are plain unconstrained text columns with a
+  // (org, platform, username) unique key (schema/buyers.sql) — @same_handle on
+  // Whatnot and on TikTok are kept as two separate buyer records on purpose.
+  const platform = body.platform === 'tiktok' ? 'tiktok' : 'whatnot';
   if (!orgId || !Array.isArray(buyers) || buyers.length === 0) return res.status(400).json({ error: 'Missing required fields: orgId, buyers' });
   if (!/^[0-9a-f-]{36}$/.test(orgId)) return res.status(400).json({ error: 'Invalid orgId' });
   // streamId is REQUIRED — imports are keyed to a stream so a re-import stays idempotent.
@@ -110,14 +118,14 @@ async function handleImport(req, res) {
     // ── 3. Resolve buyer ids (fetch existing, bulk-create the new ones) ──
     const unameToId = {};
     for (const grp of chunk(unames, 200)) {
-      const { data, error } = await sb.from('buyers').select('id, username').eq('organization_id', orgId).eq('platform', 'whatnot').in('username', grp);
+      const { data, error } = await sb.from('buyers').select('id, username').eq('organization_id', orgId).eq('platform', platform).in('username', grp);
       if (error) throw new Error('lookup buyers failed: ' + error.message);
       (data || []).forEach(r => { unameToId[r.username] = r.id; });
     }
     const newUnames = unames.filter(u => !unameToId[u]);
     if (newUnames.length) {
       const rows = newUnames.map(u => ({
-        organization_id: orgId, platform: 'whatnot', username: u,
+        organization_id: orgId, platform: platform, username: u,
         real_name: byUname[u].realName || null,
         first_seen_date: purchaseDate,
         total_spent: 0, total_breaks_purchased: 0, total_streams_participated: 0,
@@ -129,7 +137,7 @@ async function handleImport(req, res) {
         if (error && !/duplicate key|unique/i.test(error.message)) throw new Error('create buyers failed: ' + error.message);
       }
       for (const grp of chunk(newUnames, 200)) {
-        const { data, error } = await sb.from('buyers').select('id, username').eq('organization_id', orgId).eq('platform', 'whatnot').in('username', grp);
+        const { data, error } = await sb.from('buyers').select('id, username').eq('organization_id', orgId).eq('platform', platform).in('username', grp);
         if (error) throw new Error('lookup new buyers failed: ' + error.message);
         (data || []).forEach(r => { unameToId[r.username] = r.id; });
       }
@@ -140,7 +148,7 @@ async function handleImport(req, res) {
     for (const u of unames) {
       const id = unameToId[u]; if (!id) continue;
       for (const it of byUname[u].items) {
-        purchRows.push({ organization_id: orgId, buyer_id: id, stream_id: streamId, break_name: it.breakName, order_number: it.orderNumber, amount: it.amount, purchase_date: purchaseDate, platform: 'whatnot' });
+        purchRows.push({ organization_id: orgId, buyer_id: id, stream_id: streamId, break_name: it.breakName, order_number: it.orderNumber, amount: it.amount, purchase_date: purchaseDate, platform: platform });
       }
     }
 

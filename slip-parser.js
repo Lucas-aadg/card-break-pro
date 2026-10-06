@@ -93,9 +93,163 @@
       totalNewBuyers: paying.filter(function (b) { return b.isNew; }).length,
       totalRevenueParsed: round2(paying.reduce(function (s, b) { return s + (b.totalSpent || 0); }, 0)),
       totalPagesFound: blocks.length,
+      platform: 'whatnot',
       _warnings: warnings,
       _allBuyerCount: finalBuyers.length
     };
+  }
+
+  // ── TikTok Shop packing slips ────────────────────────────────────────────
+  // Structurally simpler than Whatnot's: each "Packing Slip" page is exactly
+  // one order with a clean "Order ID: / Buyer ID: / Buyer Nickname:" header
+  // and its own item table — no multi-page continuation to stitch together.
+  // The same buyer CAN still appear on multiple separate order pages (bought
+  // more than once during the stream), so orders are aggregated by Buyer ID
+  // same as Whatnot aggregates by username.
+  function parseTikTokSlips(rawText) {
+    const rawLines = String(rawText || '').split('\n').map(function (l) { return l.trim(); });
+    const lines = rawLines.filter(function (l) { return l.length > 0; });
+
+    const headerIdx = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (/Packing\s*Slip/i.test(lines[i])) headerIdx.push(i);
+    }
+    // Some exports can drop the page title on a line of its own — fall back to
+    // splitting on "Order ID:" so a slip still parses even without it.
+    const splitPoints = headerIdx.length ? headerIdx : lines.reduce(function (acc, l, i) { if (/^Order ID:/i.test(l)) acc.push(i); return acc; }, []);
+    const blocks = splitPoints.map(function (start, idx) {
+      const end = idx + 1 < splitPoints.length ? splitPoints[idx + 1] : lines.length;
+      return lines.slice(start, end);
+    });
+
+    const byUname = {};   // aggregated across every order page for that buyer
+    let streamName = '';
+    let streamDate = '';
+    const warnings = [];
+
+    for (const block of blocks) {
+      const header = extractTikTokHeader(block);
+      if (!header.username) continue; // stray/incomplete page
+      if (header.streamName) streamName = header.streamName;
+      if (header.streamDate) streamDate = header.streamDate;
+
+      const key = header.username.toLowerCase();
+      if (!byUname[key]) byUname[key] = { username: header.username, realName: header.realName, isNew: false, items: [] };
+      else if (header.realName && !byUname[key].realName) byUname[key].realName = header.realName;
+
+      const extracted = extractTikTokItems(block, header.orderId || key);
+      byUname[key].items.push.apply(byUname[key].items, extracted.items);
+
+      if (extracted.qtyTotal !== null) {
+        const rowQtySum = extracted.items.reduce(function (s, it) { return s + (it.qty || 1); }, 0);
+        if (rowQtySum !== extracted.qtyTotal) {
+          warnings.push(header.username + ': parsed ' + rowQtySum + ' item(s) but slip\'s Qty Total says ' + extracted.qtyTotal);
+        }
+      }
+    }
+
+    const finalBuyers = Object.values(byUname).map(function (b) {
+      const totalSpent = round2(b.items.reduce(function (s, it) { return s + (it.amount || 0); }, 0));
+      return { username: b.username, isNew: b.isNew, realName: b.realName, items: b.items, totalSpent: totalSpent };
+    });
+
+    // Exclude giveaway-only recipients (zero spend, no paid items) — same rule as Whatnot.
+    const paying = finalBuyers.filter(function (b) {
+      return b.username && (b.totalSpent > 0 || b.items.some(function (it) { return it.amount > 0; }));
+    });
+
+    return {
+      buyers: paying,
+      streamName: streamName || '',
+      streamDate: streamDate || '',
+      totalBuyersFound: paying.length,
+      totalNewBuyers: 0, // TikTok Shop packing slips carry no "first-time buyer" indicator — unlike Whatnot's NEW badge
+      totalRevenueParsed: round2(paying.reduce(function (s, b) { return s + (b.totalSpent || 0); }, 0)),
+      totalPagesFound: blocks.length,
+      platform: 'tiktok',
+      _warnings: warnings,
+      _allBuyerCount: finalBuyers.length
+    };
+  }
+
+  function extractTikTokHeader(block) {
+    const result = { orderId: '', username: '', realName: '', streamName: '', streamDate: '' };
+    for (const l of block) {
+      let m;
+      if (!result.orderId   && (m = l.match(/^Order ID:\s*(\S+)/i)))      result.orderId = m[1];
+      else if (!result.streamName && (m = l.match(/^Show name:\s*(.+)/i)))     result.streamName = m[1].trim();
+      else if (!result.streamDate && (m = l.match(/^Created Time:\s*(.+)/i)))  result.streamDate = m[1].trim();
+      else if (!result.username   && (m = l.match(/^Buyer ID:\s*@?(.+)/i)))     result.username = m[1].trim();
+      else if (!result.realName   && (m = l.match(/^Buyer Nickname:\s*(.+)/i))) result.realName = m[1].trim();
+    }
+    return result;
+  }
+
+  function extractTikTokItems(block, orderId) {
+    const items = [];
+    let qtyTotal = null;
+
+    // Item table: starts after the "Product Name ... Qty" header row, ends at
+    // "Qty Total:". The header sometimes wraps onto a second line
+    // ("...SKU Price" / "(Unit) Qty") in the extracted text — both halves are
+    // filtered out below rather than relied on as a boundary.
+    let start = 0;
+    for (let i = 0; i < block.length; i++) {
+      if (/Product\s*Name/i.test(block[i])) { start = i + 1; break; }
+    }
+    let end = block.length;
+    for (let i = start; i < block.length; i++) {
+      const m = block[i].match(/^Qty\s*Total:\s*(\d+)/i);
+      if (m) { qtyTotal = parseInt(m[1], 10); end = i; break; }
+    }
+    const region = block.slice(start, end).filter(function (l) {
+      return !/^\(Unit\)\s*Qty$/i.test(l) && !/SKU\s*Price$/i.test(l);
+    });
+
+    let itemIndex = 0;
+    for (const l of region) {
+      // "<Product Name...> <SKU> <Seller SKU> $<price> <qty>". SKU / Seller SKU
+      // are whatever the seller configured (often literally "Default", or
+      // blank for Seller SKU) — not needed for the CRM, so they're matched
+      // and discarded rather than relied on. The one unambiguous anchor is
+      // the trailing "$price qty"; everything before the two SKU tokens is
+      // the product name, however many words long.
+      const m = l.match(/^(.+?)\s+(\S+)\s+(\S*)\s*\$(\d+(?:\.\d{1,2})?)\s+(\d+)\s*$/);
+      if (!m) continue;
+      const name = m[1].trim();
+      const unitPrice = parseFloat(m[4]) || 0;
+      const qty = parseInt(m[5], 10) || 1;
+      itemIndex++;
+      // orderId is one order's identifier, not one item's — TikTok Shop card
+      // breaks are almost always a single item per order, but if a buyer
+      // checked out with more than one line item in the same order, each
+      // needs its own key (buyer_purchases.order_number) so neither gets
+      // silently merged/overwritten as a duplicate of the other.
+      items.push({
+        breakName: (name || 'Item').slice(0, 120),
+        orderNumber: orderId + (itemIndex > 1 ? '-' + itemIndex : ''),
+        amount: round2(unitPrice * qty),
+        qty: qty
+      });
+    }
+    return { items: items, qtyTotal: qtyTotal };
+  }
+
+  // ── Platform detection + dispatch ────────────────────────────────────────
+  // Both formats are unambiguous and self-describing, so there's no manual
+  // "which platform is this" step for the owner/breaker — just drop the file.
+  function detectPlatform(rawText) {
+    const text = String(rawText || '');
+    if (/TikTok\s*Shop/i.test(text) || (/Buyer ID:/i.test(text) && /Buyer Nickname:/i.test(text))) return 'tiktok';
+    if (/Whatnot\s*Packing\s*Slip/i.test(text)) return 'whatnot';
+    return null;
+  }
+
+  function parseSlipText(rawText) {
+    const platform = detectPlatform(rawText);
+    if (platform === 'tiktok') return parseTikTokSlips(rawText);
+    if (platform === 'whatnot') return parseWhatnotSlips(rawText);
+    throw new Error('Could not recognize this as a Whatnot or TikTok Shop packing slip PDF.');
   }
 
   function extractBuyerHeader(block) {
@@ -263,8 +417,8 @@
 
   async function parseInBrowser(file) {
     const { text, pages } = await extractPdfText(file);
-    if (!text || text.trim().length < 20) throw new Error('PDF has no extractable text. Make sure this is a Whatnot packing slip PDF (not a scan).');
-    const out = parseWhatnotSlips(text);
+    if (!text || text.trim().length < 20) throw new Error('PDF has no extractable text. Make sure this is a Whatnot or TikTok Shop packing slip PDF (not a scan).');
+    const out = parseSlipText(text);
     out._parseSource = 'browser';
     out._pages = pages;
     out._rawSample = text.slice(0, 2000);
@@ -305,5 +459,8 @@
     return best;
   }
 
-  global.SlipParser = { parseWhatnotSlips, parseSlipFile, parseInBrowser, parseOnServer, extractPdfText, SERVER_MAX_BYTES };
+  global.SlipParser = {
+    parseWhatnotSlips, parseTikTokSlips, detectPlatform, parseSlipText,
+    parseSlipFile, parseInBrowser, parseOnServer, extractPdfText, SERVER_MAX_BYTES
+  };
 })(typeof window !== 'undefined' ? window : module.exports);

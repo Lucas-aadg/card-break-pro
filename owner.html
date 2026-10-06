@@ -2466,7 +2466,7 @@
       <label>Packing Slips — Buyer Intelligence (optional)</label>
       <div id="coSlipDrop" style="border:1.5px dashed var(--border);border-radius:10px;padding:1.2rem;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;background:var(--bg);">
         <input type="file" id="coSlipFile" accept=".pdf" style="display:none;" />
-        <div id="coSlipDropLabel" style="color:var(--muted);font-size:0.85rem;pointer-events:none;">📦 Drag &amp; drop Whatnot packing slip PDF, or <span style="color:var(--primary);">browse</span></div>
+        <div id="coSlipDropLabel" style="color:var(--muted);font-size:0.85rem;pointer-events:none;">📦 Drag &amp; drop Whatnot or TikTok Shop packing slip PDF, or <span style="color:var(--primary);">browse</span></div>
       </div>
     </div>
     <div class="modal-btn-row">
@@ -2529,6 +2529,14 @@
           <label for="chModalColor">Color</label>
           <input type="color" id="chModalColor" value="#4f6ef7" style="height:42px;padding:0.2rem;cursor:pointer;" />
         </div>
+      </div>
+      <div class="form-group">
+        <label for="chModalPlatform">Platform</label>
+        <select id="chModalPlatform">
+          <option value="whatnot">Whatnot</option>
+          <option value="tiktok">TikTok Shop</option>
+        </select>
+        <p style="font-size:0.74rem;color:var(--muted);margin-top:0.35rem;line-height:1.4;">Packing slips are read automatically either way — this only matters for buyers logged live (case hits, "who's in the room") before any slip is imported, so they match up correctly once the slip comes in.</p>
       </div>
     </div>
     <div class="modal-btn-row" style="margin-top:1.5rem;">
@@ -3268,6 +3276,16 @@ async function loadChannels() {
   orgChannels = data || [];
 }
 
+// Which marketplace a stream's account is on — used to tag buyers created
+// live (case hits, "who's in the room") BEFORE any slip is imported, so they
+// land under the same platform the slip importer will later match against
+// instead of becoming an orphaned duplicate. Defaults to 'whatnot' when the
+// stream has no account set, or migration 017 hasn't run yet.
+function streamPlatform(stream) {
+  const ch = stream && stream.channel_id ? orgChannels.find(function (c) { return c.id === stream.channel_id; }) : null;
+  return (ch && ch.platform) || 'whatnot';
+}
+
 function enterChannel(channelId) {
   const ch = orgChannels.find(function(c){ return c.id === channelId; });
   if (!ch) return;
@@ -3646,6 +3664,7 @@ function openChannelModal(channelId) {
   document.getElementById('chModalName').value = ch ? ch.name : '';
   document.getElementById('chModalIcon').value = ch ? ch.icon : '📦';
   document.getElementById('chModalColor').value = ch ? ch.color : '#4f6ef7';
+  document.getElementById('chModalPlatform').value = (ch && ch.platform) || 'whatnot';
   document.getElementById('channelModal').classList.add('active');
 }
 
@@ -3690,17 +3709,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const name = document.getElementById('chModalName').value.trim();
     const icon = document.getElementById('chModalIcon').value.trim() || '📦';
     const color = document.getElementById('chModalColor').value || '#4f6ef7';
+    const platform = document.getElementById('chModalPlatform').value === 'tiktok' ? 'tiktok' : 'whatnot';
     const id = document.getElementById('chModalId').value;
     if (!name) { showGlobalError('Account name is required.'); return; }
     const btn = document.getElementById('chModalSaveBtn');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
       if (id) {
-        const { error } = await sb.from('channels').update({ name, icon, color }).eq('id', id);
-        if (error) throw error;
+        const { error } = await sb.from('channels').update({ name, icon, color, platform }).eq('id', id);
+        if (error && !CBP.isMissingSchema(error)) throw error;
+        if (error) { const retry = await sb.from('channels').update({ name, icon, color }).eq('id', id); if (retry.error) throw retry.error; } // migration 017 not run yet
       } else {
-        const { error } = await sb.from('channels').insert({ org_id: currentProfile.org_id, name, icon, color, sort_order: orgChannels.length });
-        if (error) throw error;
+        let ins = await sb.from('channels').insert({ org_id: currentProfile.org_id, name, icon, color, platform, sort_order: orgChannels.length });
+        if (ins.error && CBP.isMissingSchema(ins.error)) ins = await sb.from('channels').insert({ org_id: currentProfile.org_id, name, icon, color, sort_order: orgChannels.length }); // migration 017 not run yet
+        if (ins.error) throw ins.error;
         cbpTrack('owner_channel_created', { org_id: currentProfile.org_id });
         oclRefresh();
       }
@@ -4744,7 +4766,7 @@ function coResetSlipDrop() {
   if (!drop) return;
   drop.style.borderColor = 'var(--border)';
   drop.style.background = 'var(--bg)';
-  document.getElementById('coSlipDropLabel').innerHTML = '📦 Drag &amp; drop Whatnot packing slip PDF, or <span style="color:var(--primary);">browse</span>';
+  document.getElementById('coSlipDropLabel').innerHTML = '📦 Drag &amp; drop Whatnot or TikTok Shop packing slip PDF, or <span style="color:var(--primary);">browse</span>';
   document.getElementById('coSlipFile').value = '';
 }
 
@@ -4827,19 +4849,20 @@ function coShowSlipPreview(parsed, orgId, streamId, filename) {
   _coPreviewStreamId = streamId;
   _coPreviewStreamDate = parsed.streamDate || null;
   _coPreviewFilename = filename || null;
-  _coPreviewMeta = { parseSource: parsed._parseSource || null, fileSize: parsed._fileSize || null, pages: parsed._pages || parsed.totalPagesFound || null, warnings: (parsed._warnings || []).length };
+  _coPreviewMeta = { parseSource: parsed._parseSource || null, fileSize: parsed._fileSize || null, pages: parsed._pages || parsed.totalPagesFound || null, warnings: (parsed._warnings || []).length, platform: parsed.platform || 'whatnot' };
   var msg        = document.getElementById('slipPreviewMsg');
   var listEl     = document.getElementById('slipPreviewList');
   var dbg        = document.getElementById('slipRawDebug');
   var confirmBtn = document.getElementById('slipPreviewConfirmBtn');
 
+  var platformLabel = _coPreviewMeta && _coPreviewMeta.platform === 'tiktok' ? 'TikTok Shop' : 'Whatnot';
   if (!_coPreviewBuyers.length) {
-    msg.textContent = 'No buyers detected in this PDF. Make sure it\'s a Whatnot packing slip.';
+    msg.textContent = 'No buyers detected in this PDF. Make sure it\'s a Whatnot or TikTok Shop packing slip.';
     listEl.style.display = 'none';
     if (dbg) dbg.style.display = 'none';
     confirmBtn.style.display = 'none';
   } else {
-    msg.textContent = 'Found ' + _coPreviewBuyers.length + ' buyer' + (_coPreviewBuyers.length !== 1 ? 's' : '') +
+    msg.textContent = 'Detected ' + platformLabel + ' · Found ' + _coPreviewBuyers.length + ' buyer' + (_coPreviewBuyers.length !== 1 ? 's' : '') +
       (_coPreviewMeta && _coPreviewMeta.pages ? ' across ' + _coPreviewMeta.pages + ' pages' : '') +
       '. Review and confirm to save.' +
       (_coPreviewMeta && _coPreviewMeta.warnings ? ' ⚠ ' + _coPreviewMeta.warnings + ' slip(s) used the printed total because line items didn\'t add up.' : '');
@@ -4879,7 +4902,8 @@ function setupSlipPreviewModal() {
           rawFilename: _coPreviewFilename,
           mode: 'merge',
           parseSource: _coPreviewMeta ? _coPreviewMeta.parseSource : null,
-          fileSize: _coPreviewMeta ? _coPreviewMeta.fileSize : null
+          fileSize: _coPreviewMeta ? _coPreviewMeta.fileSize : null,
+          platform: _coPreviewMeta ? _coPreviewMeta.platform : 'whatnot'
         })
       });
       let result = null;
@@ -6232,7 +6256,7 @@ async function confirmEditStream() {
       let parsed;
       try { parsed = await SlipParser.parseSlipFile(_esSlipFile, { serverUrl: '/api/import-slip' }); }
       catch (pe) { throw new Error('Slip parse failed: ' + pe.message); }
-      if (!parsed.buyers || !parsed.buyers.length) throw new Error('Slip parsed 0 paying buyers — is this a Whatnot packing slip export? Nothing was imported.');
+      if (!parsed.buyers || !parsed.buyers.length) throw new Error('Slip parsed 0 paying buyers — is this a Whatnot or TikTok Shop packing slip export? Nothing was imported.');
       const replaceAll = !!(document.getElementById('esSlipReplace') && document.getElementById('esSlipReplace').checked);
       btn.textContent = 'Importing ' + parsed.buyers.length + ' buyers…';
       const importResp = await fetch('/api/process-import', {
@@ -6247,7 +6271,8 @@ async function confirmEditStream() {
           rawFilename: _esSlipFile.name,
           mode: replaceAll ? 'replace' : 'merge',
           parseSource: parsed._parseSource || null,
-          fileSize: parsed._fileSize || null
+          fileSize: parsed._fileSize || null,
+          platform: parsed.platform || 'whatnot'
         })
       });
       const importRes = await importResp.json().catch(() => ({}));
@@ -10359,10 +10384,12 @@ function setupLogHitModal() {
 
       var buyerId;
       if (!buyer) {
-        // New buyer — create placeholder; slip import fills spend at closeout
+        // New buyer — create placeholder; slip import fills spend at closeout.
+        // Tagged with tonight's account's platform so it matches the buyer the
+        // slip importer finds later instead of creating a duplicate.
         const { data: nb, error: insErr } = await sb.from('buyers').insert({
           organization_id: currentProfile.org_id,
-          platform: 'whatnot',
+          platform: streamPlatform(beCurrentStream),
           username: username.toLowerCase(),
           case_hits: 1,
           total_spent: 0,
