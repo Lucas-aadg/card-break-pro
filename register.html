@@ -238,6 +238,27 @@
     let referralValid = null; // null = unchecked, true = valid, false = invalid
     let referralCodeValue = '';
 
+    // Someone can land back here two ways without ever getting a subscription:
+    // (1) they closed/cancelled the Stripe tab (create-checkout's cancel_url),
+    // (2) they already have an account (maybe from a prior abandoned attempt)
+    // and are trying to register again. Either way, re-running signUp with an
+    // existing email fails outright — send them to log in and resume checkout
+    // from Billing instead of leaving them stuck on a form that can't work.
+    (async function handleReturningVisitor() {
+      const cancelled = new URLSearchParams(window.location.search).get('cancelled') === 'true';
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) {
+          if (cancelled) {
+            showError('Checkout was cancelled — no charge was made. Log in and click "Reactivate Subscription" on the Billing page whenever you\'re ready to continue.');
+          }
+          document.querySelector('.links').insertAdjacentHTML('afterbegin', '<p style="margin-bottom:0.75rem;"><a href="/login">You\'re already signed in — go to login →</a></p>');
+        } else if (cancelled) {
+          showError('Checkout was cancelled — no charge was made. If you already created your account, log in and click "Reactivate Subscription" on the Billing page to try again.');
+        }
+      } catch (e) { /* non-fatal — just skip the resume hint */ }
+    })();
+
     // ── Plan data — one plan, everything included ──
     const PLANS = {
       monthly: {
@@ -393,8 +414,21 @@
       try {
         // Step 1: Create Supabase auth user
         const { data: authData, error: authError } = await sb.auth.signUp({ email, password });
-        if (authError) { showError(escHtml(authError.message)); return; }
+        if (authError) {
+          if (/already registered|already exists|already in use/i.test(authError.message || '')) {
+            showError('An account with this email already exists. Log in and click "Reactivate Subscription" on the Billing page to finish setting up your plan.');
+            return;
+          }
+          showError(escHtml(authError.message)); return;
+        }
         if (!authData.user) { showError('Registration failed. Please try again.'); return; }
+        // Supabase signals "this email already has an account" by returning a
+        // user object with no identities (no error, by design, to avoid email
+        // enumeration) rather than an auth error. Same resume path.
+        if (Array.isArray(authData.user.identities) && authData.user.identities.length === 0) {
+          showError('An account with this email already exists. Log in and click "Reactivate Subscription" on the Billing page to finish setting up your plan.');
+          return;
+        }
         userId = authData.user.id;
 
         // Step 2: Create organization

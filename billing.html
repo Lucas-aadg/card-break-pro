@@ -216,7 +216,7 @@
         <button id="manageBtn" class="btn-full btn-primary" style="display:none;">Manage Subscription</button>
         <button id="switchToAnnualBtn" class="btn-full btn-annual" style="display:none;">Switch to Annual &amp; Save</button>
         <div id="planChangeNote" class="plan-change-note" style="display:none;"></div>
-        <a href="register.html" id="reactivateBtn" class="btn-full btn-reactivate" style="display:none;text-align:center;text-decoration:none;">Reactivate Subscription</a>
+        <button id="reactivateBtn" class="btn-full btn-reactivate" style="display:none;">Reactivate Subscription</button>
       </div>
 
       <div style="text-align:center;margin-top:1.5rem;">
@@ -322,7 +322,13 @@
         }
 
         const status = sub ? sub.status : 'inactive';
-        const tier   = sub ? (sub.tier || 'legacy') : 'legacy';
+        // 'legacy' ($250/mo) is the grandfathered price for pre-existing
+        // subscribers whose row predates the tier column (sub exists, tier is
+        // null). An org with NO subscription row at all has never been
+        // through checkout — new signups, or one where Stripe checkout was
+        // abandoned/never completed — and must show the real current price,
+        // not the legacy one. (This was showing $250 to brand-new signups.)
+        const tier   = sub ? (sub.tier || 'legacy') : 'standard';
         const cycle  = sub ? (sub.billing_cycle || 'monthly') : 'monthly';
         setStatus(status);
 
@@ -445,6 +451,37 @@
             }
           }
           reactivateBtn.style.display = 'block';
+          // Resume checkout for THIS existing account/org — never send an
+          // already-registered owner back through the signup form (that
+          // fails on "email already registered" and is how an abandoned or
+          // never-completed checkout turned into an unrecoverable dead end).
+          reactivateBtn.addEventListener('click', async function () {
+            reactivateBtn.disabled = true; reactivateBtn.textContent = 'Opening checkout…';
+            try {
+              const resp = await fetch('/api/create-checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: session.user.id,
+                  email: session.user.email,
+                  orgId: profile.org_id,
+                  tier: 'standard',
+                  billingCycle: 'monthly',
+                  returnTo: '/billing?checkout_cancelled=true'
+                })
+              });
+              const data = await resp.json();
+              if (!resp.ok || data.error) throw new Error(data.error || 'Checkout failed');
+              window.location.href = data.url;
+            } catch (err) {
+              showError('Could not open checkout: ' + err.message);
+              reactivateBtn.disabled = false; reactivateBtn.textContent = 'Reactivate Subscription';
+            }
+          });
+        }
+
+        if (params.get('checkout_cancelled') === 'true') {
+          showInfo('Checkout was cancelled — no charge was made. Click Reactivate Subscription whenever you\'re ready.');
         }
 
         loadingState.style.display   = 'none';

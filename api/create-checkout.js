@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   try {
-    const { userId, email, orgId, tier = 'standard', billingCycle = 'monthly', trialDaysOverride } = req.body;
+    const { userId, email, orgId, tier = 'standard', billingCycle = 'monthly', trialDaysOverride, returnTo } = req.body;
     if (!userId || !email || !orgId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -58,7 +58,13 @@ module.exports = async (req, res) => {
       metadata: { user_id: userId, org_id: orgId, tier, billing_cycle: billingCycle },
       subscription_data: { metadata: { tier, billing_cycle: billingCycle } },
       success_url: appUrl + '/dashboard?subscribed=true',
-      cancel_url:  appUrl + '/register?cancelled=true'
+      // Default stays /register?cancelled=true (new-signup flow). An already-
+      // registered owner resuming checkout from the Billing page passes
+      // returnTo so a cancel sends them back there, not into the signup form.
+      // Must be an on-site relative path (single leading slash, no scheme) —
+      // never pass it straight through, or a crafted value could be used to
+      // bounce someone off-site after they cancel Stripe checkout.
+      cancel_url: appUrl + (/^\/(?!\/)[\w\-./?=&]*$/.test(returnTo || '') ? returnTo : '/register?cancelled=true')
     };
 
     if (trialDays > 0) sessionParams.subscription_data.trial_period_days = trialDays;
