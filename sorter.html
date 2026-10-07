@@ -571,7 +571,7 @@ async function loadShifts() {
               (isToday ? ' <span style="background:var(--primary);color:#fff;font-size:0.6rem;font-weight:800;padding:2px 8px;border-radius:100px;vertical-align:middle;letter-spacing:0.5px;">TODAY</span>' : '') +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;gap:0.4rem 1rem;font-size:0.8rem;color:var(--muted);">' +
-              (sh.scheduled_time ? '<span>&#128336;&nbsp;' + sh.scheduled_time.slice(0,5) + '</span>' : '') +
+              (sh.scheduled_time ? '<span>&#128336;&nbsp;' + CBP.fmtTime(sh.scheduled_time) + '</span>' : '') +
               (sh.stream_key ? '<span>&#127909;&nbsp;' + escHtml(sh.stream_key) + '</span>' : '') +
               (sh.notes ? '<span>&#128203;&nbsp;' + escHtml(sh.notes) + '</span>' : '') +
             '</div>' +
@@ -618,8 +618,8 @@ async function loadShifts() {
         const statusColor = sh.status === 'completed' ? 'var(--green)' : sh.status === 'cancelled' ? 'var(--red)' : 'var(--muted)';
         const statusBg = sh.status === 'completed' ? 'rgba(52,199,89,0.1)' : sh.status === 'cancelled' ? 'rgba(255,59,48,0.1)' : 'rgba(120,120,160,0.1)';
         const statusBorder = sh.status === 'completed' ? 'rgba(52,199,89,0.25)' : sh.status === 'cancelled' ? 'rgba(255,59,48,0.25)' : 'var(--border)';
-        const cin = sh.clocked_in_at ? new Date(sh.clocked_in_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : null;
-        const cout = sh.clocked_out_at ? new Date(sh.clocked_out_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : null;
+        const cin = sh.clocked_in_at ? CBP.fmtTime(sh.clocked_in_at) : null;
+        const cout = sh.clocked_out_at ? CBP.fmtTime(sh.clocked_out_at) : null;
         const card = document.createElement('div');
         card.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:0.75rem 1.1rem;margin-bottom:0.5rem;background:rgba(255,255,255,0.01);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;opacity:0.8;';
         card.innerHTML =
@@ -671,7 +671,7 @@ async function checkTodayShift() {
     '<div>' +
       '<div style="font-weight:700;color:var(--primary);margin-bottom:0.2rem;">📅 You have a sorting shift today!</div>' +
       '<div style="font-size:0.82rem;color:var(--muted);">' +
-        (shift.scheduled_time ? 'Start time: ' + shift.scheduled_time.slice(0,5) : 'Check your schedule') +
+        (shift.scheduled_time ? 'Start time: ' + CBP.fmtTime(shift.scheduled_time) : 'Check your schedule') +
       '</div>' +
     '</div>' +
     '<button id="sorterClockInBtn" class="btn btn-green" style="padding:0.5rem 1.1rem;font-size:0.875rem;">⏱ Clock In</button>';
@@ -763,6 +763,7 @@ async function initAuth() {
     document.getElementById('sorterBadge').textContent = escHtml(profile.display_name);
 
     await CBP.loadOrgTz(sb, profile.org_id);
+    await CBP.loadOrgTimeFormat(sb, profile.org_id);
     await loadSortQueue();
     await checkTodayShift();
     loadNotifCount();
@@ -892,8 +893,8 @@ async function loadSorterPay() {
       tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
       tr.innerHTML =
         '<td style="padding:0.4rem 0.5rem;">' + escHtml(CBP.dateInTz(new Date(s.clocked_in_at))) + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_in_at).toLocaleTimeString('en-US', { timeZone: CBP.tz, hour: '2-digit', minute: '2-digit' }) + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_out_at).toLocaleTimeString('en-US', { timeZone: CBP.tz, hour: '2-digit', minute: '2-digit' }) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_in_at).toLocaleTimeString('en-US', { timeZone: CBP.tz, hour: '2-digit', minute: '2-digit', hour12: CBP.timeFormat !== '24h' }) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_out_at).toLocaleTimeString('en-US', { timeZone: CBP.tz, hour: '2-digit', minute: '2-digit', hour12: CBP.timeFormat !== '24h' }) + '</td>' +
         '<td style="padding:0.4rem 0.5rem;font-weight:700;">' + hrs.toFixed(2) + ' hrs</td>';
       tbody.appendChild(tr);
     });
@@ -976,7 +977,7 @@ function renderMyWeekGrid() {
         shifts.forEach(function(s){
           const cls=s.status==='completed'?'my-sched-chip msc-done':s.status==='in_progress'?'my-sched-chip msc-live':'my-sched-chip';
           html+='<div class="'+cls+'">';
-          if(s.scheduled_time) html+='<div style="color:var(--primary);font-size:0.72rem;font-weight:700;">'+s.scheduled_time.slice(0,5)+'</div>';
+          if(s.scheduled_time) html+='<div style="color:var(--primary);font-size:0.72rem;font-weight:700;">'+CBP.fmtTime(s.scheduled_time)+'</div>';
           if(s.stream_key) html+='<div style="color:var(--muted);font-size:0.67rem;">'+escHtml(s.stream_key)+'</div>';
           const statusTxt=s.status==='completed'?'<span style="color:var(--green);font-size:0.65rem;">&#10003; Done</span>':s.status==='in_progress'?'<span style="color:var(--yellow);font-size:0.65rem;">&#9679; Live</span>':'<span style="color:var(--muted);font-size:0.65rem;">Scheduled</span>';
           html+=statusTxt;

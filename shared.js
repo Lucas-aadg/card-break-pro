@@ -9,6 +9,7 @@
 
   const DEFAULT_TZ = 'America/New_York';
   let _tz = DEFAULT_TZ;
+  let _timeFormat = '12h';
 
   // ── timezone ────────────────────────────────────────────────────────────
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -194,6 +195,31 @@
     return _tz;
   }
 
+  // Load the org's time-format preference (12h/24h) once per page. Tolerates
+  // the column not existing yet (migrations/019) — defaults to 12h either way.
+  async function loadOrgTimeFormat(sb, orgId) {
+    try {
+      const { data, error } = await sb.from('organizations').select('time_format').eq('id', orgId).maybeSingle();
+      if (!error && data && data.time_format === '24h') _timeFormat = '24h';
+    } catch (e) {}
+    return _timeFormat;
+  }
+
+  // Formats either a full datetime (Date / ISO string) or a bare wall-clock
+  // time ('HH:MM' or 'HH:MM:SS', e.g. shifts.scheduled_time) per the org's
+  // time-format preference. One place so a 12h/24h toggle applies everywhere.
+  function fmtTime(value) {
+    if (!value) return '—';
+    let d;
+    if (value instanceof Date) d = value;
+    else {
+      const bare = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(value);
+      d = bare ? new Date(1970, 0, 1, parseInt(bare[1], 10), parseInt(bare[2], 10)) : new Date(value);
+    }
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: _timeFormat !== '24h' });
+  }
+
   const US_TIMEZONES = [
     ['America/New_York', 'Eastern'], ['America/Chicago', 'Central'], ['America/Denver', 'Mountain'], ['America/Phoenix', 'Arizona (no DST)'],
     ['America/Los_Angeles', 'Pacific'], ['America/Anchorage', 'Alaska'], ['Pacific/Honolulu', 'Hawaii'],
@@ -203,7 +229,8 @@
   global.CBP = {
     DEFAULT_TZ, US_TIMEZONES,
     get tz() { return _tz; }, setTz(tz) { if (tz) _tz = tz; },
-    loadOrgTz, partsIn, tzOffsetMinutes, dateInTz, todayIn, localMidnightISO, localTimeISO, dayEndISO, addDays,
+    get timeFormat() { return _timeFormat; }, setTimeFormat(f) { if (f === '12h' || f === '24h') _timeFormat = f; },
+    loadOrgTz, loadOrgTimeFormat, fmtTime, partsIn, tzOffsetMinutes, dateInTz, todayIn, localMidnightISO, localTimeISO, dayEndISO, addDays,
     periodBounds, hoursOverlap, sumHours, shiftHours, applyShiftWindow, salaryForRange,
     logDelta, logActionLabel, adjustStock,
     isDeactivated, enforceActive,

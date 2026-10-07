@@ -1729,6 +1729,9 @@ async function init() {
       document.getElementById('brkViewLink').style.display = '';
     }
 
+    await CBP.loadOrgTz(sb, profile.org_id);
+    await CBP.loadOrgTimeFormat(sb, profile.org_id);
+
     // Prefill settings
     document.getElementById('settDisplayName').value = profile.display_name || '';
     document.getElementById('settPhone').value = profile.phone || '';
@@ -1965,12 +1968,12 @@ function renderScheduleTable(shifts) {
     const statusBadge = s.status === 'completed' ? '<span class="badge badge-green">Completed</span>'
       : s.status === 'in_progress' ? '<span class="badge badge-yellow">In Progress</span>'
       : '<span class="badge badge-blue">Scheduled</span>';
-    const clockIn = s.clocked_in_at ? new Date(s.clocked_in_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
-    const clockOut = s.clocked_out_at ? new Date(s.clocked_out_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+    const clockIn = s.clocked_in_at ? CBP.fmtTime(s.clocked_in_at) : '—';
+    const clockOut = s.clocked_out_at ? CBP.fmtTime(s.clocked_out_at) : '—';
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td>' + escHtml(s.scheduled_date||'') + '</td>' +
-      '<td>' + (s.scheduled_time ? s.scheduled_time.slice(0,5) : '—') + '</td>' +
+      '<td>' + (s.scheduled_time ? CBP.fmtTime(s.scheduled_time) : '—') + '</td>' +
       '<td><strong>' + name + '</strong></td>' +
       '<td>' + escHtml(s.stream_key||'—') + '</td>' +
       '<td style="color:var(--muted);font-size:0.82rem;">' + escHtml(s.notes||'—') + '</td>' +
@@ -2157,7 +2160,7 @@ function calShowPopup(shiftId, anchorEl) {
   document.getElementById('calPopupName').textContent = (profile && profile.display_name) || '—';
   const lines = [];
   if (s.scheduled_date) lines.push('📅 ' + s.scheduled_date);
-  if (s.scheduled_time) lines.push('🕐 ' + s.scheduled_time.slice(0,5));
+  if (s.scheduled_time) lines.push('🕐 ' + CBP.fmtTime(s.scheduled_time));
   if (s.stream_key) lines.push('🔑 ' + escHtml(s.stream_key));
   if (s.notes) lines.push('📝 ' + escHtml(s.notes));
   lines.push(s.status === 'completed' ? '✅ Completed' : s.status === 'in_progress' ? '⏳ In Progress' : '📌 Scheduled');
@@ -2290,7 +2293,7 @@ function renderWeekGrid() {
   function makeChip(s) {
     const cls = s.status==='completed'?'sc sc-done':s.status==='in_progress'?'sc sc-live':'sc';
     const statusLine = s.status==='completed'?'<div class="sc-key" style="color:var(--green);">&#10003; Done</div>':s.status==='in_progress'?'<div class="sc-key" style="color:var(--yellow);">&#9679; Live</div>':'';
-    return '<div class="'+cls+'" draggable="true" data-sid="'+s.id+'" style="touch-action:none;">'+(s.scheduled_time?'<div class="sc-time">'+s.scheduled_time.slice(0,5)+'</div>':'')+(s.stream_key?'<div class="sc-key">'+escH(s.stream_key)+'</div>':'')+statusLine+'</div>';
+    return '<div class="'+cls+'" draggable="true" data-sid="'+s.id+'" style="touch-action:none;">'+(s.scheduled_time?'<div class="sc-time">'+CBP.fmtTime(s.scheduled_time)+'</div>':'')+(s.stream_key?'<div class="sc-key">'+escH(s.stream_key)+'</div>':'')+statusLine+'</div>';
   }
 
   function makeRow(p) {
@@ -2423,8 +2426,8 @@ async function loadClockLog() {
       '<td>' + name + '</td>' +
       '<td><span class="badge badge-gray">' + role + '</span></td>' +
       '<td>' + escHtml(s.stream_key||'—') + '</td>' +
-      '<td style="font-size:0.82rem;">' + (inT ? inT.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—') + '</td>' +
-      '<td style="font-size:0.82rem;">' + (outT ? outT.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—') + '</td>' +
+      '<td style="font-size:0.82rem;">' + (inT ? CBP.fmtTime(inT) : '—') + '</td>' +
+      '<td style="font-size:0.82rem;">' + (outT ? CBP.fmtTime(outT) : '—') + '</td>' +
       '<td>' + hrs + '</td>' +
       '<td>' + statusBadge + '</td>' +
       '<td><button class="btn-sm" data-editclockid="' + s.id + '" data-name="' + name + '" data-cin="' + (s.clocked_in_at||'') + '" data-cout="' + (s.clocked_out_at||'') + '" style="font-size:0.72rem;padding:0.2rem 0.55rem;">Edit</button></td>';
@@ -4276,7 +4279,7 @@ async function renderBpTouches(buyerId) {
   el.innerHTML = rows.map(function (t) {
     const who = t.user_id ? breakerNameById(t.user_id) : '—';
     const oc = t.outcome && TOUCH_OUTCOME_META[t.outcome];
-    const when = new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + new Date(t.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const when = new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + CBP.fmtTime(t.created_at);
     return '<div style="display:flex;gap:0.6rem;padding:0.5rem 0;border-bottom:1px solid var(--border);align-items:flex-start;">' +
       '<div style="font-size:0.78rem;white-space:nowrap;min-width:110px;">' + (TOUCH_CHANNEL_META[t.channel] || escHtml(t.channel || '')) + '</div>' +
       '<div style="flex:1;min-width:0;">' +

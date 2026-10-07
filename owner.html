@@ -3204,12 +3204,7 @@ function ld(date) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-function fmtTime(dateOrStr) {
-  if (!dateOrStr) return '—';
-  const d = dateOrStr instanceof Date ? dateOrStr : new Date(dateOrStr);
-  const use12h = localStorage.getItem('cbp_time_format') !== '24h';
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: use12h });
-}
+function fmtTime(dateOrStr) { return CBP.fmtTime(dateOrStr); }
 
 function fmt(n) {
   const v = parseFloat(n) || 0;
@@ -3646,7 +3641,7 @@ async function loadInsights() {
           '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:' + ins.color + ';margin-bottom:0.2rem;">' + ins.title + '</div>' +
           '<div style="font-size:0.82rem;color:var(--text);line-height:1.5;">' + ins.body + '</div>' +
         '</div></div>';
-    }).join('') + '<div style="font-size:0.68rem;color:var(--muted);text-align:right;margin-top:0.75rem;opacity:0.6;">Based on last 30 days · ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '</div>';
+    }).join('') + '<div style="font-size:0.68rem;color:var(--muted);text-align:right;margin-top:0.75rem;opacity:0.6;">Based on last 30 days · ' + fmtTime(new Date()) + '</div>';
 
   } catch(err) {
     el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">Could not load insights.</div>';
@@ -3808,6 +3803,7 @@ async function initAuth() {
 
     // Org timezone drives "today", pay periods and shift times everywhere
     await CBP.loadOrgTz(sb, profile.org_id);
+    await CBP.loadOrgTimeFormat(sb, profile.org_id);
 
     // PostHog: identify user with org/tier context
     const { data: orgInfo } = await sb.from('organizations').select('name').eq('id', profile.org_id).maybeSingle();
@@ -5306,7 +5302,7 @@ function invRenderReconciliation() {
     '<strong style="color:' + (drifted.length ? 'var(--red)' : 'var(--green)') + ';">' + drifted.length + ' off</strong>' +
     (drifted.length ? ' by ' + driftUnits + ' box' + (driftUnits !== 1 ? 'es' : '') + ' in total' : ' — every count matches its log') +
     (activeChannel ? ' · ' + escHtml(activeChannel.name) + ' only' : '') +
-    ' · <span style="color:var(--muted);">' + new Date().toLocaleTimeString() + '</span>';
+    ' · <span style="color:var(--muted);">' + fmtTime(new Date()) + '</span>';
   if (!shown.length) {
     table.style.display = 'none'; empty.style.display = '';
     empty.textContent = onlyDrift ? '✓ No drift — every product matches its log.' : 'No products to audit.';
@@ -8281,7 +8277,7 @@ function renderCalendar() {
       const chipColor = isDone ? 'rgba(34,197,94,0.2)' : isActive ? 'rgba(245,158,11,0.2)' : 'rgba(79,110,247,0.2)';
       const chipText = isDone ? 'var(--green)' : isActive ? 'var(--yellow)' : 'var(--primary)';
       chip.style.cssText = 'font-size:0.65rem;font-weight:600;border-radius:4px;padding:2px 4px;margin-bottom:2px;background:' + chipColor + ';color:' + chipText + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:opacity 0.15s;';
-      chip.textContent = (s.scheduled_time ? s.scheduled_time.slice(0,5) + ' ' : '') + (schedDisplayName(s) || '');
+      chip.textContent = (s.scheduled_time ? fmtTime(s.scheduled_time) + ' ' : '') + (schedDisplayName(s) || '');
       chip.title = (schedDisplayName(s) || '') + (s.stream_key ? ' — ' + s.stream_key : '');
       chip.addEventListener('click', function(e) { e.stopPropagation(); calShowPopup(s.id, chip); });
       chip.addEventListener('mouseenter', function() { chip.style.opacity = '0.75'; });
@@ -8304,7 +8300,7 @@ function calShowPopup(shiftId, anchorEl) {
   document.getElementById('calPopupName').textContent = schedDisplayName(s) || '—';
   const lines = [];
   if (s.scheduled_date) lines.push('📅 ' + s.scheduled_date);
-  if (s.scheduled_time) lines.push('🕐 ' + s.scheduled_time.slice(0,5));
+  if (s.scheduled_time) lines.push('🕐 ' + fmtTime(s.scheduled_time));
   if (s.stream_key) lines.push('🔑 ' + escHtml(s.stream_key));
   if (s.notes) lines.push('📝 ' + escHtml(s.notes));
   lines.push(s.status === 'completed' ? '✅ Completed' : s.status === 'in_progress' ? '⏳ In Progress' : '📌 Scheduled');
@@ -8430,7 +8426,7 @@ function renderWeekGrid() {
   function makeChip(s) {
     const cls = s.status==='completed'?'sc sc-done':s.status==='in_progress'?'sc sc-live':'sc';
     const statusLine = s.status==='completed'?'<div class="sc-key" style="color:var(--green);">✓ Done</div>':s.status==='in_progress'?'<div class="sc-key" style="color:var(--yellow);">● Live</div>':'';
-    return '<div class="'+cls+'" draggable="true" data-sid="'+s.id+'" style="touch-action:none;">'+(s.scheduled_time?'<div class="sc-time">'+s.scheduled_time.slice(0,5)+'</div>':'')+(s.stream_key?'<div class="sc-key">'+escHtml(s.stream_key)+'</div>':'')+statusLine+'</div>';
+    return '<div class="'+cls+'" draggable="true" data-sid="'+s.id+'" style="touch-action:none;">'+(s.scheduled_time?'<div class="sc-time">'+fmtTime(s.scheduled_time)+'</div>':'')+(s.stream_key?'<div class="sc-key">'+escHtml(s.stream_key)+'</div>':'')+statusLine+'</div>';
   }
 
   function makeRow(p) {
@@ -8568,7 +8564,7 @@ function renderSchedTable() {
     const clockOut = fmtTime(s.clocked_out_at);
     tr.innerHTML =
       '<td>' + s.scheduled_date + '</td>' +
-      '<td>' + (s.scheduled_time ? s.scheduled_time.slice(0,5) : '—') + '</td>' +
+      '<td>' + (s.scheduled_time ? fmtTime(s.scheduled_time) : '—') + '</td>' +
       '<td><strong>' + escHtml(schedDisplayName(s) || '—') + '</strong></td>' +
       '<td>' + escHtml(s.stream_key || '—') + '</td>' +
       '<td style="color:var(--muted);font-size:0.82rem;">' + escHtml(s.notes || '—') + '</td>' +
@@ -8983,21 +8979,24 @@ async function loadSettings() {
     });
 
     // Time format
-    document.getElementById('settTime12').addEventListener('click', function () {
-      localStorage.setItem('cbp_time_format', '12h');
-      updateTimeFormatBtns();
-      showGlobalSuccess('Time format set to 12h (AM/PM).');
-    });
-    document.getElementById('settTime24').addEventListener('click', function () {
-      localStorage.setItem('cbp_time_format', '24h');
-      updateTimeFormatBtns();
-      showGlobalSuccess('Time format set to 24h.');
-    });
+    document.getElementById('settTime12').addEventListener('click', function () { saveOrgTimeFormat('12h'); });
+    document.getElementById('settTime24').addEventListener('click', function () { saveOrgTimeFormat('24h'); });
   }
 }
 
+async function saveOrgTimeFormat(fmt) {
+  const { error } = await sb.from('organizations').update({ time_format: fmt }).eq('id', currentProfile.org_id);
+  if (error) {
+    showGlobalError(CBP.isMissingSchema(error) ? 'Run migrations/019_org_time_format.sql in Supabase first, then try again.' : 'Couldn\'t save: ' + error.message);
+    return;
+  }
+  CBP.setTimeFormat(fmt);
+  updateTimeFormatBtns();
+  showGlobalSuccess('Time format set to ' + (fmt === '24h' ? '24h' : '12h (AM/PM)') + ' for everyone in your organization.');
+}
+
 function updateTimeFormatBtns() {
-  const is24 = localStorage.getItem('cbp_time_format') === '24h';
+  const is24 = CBP.timeFormat === '24h';
   const btn12 = document.getElementById('settTime12');
   const btn24 = document.getElementById('settTime24');
   if (!btn12 || !btn24) return;
@@ -10797,7 +10796,7 @@ async function renderBpTouches(buyerId) {
   el.innerHTML = rows.map(function (t) {
     const who = t.user_id ? breakerNameById(t.user_id) : '—';
     const oc = t.outcome && TOUCH_OUTCOME_META[t.outcome];
-    const when = new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + new Date(t.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const when = new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + fmtTime(t.created_at);
     return '<div style="display:flex;gap:0.6rem;padding:0.5rem 0;border-bottom:1px solid var(--border);align-items:flex-start;">' +
       '<div style="font-size:0.78rem;white-space:nowrap;min-width:110px;">' + (TOUCH_CHANNEL_META[t.channel] || escHtml(t.channel || '')) + '</div>' +
       '<div style="flex:1;min-width:0;">' +

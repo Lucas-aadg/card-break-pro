@@ -1206,6 +1206,7 @@ async function initAuth() {
     }
 
     await CBP.loadOrgTz(sb, profile.org_id);
+    await CBP.loadOrgTimeFormat(sb, profile.org_id);
     await loadProducts();
     setupBreakerTabs();
     setupEventListeners();
@@ -2463,7 +2464,7 @@ function renderMyWeekGrid() {
         shifts.forEach(function(s){
           const cls=s.status==='completed'?'my-sched-chip msc-done':s.status==='in_progress'?'my-sched-chip msc-live':'my-sched-chip';
           html+='<div class="'+cls+'">';
-          if(s.scheduled_time) html+='<div style="color:var(--primary);font-size:0.72rem;font-weight:700;">'+s.scheduled_time.slice(0,5)+'</div>';
+          if(s.scheduled_time) html+='<div style="color:var(--primary);font-size:0.72rem;font-weight:700;">'+CBP.fmtTime(s.scheduled_time)+'</div>';
           if(s.stream_key) html+='<div style="color:var(--muted);font-size:0.67rem;">'+escHtml(s.stream_key)+'</div>';
           const statusTxt=s.status==='completed'?'<span style="color:var(--green);font-size:0.65rem;">&#10003; Done</span>':s.status==='in_progress'?'<span style="color:var(--yellow);font-size:0.65rem;">&#9679; Live</span>':'<span style="color:var(--muted);font-size:0.65rem;">Scheduled</span>';
           html+=statusTxt;
@@ -2576,7 +2577,7 @@ async function loadShifts() {
             (isToday ? ' <span style="background:var(--primary);color:#fff;font-size:0.6rem;font-weight:800;padding:2px 8px;border-radius:100px;vertical-align:middle;letter-spacing:0.5px;">TODAY</span>' : '') +
           '</div>' +
           '<div style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;font-size:0.8rem;color:var(--muted);">' +
-            (s.scheduled_time ? '<span>&#128336;&nbsp;' + s.scheduled_time.slice(0,5) + '</span>' : '') +
+            (s.scheduled_time ? '<span>&#128336;&nbsp;' + CBP.fmtTime(s.scheduled_time) + '</span>' : '') +
             (s.stream_key ? '<span>&#127909;&nbsp;' + escHtml(s.stream_key) + '</span>' : '') +
             (s.notes ? '<span>&#128203;&nbsp;' + escHtml(s.notes) + '</span>' : '') +
           '</div>' +
@@ -2601,7 +2602,7 @@ async function loadShifts() {
         '<div>' +
           '<div style="font-weight:600;font-size:0.9rem;color:var(--text);">' + formatShiftDate(s.scheduled_date) + '</div>' +
           '<div style="display:flex;flex-wrap:wrap;gap:0.4rem 0.75rem;font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">' +
-            (s.scheduled_time ? '<span>&#128336;&nbsp;' + s.scheduled_time.slice(0,5) + '</span>' : '') +
+            (s.scheduled_time ? '<span>&#128336;&nbsp;' + CBP.fmtTime(s.scheduled_time) + '</span>' : '') +
             (s.stream_key ? '<span>&#127909;&nbsp;' + escHtml(s.stream_key) + '</span>' : '') +
           '</div>' +
         '</div>' +
@@ -2665,7 +2666,7 @@ async function checkTodayShiftAndNotify() {
     '<div>' +
       '<div style="font-weight:700;color:var(--primary);margin-bottom:0.2rem;">&#128336; You have a shift today!</div>' +
       '<div style="font-size:0.83rem;color:var(--muted);">' +
-        (shift.scheduled_time ? 'Start time: ' + shift.scheduled_time.slice(0,5) + '&nbsp;&nbsp;' : '') +
+        (shift.scheduled_time ? 'Start time: ' + CBP.fmtTime(shift.scheduled_time) + '&nbsp;&nbsp;' : '') +
         (shift.stream_key ? '&#128273; ' + escHtml(shift.stream_key) + '&nbsp;&nbsp;' : '') +
         (shift.notes ? escHtml(shift.notes) : '') +
       '</div>' +
@@ -2832,8 +2833,8 @@ async function loadPayouts() {
       tr.style.borderBottom = '1px solid rgba(45,45,61,0.5)';
       tr.innerHTML =
         '<td style="padding:0.4rem 0.5rem;">' + s.scheduled_date + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_in_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + new Date(s.clocked_out_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + CBP.fmtTime(s.clocked_in_at) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + CBP.fmtTime(s.clocked_out_at) + '</td>' +
         '<td style="padding:0.4rem 0.5rem;">' + hrs.toFixed(2) + ' hrs</td>' +
         '<td style="padding:0.4rem 0.5rem;font-weight:700;color:var(--green);">' + fmt(pay) + '</td>';
       shiftTbody.appendChild(tr);
