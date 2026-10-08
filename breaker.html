@@ -2764,6 +2764,10 @@ async function loadPayouts() {
   // ── Commission component ───────────────────────────────
   if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') {
     const rate = (parseFloat(currentProfile.commission_rate) || 0) / 100;
+    // Period netting (owner-configured in Pay Settings): losses on one stream
+    // reduce commission from another in the same period — same math as the
+    // owner's Payroll tab, so this never disagrees with what they see there.
+    const periodTotal = ((currentProfile.category_rates || {}).__commission_method || currentProfile.commission_method || 'per_stream') === 'period_total';
     const streams = await CBP.pageAll(function () {
       return sb.from('streams')
         .select('id, stream_key, break_date, final_sales, total_product_cost, total_other_costs, commission_payout')
@@ -2785,8 +2789,13 @@ async function loadPayouts() {
       const other = parseFloat(s.total_other_costs) || 0;
       // final_sales already reflects platform fee deduction — no double-subtract
       const profit = sales - cost - other;
-      // The closeout snapshot is the ledger (rate at the time); fall back to a live calc for old rows
-      const commission = (s.commission_payout != null && s.commission_payout !== '') ? Math.max(0, parseFloat(s.commission_payout) || 0) : Math.max(0, profit) * rate;
+      // Period netting: no per-stream floor, no close-out snapshot — same
+      // raw-profit math as the owner's Payroll tab. Otherwise, the closeout
+      // snapshot is the ledger (rate at the time); fall back to a live calc
+      // for old rows, floored at $0 so one bad stream never takes from another.
+      const commission = periodTotal
+        ? profit * rate
+        : (s.commission_payout != null && s.commission_payout !== '') ? Math.max(0, parseFloat(s.commission_payout) || 0) : Math.max(0, profit) * rate;
       totalProfit += profit;
       totalCommission += commission;
       const tr = document.createElement('tr');
@@ -2797,14 +2806,14 @@ async function loadPayouts() {
         '<td style="padding:0.4rem 0.5rem;">' + fmt(sales) + '</td>' +
         '<td style="padding:0.4rem 0.5rem;">' + fmt(cost) + '</td>' +
         '<td style="padding:0.4rem 0.5rem;color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(profit) + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:var(--green);">' + fmt(commission) + '</td>';
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:' + (commission >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(commission) + '</td>';
       tbody.appendChild(tr);
     });
     if (!streams.length) tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);font-style:italic;padding:0.75rem 0.5rem;">No closed streams this period.</td></tr>';
     document.getElementById('payoutStreamSection').style.display = '';
 
     statsHTML.push('<div class="stat-card"><div class="stat-label">Net Profit (My Streams)</div><div class="stat-value">' + fmt(totalProfit) + '</div></div>');
-    statsHTML.push('<div class="stat-card"><div class="stat-label">Commission (' + (parseFloat(currentProfile.commission_rate)||0) + '%)</div><div class="stat-value green">' + fmt(totalCommission) + '</div></div>');
+    statsHTML.push('<div class="stat-card"><div class="stat-label">Commission (' + (parseFloat(currentProfile.commission_rate)||0) + '%)</div><div class="stat-value ' + (totalCommission >= 0 ? 'green' : 'red') + '">' + fmt(totalCommission) + '</div></div>');
     grandTotal += totalCommission;
   }
 
@@ -2865,6 +2874,7 @@ async function loadPayouts() {
 
   document.getElementById('payoutStatsRow').innerHTML = statsHTML.join('');
   document.getElementById('payoutTotal').textContent = fmt(grandTotal);
+  document.getElementById('payoutTotal').style.color = grandTotal >= 0 ? 'var(--green)' : 'var(--red)';
   document.getElementById('payoutTotalLabel').textContent = 'Total Earnings This Period';
 }
 

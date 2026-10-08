@@ -840,12 +840,24 @@ async function buildMemberEarnings(member, period) {
       csv += csvRow('Stream Date','Gross Revenue (USD)','Box Cost (USD)','Other Costs (USD)','Net Profit Base (USD)','Commission Rate','Commission Earned (USD)','Basis');
 
       const rate = (parseFloat(member.commission_rate)||0)/100;
+      // Period netting (Team → Pay Settings): losses on one stream reduce
+      // commission from another in the same period, same math as Payroll —
+      // no per-stream floor and no close-out snapshot, since the snapshot
+      // was locked under whichever method was active when that stream closed.
+      const periodTotal = ((member.category_rates || {}).__commission_method || member.commission_method || 'per_stream') === 'period_total';
       let tBase=0, tComm=0;
 
       streams.forEach(function(s) {
         const rev = parseFloat(s.final_sales)||0;
         const cogs = parseFloat(s.total_product_cost)||0;
         const other = parseFloat(s.total_other_costs)||0;
+        if (periodTotal) {
+          const rawProfit = rev - cogs - other;
+          const comm = rawProfit * rate;
+          tBase += rawProfit; tComm += comm;
+          csv += csvRow(s.break_date, n2(rev), n2(cogs), n2(other), n2(rawProfit), (parseFloat(member.commission_rate)||0)+'%', n2(comm), 'period netting');
+          return;
+        }
         const profit = Math.max(0, rev - cogs - other);
         // The amount locked at close-out is what Payroll pays; older streams
         // without a snapshot are computed at the member's current rate.

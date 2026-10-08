@@ -7669,11 +7669,13 @@ async function calcBreakerPay(p, fromTs, toTs, result) {
     const streamList = await CBP.pageAll(function () { return commStreamsQ; });
     let commission;
     if (periodTotal) {
-      // Sum all streams first, then floor at $0 — losses can reduce gains
+      // Sum all streams first — losses CAN reduce gains (that's the point of
+      // this setting), so commission is allowed to go negative here. It's
+      // only floored at $0 where it's turned into an actual amount to pay out.
       const totalSales = streamList.reduce(function (s, x) { return s + (parseFloat(x.final_sales) || 0); }, 0);
       const totalCosts = streamList.reduce(function (s, x) { return s + (parseFloat(x.total_product_cost) || 0) + (parseFloat(x.total_other_costs) || 0); }, 0);
       const netProfit = totalSales - totalCosts;
-      commission = Math.max(0, netProfit) * rate;
+      commission = netProfit * rate;
       parts.push(streamList.length + ' streams · sales ' + fmt(totalSales) + ' − costs ' + fmt(totalCosts) + ' = profit ' + fmt(netProfit) + ' × ' + (parseFloat(p.commission_rate) || 0) + '% = ' + fmt(commission));
     } else {
       // Per-stream: the closeout snapshot per stream (rate at the time), floored at $0 each —
@@ -7836,13 +7838,17 @@ function renderPayrollResults() {
       };
       const tips = r.tips || 0;
       const paid = r.paid || 0;
-      const owed = Math.max(0, r.total - paid);
+      // The true net for the period — can be negative under period netting.
+      // Nothing is actually clawed back; "owed" (floored at $0) is what's
+      // summed into the totals below and what Mark as Paid will disburse.
+      const net = r.total - paid;
+      const payColor = net < 0 ? 'var(--red)' : (notSet && !tips ? 'var(--muted)' : 'var(--text)');
       tr.innerHTML =
         '<td><strong>' + escHtml(r.name) + '</strong></td>' +
         '<td><span class="badge ' + (r.role === 'breaker' || r.role === 'breaker/manager' ? 'badge-green' : 'badge-gray') + '">' + r.role + '</span></td>' +
         '<td style="font-size:0.82rem;">' + escHtml(typeLabels[r.pay_type] || (notSet ? 'Not set' : r.pay_type)) + '</td>' +
         '<td style="font-size:0.8rem;color:var(--muted);">' + escHtml(r.breakdown || '—') + (paid ? '<div style="font-size:0.72rem;color:var(--yellow);margin-top:2px;">already paid ' + fmt(paid) + ' in an overlapping run</div>' : '') + '</td>' +
-        '<td style="text-align:right;font-weight:800;color:' + (notSet && !tips ? 'var(--muted)' : 'var(--text)') + ';">' + (notSet && !tips ? '—' : fmt(owed)) + (paid ? '<div style="font-size:0.7rem;color:var(--muted);font-weight:500;">of ' + fmt(r.total) + '</div>' : '') + '</td>';
+        '<td style="text-align:right;font-weight:800;color:' + payColor + ';">' + (notSet && !tips ? '—' : fmt(net)) + (paid ? '<div style="font-size:0.7rem;color:var(--muted);font-weight:500;">of ' + fmt(r.total) + '</div>' : '') + (net < 0 ? '<div style="font-size:0.7rem;color:var(--red);font-weight:500;">losses exceeded earnings — $0 due, not carried forward</div>' : '') + '</td>';
       tbody.appendChild(tr);
     });
   }
