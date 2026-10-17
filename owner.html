@@ -1427,6 +1427,9 @@
       <div class="panel-header">
         <div class="panel-title">All Streams</div>
         <div style="display:flex;gap:0.5rem;align-items:center;">
+          <select id="ssBreakerFilter" style="padding:0.4rem 0.75rem;font-size:0.82rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);outline:none;">
+            <option value="all">All Breakers</option>
+          </select>
           <button class="btn btn-outline btn-sm" id="ssRefreshBtn" style="padding:0.3rem 0.7rem;font-size:0.75rem;">Refresh</button>
           <button onclick="printTable('Stream Summary', 'Card Break Pro — Stream Summary — ' + new Date().toLocaleDateString(), 'ssTable')" title="Print / Save as PDF" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:0.3rem 0.5rem;font-size:0.9rem;line-height:1;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--primary)';" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button>
         </div>
@@ -5859,8 +5862,11 @@ function exportHistoryCsv() {
 // ══════════════════════════════════════════════════════════
 //  STREAM SUMMARY TAB
 // ══════════════════════════════════════════════════════════
+let ssCurrentStreams = [];
+
 function setupStreamSummary() {
   document.getElementById('ssRefreshBtn').addEventListener('click', loadStreamSummary);
+  document.getElementById('ssBreakerFilter').addEventListener('change', renderStreamSummaryTable);
   document.getElementById('editStreamModal').addEventListener('click', function (e) {
     if (e.target === this) closeEditStream();
   });
@@ -5881,13 +5887,40 @@ async function loadStreamSummary() {
       return ssQ;
     });
 
-    tbody.innerHTML = '';
-    if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="11">No streams recorded yet.</td></tr>';
-      return;
-    }
+    ssCurrentStreams = data || [];
 
-    data.forEach(function (s) {
+    // Breaker filter options — every breaker who has ever shown up on a
+    // stream here, including deactivated ones, since this is a historical
+    // report, not an assignment picker. Keep the currently selected value.
+    const sel = document.getElementById('ssBreakerFilter');
+    const prevVal = sel.value;
+    const breakerIds = [...new Set(ssCurrentStreams.map(function (s) { return s.breaker_id; }).filter(Boolean))];
+    const breakerOpts = breakerIds
+      .map(function (id) { return { id: id, name: getProfileName(id) }; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name); });
+    sel.innerHTML = '<option value="all">All Breakers</option>' +
+      breakerOpts.map(function (b) { return '<option value="' + b.id + '">' + escHtml(b.name) + '</option>'; }).join('');
+    if (breakerIds.includes(prevVal)) sel.value = prevVal;
+
+    renderStreamSummaryTable();
+  } catch (err) {
+    showGlobalError('Failed to load streams: ' + escHtml(err.message));
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Error loading data.</td></tr>';
+  }
+}
+
+function renderStreamSummaryTable() {
+  const tbody = document.getElementById('ssTableBody');
+  const breakerFilter = document.getElementById('ssBreakerFilter').value;
+  const data = breakerFilter === 'all' ? ssCurrentStreams : ssCurrentStreams.filter(function (s) { return s.breaker_id === breakerFilter; });
+
+  tbody.innerHTML = '';
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">' + (breakerFilter === 'all' ? 'No streams recorded yet.' : 'No streams for this breaker yet.') + '</td></tr>';
+    return;
+  }
+
+  data.forEach(function (s) {
       const tr = document.createElement('tr');
       const profit = parseFloat(s.net_profit);
       const profitDisplay = isNaN(profit) ? '—' : '<span style="color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + fmt(profit) + '</span>';
@@ -5908,10 +5941,6 @@ async function loadStreamSummary() {
         '</td>';
       tbody.appendChild(tr);
     });
-  } catch (err) {
-    showGlobalError('Failed to load streams: ' + escHtml(err.message));
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Error loading data.</td></tr>';
-  }
 }
 
 // ── Edit Stream State ─────────────────────────────────────────────────────
