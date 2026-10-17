@@ -2724,6 +2724,39 @@
   </div>
 </div>
 
+<!-- PAYROLL DETAIL MODAL — click a Payroll row to see every stream/shift behind the number -->
+<div class="modal-overlay" id="payrollDetailModal">
+  <div class="modal" style="max-width:820px;width:100%;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem;">
+      <div>
+        <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--primary);margin-bottom:0.35rem;">Payroll Detail</div>
+        <h2 style="margin:0;font-size:1.3rem;font-weight:900;letter-spacing:-0.4px;" id="pdTitle">—</h2>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;" id="pdSubtitle"></div>
+      </div>
+      <button onclick="document.getElementById('payrollDetailModal').classList.remove('active')" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>
+    </div>
+    <div id="pdStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.5rem;"></div>
+    <div id="pdBody"></div>
+  </div>
+</div>
+
+<!-- TEAM PROFILE MODAL — lifetime stats for one team member -->
+<div class="modal-overlay" id="teamProfileModal">
+  <div class="modal" style="max-width:720px;width:100%;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem;">
+      <div>
+        <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--primary);margin-bottom:0.35rem;">Team Profile</div>
+        <h2 style="margin:0;font-size:1.3rem;font-weight:900;letter-spacing:-0.4px;" id="tpTitle">—</h2>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;" id="tpSubtitle"></div>
+      </div>
+      <button onclick="document.getElementById('teamProfileModal').classList.remove('active')" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>
+    </div>
+    <div id="tpStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.25rem;"></div>
+    <div id="tpHighlights" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1.5rem;"></div>
+    <div id="tpBody"></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════════
      SETUP WIZARD
 ═══════════════════════════════════════════ -->
@@ -6975,6 +7008,7 @@ async function loadTeam() {
       '<td><div style="display:flex;flex-wrap:wrap;gap:0.15rem;align-items:center;">' + chipsHtml + (!isOwner && !isInactive ? ' <button class="btn btn-outline btn-sm" data-action="assign" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.15rem 0.5rem;font-size:0.7rem;margin-left:0.25rem;">Assign</button>' : '') + '</div></td>' +
       '<td>' + fmtDate(p.created_at) + '</td>' +
       '<td><div class="btn-row">' +
+        (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="profile" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Profile</button>' : '') +
         (isInactive
           ? '<button class="btn btn-outline btn-sm" data-action="restore" data-id="' + p.id + '" data-name="' + escHtml(p.display_name) + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Restore</button>'
           : (!isOwner ? '<button class="btn btn-outline btn-sm" data-action="pay" data-id="' + p.id + '" style="padding:0.25rem 0.6rem;font-size:0.75rem;">Pay Settings</button>' : '') +
@@ -6989,6 +7023,13 @@ async function loadTeam() {
     btn.addEventListener('click', function () {
       const p = allProfiles.find(function (x) { return x.id === btn.dataset.id; });
       if (p) openPaySettings(p);
+    });
+  });
+
+  tbody.querySelectorAll('[data-action="profile"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const p = allProfiles.find(function (x) { return x.id === btn.dataset.id; });
+      if (p) openTeamProfile(p);
     });
   });
 
@@ -7267,6 +7308,178 @@ async function loadCategoryRateInputs(existingRates, bodyId) {
   } catch (e) {
     body.innerHTML = '<span style="color:var(--red);font-size:0.82rem;">Failed to load categories.</span>';
   }
+}
+
+// ── Team Profile ─────────────────────────────────────────
+// Lifetime stats for one team member. Breakers see streams/breaks/buyers;
+// sorters see hours/tasks; plain managers get tenure only — there's no
+// manager-specific performance data anywhere in the schema to show.
+const WEEKDAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function weekdayOf(dateStr) { return new Date(dateStr + 'T12:00:00Z').getUTCDay(); }
+
+function humanizeTenure(createdAt) {
+  if (!createdAt) return '—';
+  const days = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000));
+  if (days < 1) return 'Joined today';
+  if (days < 30) return days + ' day' + (days === 1 ? '' : 's');
+  const months = Math.floor(days / 30.4375);
+  if (months < 12) return months + ' month' + (months === 1 ? '' : 's');
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  return years + ' year' + (years === 1 ? '' : 's') + (remMonths ? ', ' + remMonths + ' mo' : '');
+}
+
+function tpStatCard(label, value, color) {
+  return '<div class="panel" style="margin:0;padding:0.85rem 1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.3rem;">' + label + '</div><div style="font-size:1.25rem;font-weight:800;color:' + (color || 'var(--text)') + ';">' + value + '</div></div>';
+}
+
+async function openTeamProfile(profile) {
+  const modal = document.getElementById('teamProfileModal');
+  document.getElementById('tpTitle').textContent = profile.display_name;
+  document.getElementById('tpSubtitle').textContent = (profile.role === 'breaker/manager' ? 'Breaker/Manager' : profile.role.charAt(0).toUpperCase() + profile.role.slice(1)) + ' · Member for ' + humanizeTenure(profile.created_at) + ' (since ' + fmtDate(profile.created_at) + ')';
+  document.getElementById('tpStats').innerHTML = '<div class="panel" style="margin:0;padding:0.85rem 1rem;grid-column:1/-1;color:var(--muted);">Loading…</div>';
+  document.getElementById('tpHighlights').innerHTML = '';
+  document.getElementById('tpBody').innerHTML = '';
+  modal.classList.add('active');
+
+  try {
+    if (profile.role === 'breaker' || profile.role === 'breaker/manager') {
+      await renderBreakerProfile(profile);
+    } else if (profile.role === 'sorter') {
+      await renderSorterProfile(profile);
+    } else {
+      document.getElementById('tpStats').innerHTML = tpStatCard('Role', 'Manager', 'var(--text)');
+      document.getElementById('tpBody').innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">No performance metrics to show for managers yet — they don\'t run streams or clock sortable hours.</div>';
+    }
+  } catch (err) {
+    document.getElementById('tpBody').innerHTML = '<div style="color:var(--red);font-size:0.85rem;">Failed to load profile: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+async function renderBreakerProfile(profile) {
+  const streams = await CBP.pageAll(function () {
+    return sb.from('streams')
+      .select('id, break_date, final_sales, total_product_cost, total_other_costs, net_profit')
+      .eq('org_id', currentProfile.org_id).eq('breaker_id', profile.id).eq('status', 'closed');
+  });
+
+  const { count: breakCount } = await sb.from('breaks').select('id', { count: 'exact', head: true })
+    .eq('org_id', currentProfile.org_id).eq('breaker_id', profile.id);
+
+  const totalRevenue = streams.reduce(function (s, x) { return s + (parseFloat(x.final_sales) || 0); }, 0);
+  const totalProfit = streams.reduce(function (s, x) { return s + (parseFloat(x.net_profit) != null && x.net_profit !== '' ? parseFloat(x.net_profit) : (parseFloat(x.final_sales) || 0) - (parseFloat(x.total_product_cost) || 0) - (parseFloat(x.total_other_costs) || 0)); }, 0);
+  const margin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
+
+  document.getElementById('tpStats').innerHTML =
+    tpStatCard('Streams Run', streams.length) +
+    tpStatCard('Breaks Run', breakCount || 0) +
+    tpStatCard('Lifetime Revenue', fmt(totalRevenue), 'var(--primary)') +
+    tpStatCard('Lifetime Profit', fmt(totalProfit), totalProfit >= 0 ? 'var(--green)' : 'var(--red)') +
+    tpStatCard('Margin', margin.toFixed(1) + '%', margin >= 0 ? 'var(--green)' : 'var(--red)') +
+    tpStatCard('Avg Profit / Stream', streams.length ? fmt(totalProfit / streams.length) : '—');
+
+  // Best day of the week — by average net profit per stream run that weekday
+  const byDay = {};
+  streams.forEach(function (s) {
+    if (!s.break_date) return;
+    const d = weekdayOf(s.break_date);
+    const profit = parseFloat(s.net_profit) != null && s.net_profit !== '' ? parseFloat(s.net_profit) : (parseFloat(s.final_sales) || 0) - (parseFloat(s.total_product_cost) || 0) - (parseFloat(s.total_other_costs) || 0);
+    if (!byDay[d]) byDay[d] = { count: 0, total: 0 };
+    byDay[d].count++; byDay[d].total += profit;
+  });
+  let bestDay = null;
+  Object.keys(byDay).forEach(function (d) {
+    const avg = byDay[d].total / byDay[d].count;
+    if (!bestDay || avg > bestDay.avg) bestDay = { day: +d, avg: avg, count: byDay[d].count };
+  });
+
+  // Average new buyers per stream — a buyer counts as "new" for a stream if
+  // their very first purchase anywhere was on that stream's day. Averaged
+  // over every closed stream they ran, including ones with zero buyers logged.
+  let avgNewBuyers = null;
+  if (streams.length) {
+    const streamIds = streams.map(function (s) { return s.id; });
+    const streamById = {}; streams.forEach(function (s) { streamById[s.id] = s; });
+    const purchases = await inChunks(function (ids) {
+      return sb.from('buyer_purchases').select('buyer_id, stream_id').in('stream_id', ids).eq('organization_id', currentProfile.org_id);
+    }, streamIds);
+    const buyerIds = [...new Set(purchases.map(function (p) { return p.buyer_id; }).filter(Boolean))];
+    let firstSeenById = {};
+    if (buyerIds.length) {
+      const buyers = await inChunks(function (ids) {
+        return sb.from('buyers').select('id, first_seen_date').in('id', ids);
+      }, buyerIds);
+      buyers.forEach(function (b) { firstSeenById[b.id] = b.first_seen_date; });
+    }
+    let newBuyerTotal = 0;
+    const seenPerStream = {}; // dedupe a buyer who shows up twice in the same stream's purchases
+    purchases.forEach(function (p) {
+      const stream = streamById[p.stream_id];
+      if (!stream || !p.buyer_id) return;
+      const key = p.stream_id + ':' + p.buyer_id;
+      if (seenPerStream[key]) return;
+      seenPerStream[key] = true;
+      if (firstSeenById[p.buyer_id] === stream.break_date) newBuyerTotal++;
+    });
+    avgNewBuyers = newBuyerTotal / streams.length;
+  }
+
+  document.getElementById('tpHighlights').innerHTML =
+    '<div class="panel" style="margin:0;padding:1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.4rem;">Best Day of the Week</div>' +
+      (bestDay ? '<div style="font-size:1.1rem;font-weight:800;">' + WEEKDAY_NAMES[bestDay.day] + 's</div><div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">avg profit ' + fmt(bestDay.avg) + ' across ' + bestDay.count + ' stream' + (bestDay.count === 1 ? '' : 's') + '</div>' : '<div style="color:var(--muted);font-size:0.85rem;">Not enough stream history yet.</div>') +
+    '</div>' +
+    '<div class="panel" style="margin:0;padding:1rem;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.4rem;">Avg New Buyers / Stream</div>' +
+      (avgNewBuyers != null ? '<div style="font-size:1.1rem;font-weight:800;">' + avgNewBuyers.toFixed(1) + '</div><div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">a buyer\'s first-ever purchase landing on one of their streams</div>' : '<div style="color:var(--muted);font-size:0.85rem;">No streams yet.</div>') +
+    '</div>';
+
+  document.getElementById('tpBody').innerHTML = '';
+}
+
+async function renderSorterProfile(profile) {
+  const shifts = await CBP.pageAll(function () {
+    return sb.from('schedules')
+      .select('scheduled_date, clocked_in_at, clocked_out_at')
+      .eq('org_id', currentProfile.org_id).eq('sorter_id', profile.id).eq('status', 'completed')
+      .not('clocked_in_at', 'is', null).not('clocked_out_at', 'is', null);
+  });
+  const { count: tasksDone } = await sb.from('sort_tasks').select('id', { count: 'exact', head: true })
+    .eq('org_id', currentProfile.org_id).eq('sorter_id', profile.id).eq('status', 'completed');
+  const { data: taskStreams } = await sb.from('sort_tasks').select('stream_id')
+    .eq('org_id', currentProfile.org_id).eq('sorter_id', profile.id).eq('status', 'completed').not('stream_id', 'is', null);
+
+  const totalHours = shifts.reduce(function (s, x) { return s + CBP.shiftHours(x); }, 0);
+
+  document.getElementById('tpStats').innerHTML =
+    tpStatCard('Shifts Worked', shifts.length) +
+    tpStatCard('Tasks Completed', tasksDone || 0) +
+    tpStatCard('Streams Sorted', new Set((taskStreams || []).map(function (t) { return t.stream_id; })).size) +
+    tpStatCard('Total Hours', totalHours.toFixed(1) + 'h', 'var(--primary)') +
+    tpStatCard('Avg Hours / Shift', shifts.length ? (totalHours / shifts.length).toFixed(1) + 'h' : '—') +
+    tpStatCard('Avg Tasks / Shift', shifts.length ? ((tasksDone || 0) / shifts.length).toFixed(1) : '—');
+
+  // Most productive day of the week — sort_tasks has no shift link, so hours
+  // clocked (grouped by the shift's scheduled day) is the cleanest signal
+  // the schema supports; tasks-per-weekday would need to guess which shift
+  // a task belongs to.
+  const byDay = {};
+  shifts.forEach(function (s) {
+    if (!s.scheduled_date) return;
+    const d = weekdayOf(s.scheduled_date);
+    if (!byDay[d]) byDay[d] = { count: 0, total: 0 };
+    byDay[d].count++; byDay[d].total += CBP.shiftHours(s);
+  });
+  let bestDay = null;
+  Object.keys(byDay).forEach(function (d) {
+    const avg = byDay[d].total / byDay[d].count;
+    if (!bestDay || avg > bestDay.avg) bestDay = { day: +d, avg: avg, count: byDay[d].count };
+  });
+
+  document.getElementById('tpHighlights').innerHTML =
+    '<div class="panel" style="margin:0;padding:1rem;grid-column:1/-1;"><div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.4rem;">Most Active Day of the Week</div>' +
+      (bestDay ? '<div style="font-size:1.1rem;font-weight:800;">' + WEEKDAY_NAMES[bestDay.day] + 's</div><div style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">avg ' + bestDay.avg.toFixed(1) + 'h clocked across ' + bestDay.count + ' shift' + (bestDay.count === 1 ? '' : 's') + '</div>' : '<div style="color:var(--muted);font-size:0.85rem;">Not enough shift history yet.</div>') +
+    '</div>';
+
+  document.getElementById('tpBody').innerHTML = '';
 }
 
 async function openPaySettings(profile) {
@@ -7830,6 +8043,9 @@ function renderPayrollResults() {
   } else {
     filtered.forEach(function (r) {
       const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.title = 'Click to see every stream/shift behind this number';
+      tr.addEventListener('click', function () { openPayrollDetail(r); });
       const notSet = !r.pay_type || r.pay_type === 'not_set';
       const typeLabels = {
         commission:'Commission', hourly:'Hourly', salary:'Salary',
@@ -7875,6 +8091,192 @@ function renderPayrollResults() {
   document.getElementById('prResultsWrap').style.display = '';
   document.getElementById('prEmptyState').style.display = 'none';
   document.getElementById('prSummaryStrip').style.display = 'grid';
+}
+
+// ── Payroll Detail (click a row) ─────────────────────────
+// Everything behind one person's number for the period currently selected
+// in Payroll — same queries and same period-netting rules as calcBreakerPay/
+// calcSorterPay, just kept per-row instead of summed, so this can never
+// disagree with the total shown in the results table.
+function pdSectionHtml(title, headers, rowsHtml, customHtml) {
+  const inner = customHtml != null ? customHtml :
+    '<div style="overflow-x:auto;"><table style="width:100%;font-size:0.82rem;border-collapse:collapse;"><thead><tr>' +
+      headers.map(function (h) { return '<th style="text-align:left;color:var(--muted);font-weight:600;padding:0.4rem 0.5rem;border-bottom:1px solid var(--border);">' + h + '</th>'; }).join('') +
+    '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+  return '<div class="panel" style="margin:0 0 1rem;padding:1rem;"><div class="panel-title" style="margin-bottom:0.6rem;">' + escHtml(title) + '</div>' + inner + '</div>';
+}
+
+async function pdBuildStreamSection(profile) {
+  const rate = (parseFloat(profile.commission_rate) || 0) / 100;
+  const periodTotal = ((profile.category_rates || {}).__commission_method || profile.commission_method || 'per_stream') === 'period_total';
+  let q = sb.from('streams')
+    .select('id, stream_key, break_date, final_sales, total_product_cost, total_other_costs, commission_payout')
+    .eq('breaker_id', profile.id).eq('org_id', currentProfile.org_id).eq('status', 'closed')
+    .gte('break_date', prCurrentRange.from).lte('break_date', prCurrentRange.to);
+  if (activeChannel) q = q.eq('channel_id', activeChannel.id);
+  const streams = await CBP.pageAll(function () { return q; });
+
+  let rows = '', totalComm = 0;
+  if (!streams.length) {
+    rows = '<tr><td colspan="6" style="color:var(--muted);font-style:italic;padding:0.6rem 0.5rem;">No closed streams this period.</td></tr>';
+  } else {
+    streams.forEach(function (s) {
+      const rev = parseFloat(s.final_sales) || 0, cogs = parseFloat(s.total_product_cost) || 0, other = parseFloat(s.total_other_costs) || 0;
+      const profit = rev - cogs - other;
+      // Period netting: no per-stream floor. Summing profit × rate per row is
+      // mathematically identical to netting the whole period at once, so this
+      // always agrees with the Total Earned figure above.
+      const comm = periodTotal ? profit * rate : streamCommission(s, rate);
+      totalComm += comm;
+      rows += '<tr>' +
+        '<td style="padding:0.4rem 0.5rem;">' + escHtml(s.stream_key || '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + s.break_date + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + fmt(rev) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + fmt(cogs + other) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:' + (profit >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(profit) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;color:' + (comm >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(comm) + '</td>' +
+      '</tr>';
+    });
+    rows += '<tr style="border-top:2px solid var(--border);"><td colspan="5" style="padding:0.5rem 0.5rem;font-weight:700;text-align:right;">Subtotal</td><td style="padding:0.5rem 0.5rem;font-weight:800;color:' + (totalComm >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmt(totalComm) + '</td></tr>';
+  }
+  return pdSectionHtml('Commission — ' + streams.length + ' stream' + (streams.length === 1 ? '' : 's') + (periodTotal ? ' · period netting on' : '') + ' · ' + (parseFloat(profile.commission_rate) || 0) + '%',
+    ['Stream', 'Date', 'Revenue', 'Costs', 'Profit', 'Commission'], rows);
+}
+
+async function pdBuildPerBreakSection(profile) {
+  const categoryRates = Object.assign({}, profile.category_rates || {});
+  delete categoryRates.__commission_method;
+  const hasCategoryRates = Object.keys(categoryRates).length > 0;
+  const defaultRate = parseFloat(profile.per_break_rate) || 0;
+
+  let q = sb.from('streams').select('id, stream_key, break_date')
+    .eq('breaker_id', profile.id).eq('org_id', currentProfile.org_id).eq('status', 'closed')
+    .gte('break_date', prCurrentRange.from).lte('break_date', prCurrentRange.to);
+  if (activeChannel) q = q.eq('channel_id', activeChannel.id);
+  const streams = await CBP.pageAll(function () { return q; });
+  const streamIds = streams.map(function (s) { return s.id; });
+
+  const catByStream = {};
+  if (hasCategoryRates && streamIds.length) {
+    const bks = await inChunks(function (ids) {
+      return sb.from('breaks').select('stream_id, products_used').in('stream_id', ids).not('products_used', 'is', null).order('break_number', { ascending: true });
+    }, streamIds);
+    const productIds = [];
+    bks.forEach(function (b) { (b.products_used || []).forEach(function (pu) { if (pu.product_id) productIds.push(pu.product_id); }); });
+    const prodCatMap = {};
+    if (productIds.length) {
+      const prods = await inChunks(function (ids) { return sb.from('products').select('id, category').in('id', ids); }, [...new Set(productIds)]);
+      prods.forEach(function (prod) { prodCatMap[prod.id] = prod.category; });
+    }
+    const perStream = {};
+    bks.forEach(function (b) {
+      const cat = breakCategory(b, prodCatMap);
+      if (!cat) return;
+      const t = perStream[b.stream_id] = perStream[b.stream_id] || {};
+      t[cat] = (t[cat] || 0) + 1;
+    });
+    streamIds.forEach(function (sid) {
+      let best = '__default__', bestN = 0;
+      Object.keys(perStream[sid] || {}).forEach(function (c) { if (perStream[sid][c] > bestN) { best = c; bestN = perStream[sid][c]; } });
+      if (best !== '__default__' && categoryRates[best] == null) best = '__default__';
+      catByStream[sid] = best;
+    });
+  }
+
+  let rows = '', totalEarned = 0;
+  if (!streams.length) {
+    rows = '<tr><td colspan="5" style="color:var(--muted);font-style:italic;padding:0.6rem 0.5rem;">No closed streams this period.</td></tr>';
+  } else {
+    streams.forEach(function (s) {
+      const cat = catByStream[s.id] || '__default__';
+      const rate = cat !== '__default__' ? parseFloat(categoryRates[cat]) : defaultRate;
+      totalEarned += rate;
+      rows += '<tr>' +
+        '<td style="padding:0.4rem 0.5rem;">' + escHtml(s.stream_key || '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + s.break_date + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + (cat === '__default__' ? 'uncategorized' : escHtml(cat)) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">$' + rate.toFixed(2) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;">' + fmt(rate) + '</td>' +
+      '</tr>';
+    });
+    rows += '<tr style="border-top:2px solid var(--border);"><td colspan="4" style="padding:0.5rem 0.5rem;font-weight:700;text-align:right;">Subtotal</td><td style="padding:0.5rem 0.5rem;font-weight:800;">' + fmt(totalEarned) + '</td></tr>';
+  }
+  return pdSectionHtml('Per Break — ' + streams.length + ' stream' + (streams.length === 1 ? '' : 's') + ' (1 break run per stream)',
+    ['Stream', 'Date', 'Category', 'Rate', 'Earned'], rows);
+}
+
+async function pdBuildShiftSection(profile, idField, label) {
+  // Same basis as calcHours: status 'completed', plus the active-channel
+  // filter if one is set — otherwise this can disagree with Total Earned.
+  let q = sb.from('schedules')
+    .select('scheduled_date, clocked_in_at, clocked_out_at')
+    .eq('org_id', currentProfile.org_id).eq(idField, profile.id).eq('status', 'completed')
+    .not('clocked_in_at', 'is', null).not('clocked_out_at', 'is', null);
+  if (activeChannel) q = q.eq('channel_id', activeChannel.id);
+  q = CBP.applyShiftWindow(q, prCurrentRange.fromISO, prCurrentRange.toISO);
+  const shifts = await CBP.pageAll(function () { return q; });
+  const rate = parseFloat(profile.hourly_rate) || 0;
+  let rows = '', totalHours = 0, totalEarned = 0;
+  if (!shifts.length) {
+    rows = '<tr><td colspan="5" style="color:var(--muted);font-style:italic;padding:0.6rem 0.5rem;">No clocked shifts this period.</td></tr>';
+  } else {
+    shifts.forEach(function (sh) {
+      const hrs = CBP.hoursOverlap(sh, prCurrentRange.fromISO, prCurrentRange.toISO);
+      const earned = hrs * rate;
+      totalHours += hrs; totalEarned += earned;
+      rows += '<tr>' +
+        '<td style="padding:0.4rem 0.5rem;color:var(--muted);">' + (sh.scheduled_date || CBP.dateInTz(new Date(sh.clocked_in_at))) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + CBP.fmtTime(sh.clocked_in_at) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + CBP.fmtTime(sh.clocked_out_at) + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;">' + hrs.toFixed(2) + 'h</td>' +
+        '<td style="padding:0.4rem 0.5rem;font-weight:700;">' + fmt(earned) + '</td>' +
+      '</tr>';
+    });
+    rows += '<tr style="border-top:2px solid var(--border);"><td colspan="3" style="padding:0.5rem 0.5rem;font-weight:700;text-align:right;">Subtotal</td><td style="padding:0.5rem 0.5rem;font-weight:700;">' + totalHours.toFixed(2) + 'h</td><td style="padding:0.5rem 0.5rem;font-weight:800;">' + fmt(totalEarned) + '</td></tr>';
+  }
+  return pdSectionHtml((label || 'Hourly') + ' — ' + shifts.length + ' shift' + (shifts.length === 1 ? '' : 's') + ' · $' + rate.toFixed(2) + '/hr',
+    ['Date', 'Clock In', 'Clock Out', 'Hours', 'Earned'], rows);
+}
+
+function pdBuildSalarySection(profile) {
+  const amount = parseFloat(profile.salary_amount) || 0;
+  const sal = CBP.salaryForRange(amount, profile.salary_period || 'weekly', prCurrentRange.from, prCurrentRange.to);
+  return pdSectionHtml('Salary', null, null,
+    '<div style="font-size:0.88rem;">' + fmt(amount) + ' / ' + (profile.salary_period || 'weekly') + ' × ' + sal.days + ' day' + (sal.days === 1 ? '' : 's') + ' in this period = <strong>' + fmt(sal.total) + '</strong></div>');
+}
+
+async function openPayrollDetail(r) {
+  const modal = document.getElementById('payrollDetailModal');
+  const profile = allProfiles.find(function (x) { return x.id === r.profile_id; }) || {};
+  document.getElementById('pdTitle').textContent = r.name;
+  document.getElementById('pdSubtitle').textContent = prCurrentRange.label + (activeChannel ? ' · ' + activeChannel.name : '');
+  const paid = r.paid || 0;
+  const net = r.total - paid;
+  document.getElementById('pdStats').innerHTML =
+    tpStatCard('Total Earned', fmt(r.total)) +
+    tpStatCard('Already Paid', fmt(paid)) +
+    tpStatCard('Currently Owed', fmt(net), net >= 0 ? 'var(--green)' : 'var(--red)');
+  document.getElementById('pdBody').innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:1rem 0;">Loading…</div>';
+  modal.classList.add('active');
+
+  try {
+    const type = r.pay_type;
+    const sections = [];
+
+    if (r.role === 'breaker' || r.role === 'breaker/manager') {
+      if (type === 'commission' || type === 'hourly_commission' || type === 'salary_commission') sections.push(await pdBuildStreamSection(profile));
+      if (type === 'per_break') sections.push(await pdBuildPerBreakSection(profile));
+      if (type === 'hourly' || type === 'hourly_commission') sections.push(await pdBuildShiftSection(profile, 'breaker_id', 'Hourly'));
+      if (type === 'salary' || type === 'salary_commission') sections.push(pdBuildSalarySection(profile));
+      if (r.tips) sections.push(pdSectionHtml('Tips', null, null, '<div style="font-size:0.88rem;">Reported tips this period: <strong>' + fmt(r.tips) + '</strong></div>'));
+    } else if (r.role === 'sorter') {
+      sections.push(await pdBuildShiftSection(profile, 'sorter_id', 'Hourly'));
+    }
+
+    document.getElementById('pdBody').innerHTML = sections.join('') || '<div style="color:var(--muted);font-size:0.85rem;">No pay type configured for this person — set it in Team → Pay Settings.</div>';
+  } catch (err) {
+    document.getElementById('pdBody').innerHTML = '<div style="color:var(--red);font-size:0.85rem;">Failed to load detail: ' + escHtml(err.message) + '</div>';
+  }
 }
 
 async function loadPayrollHistory() {
