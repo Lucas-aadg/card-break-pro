@@ -1989,6 +1989,24 @@
           <button class="sort-filter-btn" data-filter="completed" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Completed</button>
         </div>
       </div>
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;padding:0.85rem 1.1rem;border-bottom:1px solid var(--border);">
+        <div>
+          <label for="sortFilterFrom" style="display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.25rem;">From</label>
+          <input type="date" id="sortFilterFrom" style="padding:0.4rem 0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem;" />
+        </div>
+        <div>
+          <label for="sortFilterTo" style="display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.25rem;">To</label>
+          <input type="date" id="sortFilterTo" style="padding:0.4rem 0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem;" />
+        </div>
+        <div>
+          <label for="sortFilterSorter" style="display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.25rem;">Sorter</label>
+          <select id="sortFilterSorter" style="padding:0.4rem 0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem;min-width:11rem;">
+            <option value="">All sorters</option>
+          </select>
+        </div>
+        <button class="btn btn-outline btn-sm" id="sortFilterClear" style="padding:0.4rem 0.9rem;">Clear</button>
+      </div>
+      <div id="sortSummary" style="display:none;padding:0.85rem 1.1rem;border-bottom:1px solid var(--border);"></div>
       <div class="tbl-wrap">
         <table class="data-table" id="sortingTable">
           <thead>
@@ -9216,7 +9234,37 @@ async function loadSorting() {
       if (sorters) sorters.forEach(s => { sorterMap[s.id] = s.display_name; });
     }
 
-    const filtered = sortingFilter === 'all' ? allTasks : allTasks.filter(t => t.status === sortingFilter);
+    // Sorter dropdown: every sorter on the team, keeping the current pick
+    const sorterSel = document.getElementById('sortFilterSorter');
+    const pickedSorter = sorterSel.value;
+    sorterSel.innerHTML = '<option value="">All sorters</option>';
+    activeTeam().filter(function (p) { return p.role === 'sorter'; }).forEach(function (p) {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.display_name;
+      sorterSel.appendChild(opt);
+    });
+    sorterSel.value = pickedSorter;
+
+    const fromD = document.getElementById('sortFilterFrom').value;
+    const toD = document.getElementById('sortFilterTo').value;
+    const localDay = function (iso) {
+      const d = new Date(iso);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+    const filtered = allTasks.filter(function (t) {
+      if (sortingFilter !== 'all' && t.status !== sortingFilter) return false;
+      if (pickedSorter && t.sorter_id !== pickedSorter) return false;
+      if (fromD || toD) {
+        // Date = the day it was sorted; tasks not done yet fall back to when they were queued
+        const day = localDay(t.completed_at || t.created_at);
+        if (fromD && day < fromD) return false;
+        if (toD && day > toD) return false;
+      }
+      return true;
+    });
+
+    renderSortSummary(filtered, pickedSorter, fromD, toD, sorterSel);
 
     tbody.innerHTML = '';
     if (!filtered.length) {
@@ -9252,6 +9300,57 @@ async function loadSorting() {
     });
   } catch (err) {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Failed to load sort tasks.</td></tr>';
+    console.error(err);
+  }
+}
+
+// "23 Football breaks · 5 Disney breaks" for the completed tasks in the current filter.
+// Each break is counted under its own majority product category (same rule payroll uses).
+let _sortSummarySeq = 0;
+async function renderSortSummary(tasks, sorterId, fromD, toD, sorterSel) {
+  const box = document.getElementById('sortSummary');
+  const seq = ++_sortSummarySeq;
+  const filtering = !!(sorterId || fromD || toD);
+  const done = tasks.filter(function (t) { return t.status === 'completed' && t.stream_id; });
+  if (!filtering && !done.length) { box.style.display = 'none'; return; }
+
+  const who = sorterId ? sorterSel.options[sorterSel.selectedIndex].textContent : 'All sorters';
+  const when = (fromD || toD) ? ((fromD || 'start') + ' → ' + (toD || 'today')) : 'All time';
+  box.style.display = '';
+  box.innerHTML = '<span style="color:var(--muted);font-size:0.85rem;">Counting…</span>';
+
+  try {
+    const streamIds = [...new Set(done.map(function (t) { return t.stream_id; }))];
+    const bks = streamIds.length ? await inChunks(function (ids) {
+      return sb.from('breaks').select('id, stream_id, products_used').in('stream_id', ids);
+    }, streamIds) : [];
+    const productIds = [];
+    bks.forEach(function (b) { (b.products_used || []).forEach(function (pu) { if (pu.product_id) productIds.push(pu.product_id); }); });
+    const prodCatMap = {};
+    if (productIds.length) {
+      const prods = await inChunks(function (ids) { return sb.from('products').select('id, category').in('id', ids); }, [...new Set(productIds)]);
+      prods.forEach(function (p) { prodCatMap[p.id] = p.category; });
+    }
+    if (seq !== _sortSummarySeq) return; // a newer filter change superseded this one
+
+    const tally = {};
+    bks.forEach(function (b) {
+      const cat = breakCategory(b, prodCatMap) || 'Uncategorized';
+      tally[cat] = (tally[cat] || 0) + 1;
+    });
+    const total = bks.length;
+    const chips = Object.keys(tally).sort(function (a, b) { return tally[b] - tally[a]; }).map(function (c) {
+      return '<span class="badge badge-blue" style="font-size:0.85rem;padding:0.3rem 0.7rem;">' + tally[c] + ' ' + escHtml(c) + ' break' + (tally[c] === 1 ? '' : 's') + '</span>';
+    }).join(' ');
+
+    box.innerHTML =
+      '<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:0.4rem;">Sorted — ' + escHtml(who) + ' · ' + escHtml(when) + '</div>' +
+      (total
+        ? '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;"><span style="font-size:1.4rem;font-weight:900;margin-right:0.4rem;">' + total + ' break' + (total === 1 ? '' : 's') + '</span>' + chips + '<span style="color:var(--muted);font-size:0.8rem;">across ' + done.length + ' stream' + (done.length === 1 ? '' : 's') + '</span></div>'
+        : '<div style="color:var(--muted);font-size:0.9rem;">Nothing sorted in this selection.</div>');
+  } catch (err) {
+    if (seq !== _sortSummarySeq) return;
+    box.innerHTML = '<span style="color:var(--red);font-size:0.85rem;">Couldn\'t load the sorted summary.</span>';
     console.error(err);
   }
 }
@@ -9332,6 +9431,15 @@ function setupSortingFilters() {
       sortingFilter = btn.dataset.filter;
       loadSorting();
     });
+  });
+  ['sortFilterFrom', 'sortFilterTo', 'sortFilterSorter'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', loadSorting);
+  });
+  document.getElementById('sortFilterClear').addEventListener('click', function () {
+    document.getElementById('sortFilterFrom').value = '';
+    document.getElementById('sortFilterTo').value = '';
+    document.getElementById('sortFilterSorter').value = '';
+    loadSorting();
   });
 }
 
