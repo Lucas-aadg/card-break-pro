@@ -1898,6 +1898,15 @@ async function handleSubmitBreak() {
   const productsUsed = getProductsUsed();
   const totalUnitsUsed = getTotalUnitsUsed();
 
+  // A break with no products logs $0 box cost and never deducts stock — the owner
+  // then has to rebuild it by hand in Stream Summary. Block it at the source.
+  if (!productsUsed.length) {
+    showError(products.length
+      ? 'Select the products you opened for this break before submitting.'
+      : 'No products available. Ask your owner to add products in Inventory before submitting breaks.');
+    return;
+  }
+
   const submitBtn = document.getElementById('submitBreakBtn');
   submitBtn.disabled = true;
   submitBtn.textContent = 'Submitting…';

@@ -6122,8 +6122,14 @@ function esQtyChanged(input, idx) {
   esUpdateTotals();
 }
 
+// Scoped to the edit modal — the break-entry product table also uses data-idx and
+// comes first in the DOM, so an unscoped lookup grabbed that instead of this card.
+function esCardEl(idx) {
+  return document.querySelector('#esBreakList .es-break-card[data-idx="' + idx + '"]');
+}
+
 function esUpdateBreakCost(idx) {
-  const card = document.querySelector('[data-idx="' + idx + '"]');
+  const card = esCardEl(idx);
   if (!card) return;
   let total = 0;
   card.querySelectorAll('.es-qty-inp').forEach(function(inp) {
@@ -6141,7 +6147,7 @@ function esGetBreaksFromUI() {
   const result = [];
   _esEditBreaks.forEach(function(brk, idx) {
     if (brk._deleted) return;
-    const card = document.querySelector('[data-idx="' + idx + '"]');
+    const card = esCardEl(idx);
     const productsUsed = [];
     if (card) {
       card.querySelectorAll('.es-qty-inp').forEach(function(inp) {
