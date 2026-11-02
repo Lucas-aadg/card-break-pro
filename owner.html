@@ -2703,6 +2703,7 @@
 
     <!-- Footer -->
     <div class="es-modal-ft">
+      <div id="esError" class="error-box" style="flex-basis:100%;margin-bottom:0.5rem;"></div>
       <div class="es-ft-totals" id="esFtTotals"></div>
       <div class="es-modal-actions">
         <button class="btn btn-outline" onclick="closeEditStream()">Cancel</button>
@@ -5971,6 +5972,7 @@ var _esHasSlip = false;
 
 function closeEditStream() {
   document.getElementById('editStreamModal').classList.remove('active');
+  var esErrClr = document.getElementById('esError'); if (esErrClr) esErrClr.style.display = 'none';
   _esStreamId = null; _esStreamData = null;
   _esOrigBreaks = []; _esEditBreaks = [];
   _esSlipFile = null; _esHasSlip = false;
@@ -6217,7 +6219,13 @@ async function confirmEditStream() {
   const finalSales = parseFloat(document.getElementById('esFinalSales').value) || 0;
   const notes = document.getElementById('esNotes').value.trim();
 
-  if (!finalSales) { showGlobalError('Please enter Final Sales amount.'); return; }
+  // The page-level error banner sits behind this modal's overlay, so errors
+  // here have to render inside the modal or the save just looks dead.
+  const esErrEl = document.getElementById('esError');
+  function esShowError(msg) { esErrEl.textContent = msg; esErrEl.style.display = 'block'; }
+  esErrEl.style.display = 'none';
+
+  if (!finalSales) { esShowError('Please enter Final Sales amount.'); return; }
 
   const btn = document.getElementById('esSaveBtn');
   btn.disabled = true;
@@ -6366,7 +6374,7 @@ async function confirmEditStream() {
     showGlobalSuccess('Stream updated successfully.');
     await loadStreamSummary();
   } catch (err) {
-    showGlobalError('Failed to update stream: ' + escHtml(err.message));
+    esShowError('Failed to update stream: ' + err.message);
   } finally {
     btn.disabled = false;
     btn.textContent = 'Save Changes';
@@ -6393,7 +6401,7 @@ async function deleteStream(streamId, streamKey) {
     }
   } catch (err) {
     hideLoading();
-    showGlobalError('Failed to delete stream: ' + escHtml(err.message));
+    showGlobalError('Failed to delete stream: ' + err.message);
   }
 }
 

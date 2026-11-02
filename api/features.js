@@ -1356,7 +1356,10 @@ async function streamHandler(req, res, sb, action) {
       // 3. Delete all dependent records then the stream. Check every delete —
       // a swallowed failure leaves orphaned rows or a stream whose buyer totals
       // were already reversed, and the user was told it deleted cleanly.
+      // Tips are payroll money owed to the breaker — keep them, just detach from
+      // the stream (tips_stream_id_fkey has no ON DELETE rule and blocked deletes).
       const delSteps = [
+        ['tips',            sb.from('tips').update({ stream_id: null }).eq('stream_id', streamId).eq('org_id', profile.org_id)],
         ['buyer_purchases', sb.from('buyer_purchases').delete().eq('stream_id', streamId).eq('organization_id', profile.org_id)],
         ['sorter_splits',   sb.from('sorter_splits').delete().eq('stream_id', streamId)],
         ['stream_slip_imports', sb.from('stream_slip_imports').delete().eq('stream_id', streamId)],
