@@ -1378,6 +1378,23 @@ async function streamHandler(req, res, sb, action) {
       return fail(res, 500, e.message);
     }
   }
+  // Remove a sort task from the queue (stream + breaks are kept). Done server-side:
+  // the client delete was RLS-gated to is_owner() and silently matched 0 rows for
+  // managers, and the page never checked the result, so the trash button did nothing.
+  if (action === 'delete-sort-task' && req.method === 'DELETE') {
+    const { err, profile } = await authenticate(req, sb);
+    if (err) return fail(res, err.status, err.msg);
+    if (!['owner', 'manager'].includes(profile.role)) return fail(res, 403, 'Owner or manager only');
+
+    const taskId = req.query.taskId;
+    if (!taskId || !/^[0-9a-f-]{36}$/.test(taskId)) return fail(res, 400, 'Invalid taskId');
+
+    const { data, error } = await sb.from('sort_tasks').delete()
+      .eq('id', taskId).eq('org_id', profile.org_id).select('id');
+    if (error) return fail(res, 500, error.message);
+    if (!data || !data.length) return fail(res, 404, 'Sort task not found');
+    return res.status(200).json({ ok: true });
+  }
   return fail(res, 400, 'Unknown stream action: ' + action);
 }
 

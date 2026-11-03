@@ -9373,12 +9373,19 @@ async function deleteSortTask(taskId, streamKey) {
   if (!confirm('Remove sort task for "' + streamKey + '" from the queue?\n\nThis only removes the sort task — the stream and breaks are kept.')) return;
   showLoading('Removing…');
   try {
-    await sb.from('sort_tasks').delete().eq('id', taskId);
+    const token = await ownerAuthToken();
+    const resp = await fetch('/api/features?feature=stream&action=delete-sort-task&taskId=' + encodeURIComponent(taskId), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await resp.json().catch(function () { return {}; });
+    if (!resp.ok) throw new Error(data.error || 'Delete failed (' + resp.status + ')');
     hideLoading();
+    showGlobalSuccess('Sort task removed.');
     await loadSorting();
   } catch (err) {
     hideLoading();
-    showGlobalError('Failed to remove sort task: ' + escHtml(err.message));
+    showGlobalError('Failed to remove sort task: ' + err.message);
   }
 }
 
