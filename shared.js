@@ -220,6 +220,33 @@
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: _timeFormat !== '24h' });
   }
 
+  // Sort task lifecycle: sort (status) then ship (ship_status, migrations/020).
+  // One place so the owner/manager Sorting tabs label + filter it the same way.
+  function sortStage(task) {
+    if (task.status === 'pending') return 'needs_sort';
+    if (task.status === 'in_progress') return 'sorting';
+    if (task.ship_status === 'in_progress') return 'shipping';
+    if (task.ship_status === 'shipped') return 'shipped';
+    return 'ready_to_ship';
+  }
+  const SORT_STAGE_BADGE = {
+    needs_sort:    '<span class="badge badge-gray">Needs Sorting</span>',
+    sorting:       '<span class="badge badge-yellow">Sorting</span>',
+    ready_to_ship: '<span class="badge badge-blue">Ready to Ship</span>',
+    shipping:      '<span class="badge badge-yellow">Shipping</span>',
+    shipped:       '<span class="badge badge-green">Shipped</span>'
+  };
+  // Filter pills: all | pending (needs sorting) | in_progress (sorting or
+  // shipping) | to_ship (sorted, waiting on a shipper) | completed (shipped)
+  function sortFilterMatch(task, filter) {
+    const st = sortStage(task);
+    if (filter === 'pending') return st === 'needs_sort';
+    if (filter === 'in_progress') return st === 'sorting' || st === 'shipping';
+    if (filter === 'to_ship') return st === 'ready_to_ship';
+    if (filter === 'completed') return st === 'shipped';
+    return true;
+  }
+
   const US_TIMEZONES = [
     ['America/New_York', 'Eastern'], ['America/Chicago', 'Central'], ['America/Denver', 'Mountain'], ['America/Phoenix', 'Arizona (no DST)'],
     ['America/Los_Angeles', 'Pacific'], ['America/Anchorage', 'Alaska'], ['Pacific/Honolulu', 'Hawaii'],
@@ -234,6 +261,7 @@
     periodBounds, hoursOverlap, sumHours, shiftHours, applyShiftWindow, salaryForRange,
     logDelta, logActionLabel, adjustStock,
     isDeactivated, enforceActive,
-    pageAll, isMissingSchema, captureError
+    pageAll, isMissingSchema, captureError,
+    sortStage, SORT_STAGE_BADGE, sortFilterMatch
   };
 })(typeof window !== 'undefined' ? window : module.exports);

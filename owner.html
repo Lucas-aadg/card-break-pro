@@ -1984,9 +1984,10 @@
         <div class="panel-title">Sort Queue</div>
         <div style="display:flex;gap:0.5rem;">
           <button class="sort-filter-btn active" data-filter="all" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;">All</button>
-          <button class="sort-filter-btn" data-filter="pending" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Pending</button>
+          <button class="sort-filter-btn" data-filter="pending" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Needs Sorting</button>
           <button class="sort-filter-btn" data-filter="in_progress" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">In Progress</button>
-          <button class="sort-filter-btn" data-filter="completed" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Completed</button>
+          <button class="sort-filter-btn" data-filter="to_ship" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Ready to Ship</button>
+          <button class="sort-filter-btn" data-filter="completed" style="padding:0.3rem 0.8rem;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;">Shipped</button>
         </div>
       </div>
       <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;padding:0.85rem 1.1rem;border-bottom:1px solid var(--border);">
@@ -2015,8 +2016,8 @@
               <th>Break Date</th>
               <th>Breaks</th>
               <th>Status</th>
-              <th>Assigned To</th>
-              <th>Completed At</th>
+              <th>Sorted By</th>
+              <th>Shipped By</th>
               <th></th>
             </tr>
           </thead>
@@ -2571,7 +2572,7 @@
 <!-- Complete Sort Task Modal -->
 <div class="modal-overlay" id="completeSortModal">
   <div class="modal" style="max-width:380px;">
-    <h2>Mark Sort as Complete</h2>
+    <h2>Mark as Sorted</h2>
     <input type="hidden" id="completeSortTaskId">
     <div style="margin-bottom:1.25rem;">
       <p style="color:var(--muted);font-size:0.88rem;margin-bottom:1rem;">Stream: <strong id="completeSortStreamKey" style="color:var(--text);"></strong></p>
@@ -2581,6 +2582,7 @@
           <option value="">— Select sorter —</option>
         </select>
       </div>
+      <div id="completeSortError" class="error-box" style="margin:0.75rem 0 0;"></div>
     </div>
     <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
       <button class="btn btn-outline" onclick="document.getElementById('completeSortModal').classList.remove('active')">Cancel</button>
@@ -9214,7 +9216,7 @@ async function loadSorting() {
     // Step 1: load sort tasks (scoped to active channel via chunked stream_ids)
     const sortTasksQ = function (ids) {
       let q = sb.from('sort_tasks')
-        .select('id, status, sorter_id, completed_at, created_at, stream_id')
+        .select('id, status, sorter_id, completed_at, created_at, stream_id, ship_status, shipper_id, shipped_at')
         .eq('org_id', currentProfile.org_id)
         .order('created_at', { ascending: true });
       return ids ? q.in('stream_id', ids) : q;
@@ -9241,7 +9243,7 @@ async function loadSorting() {
     }
 
     // Step 3: load sorter display names
-    const sorterIds = [...new Set(allTasks.filter(t => t.sorter_id).map(t => t.sorter_id))];
+    const sorterIds = [...new Set(allTasks.flatMap(t => [t.sorter_id, t.shipper_id]).filter(Boolean))];
     let sorterMap = {};
     if (sorterIds.length > 0) {
       const { data: sorters } = await sb.from('profiles').select('id, display_name').in('id', sorterIds);
@@ -9267,8 +9269,8 @@ async function loadSorting() {
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     };
     const filtered = allTasks.filter(function (t) {
-      if (sortingFilter !== 'all' && t.status !== sortingFilter) return false;
-      if (pickedSorter && t.sorter_id !== pickedSorter) return false;
+      if (!CBP.sortFilterMatch(t, sortingFilter)) return false;
+      if (pickedSorter && t.sorter_id !== pickedSorter && t.shipper_id !== pickedSorter) return false;
       if (fromD || toD) {
         // Date = the day it was sorted; tasks not done yet fall back to when they were queued
         const day = localDay(t.completed_at || t.created_at);
@@ -9289,26 +9291,29 @@ async function loadSorting() {
     filtered.forEach(function (task) {
       const s = streamMap[task.stream_id] || {};
       const tr = document.createElement('tr');
-      const statusBadge = task.status === 'completed'
-        ? '<span class="badge badge-green">Completed</span>'
-        : task.status === 'in_progress'
-        ? '<span class="badge badge-yellow">In Progress</span>'
-        : '<span class="badge badge-gray">Pending</span>';
+      const stage = CBP.sortStage(task);
+      const statusBadge = CBP.SORT_STAGE_BADGE[stage];
 
-      const sorterName = task.sorter_id && sorterMap[task.sorter_id] ? escHtml(sorterMap[task.sorter_id]) : '<span style="color:var(--muted);">—</span>';
-      const completedAt = task.completed_at ? new Date(task.completed_at).toLocaleString() : '<span style="color:var(--muted);">—</span>';
+      // Name + when they finished, e.g. "Gus" / "11/2/2026, 3:14 PM"
+      const personCell = function (id, at) {
+        if (!id || !sorterMap[id]) return '<span style="color:var(--muted);">—</span>';
+        return escHtml(sorterMap[id]) + (at ? '<div style="font-size:0.75rem;color:var(--muted);">' + new Date(at).toLocaleString() + '</div>' : '');
+      };
       const breakCount = s.break_count || '—';
 
-      const completeBtn = task.status !== 'completed'
-        ? '<button onclick="openCompleteSort(\'' + task.id + '\',\'' + escHtml(s.stream_key || task.id) + '\')" title="Mark as complete & assign sorter" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:5px;color:var(--green);cursor:pointer;padding:0.2rem 0.55rem;font-size:0.75rem;font-weight:700;margin-right:0.35rem;white-space:nowrap;">✓ Complete</button>'
+      const btnStyle = 'background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:5px;color:var(--green);cursor:pointer;padding:0.2rem 0.55rem;font-size:0.75rem;font-weight:700;margin-right:0.35rem;white-space:nowrap;';
+      const completeBtn = (stage === 'needs_sort' || stage === 'sorting')
+        ? '<button onclick="openCompleteSort(\'' + task.id + '\',\'' + escHtml(s.stream_key || task.id) + '\',\'sort\')" title="Mark as sorted & assign sorter" style="' + btnStyle + '">✓ Sorted</button>'
+        : (stage === 'ready_to_ship' || stage === 'shipping')
+        ? '<button onclick="openCompleteSort(\'' + task.id + '\',\'' + escHtml(s.stream_key || task.id) + '\',\'ship\')" title="Mark as shipped & assign shipper" style="' + btnStyle + '">✓ Shipped</button>'
         : '';
       tr.innerHTML =
         '<td style="font-weight:600;">' + escHtml(s.stream_key || '—') + '</td>' +
         '<td style="color:var(--muted);">' + (s.break_date || '—') + '</td>' +
         '<td style="text-align:center;">' + breakCount + '</td>' +
         '<td>' + statusBadge + '</td>' +
-        '<td>' + sorterName + '</td>' +
-        '<td style="font-size:0.82rem;color:var(--muted);">' + completedAt + '</td>' +
+        '<td>' + personCell(task.sorter_id, task.completed_at) + '</td>' +
+        '<td>' + personCell(task.shipper_id, task.shipped_at) + '</td>' +
         '<td style="text-align:center;white-space:nowrap;">' + completeBtn + '<button onclick="deleteSortTask(\'' + task.id + '\',\'' + escHtml(s.stream_key || task.id) + '\')" title="Remove sort task" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
       tbody.appendChild(tr);
     });
@@ -9325,7 +9330,8 @@ async function renderSortSummary(tasks, sorterId, fromD, toD, sorterSel) {
   const box = document.getElementById('sortSummary');
   const seq = ++_sortSummarySeq;
   const filtering = !!(sorterId || fromD || toD);
-  const done = tasks.filter(function (t) { return t.status === 'completed' && t.stream_id; });
+  // "Sorted" credit only — a sorter who just shipped a stream doesn't get its breaks counted here
+  const done = tasks.filter(function (t) { return t.status === 'completed' && t.stream_id && (!sorterId || t.sorter_id === sorterId); });
   if (!filtering && !done.length) { box.style.display = 'none'; return; }
 
   const who = sorterId ? sorterSel.options[sorterSel.selectedIndex].textContent : 'All sorters';
@@ -9389,9 +9395,18 @@ async function deleteSortTask(taskId, streamKey) {
   }
 }
 
-function openCompleteSort(taskId, streamKey) {
+// mode: 'sort' marks the stream sorted, 'ship' marks it shipped — same modal,
+// the picked person gets credit for that job.
+let _completeSortMode = 'sort';
+function openCompleteSort(taskId, streamKey, mode) {
+  _completeSortMode = mode === 'ship' ? 'ship' : 'sort';
+  const ship = _completeSortMode === 'ship';
   document.getElementById('completeSortTaskId').value = taskId;
   document.getElementById('completeSortStreamKey').textContent = streamKey;
+  document.querySelector('#completeSortModal h2').textContent = ship ? 'Mark as Shipped' : 'Mark as Sorted';
+  document.querySelector('label[for="completeSortSorterSelect"]').textContent = ship ? 'Who shipped it?' : 'Who sorted it?';
+  document.querySelector('#completeSortModal .btn-primary').textContent = ship ? 'Mark Shipped' : 'Mark Sorted';
+  document.getElementById('completeSortError').style.display = 'none';
 
   // Populate sorter dropdown from allProfiles
   const sel = document.getElementById('completeSortSorterSelect');
@@ -9410,26 +9425,31 @@ function openCompleteSort(taskId, streamKey) {
 async function confirmCompleteSort() {
   const taskId = document.getElementById('completeSortTaskId').value;
   const sorterId = document.getElementById('completeSortSorterSelect').value;
-  if (!sorterId) { showGlobalError('Please select a sorter to assign credit to.'); return; }
+  const ship = _completeSortMode === 'ship';
+  // Errors render inside the modal — the page banner sits behind the overlay
+  const errEl = document.getElementById('completeSortError');
+  errEl.style.display = 'none';
+  if (!sorterId) { errEl.textContent = 'Pick who ' + (ship ? 'shipped' : 'sorted') + ' it.'; errEl.style.display = 'block'; return; }
 
   const btn = document.querySelector('#completeSortModal .btn-primary');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    const updates = {
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      sorter_id: sorterId
-    };
-    const { error } = await sb.from('sort_tasks').update(updates)
-      .eq('id', taskId).eq('org_id', currentProfile.org_id);
+    const now = new Date().toISOString();
+    const updates = ship
+      ? { ship_status: 'shipped', shipper_id: sorterId, shipped_at: now }
+      : { status: 'completed', completed_at: now, sorter_id: sorterId };
+    const { data, error } = await sb.from('sort_tasks').update(updates)
+      .eq('id', taskId).eq('org_id', currentProfile.org_id).select('id');
     if (error) throw error;
+    if (!data || !data.length) throw new Error('Update blocked — refresh and try again.');
     document.getElementById('completeSortModal').classList.remove('active');
-    showGlobalSuccess('Sort task marked as complete.');
+    showGlobalSuccess(ship ? 'Stream marked as shipped.' : 'Stream marked as sorted — ready to ship.');
     await loadSorting();
   } catch (err) {
-    showGlobalError('Failed to complete sort task: ' + escHtml(err.message));
+    errEl.textContent = 'Failed to save: ' + err.message;
+    errEl.style.display = 'block';
   } finally {
-    btn.disabled = false; btn.textContent = 'Mark Complete';
+    btn.disabled = false; btn.textContent = ship ? 'Mark Shipped' : 'Mark Sorted';
   }
 }
 

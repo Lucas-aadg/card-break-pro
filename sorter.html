@@ -394,9 +394,9 @@ async function loadSortQueue() {
   try {
     const { data: rawTasks, error } = await sb
       .from('sort_tasks')
-      .select('id, status, sorter_id, completed_at, created_at, stream_id')
+      .select('id, status, sorter_id, completed_at, created_at, stream_id, ship_status, shipper_id')
       .eq('org_id', currentProfile.org_id)
-      .neq('status', 'completed')
+      .or('status.neq.completed,ship_status.neq.shipped')
       .order('created_at', { ascending: true });
 
     if (error) throw error;
@@ -416,30 +416,43 @@ async function loadSortQueue() {
     }
 
     if (!tasks.length) {
-      list.innerHTML = '<div class="sort-empty"><div class="sort-empty-icon">✅</div><div class="sort-empty-title">Queue is clear. Nice work.</div><div style="font-size:0.85rem;color:var(--muted);">No streams waiting to be sorted.</div></div>';
+      list.innerHTML = '<div class="sort-empty"><div class="sort-empty-icon">✅</div><div class="sort-empty-title">Queue is clear. Nice work.</div><div style="font-size:0.85rem;color:var(--muted);">No streams waiting to be sorted or shipped.</div></div>';
       return;
     }
 
     list.innerHTML = '';
     tasks.forEach(function (task) {
       const s = streamMap[task.stream_id] || {};
+      // Two stages: sort (status), then ship (ship_status). Shipping opens up
+      // once sorting is done, and anyone can ship — not just whoever sorted.
+      const sorted = task.status === 'completed';
       const isInProgress = task.status === 'in_progress' && task.sorter_id === currentUser.id;
       const isOtherProgress = task.status === 'in_progress' && task.sorter_id !== currentUser.id;
+      const isShipping = sorted && task.ship_status === 'in_progress';
+      const isMyShipping = isShipping && task.shipper_id === currentUser.id;
 
       const card = document.createElement('div');
-      card.className = 'sort-card' + (task.status === 'in_progress' ? ' in-progress' : '');
+      card.className = 'sort-card' + (task.status === 'in_progress' || isShipping ? ' in-progress' : '');
 
       let statusBadge = '';
-      if (task.status === 'pending') statusBadge = '<span class="badge badge-gray">Pending</span>';
-      else if (task.status === 'in_progress') statusBadge = '<span class="badge badge-yellow">In Progress</span>';
+      if (task.status === 'pending') statusBadge = '<span class="badge badge-gray">Needs Sorting</span>';
+      else if (task.status === 'in_progress') statusBadge = '<span class="badge badge-yellow">Sorting</span>';
+      else if (isShipping) statusBadge = '<span class="badge badge-yellow">Shipping</span>';
+      else statusBadge = '<span class="badge badge-green">Sorted · Ready to Ship</span>';
 
       let actionsHtml = '';
       if (task.status === 'pending') {
         actionsHtml = '<button class="btn btn-yellow" data-action="start" data-id="' + task.id + '">▶ Start Sorting</button>';
       } else if (isInProgress) {
-        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">✓ Mark Complete</button>';
+        actionsHtml = '<button class="btn btn-green" data-action="complete" data-id="' + task.id + '">✓ Finish Sorting</button>';
       } else if (isOtherProgress) {
-        actionsHtml = '<span style="font-size:0.82rem;color:var(--muted);padding:0.5rem 0;display:block;">In progress by another sorter</span>';
+        actionsHtml = '<span style="font-size:0.82rem;color:var(--muted);padding:0.5rem 0;display:block;">Being sorted by another sorter</span>';
+      } else if (!isShipping) {
+        actionsHtml = '<button class="btn btn-yellow" data-action="ship-start" data-id="' + task.id + '">🚚 Start Shipping</button>';
+      } else if (isMyShipping) {
+        actionsHtml = '<button class="btn btn-green" data-action="ship-done" data-id="' + task.id + '">✓ Finish Shipping</button>';
+      } else {
+        actionsHtml = '<span style="font-size:0.82rem;color:var(--muted);padding:0.5rem 0;display:block;">Being shipped by another sorter</span>';
       }
 
       const breakCount = s.break_count || '?';
@@ -470,11 +483,12 @@ async function loadSortQueue() {
             // Claim only if it's still pending — two sorters tapping at once can't both "own" it
             const { data: claimed, error: startErr } = await sb.from('sort_tasks').update({
               status: 'in_progress',
-              sorter_id: currentUser.id
+              sorter_id: currentUser.id,
+              sort_started_at: new Date().toISOString()
             }).eq('id', taskId).eq('org_id', currentProfile.org_id).eq('status', 'pending').select('id');
             if (startErr) throw startErr;
             if (!claimed || !claimed.length) throw new Error('Someone else just started this one — refresh the queue.');
-            showSuccess('Started sorting. Mark complete when done.');
+            showSuccess('Started sorting. Click Finish Sorting when done.');
             const sfsFlagKey = 'cbp_sorter_first_sort_' + (currentUser?.id || '');
             if (!localStorage.getItem(sfsFlagKey)) {
               localStorage.setItem(sfsFlagKey, '1');
@@ -488,7 +502,25 @@ async function loadSortQueue() {
             }).eq('id', taskId).eq('org_id', currentProfile.org_id).select();
             if (doneErr) throw doneErr;
             if (!updatedRows || updatedRows.length === 0) throw new Error('Update blocked — ask your owner to run the sort_tasks RLS fix in Supabase.');
-            showSuccess('Stream marked as sorted and shipped!');
+            showSuccess('Stream sorted! It\'s now ready to ship.');
+          } else if (action === 'ship-start') {
+            // Claim shipping only if sorted and nobody has started shipping it yet
+            const { data: claimed, error: shipErr } = await sb.from('sort_tasks').update({
+              ship_status: 'in_progress',
+              shipper_id: currentUser.id,
+              ship_started_at: new Date().toISOString()
+            }).eq('id', taskId).eq('org_id', currentProfile.org_id).eq('status', 'completed').eq('ship_status', 'pending').select('id');
+            if (shipErr) throw shipErr;
+            if (!claimed || !claimed.length) throw new Error('Someone else just started shipping this one — refresh the queue.');
+            showSuccess('Started shipping. Click Finish Shipping when it\'s out the door.');
+          } else if (action === 'ship-done') {
+            const { data: shippedRows, error: shipDoneErr } = await sb.from('sort_tasks').update({
+              ship_status: 'shipped',
+              shipped_at: new Date().toISOString()
+            }).eq('id', taskId).eq('org_id', currentProfile.org_id).eq('shipper_id', currentUser.id).select('id');
+            if (shipDoneErr) throw shipDoneErr;
+            if (!shippedRows || !shippedRows.length) throw new Error('Update blocked — refresh the queue and try again.');
+            showSuccess('Stream shipped — all done!');
           }
           await loadSortQueue();
         } catch (err) {
@@ -1072,6 +1104,9 @@ async function checkSorterOnboarding() {
 }
 
 function showSorterGuide() {
+  // initAuth runs from a script above the guide markup — on a fast load it can
+  // finish before the guide is parsed, so wait for the DOM instead of crashing.
+  if (!document.getElementById('sorterGuide')) { document.addEventListener('DOMContentLoaded', showSorterGuide, { once: true }); return; }
   sgCurrentScreen = 0;
   sgRender();
   document.getElementById('sorterGuide').classList.add('sg-open');
@@ -1280,13 +1315,12 @@ function renderLbList(entries, myRank) {
       <div class="sg-step">Step 4 of 6</div>
       <div class="sg-title">Starting and Completing a Sort</div>
       <div class="sg-body">
-        Click <strong>Start Sorting</strong> on a task to claim it. Only one sorter can work a task at a time. When you're done:
+        Every stream has two jobs — sorting, then shipping. Only one person can work each job at a time:
         <div class="sg-highlight">
-          1. Pull and package the cards for that stream<br>
-          2. Ship them out<br>
-          3. Click <strong>Mark Complete</strong>
+          1. Click <strong>Start Sorting</strong>, pull and package the cards, then click <strong>Finish Sorting</strong><br>
+          2. Click <strong>Start Shipping</strong>, ship them out, then click <strong>Finish Shipping</strong>
         </div>
-        Do not mark complete until the order is actually shipped. Your owner tracks this data.
+        If you're running behind, you can finish sorting and leave shipping for another sorter. Your owner sees who sorted and who shipped each stream.
       </div>
       <div class="sg-actions">
         <button class="sg-btn-back" onclick="sgBack()">Back</button>
