@@ -3042,12 +3042,16 @@ async function checkBreakerOnboarding() {
   // Mark as seen immediately — prevents re-showing if user closes tab mid-guide
   // bgFinish() will also mark done when guide is completed/skipped
   localStorage.setItem(doneKey, '1');
-  sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id).catch(() => {});
+  // Supabase query builders are thenables with no .catch — calling .catch threw,
+  // which skipped showBreakerGuide() and never sent this update.
+  sb.from('profiles').update({ onboarding_complete: true }).eq('id', currentUser.id).then(function () {}, function () {});
 
   showBreakerGuide();
 }
 
 function showBreakerGuide() {
+  // Script runs above the guide markup — on a fast load, wait for the DOM
+  if (!document.getElementById('breakerGuide')) { document.addEventListener('DOMContentLoaded', showBreakerGuide, { once: true }); return; }
   bgCurrentScreen = 0;
   bgRender();
   document.getElementById('breakerGuide').classList.add('bg-open');
@@ -4442,7 +4446,7 @@ async function brkAuthToken() {
 // ═══════════════════════════════════════════════════════════
 // BREAKER — LEADERBOARD V2
 // ═══════════════════════════════════════════════════════════
-const BRK_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue' };
+const BRK_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue', net_profit: 'Profit' };
 let brkActiveLbCat = 'breaks_completed';
 let brkLbYear = new Date().getFullYear();
 let brkLbMonth = new Date().getMonth() + 1;
@@ -4474,6 +4478,7 @@ async function brkLoadLeaderboard() {
     const token = await brkAuthToken();
     const res = await fetch('/api/leaderboard?category=' + brkActiveLbCat + '&year=' + brkLbYear + '&month=' + brkLbMonth, { headers: { Authorization: 'Bearer ' + token } });
     const data = await res.json();
+    if (data.category) brkActiveLbCat = data.category;
     brkRenderLbCats(data.visible_categories || Object.keys(BRK_LB_LABELS));
     brkRenderLbList(data.entries || [], data.my_rank || null);
   } catch (e) { list.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed: ' + escHtml(e.message) + '</div>'; }
@@ -4490,7 +4495,6 @@ function brkSetLbCat(cat) { brkActiveLbCat = cat; brkLoadLeaderboard(); }
 function brkRenderLbList(entries, myRank) {
   const list = document.getElementById('brkLbList');
   if (!entries.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">No data for this period.</div>'; return; }
-  const isRevenue = brkActiveLbCat === 'revenue_generated';
   const MEDALS = ['🥇','🥈','🥉'];
   const maxVal = Math.max.apply(null, entries.map(function(e){ return parseFloat(e.value) || 0; })) || 1;
   const rows = entries.slice(0, 10).map(function(e, i) {
@@ -4498,8 +4502,8 @@ function brkRenderLbList(entries, myRank) {
     const medal = rank <= 3 ? MEDALS[rank - 1] : null;
     const rankClass = rank === 1 ? ' gold' : rank === 2 ? ' silver' : rank === 3 ? ' bronze' : '';
     const isMe = e.staff_id === currentUser?.id;
-    const val = isRevenue ? '$' + (parseFloat(e.value) || 0).toFixed(0) : Math.round(e.value || 0).toString();
-    const barPct = maxVal > 0 ? Math.round((parseFloat(e.value) || 0) / maxVal * 100) : 0;
+    const val = CBP.lbFmt(brkActiveLbCat, e.value);
+    const barPct = CBP.lbBarPct(e.value, maxVal);
     return '<div class="lb-row' + (isMe ? ' lb-me' : '') + '">' +
       '<div class="lb-medal">' + (medal || '<span class="lb-rank' + rankClass + '">' + rank + '</span>') + '</div>' +
       '<div class="lb-name">' + escHtml(e.display_name || '?') + (isMe ? ' <span style="color:var(--primary);font-size:0.68rem;">(you)</span>' : '') + '</div>' +
@@ -4509,7 +4513,7 @@ function brkRenderLbList(entries, myRank) {
   }).join('');
   let myRankHtml = '';
   if (myRank && myRank.rank > 10) {
-    const val = isRevenue ? '$' + (parseFloat(myRank.value) || 0).toFixed(0) : Math.round(myRank.value || 0).toString();
+    const val = CBP.lbFmt(brkActiveLbCat, myRank.value);
     myRankHtml = '<div style="border-top:1px dashed rgba(45,45,61,0.8);margin-top:0.75rem;padding-top:0.75rem;">' +
       '<div class="lb-row lb-me"><div class="lb-medal"><span class="lb-rank">' + myRank.rank + '</span></div><div class="lb-name">You</div><div class="lb-bar-wrap"></div><div class="lb-val">' + val + '</div></div></div>';
   }

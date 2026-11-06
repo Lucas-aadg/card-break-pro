@@ -1,5 +1,5 @@
 // CardBreakPro Service Worker
-const CACHE = 'cbp-v15';
+const CACHE = 'cbp-v16';
 const PRECACHE = [
   '/config.js',
   '/analytics.js',

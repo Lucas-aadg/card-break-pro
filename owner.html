@@ -2441,7 +2441,7 @@
           <span class="lb-month-label" id="ownerLbMonthLabel">—</span>
           <button class="lb-month-btn" id="ownerLbNext" onclick="ownerLbNavMonth(1)">&#8250;</button>
         </div>
-        <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.75rem;" onclick="document.getElementById('lbSettingsModal').classList.add('active')">Settings</button>
+        <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.75rem;" onclick="openLbSettings()">Settings</button>
       </div>
       <div style="padding:1rem 1.25rem 0;" id="ownerLbCats"></div>
       <div id="ownerLbList" style="padding:0 0.75rem 0.75rem;"><div style="color:var(--muted);text-align:center;padding:2rem;font-size:0.85rem;">Loading…</div></div>
@@ -11577,7 +11577,7 @@ async function ownerAuthToken() {
 // ═══════════════════════════════════════════════════════════
 // OWNER — LEADERBOARD
 // ═══════════════════════════════════════════════════════════
-const OWNER_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue' };
+const OWNER_LB_LABELS = { breaks_completed: 'Breaks', revenue_generated: 'Revenue', net_profit: 'Profit' };
 let ownerActiveLbCat = 'breaks_completed';
 let ownerLbYear = new Date().getFullYear();
 let ownerLbMonth = new Date().getMonth() + 1;
@@ -11610,6 +11610,7 @@ async function ownerLoadLeaderboard() {
     const token = await ownerAuthToken();
     const res = await fetch('/api/leaderboard?category=' + ownerActiveLbCat + '&year=' + ownerLbYear + '&month=' + ownerLbMonth, { headers: { Authorization: 'Bearer ' + token } });
     const data = await res.json();
+    if (data.category) ownerActiveLbCat = data.category;
     ownerRenderLbCats(data.visible_categories || Object.keys(OWNER_LB_LABELS));
     ownerRenderLbList(data.entries || [], data.my_rank || null);
   } catch (e) { list.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:0.85rem;">Failed: ' + escHtml(e.message) + '</div>'; }
@@ -11639,7 +11640,7 @@ function ownerRenderLbList(entries, myRank) {
       '</div>';
     return;
   }
-  const isRevenue = ownerActiveLbCat === 'revenue_generated';
+  const isRevenue = CBP.lbIsMoney(ownerActiveLbCat);
   const MEDAL_EMOJIS = { 1:'🥇', 2:'🥈', 3:'🥉' };
   const AV_COLORS = {
     1: 'linear-gradient(135deg,#f59e0b,#d97706)',
@@ -11651,16 +11652,13 @@ function ownerRenderLbList(entries, myRank) {
   function initials(name) {
     return (name || '?').split(' ').map(function(w){ return w[0]||''; }).join('').toUpperCase().slice(0,2) || '?';
   }
-  function fmtVal(v) {
-    if (isRevenue) return '$' + (parseFloat(v)||0).toLocaleString('en-US',{maximumFractionDigits:0});
-    return Math.round(v||0).toLocaleString('en-US');
-  }
+  function fmtVal(v) { return CBP.lbFmt(ownerActiveLbCat, v); }
 
   const rows = entries.slice(0, 10).map(function(e, i) {
     const rank = e.rank || (i + 1);
     const medal = MEDAL_EMOJIS[rank] || null;
     const avBg = AV_COLORS[rank] || 'var(--primary)';
-    const barPct = Math.round((parseFloat(e.value)||0) / maxVal * 100);
+    const barPct = CBP.lbBarPct(e.value, maxVal);
     const isMe = e.staff_id === currentUser?.id;
     const rankClass = rank <= 3 ? ' rank' + rank : '';
     const meClass = (isMe && rank > 3) ? ' lb-v3-me' : '';
@@ -12096,7 +12094,9 @@ document.getElementById('earnOverlay')?.addEventListener('click', function(e) {
     <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.25rem;" id="lbSettingsCats">
       <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;color:var(--text);text-transform:none;letter-spacing:0;"><input type="checkbox" value="breaks_completed" style="width:auto;" checked /> Breaks</label>
       <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;color:var(--text);text-transform:none;letter-spacing:0;"><input type="checkbox" value="revenue_generated" style="width:auto;" checked /> Revenue</label>
+      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;color:var(--text);text-transform:none;letter-spacing:0;"><input type="checkbox" value="net_profit" style="width:auto;" checked /> Profit</label>
     </div>
+    <div id="lbSettingsError" class="error-box" style="margin:0 0 0.75rem;"></div>
     <div style="display:flex;gap:0.75rem;">
       <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('lbSettingsModal').classList.remove('active')">Cancel</button>
       <button class="btn btn-primary" style="flex:1;" onclick="saveLbSettings()">Save</button>
@@ -12183,9 +12183,25 @@ async function submitNewGoal() {
 }
 
 // ── LB settings save ────────────────────────────────────────
+// Open with the org's saved categories ticked (no saved row yet = all visible)
+async function openLbSettings() {
+  const errEl = document.getElementById('lbSettingsError');
+  errEl.style.display = 'none';
+  try {
+    const token = await ownerAuthToken();
+    const res = await fetch('/api/leaderboard/settings', { headers: { 'Authorization': 'Bearer ' + token } });
+    const data = await res.json().catch(function () { return {}; });
+    const saved = data.settings && Array.isArray(data.settings.visible_categories) ? data.settings.visible_categories : null;
+    document.querySelectorAll('#lbSettingsCats input').forEach(function (cb) { cb.checked = !saved || saved.includes(cb.value); });
+  } catch (e) { /* fall back to whatever the boxes show */ }
+  document.getElementById('lbSettingsModal').classList.add('active');
+}
+
 async function saveLbSettings() {
   const checked = Array.from(document.querySelectorAll('#lbSettingsCats input:checked')).map(function(cb){ return cb.value; });
-  if (!checked.length) { alert('Select at least one category.'); return; }
+  const errEl = document.getElementById('lbSettingsError');
+  errEl.style.display = 'none';
+  if (!checked.length) { errEl.textContent = 'Select at least one category.'; errEl.style.display = 'block'; return; }
   try {
     const token = await ownerAuthToken();
     const res = await fetch('/api/leaderboard/settings', {
@@ -12195,10 +12211,11 @@ async function saveLbSettings() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed');
-    document.getElementById('lbSettingsModal').style.display = 'none';
+    document.getElementById('lbSettingsModal').classList.remove('active');
+    if (!checked.includes(ownerActiveLbCat)) ownerActiveLbCat = checked[0];
     await ownerLoadLeaderboard();
     showGlobalSuccess('Leaderboard settings saved.');
-  } catch (e) { showGlobalError(e.message); }
+  } catch (e) { errEl.textContent = 'Failed to save: ' + e.message; errEl.style.display = 'block'; }
 }
 
 </script>

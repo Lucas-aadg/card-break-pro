@@ -247,6 +247,18 @@
     return true;
   }
 
+  // Leaderboard values: Revenue + Profit are money, Breaks is a count. Profit
+  // can be negative (a breaker who lost money), so sign goes before the $ and
+  // bars clamp at 0 instead of rendering a negative width.
+  function lbIsMoney(cat) { return cat === 'revenue_generated' || cat === 'net_profit'; }
+  function lbFmt(cat, v) {
+    const n = parseFloat(v) || 0;
+    if (!lbIsMoney(cat)) return Math.round(n).toLocaleString('en-US');
+    const s = '$' + Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return n < 0 ? '-' + s : s;
+  }
+  function lbBarPct(v, max) { return max > 0 ? Math.max(0, Math.round((parseFloat(v) || 0) / max * 100)) : 0; }
+
   const US_TIMEZONES = [
     ['America/New_York', 'Eastern'], ['America/Chicago', 'Central'], ['America/Denver', 'Mountain'], ['America/Phoenix', 'Arizona (no DST)'],
     ['America/Los_Angeles', 'Pacific'], ['America/Anchorage', 'Alaska'], ['Pacific/Honolulu', 'Hawaii'],
@@ -262,6 +274,7 @@
     logDelta, logActionLabel, adjustStock,
     isDeactivated, enforceActive,
     pageAll, isMissingSchema, captureError,
-    sortStage, SORT_STAGE_BADGE, sortFilterMatch
+    sortStage, SORT_STAGE_BADGE, sortFilterMatch,
+    lbIsMoney, lbFmt, lbBarPct
   };
 })(typeof window !== 'undefined' ? window : module.exports);

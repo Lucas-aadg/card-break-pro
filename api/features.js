@@ -333,22 +333,28 @@ async function leaderboardHandler(req, res, sb, action) {
     // Accept both year/month (frontend) and period_year/period_month (legacy)
     const year  = parseInt(req.query.year  || req.query.period_year  || now.getFullYear(), 10);
     const month = parseInt(req.query.month || req.query.period_month || (now.getMonth() + 1), 10);
-    const category = req.query.category || 'breaks_completed';
-
-    const VALID_CATS = ['breaks_completed', 'revenue_generated'];
+    const VALID_CATS = ['breaks_completed', 'revenue_generated', 'net_profit'];
     const rawCats = settings?.visible_categories || VALID_CATS;
     const visibleCategories = rawCats.filter(function(c) { return VALID_CATS.includes(c); });
     if (!visibleCategories.length) visibleCategories.push(...VALID_CATS);
-    if (!visibleCategories.includes(category)) return fail(res, 400, 'Category not available');
+    // A tab the owner just hid falls back to the first visible one instead of
+    // erroring — pages read `category` back from the response.
+    const category = visibleCategories.includes(req.query.category) ? req.query.category : visibleCategories[0];
 
-    let { data: rows, error } = await sb.from('leaderboard_snapshots')
-      .select('staff_id, value, rank, staff:profiles!staff_id(id, display_name, role)')
-      .eq('org_id', profile.org_id)
-      .eq('period_year', year)
-      .eq('period_month', month)
-      .eq('category', category)
-      .order('value', { ascending: false })
-      .limit(20);
+    // Profit is always computed live from breaks: per-break net_profit is
+    // re-synced when a stream's final sales are edited, so a stored snapshot
+    // would go stale. Breaks/Revenue use snapshots when they exist.
+    let rows = [], error = null;
+    if (category !== 'net_profit') {
+      ({ data: rows, error } = await sb.from('leaderboard_snapshots')
+        .select('staff_id, value, rank, staff:profiles!staff_id(id, display_name, role)')
+        .eq('org_id', profile.org_id)
+        .eq('period_year', year)
+        .eq('period_month', month)
+        .eq('category', category)
+        .order('value', { ascending: false })
+        .limit(20));
+    }
 
     if (error) return fail(res, 500, error.message);
 
@@ -364,19 +370,20 @@ async function leaderboardHandler(req, res, sb, action) {
         .in('role', ['breaker', 'breaker/manager']);
 
       // One paged query for the whole month, then aggregate per breaker
-      const monthBreaks = await pageAll(() => sb.from('breaks').select('breaker_id, revenue')
+      const monthBreaks = await pageAll(() => sb.from('breaks').select('breaker_id, revenue, net_profit')
         .eq('org_id', profile.org_id).gte('break_date', monthStart).lte('break_date', monthEnd));
       const agg = {};
       for (const b of monthBreaks) {
         if (!b.breaker_id) continue;
-        const a = agg[b.breaker_id] = agg[b.breaker_id] || { count: 0, revenue: 0 };
-        a.count++; a.revenue += parseFloat(b.revenue) || 0;
+        const a = agg[b.breaker_id] = agg[b.breaker_id] || { count: 0, revenue: 0, profit: 0 };
+        a.count++; a.revenue += parseFloat(b.revenue) || 0; a.profit += parseFloat(b.net_profit) || 0;
       }
       const computed = [];
       for (const breaker of (breakers || [])) {
-        const a = agg[breaker.id] || { count: 0, revenue: 0 };
-        const value = category === 'breaks_completed' ? a.count : a.revenue;
-        if (value > 0) computed.push({ staff_id: breaker.id, display_name: breaker.display_name, role: breaker.role, value });
+        const a = agg[breaker.id] || { count: 0, revenue: 0, profit: 0 };
+        const value = category === 'breaks_completed' ? a.count : category === 'net_profit' ? Math.round(a.profit * 100) / 100 : a.revenue;
+        // Profit ranks everyone who broke this month — including a breaker who lost money
+        if (category === 'net_profit' ? a.count > 0 : value > 0) computed.push({ staff_id: breaker.id, display_name: breaker.display_name, role: breaker.role, value });
       }
 
       computed.sort((a, b) => b.value - a.value);
@@ -426,10 +433,16 @@ async function leaderboardHandler(req, res, sb, action) {
       const updates = { updated_at: new Date().toISOString() };
       if (typeof visible_to_breakers === 'boolean') updates.visible_to_breakers = visible_to_breakers;
       if (typeof visible_to_sorters  === 'boolean') updates.visible_to_sorters  = visible_to_sorters;
-      if (Array.isArray(visible_categories)) updates.visible_categories = visible_categories;
+      if (Array.isArray(visible_categories)) {
+        const cats = visible_categories.filter(function (c) { return ['breaks_completed', 'revenue_generated', 'net_profit'].includes(c); });
+        if (!cats.length) return fail(res, 400, 'Select at least one category');
+        updates.visible_categories = cats;
+      }
 
+      // Upsert — an org that never saved settings has no row, and a plain
+      // update matched nothing and failed the save.
       const { data, error } = await sb.from('leaderboard_settings')
-        .update(updates).eq('org_id', profile.org_id).select('*').single();
+        .upsert(Object.assign({ org_id: profile.org_id }, updates), { onConflict: 'org_id' }).select('*').single();
       if (error) return fail(res, 500, error.message);
       return res.status(200).json({ settings: data });
     }
