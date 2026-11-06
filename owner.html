@@ -2591,6 +2591,28 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="editSortModal">
+  <div class="modal" style="max-width:400px;">
+    <h2>Edit Sort Credit</h2>
+    <input type="hidden" id="editSortTaskId">
+    <p style="color:var(--muted);font-size:0.88rem;margin-bottom:1rem;">Stream: <strong id="editSortStreamKey" style="color:var(--text);"></strong></p>
+    <div class="form-group">
+      <label for="editSortSorter">Sorted by</label>
+      <select id="editSortSorter" onchange="editSortSyncShip()" style="width:100%;padding:0.55rem 0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;outline:none;"></select>
+    </div>
+    <div class="form-group">
+      <label for="editSortShipper">Shipped by</label>
+      <select id="editSortShipper" style="width:100%;padding:0.55rem 0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;outline:none;"></select>
+    </div>
+    <p style="color:var(--muted);font-size:0.78rem;margin:0 0 0.75rem;">"Not sorted" sends the stream back to the sort queue. A stream can't be shipped until it's sorted.</p>
+    <div id="editSortError" class="error-box" style="margin:0 0 0.75rem;"></div>
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="document.getElementById('editSortModal').classList.remove('active')">Cancel</button>
+      <button class="btn btn-primary" id="editSortSaveBtn" onclick="saveEditSort()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="editBreakModal">
   <div class="modal" style="max-width:440px;">
     <h2>Edit Break</h2>
@@ -9288,6 +9310,8 @@ async function loadSorting() {
       return;
     }
 
+    _sortTaskMap = {};
+    filtered.forEach(function (task) { _sortTaskMap[task.id] = { task: task, streamKey: (streamMap[task.stream_id] || {}).stream_key, names: sorterMap }; });
     filtered.forEach(function (task) {
       const s = streamMap[task.stream_id] || {};
       const tr = document.createElement('tr');
@@ -9314,7 +9338,7 @@ async function loadSorting() {
         '<td>' + statusBadge + '</td>' +
         '<td>' + personCell(task.sorter_id, task.completed_at) + '</td>' +
         '<td>' + personCell(task.shipper_id, task.shipped_at) + '</td>' +
-        '<td style="text-align:center;white-space:nowrap;">' + completeBtn + '<button onclick="deleteSortTask(\'' + task.id + '\',\'' + escHtml(s.stream_key || task.id) + '\')" title="Remove sort task" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
+        '<td style="text-align:center;white-space:nowrap;">' + completeBtn + '<button onclick="openEditSort(\'' + task.id + '\')" title="Edit who sorted / shipped" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted);padding:0.2rem 0.55rem;font-size:0.75rem;font-weight:700;margin-right:0.35rem;">✎ Edit</button><button onclick="deleteSortTask(\'' + task.id + '\',\'' + escHtml(s.stream_key || task.id) + '\')" title="Remove sort task" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;font-size:1rem;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">🗑</button></td>';
       tbody.appendChild(tr);
     });
   } catch (err) {
@@ -9372,6 +9396,92 @@ async function renderSortSummary(tasks, sorterId, fromD, toD, sorterSel) {
     if (seq !== _sortSummarySeq) return;
     box.innerHTML = '<span style="color:var(--red);font-size:0.85rem;">Couldn\'t load the sorted summary.</span>';
     console.error(err);
+  }
+}
+
+// ── Edit who sorted / shipped a stream ───────────────────────────────────
+// Fixes a sorter clicking the wrong stream: reassign the credit, or clear it
+// ("Not sorted" sends the stream back to the queue). Only the dropdowns the
+// owner actually changes are written, so opening + saving an in-progress task
+// without touching it leaves it as-is.
+let _sortTaskMap = {};
+let _editSortOrig = { sorter: '', shipper: '' };
+function editSortFill(sel, emptyLabel, currentId, names, inProgress) {
+  sel.innerHTML = '<option value="">' + emptyLabel + '</option>';
+  const people = activeTeam().filter(function (p) { return p.role === 'sorter'; });
+  // Keep a deactivated sorter selectable if they hold the credit today
+  if (currentId && !people.some(function (p) { return p.id === currentId; })) people.push({ id: currentId, display_name: names[currentId] || 'Former sorter' });
+  people.forEach(function (p) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.display_name + (inProgress && p.id === currentId ? ' (in progress)' : '');
+    sel.appendChild(opt);
+  });
+  sel.value = currentId || '';
+}
+function openEditSort(taskId) {
+  const entry = _sortTaskMap[taskId];
+  if (!entry) return;
+  const t = entry.task;
+  // A job someone has started but not finished shows as "Name (in progress)";
+  // leaving it selected keeps it in progress, changing it reassigns/clears it.
+  _editSortOrig = {
+    sorter: t.status !== 'pending' ? (t.sorter_id || '') : '',
+    shipper: t.status === 'completed' && t.ship_status !== 'pending' ? (t.shipper_id || '') : ''
+  };
+  document.getElementById('editSortTaskId').value = taskId;
+  document.getElementById('editSortStreamKey').textContent = entry.streamKey || '—';
+  editSortFill(document.getElementById('editSortSorter'), '— Not sorted —', _editSortOrig.sorter, entry.names, t.status === 'in_progress');
+  editSortFill(document.getElementById('editSortShipper'), '— Not shipped —', _editSortOrig.shipper, entry.names, t.ship_status === 'in_progress');
+  document.getElementById('editSortError').style.display = 'none';
+  editSortSyncShip();
+  document.getElementById('editSortModal').classList.add('active');
+}
+function editSortSyncShip() {
+  const v = document.getElementById('editSortSorter').value;
+  const t = (_sortTaskMap[document.getElementById('editSortTaskId').value] || {}).task;
+  // Shipping unlocks once the pick means "sorted" — not while it's still someone's in-progress sort
+  const sorted = !!v && !(t && t.status === 'in_progress' && v === _editSortOrig.sorter);
+  const ship = document.getElementById('editSortShipper');
+  if (!sorted) ship.value = '';
+  ship.disabled = !sorted;
+}
+async function saveEditSort() {
+  const taskId = document.getElementById('editSortTaskId').value;
+  const t = (_sortTaskMap[taskId] || {}).task;
+  const sorter = document.getElementById('editSortSorter').value;
+  const shipper = document.getElementById('editSortShipper').disabled ? '' : document.getElementById('editSortShipper').value;
+  const errEl = document.getElementById('editSortError');
+  errEl.style.display = 'none';
+
+  const now = new Date().toISOString();
+  const updates = {};
+  if (sorter !== _editSortOrig.sorter) {
+    if (!sorter) Object.assign(updates, { status: 'pending', sorter_id: null, completed_at: null, sort_started_at: null });
+    else Object.assign(updates, { status: 'completed', sorter_id: sorter, completed_at: (t && t.status === 'completed' && t.completed_at) || now });
+  }
+  // Unsorting always wipes shipping too
+  if (shipper !== _editSortOrig.shipper || (!sorter && t && t.ship_status !== 'pending')) {
+    if (!shipper) Object.assign(updates, { ship_status: 'pending', shipper_id: null, ship_started_at: null, shipped_at: null });
+    else Object.assign(updates, { ship_status: 'shipped', shipper_id: shipper, shipped_at: (t && t.ship_status === 'shipped' && t.shipped_at) || now });
+  }
+  if (!Object.keys(updates).length) { document.getElementById('editSortModal').classList.remove('active'); return; }
+
+  const btn = document.getElementById('editSortSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const { data, error } = await sb.from('sort_tasks').update(updates)
+      .eq('id', taskId).eq('org_id', currentProfile.org_id).select('id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('Update blocked — refresh and try again.');
+    document.getElementById('editSortModal').classList.remove('active');
+    showGlobalSuccess('Sort credit updated.');
+    await loadSorting();
+  } catch (err) {
+    errEl.textContent = 'Failed to save: ' + err.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
   }
 }
 
